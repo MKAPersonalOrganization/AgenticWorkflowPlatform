@@ -13,7 +13,7 @@ type PricingPageProps struct {
 }
 
 templ PricingPage(props PricingPageProps) {
-	@components.AppLayout(components.AppLayoutProps{
+	@components.BaseLayout(components.LayoutProps{
 		Title: i18n.T(ctx, "Activate Your Account"),
 		User:  props.User,
 	}) {

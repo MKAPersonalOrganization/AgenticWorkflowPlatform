@@ -199,16 +199,14 @@ func (u *ProjectionUpdater) runAsLeader(ctx context.Context) error {
 // pollLoop is the core event-processing loop, extracted so it only runs while
 // this pod holds the advisory lock.
 //
-// Per-projection checkpoints: if projectionNames is non-empty the updater
-// maintains a separate checkpoint row per name. It polls from the minimum
-// position across all projections and advances each projection's checkpoint
-// after a successful dispatch batch. When projectionNames is empty the legacy
-// "all_projections" single-checkpoint behaviour is preserved.
+// Per-projection checkpoints: the updater maintains a separate checkpoint row
+// per registered projection name. It polls from the minimum position across
+// all projections and advances each projection's checkpoint after a successful
+// dispatch batch.
 func (u *ProjectionUpdater) pollLoop(ctx context.Context) error {
 	names := u.projectionNames
 	if len(names) == 0 {
-		// Legacy: single shared checkpoint.
-		names = []string{"all_projections"}
+		return fmt.Errorf("projection updater: no projection names registered")
 	}
 
 	// Load the checkpoint for each registered projection.

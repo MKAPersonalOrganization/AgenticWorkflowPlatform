@@ -11,8 +11,6 @@ import (
 type ThreadQueryService interface {
 	// GetThreadMessages retrieves AGUI-formatted messages for a thread
 	GetThreadMessages(threadID string) []aguievents.Message
-	// ListThreadSummaries retrieves all threads with summaries, sorted by most recent
-	ListThreadSummaries() []ThreadSummary
 }
 
 // ThreadSummary represents a summary of a thread for list views.

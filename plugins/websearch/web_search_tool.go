@@ -121,10 +121,6 @@ func (rl *rateLimiter) allow(userID string) bool {
 	return true
 }
 
-// global rate limiter instance shared across all WebSearchTool instances.
-// Deprecated: kept as a fallback; new tools receive their own limiter.
-var globalLimiter = newRateLimiter()
-
 // =========================================================================
 // WebSearchTool
 // =========================================================================

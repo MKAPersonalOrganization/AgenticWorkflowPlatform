@@ -200,10 +200,5 @@ templ StatusBadgeScript() {
 			if (doc.current_stage) return normalizeStatus(doc.current_stage);
 			return normalizeStatus(doc.status);
 		}
-
-		// Legacy emoji function (kept for backward compat)
-		function stageIcon(stage) {
-			return statusIcon(stage);
-		}
 	</script>
 }

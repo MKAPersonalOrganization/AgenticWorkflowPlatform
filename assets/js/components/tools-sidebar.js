@@ -162,8 +162,4 @@ export const toolsDialog = () => ({
     closeDetail() {
         this.detailItem = null;
     },
-
-    // Keep old names as aliases for backward compat with any inline handlers
-    closeProfile() { this.closeDetail(); },
-    closeMcpDetail() { this.closeDetail(); },
 });

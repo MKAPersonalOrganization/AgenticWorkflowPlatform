@@ -398,10 +398,6 @@ func (a *dbAgent) SubAgents() []agent.Agent { return a.Agent.SubAgents() }
 // unwrapping via the bespoke embeddedAgentAccessor interface.
 func (a *dbAgent) Config() agent.Config { return a.Agent.(agent.Configurable).Config() }
 
-// EmbeddedAgent returns the inner agent.Agent value.
-// Retained for backward compatibility but no longer needed by extractAgentConfig.
-func (a *dbAgent) EmbeddedAgent() agent.Agent { return a.Agent }
-
 // ──────────────────────────────────────────────────────────────────────────────
 // configAgent is a concrete agent.Agent that holds an agent.Config.
 // It implements agent.Configurable so the adapter layer can extract the

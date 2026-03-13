@@ -5,17 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"school-with-ai/platform/artifact"
 	"strings"
+
+	"school-with-ai/platform/artifact"
 )
 
 const (
 	// MemorySessionID identifies the session used for storing long-term memory.
 	// It is distinct from thread IDs to ensure separation.
 	MemorySessionID = "long_term_memory"
-
-	// LegacyMemorySessionID is the old session ID that was used before migration.
-	LegacyMemorySessionID = "user_shared"
 
 	// MemoryFileName is the name of the markdown file storing the memories.
 	MemoryFileName = "SCHOOLAI.md"
@@ -39,31 +37,7 @@ func (s *ArtifactMemoryService) Load(ctx context.Context, userID string) (string
 	rc, _, err := s.store.Load(ctx, userID, MemorySessionID, MemoryFileName)
 	if err != nil {
 		if errors.Is(err, artifact.ErrNotFound) {
-			// Fallback to legacy location for backward compatibility
-			legacyRC, _, legacyErr := s.store.Load(ctx, userID, LegacyMemorySessionID, MemoryFileName)
-			if legacyErr != nil {
-				if errors.Is(legacyErr, artifact.ErrNotFound) {
-					return "", nil
-				}
-				return "", fmt.Errorf("failed to load memory from legacy artifact store: %w", legacyErr)
-			}
-			defer legacyRC.Close()
-
-			content, err := io.ReadAll(io.LimitReader(legacyRC, maxMemorySize))
-			if err != nil {
-				return "", fmt.Errorf("failed to read legacy memory content: %w", err)
-			}
-
-			// Migrate to new location
-			if len(content) > 0 {
-				contentStr := string(content)
-				if migErr := s.Save(ctx, userID, contentStr); migErr != nil {
-					// Log but don't fail - we can still return the content
-					// In a production environment, you might want to log this error properly
-				}
-			}
-
-			return string(content), nil
+			return "", nil
 		}
 		return "", fmt.Errorf("failed to load memory from artifact store: %w", err)
 	}
