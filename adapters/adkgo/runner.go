@@ -186,11 +186,8 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			afterToolCBs = mb.afterToolCallbacks()
 		}
 
-		// Build before-agent hooks for requirements system bridging.
+		// Build before-agent callbacks for requirements guidance injection.
 		beforeAgentCBs := buildBeforeRunHooks(agentCfg, req, agentName)
-
-		// Build after-agent hooks from config.
-		afterAgentCBs := buildAfterRunHooks(agentCfg)
 
 		adkAgent, aErr := llmagent.New(llmagent.Config{
 			Name:                  agentName,
@@ -200,7 +197,6 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			Tools:                 adkTools,
 			GenerateContentConfig: genCfg,
 			BeforeAgentCallbacks:  beforeAgentCBs,
-			AfterAgentCallbacks:   afterAgentCBs,
 			BeforeToolCallbacks:   beforeToolCBs,
 			AfterToolCallbacks:    afterToolCBs,
 		})
@@ -754,24 +750,6 @@ func extractAgentConfig(a fagent.Agent) *fagent.Config {
 	return nil
 }
 
-// extractHookProvider returns the HookProvider from an agent, if available.
-func extractHookProvider(a fagent.Agent) fagent.HookProvider {
-	if cp, ok := a.(fagent.HookProvider); ok {
-		return cp
-	}
-	type embeddedAgentAccessor interface {
-		EmbeddedAgent() fagent.Agent
-	}
-	if ea, ok := a.(embeddedAgentAccessor); ok {
-		if inner := ea.EmbeddedAgent(); inner != nil {
-			if cp, ok := inner.(fagent.HookProvider); ok {
-				return cp
-			}
-		}
-	}
-	return nil
-}
-
 // ──────────────────────────────────────────────────────────────────────────────
 // Middleware Bridge
 //
@@ -894,17 +872,13 @@ func (t *adkToolBridge) Name() string           { return t.name }
 func (t *adkToolBridge) Description() string    { return t.desc }
 func (t *adkToolBridge) Schema() *fagent.Schema { return nil }
 
-// buildBeforeRunHooks creates ADK-Go BeforeAgentCallbacks to bridge
-// the foundation Requirements system into ADK-Go's agent lifecycle.
-//
-// The Requirements system evaluates rules that constrain tool availability,
-// force specific tools, prevent stopping, etc. In the custom adapter, this
-// runs as Chat-level middleware (RequirementMiddleware). Here we bridge it
-// via ADK-Go's BeforeAgentCallbacks:
+// buildBeforeRunHooks creates ADK-Go BeforeAgentCallbacks for the Requirements
+// system. Requirements evaluate rules that constrain tool availability, force
+// specific tools, prevent stopping, etc.
 //
 //  1. Evaluate all enabled Requirements against the current Invocation
-//  2. Collect rules (allowed/hidden/forced tools, ToolChoice)
-//  3. Inject blocked-tool guidance into the LLM context via session state
+//  2. Collect rules (allowed/hidden/forced tools)
+//  3. Inject guidance into the LLM context via session state
 //  4. Tools were already filtered at build time in resolveTools()
 func buildBeforeRunHooks(
 	agentCfg *fagent.Config,
@@ -982,36 +956,3 @@ func buildBeforeRunHooks(
 	}
 }
 
-// buildAfterRunHooks translates foundation AfterRunHooks to ADK-Go AfterAgentCallbacks.
-func buildAfterRunHooks(agentCfg *fagent.Config) []agent.AfterAgentCallback {
-	if agentCfg == nil || len(agentCfg.AfterRunHooks) == 0 {
-		return nil
-	}
-
-	var callbacks []agent.AfterAgentCallback
-	for _, foundationHook := range agentCfg.AfterRunHooks {
-		hook := foundationHook // capture
-		callbacks = append(callbacks, func(ctx agent.CallbackContext) (*genai.Content, error) {
-			// Bridge foundation hook to ADK-Go callback.
-			hookCtx := &fagent.HookContext{
-				Context:   ctx,
-				AgentName: ctx.AgentName(),
-				SessionID: ctx.SessionID(),
-				UserID:    ctx.UserID(),
-				State:     fagent.NewStateDelta(),
-			}
-			evt, err := hook(hookCtx)
-			if err != nil {
-				return nil, err
-			}
-			if evt != nil {
-				// Convert the foundation event to genai.Content for ADK-Go.
-				if me, ok := evt.(*fagent.MessageEvent); ok && me.Message != nil {
-					return genai.NewContentFromText(me.Message.Text(), "model"), nil
-				}
-			}
-			return nil, nil
-		})
-	}
-	return callbacks
-}

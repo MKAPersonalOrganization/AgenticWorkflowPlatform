@@ -10,12 +10,24 @@ import (
 	"github.com/a-h/templ"
 )
 
+// ClientFactory creates a GroundedSearchClient from per-user plugin settings.
+// The factory is provided at wiring time (e.g. in main.go) so the plugin
+// layer stays independent of any concrete AI SDK.
+type ClientFactory func(apiKey, model string) GroundedSearchClient
+
 // Provider implements the toolregistry.PluginProvider interface for the
 // web search toolset.
 // Inspired by Gemini CLI's google_web_search tool — enables agents to perform
-// grounded Google Searches via the Gemini API and return synthesized answers
-// with inline citations and source links.
-type Provider struct{}
+// grounded Google Searches and return synthesized answers with inline
+// citations and source links.
+type Provider struct {
+	newClient ClientFactory
+}
+
+// NewProvider creates a Provider with the given client factory.
+func NewProvider(factory ClientFactory) *Provider {
+	return &Provider{newClient: factory}
+}
 
 func (p *Provider) ID() string { return "websearch" }
 
@@ -89,13 +101,12 @@ func (p *Provider) SettingsSchema() []toolregistry.SettingsField {
 func (p *Provider) CreateExecutable(_ context.Context, toolID string, deps toolregistry.FactoryDeps) (agent.ExecutableTool, error) {
 	switch toolID {
 	case "web_search":
-		// Resolve settings from the per-user plugin settings.
 		var apiKey, model string
 		if ps := deps.PluginSettings("websearch"); ps != nil {
 			apiKey = ps["api_key"]
 			model = ps["model"]
 		}
-		return NewWebSearchTool(apiKey, model), nil
+		return NewWebSearchTool(p.newClient(apiKey, model)), nil
 	default:
 		return nil, nil
 	}

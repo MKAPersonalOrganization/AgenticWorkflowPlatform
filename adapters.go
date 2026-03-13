@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"iter"
 	"strings"
-	"time"
 
 	"school-with-ai/foundation/agent"
 	"school-with-ai/modules/agentstore"
@@ -313,21 +311,15 @@ func mapFileStat(s *filesystem.FileStat) *fsplugin.FileStat {
 
 type userAwareAgentProvider struct {
 	repo                agentstore.AgentDefinitionRepository
-	agentMiddlewares    []agent.Middleware
-	chatMiddlewares     []agent.Middleware
 	functionMiddlewares []agent.Middleware
 }
 
 func newUserAwareAgentProvider(
 	repo agentstore.AgentDefinitionRepository,
-	agentMw []agent.Middleware,
-	chatMw []agent.Middleware,
 	funcMw []agent.Middleware,
 ) *userAwareAgentProvider {
 	return &userAwareAgentProvider{
 		repo:                repo,
-		agentMiddlewares:    agentMw,
-		chatMiddlewares:     chatMw,
 		functionMiddlewares: funcMw,
 	}
 }
@@ -376,8 +368,6 @@ func (p *userAwareAgentProvider) agentFromDefinition(def *agentstore.AgentDefini
 		SystemPrompt:        def.SystemPrompt,
 		Tools:               []agent.Tool{},
 		Requirements:        []agent.Requirement{},
-		AgentMiddlewares:    p.agentMiddlewares,
-		ChatMiddlewares:     p.chatMiddlewares,
 		FunctionMiddlewares: p.functionMiddlewares,
 	}
 	a := newConfigAgent(cfg)
@@ -411,9 +401,8 @@ func (a *dbAgent) EmbeddedAgent() agent.Agent { return a.Agent }
 
 // ──────────────────────────────────────────────────────────────────────────────
 // configAgent is a concrete agent.Agent that holds an agent.Config.
-// It implements agent.Configurable, agent.HookProvider, and
-// agent.MiddlewareProvider so adapter layers can extract what they need
-// via interfaces.
+// It implements agent.Configurable so the adapter layer can extract the
+// full configuration without importing concrete types.
 // ──────────────────────────────────────────────────────────────────────────────
 
 type configAgent struct {
@@ -428,65 +417,6 @@ func (a *configAgent) ID() agent.ID             { return a.config.Name }
 func (a *configAgent) Name() string             { return a.config.Name }
 func (a *configAgent) Description() string      { return a.config.Description }
 func (a *configAgent) SubAgents() []agent.Agent { return a.config.SubAgents }
+func (a *configAgent) Config() agent.Config     { return a.config }
 
-func (a *configAgent) Run(_ context.Context, inv *agent.Invocation) iter.Seq2[agent.Event, error] {
-	return func(yield func(agent.Event, error) bool) {
-		// Run lifecycle hooks — actual LLM execution is handled by the
-		// RunnerAdapter (adkgo). This Run method is only invoked if the
-		// agent is used standalone, which it never is in production.
-		for _, hook := range a.config.BeforeRunHooks {
-			hookCtx := &agent.HookContext{
-				Context:    context.Background(),
-				Invocation: inv,
-				AgentName:  a.config.Name,
-				SessionID:  inv.SessionID,
-				UserID:     inv.UserID,
-				State:      agent.NewStateDelta(),
-			}
-			evt, err := hook(hookCtx)
-			if err != nil {
-				yield(nil, fmt.Errorf("before-run hook: %w", err))
-				return
-			}
-			if evt != nil {
-				if !yield(evt, nil) {
-					return
-				}
-				return
-			}
-		}
-		if a.config.SystemPrompt != "" {
-			yield(&agent.MessageEvent{
-				Message: &agent.Message{
-					ID:   agent.GenerateID(),
-					Role: agent.RoleSystem,
-					Content: []agent.Content{{
-						Type: agent.ContentTypeText,
-						Text: a.config.SystemPrompt,
-					}},
-					Author: a.config.Name,
-				},
-				EventTime: time.Now(),
-			}, nil)
-		}
-	}
-}
-
-func (a *configAgent) Config() agent.Config                      { return a.config }
-func (a *configAgent) AgentMiddlewares() []agent.Middleware      { return a.config.AgentMiddlewares }
-func (a *configAgent) ChatMiddlewares() []agent.Middleware       { return a.config.ChatMiddlewares }
-func (a *configAgent) FunctionMiddlewares() []agent.Middleware   { return a.config.FunctionMiddlewares }
-func (a *configAgent) Tools() []agent.Tool                       { return a.config.Tools }
-func (a *configAgent) BeforeToolHooks() []agent.BeforeToolHook   { return a.config.BeforeToolHooks }
-func (a *configAgent) AfterToolHooks() []agent.AfterToolHook     { return a.config.AfterToolHooks }
-func (a *configAgent) BeforeModelHooks() []agent.BeforeModelHook { return a.config.BeforeModelHooks }
-func (a *configAgent) AfterModelHooks() []agent.AfterModelHook   { return a.config.AfterModelHooks }
-func (a *configAgent) BeforeRunHooks() []agent.BeforeRunHook     { return a.config.BeforeRunHooks }
-func (a *configAgent) AfterRunHooks() []agent.AfterRunHook       { return a.config.AfterRunHooks }
-
-var (
-	_ agent.Agent              = (*configAgent)(nil)
-	_ agent.Configurable       = (*configAgent)(nil)
-	_ agent.HookProvider       = (*configAgent)(nil)
-	_ agent.MiddlewareProvider = (*configAgent)(nil)
-)
+var _ agent.Configurable = (*configAgent)(nil)

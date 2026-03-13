@@ -65,8 +65,8 @@ func NewMathInstructorConfig(ctx context.Context, artifactStore artifact.Service
 		Tools:         []agent.Tool{}, // Tools managed via permissions service
 
 		// Declarative requirements: evaluated before each LLM turn.
-		// The framework auto-wires ToolProvider tools, PromptProvider prompts,
-		// and the RequirementMiddleware from this list.
+		// The adapter auto-wires ToolProvider tools, PromptProvider prompts,
+		// and FunctionMiddlewareProvider middlewares from this list.
 		Requirements: []agent.Requirement{
 			agent.NewConditionalRequirement("think", agent.ForceAtStep(1)),
 		},
