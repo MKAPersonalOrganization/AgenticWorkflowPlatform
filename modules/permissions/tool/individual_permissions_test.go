@@ -3,18 +3,28 @@ package tool_test
 import (
 	"context"
 	"os"
+	"testing"
+
 	"school-with-ai/foundation/logger"
 	"school-with-ai/modules/permissions/tool"
 	"school-with-ai/modules/permissions/tool/mocks"
-	"testing"
+
+	"github.com/alicebob/miniredis/v2"
+	goredis "github.com/redis/go-redis/v9"
 )
+
+func testRedisClientIndiv(t *testing.T) *goredis.Client {
+	t.Helper()
+	s := miniredis.RunT(t)
+	return goredis.NewClient(&goredis.Options{Addr: s.Addr()})
+}
 
 func TestIndividualToolPermissions(t *testing.T) {
 	// Create logger for tests
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
 
 	// Create service with in-memory repository
-	service := tool.NewService(log, mocks.NewInMemoryRepository())
+	service := tool.NewService(log, mocks.NewInMemoryRepository(), testRedisClientIndiv(t))
 
 	ctx := context.Background()
 
@@ -65,7 +75,7 @@ func TestIndividualToolPermissions(t *testing.T) {
 
 func TestIndividualToolPermissionInheritance(t *testing.T) {
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
-	service := tool.NewService(log, mocks.NewInMemoryRepository())
+	service := tool.NewService(log, mocks.NewInMemoryRepository(), testRedisClientIndiv(t))
 	ctx := context.Background()
 
 	userID := "test-user"
@@ -102,7 +112,7 @@ func TestIndividualToolPermissionInheritance(t *testing.T) {
 
 func TestIndividualToolPermissionOverride(t *testing.T) {
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
-	service := tool.NewService(log, mocks.NewInMemoryRepository())
+	service := tool.NewService(log, mocks.NewInMemoryRepository(), testRedisClientIndiv(t))
 	ctx := context.Background()
 
 	userID := "test-user"
@@ -142,7 +152,7 @@ func TestIndividualToolPermissionOverride(t *testing.T) {
 
 func TestGetEnabledToolsInSet(t *testing.T) {
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
-	service := tool.NewService(log, mocks.NewInMemoryRepository())
+	service := tool.NewService(log, mocks.NewInMemoryRepository(), testRedisClientIndiv(t))
 	ctx := context.Background()
 
 	userID := "test-user"

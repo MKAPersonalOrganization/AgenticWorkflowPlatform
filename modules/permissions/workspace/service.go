@@ -6,6 +6,8 @@ import (
 
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/permcache"
+
+	"github.com/redis/go-redis/v9"
 )
 
 // WorkspacePermission represents a workspace attached to an agent.
@@ -34,11 +36,12 @@ type Service struct {
 }
 
 // NewService creates a new workspace permissions service.
-func NewService(log *logger.Logger, repo Repository) *Service {
+// The rdb client is used for distributed Redis caching of permission lookups.
+func NewService(log *logger.Logger, repo Repository, rdb redis.Cmdable) *Service {
 	return &Service{
 		log:   log,
 		repo:  repo,
-		cache: permcache.New[WorkspacePermission](),
+		cache: permcache.New[WorkspacePermission](rdb, "workspaceperm"),
 	}
 }
 

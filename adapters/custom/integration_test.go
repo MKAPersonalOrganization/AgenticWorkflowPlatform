@@ -3,15 +3,18 @@ package custom
 import (
 	"context"
 	"os"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/plugins/calculator"
-	"school-with-ai/modules/permissions/tool"
-	"school-with-ai/platform/toolregistry"
 	"testing"
 
-	tool_mocks "school-with-ai/modules/permissions/tool/mocks"
+	"school-with-ai/foundation/logger"
+	"school-with-ai/modules/permissions/tool"
+	"school-with-ai/platform/toolregistry"
+	"school-with-ai/plugins/calculator"
 
+	tool_mocks "school-with-ai/modules/permissions/tool/mocks"
 	toolregistry_mocks "school-with-ai/platform/toolregistry/mocks"
+
+	"github.com/alicebob/miniredis/v2"
+	goredis "github.com/redis/go-redis/v9"
 )
 
 // TestToolFactoryIntegration tests that the tool factory can properly create executable tools
@@ -28,7 +31,9 @@ func TestToolFactoryIntegration(t *testing.T) {
 	toolregistry.RegisterPlugin(&calculator.Provider{})
 
 	// Create services
-	permissionsService := tool.NewService(log, permissionsRepo)
+	s := miniredis.RunT(t)
+	rdb := goredis.NewClient(&goredis.Options{Addr: s.Addr()})
+	permissionsService := tool.NewService(log, permissionsRepo, rdb)
 	toolRegistry := toolregistry.NewRegistry(log, toolRegistryRepo)
 
 	// Initialize tool registry with default tools and tool sets

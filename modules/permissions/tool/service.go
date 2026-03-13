@@ -7,6 +7,8 @@ import (
 
 	"school-with-ai/foundation/logger"
 	"school-with-ai/foundation/permcache"
+
+	"github.com/redis/go-redis/v9"
 )
 
 // Permission represents permission for an agent to use a specific tool within a tool set.
@@ -70,12 +72,13 @@ type Service struct {
 }
 
 // NewService creates a new permissions service.
-func NewService(log *logger.Logger, repo Repository) *Service {
+// The rdb client is used for distributed Redis caching of permission lookups.
+func NewService(log *logger.Logger, repo Repository, rdb redis.Cmdable) *Service {
 	return &Service{
 		log:          log,
 		repo:         repo,
-		toolSetCache: permcache.New[ToolSetPermission](),
-		toolCache:    permcache.New[Permission](),
+		toolSetCache: permcache.New[ToolSetPermission](rdb, "toolsetperm"),
+		toolCache:    permcache.New[Permission](rdb, "toolperm"),
 	}
 }
 

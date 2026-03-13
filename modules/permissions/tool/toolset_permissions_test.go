@@ -3,14 +3,24 @@ package tool_test
 import (
 	"context"
 	"os"
+	"testing"
+
 	"school-with-ai/foundation/logger"
 	"school-with-ai/modules/permissions/tool"
 	"school-with-ai/modules/permissions/tool/mocks"
 	"school-with-ai/platform/toolregistry"
-	"testing"
 
 	toolregistry_mocks "school-with-ai/platform/toolregistry/mocks"
+
+	"github.com/alicebob/miniredis/v2"
+	goredis "github.com/redis/go-redis/v9"
 )
+
+func testRedisClientToolset(t *testing.T) *goredis.Client {
+	t.Helper()
+	s := miniredis.RunT(t)
+	return goredis.NewClient(&goredis.Options{Addr: s.Addr()})
+}
 
 func TestToolSetPermissions(t *testing.T) {
 	ctx := context.Background()
@@ -20,7 +30,7 @@ func TestToolSetPermissions(t *testing.T) {
 	permissionsRepo := mocks.NewInMemoryRepository()
 	toolRegistryRepo := toolregistry_mocks.NewInMemoryRepository()
 
-	permissionsService := tool.NewService(log, permissionsRepo)
+	permissionsService := tool.NewService(log, permissionsRepo, testRedisClientToolset(t))
 	toolRegistry := toolregistry.NewRegistry(log, toolRegistryRepo)
 
 	// Initialize tool registry
