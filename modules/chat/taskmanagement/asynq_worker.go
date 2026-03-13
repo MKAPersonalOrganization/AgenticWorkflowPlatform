@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"school-with-ai/foundation/logger"
 	"school-with-ai/modules/chat/agentorchestrator"
-	"time"
 
 	"github.com/hibiken/asynq"
 )
@@ -18,7 +19,6 @@ const (
 
 // FileAttachment represents a file sent with a chat message (image, audio, PDF, etc.).
 type FileAttachment struct {
-	Data     string `json:"data,omitempty"`     // Base64 data URL — legacy path (data:image/png;base64,...)
 	URL      string `json:"url,omitempty"`      // Pre-uploaded artifact URL (e.g. /v1/threads/.../artifacts/file.wav)
 	MimeType string `json:"mimeType,omitempty"` // e.g. "image/png", "audio/wav"
 	FileName string `json:"fileName,omitempty"` // Original filename
@@ -33,7 +33,7 @@ type ProcessChatPayload struct {
 	UserID      string           `json:"user_id"`
 	AgentName   string           `json:"agent_name,omitempty"`
 	ToolCallID  string           `json:"tool_call_id,omitempty"` // Set when this message is an answer to a tool's elicitation
-	Attachments []FileAttachment `json:"attachments,omitempty"`  // Attached files (base64 data URLs)
+	Attachments []FileAttachment `json:"attachments,omitempty"`  // Attached files
 }
 
 // NewProcessChatTask creates a new task for processing a chat message.
@@ -124,7 +124,6 @@ func toOrchestratorAttachments(atts []FileAttachment) []agentorchestrator.FileAt
 	result := make([]agentorchestrator.FileAttachment, len(atts))
 	for i, att := range atts {
 		result[i] = agentorchestrator.FileAttachment{
-			Data:     att.Data,
 			URL:      att.URL,
 			MimeType: att.MimeType,
 			FileName: att.FileName,

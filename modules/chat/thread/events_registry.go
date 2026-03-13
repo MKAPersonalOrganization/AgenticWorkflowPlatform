@@ -29,15 +29,4 @@ func RegisterThreadEvents(r *es.DeserializerRegistry) {
 	r.Register("AuthGranted", func() es.Event { return &AuthGranted{} })
 	r.Register("AuthDenied", func() es.Event { return &AuthDenied{} })
 	r.Register("ToolCancelled", func() es.Event { return &ToolCancelled{} })
-
-	// Legacy aliases — old event type names stored in existing streams.
-	r.Register("ThreadTitleChanged", func() es.Event { return &ThreadTitleUpdated{} })
-	r.Register("ToolSuccess", func() es.Event { return &ToolResultAdded{} })
-	r.RegisterWithTransform("ToolError",
-		func() es.Event { return &ToolResultAdded{} },
-		func(e es.Event) es.Event {
-			e.(*ToolResultAdded).IsError = true
-			return e
-		},
-	)
 }

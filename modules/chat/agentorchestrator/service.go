@@ -1,7 +1,6 @@
 package agentorchestrator
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
@@ -18,8 +17,6 @@ import (
 	"school-with-ai/modules/chat/thread"
 	"school-with-ai/modules/chat/threadmgmt"
 	"school-with-ai/platform/artifact"
-
-	"github.com/google/uuid"
 )
 
 // EventEmitter is the interface for broadcasting events.
@@ -265,7 +262,6 @@ func (s *Service) GetThreadManagement() *threadmgmt.Manager {
 
 // FileAttachment represents a file attached to a message (image, audio, PDF, etc.).
 type FileAttachment struct {
-	Data     string // Base64 data URL (data:image/...;base64,...) — legacy path
 	URL      string // Pre-uploaded artifact URL (e.g. /v1/threads/.../artifacts/file.wav)
 	MimeType string // e.g. "image/png", "audio/wav", "application/pdf"
 	FileName string // Original filename (e.g. "screenshot.png")
@@ -462,67 +458,16 @@ func (s *Service) saveAttachments(ctx context.Context, req RunExecutionRequest) 
 
 	var refs []thread.Attachment
 	for _, att := range req.Attachments {
-		// Pre-uploaded attachment: already in S3, just build the ref.
-		if att.URL != "" {
-			refs = append(refs, thread.Attachment{
-				URL:      att.URL,
-				MimeType: att.MimeType,
-				FileName: att.FileName,
-			})
+		if att.URL == "" {
 			continue
 		}
-
-		// Legacy path: base64 data URL → decode and save to S3.
-		mimeType, data, err := parseDataURL(att.Data)
-		if err != nil {
-			s.log.Warn(ctx, "Orchestrator: Failed to parse data URL, skipping artifact save", "error", err)
-			continue
-		}
-		if mimeType == "" {
-			mimeType = att.MimeType
-		}
-
-		ext := mimeToExt(mimeType)
-		fileName := att.FileName
-		if fileName == "" {
-			fileName = fmt.Sprintf("file-%s.%s", uuid.New().String()[:8], ext)
-		}
-
-		_, saveErr := s.artifactStore.Save(ctx, req.UserID, req.ThreadID, fileName, mimeType, bytes.NewReader(data))
-		if saveErr != nil {
-			s.log.Error(ctx, "Orchestrator: Failed to save artifact", "error", saveErr, "fileName", fileName)
-			continue
-		}
-
-		artifactURL := fmt.Sprintf("/v1/threads/%s/artifacts/%s", req.ThreadID, fileName)
 		refs = append(refs, thread.Attachment{
-			URL:      artifactURL,
-			MimeType: mimeType,
-			FileName: fileName,
+			URL:      att.URL,
+			MimeType: att.MimeType,
+			FileName: att.FileName,
 		})
 	}
 	return refs
-}
-
-// parseDataURL extracts the MIME type and raw bytes from a data URL.
-func parseDataURL(dataURL string) (mimeType string, data []byte, err error) {
-	if !strings.HasPrefix(dataURL, "data:") {
-		return "", nil, fmt.Errorf("not a data URL")
-	}
-	rest := dataURL[5:] // strip "data:"
-	semicolonIdx := strings.Index(rest, ";")
-	commaIdx := strings.Index(rest, ",")
-	if semicolonIdx < 0 || commaIdx < 0 || commaIdx < semicolonIdx {
-		return "", nil, fmt.Errorf("invalid data URL format")
-	}
-	mimeType = rest[:semicolonIdx]
-	encoded := rest[commaIdx+1:]
-	data, err = base64.StdEncoding.DecodeString(encoded)
-	if err != nil {
-		// Try URL-safe base64 or raw encoding
-		data, err = base64.RawStdEncoding.DecodeString(encoded)
-	}
-	return mimeType, data, err
 }
 
 // mimeToExt returns a file extension for common MIME types.
@@ -584,24 +529,24 @@ func (s *Service) buildMessageContent(ctx context.Context, req RunExecutionReque
 	}
 
 	for _, att := range attachments {
-		// Resolve the data URL: use existing Data or load from S3 for pre-uploaded files.
-		dataURL := att.Data
-		if dataURL == "" && att.URL != "" && s.artifactStore != nil {
-			// Extract the actual S3 filename from the artifact URL.
-			// URL format: /v1/threads/{threadId}/artifacts/{uuid_originalName}
-			// att.FileName has the original name (e.g. "Logo.jpg") but S3
-			// stores the UUID-prefixed version (e.g. "65f313b5_Logo.jpg").
-			s3FileName := att.FileName
-			if parts := strings.Split(att.URL, "/"); len(parts) > 0 {
-				s3FileName = parts[len(parts)-1]
-			}
-			loaded, err := s.loadArtifactAsDataURL(ctx, req.UserID, req.ThreadID, s3FileName, att.MimeType)
-			if err != nil {
-				s.log.Warn(ctx, "Failed to load pre-uploaded attachment for LLM, skipping",
-					"error", err, "fileName", s3FileName, "url", att.URL)
-				continue
-			}
-			dataURL = loaded
+		// Load the artifact from S3 and convert to a data URL for the LLM.
+		if att.URL == "" || s.artifactStore == nil {
+			continue
+		}
+
+		// Extract the actual S3 filename from the artifact URL.
+		// URL format: /v1/threads/{threadId}/artifacts/{uuid_originalName}
+		// att.FileName has the original name (e.g. "Logo.jpg") but S3
+		// stores the UUID-prefixed version (e.g. "65f313b5_Logo.jpg").
+		s3FileName := att.FileName
+		if parts := strings.Split(att.URL, "/"); len(parts) > 0 {
+			s3FileName = parts[len(parts)-1]
+		}
+		dataURL, err := s.loadArtifactAsDataURL(ctx, req.UserID, req.ThreadID, s3FileName, att.MimeType)
+		if err != nil {
+			s.log.Warn(ctx, "Failed to load pre-uploaded attachment for LLM, skipping",
+				"error", err, "fileName", s3FileName, "url", att.URL)
+			continue
 		}
 		if dataURL == "" {
 			continue

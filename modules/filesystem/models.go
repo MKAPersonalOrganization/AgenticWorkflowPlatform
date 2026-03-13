@@ -36,9 +36,8 @@ type GitHubConfig struct {
 	Owner  string `json:"owner"`
 	Repo   string `json:"repo"`
 	Branch string `json:"branch"`
-	// Token is no longer user-supplied; it is resolved at runtime from the
-	// github_connections table via OAuth.  Kept for backward-compatibility
-	// with any existing rows that stored a PAT directly.
+	// Token is resolved at runtime from the github_connections table via OAuth.
+	// It is populated transiently during API calls and never persisted.
 	Token string `json:"token,omitempty"`
 }
 
