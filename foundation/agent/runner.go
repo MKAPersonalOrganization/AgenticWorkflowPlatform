@@ -18,7 +18,7 @@ type RunRequest struct {
 	// Config optionally overrides agent execution settings.
 	Config *RunConfig
 
-	// Context provides additional data (e.g., student profile).
+	// Context provides additional data for the invocation.
 	Context map[string]any
 
 	// Resumable indicates if the invocation can be resumed.

@@ -5,7 +5,7 @@ import (
 )
 
 // Stream is a sequence of events or errors from agent execution.
-// This is an alias for Go 1.23 iterators, compatible with both ADK-Go and Blades.
+// This is an alias for Go 1.23+ iterators.
 type Stream = iter.Seq2[Event, error]
 
 // MessageStream is a sequence of messages or errors.
@@ -13,7 +13,6 @@ type Stream = iter.Seq2[Event, error]
 type MessageStream = iter.Seq2[*Message, error]
 
 // MessageStatus indicates the current state of a message.
-// This aligns with Blades' Status type for streaming support.
 type MessageStatus string
 
 const (

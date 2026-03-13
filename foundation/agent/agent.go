@@ -10,6 +10,9 @@ type ID = string
 
 // Agent represents an AI agent that can process user requests and produce responses.
 // Per ADR 001: This interface is the sole access point for agent interactions.
+//
+// Agents form a tree: each agent can have SubAgents for delegation/transfer.
+// The runner walks the tree to find the appropriate agent for each invocation.
 type Agent interface {
 	// ID returns the unique identifier for this agent.
 	ID() ID
@@ -23,6 +26,36 @@ type Agent interface {
 	// Run executes the agent with the given invocation.
 	// Returns an iterator that yields events as the agent processes the request.
 	Run(ctx context.Context, inv *Invocation) iter.Seq2[Event, error]
+
+	// SubAgents returns child agents available for delegation.
+	// Returns nil for leaf agents.
+	SubAgents() []Agent
+}
+
+// Configurable is an optional interface for agents that expose their configuration.
+// This allows the adapter layer to extract agent configuration without importing
+// concrete agent types (e.g., CustomAgent).
+type Configurable interface {
+	Agent
+	Config() Config
+}
+
+// HookProvider is an optional interface for agents that expose lifecycle hooks.
+// Adapters use this to wire Before/After interception at each execution level.
+type HookProvider interface {
+	BeforeToolHooks() []BeforeToolHook
+	AfterToolHooks() []AfterToolHook
+	BeforeModelHooks() []BeforeModelHook
+	AfterModelHooks() []AfterModelHook
+	BeforeRunHooks() []BeforeRunHook
+	AfterRunHooks() []AfterRunHook
+}
+
+// MiddlewareProvider is an optional interface for agents that expose middleware chains.
+type MiddlewareProvider interface {
+	AgentMiddlewares() []Middleware
+	ChatMiddlewares() []Middleware
+	FunctionMiddlewares() []Middleware
 }
 
 // AgentMetadata represents metadata for an agent exposed via the API.
@@ -50,7 +83,8 @@ type AgentProvider interface {
 }
 
 // Invocation contains all the information needed to execute an agent.
-// This struct bridges ADK-Go's InvocationContext and Blades' Invocation.
+// It captures the full execution context: user input, history, tools,
+// and configuration for a single agent run.
 type Invocation struct {
 	// ID is a unique identifier for this invocation (for resumability).
 	ID string
@@ -74,7 +108,7 @@ type Invocation struct {
 	// These are merged with the agent's default tools.
 	Tools []Tool
 
-	// Context is custom context data (e.g., student profile, memory).
+	// Context is custom context data (e.g., user context, memory).
 	Context map[string]any
 
 	// Config contains agent execution configuration.
@@ -85,6 +119,22 @@ type Invocation struct {
 
 	// Streamable indicates if the response should be streamed.
 	Streamable bool
+
+	// Branch isolates conversation history for concurrent sub-agents.
+	// Format: "agent_1.agent_2.agent_3" (parent chain).
+	Branch string
+
+	// Effects accumulates side-effects for the current step.
+	// State deltas, artifact changes, transfer requests, etc.
+	Effects *StepEffects
+
+	// EndInvocation is set to true to stop the current invocation.
+	// This halts any further agent calls in the invocation.
+	EndInvocation bool
+
+	// Step tracks the current step number within an agent call.
+	// Used by Requirements to make step-dependent decisions.
+	Step int
 }
 
 // Clone creates a deep copy of the Invocation.

@@ -35,9 +35,6 @@ type Message struct {
 	// Usage contains token consumption metrics.
 	Usage *Usage
 
-	// Actions contains state changes requested by the agent.
-	Actions map[string]any
-
 	// Metadata for extensibility (e.g., model info).
 	Metadata map[string]any
 }
@@ -185,7 +182,6 @@ func NewAssistantMessage(id string, status MessageStatus) *Message {
 		Role:     RoleAssistant,
 		Status:   status,
 		Content:  []Content{},
-		Actions:  make(map[string]any),
 		Metadata: make(map[string]any),
 	}
 }

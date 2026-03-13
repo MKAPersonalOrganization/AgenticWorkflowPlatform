@@ -24,13 +24,6 @@ type ModelConfigResolver interface {
 	GetModelConfigForUser(ctx context.Context, userID string) (*agent.ModelConfig, error)
 }
 
-// TTSConfigResolver resolves TTS configuration for a given user.
-type TTSConfigResolver interface {
-	// GetTTSConfigForUserFlat returns the API key, model, and voice for a user's TTS config.
-	// Returns empty strings (no error) if no TTS config is set.
-	GetTTSConfigForUserFlat(ctx context.Context, userID string) (apiKey, model, voice string, err error)
-}
-
 // RunnerAdapter adapts the custom agent engine to the agent.Runner interface.
 // All external capabilities are injected as narrow interfaces defined in
 // interfaces.go — the adapter never imports module or service packages.
@@ -39,17 +32,16 @@ type RunnerAdapter struct {
 	agentProvider          agent.AgentProvider
 	threadMgr              ThreadManager
 	pipeline               *EventPipeline
-	profileProvider        agent.StudentProfileProvider
+	profileProvider        agent.UserContextProvider
 	configResolver         ModelConfigResolver
-	ttsResolver            TTSConfigResolver
 	pluginSettingsResolver PluginSettingsResolver
 	permChecker            ToolPermissionChecker
 	workspacePermChecker   WorkspacePermissionChecker
 	mcpResolver            MCPToolResolver
 	newToolSetFactory      NewToolSetFactoryFunc
-	skillInjector          SkillPromptInjector
-	edgequakeEnabled       bool
-	edgequakeBaseURL       string
+	promptInjector         PromptInjector
+	knowledgeBaseEnabled   bool
+	extraConfigFn          ExtraConfigFunc
 }
 
 // RunnerAdapterConfig holds all dependencies for creating a RunnerAdapter.
@@ -58,16 +50,15 @@ type RunnerAdapterConfig struct {
 	ThreadMgr              ThreadManager
 	AgentProvider          agent.AgentProvider
 	ConfigResolver         ModelConfigResolver
-	TTSResolver            TTSConfigResolver
 	PluginSettingsResolver PluginSettingsResolver
-	ProfileProvider        agent.StudentProfileProvider
+	ProfileProvider        agent.UserContextProvider
 	PermChecker            ToolPermissionChecker
 	WorkspacePermChecker   WorkspacePermissionChecker
 	MCPResolver            MCPToolResolver
 	NewToolSetFactory      NewToolSetFactoryFunc
-	SkillInjector          SkillPromptInjector
-	EdgequakeEnabled       bool
-	EdgequakeBaseURL       string
+	PromptInjector         PromptInjector
+	KnowledgeBaseEnabled   bool
+	ExtraConfigFn          ExtraConfigFunc
 }
 
 // NewRunnerAdapter creates a new runner adapter from the given config.
@@ -86,11 +77,10 @@ func NewRunnerAdapter(ctx context.Context, cfg RunnerAdapterConfig) (*RunnerAdap
 		workspacePermChecker:   cfg.WorkspacePermChecker,
 		mcpResolver:            cfg.MCPResolver,
 		newToolSetFactory:      cfg.NewToolSetFactory,
-		skillInjector:          cfg.SkillInjector,
-		edgequakeEnabled:       cfg.EdgequakeEnabled,
-		edgequakeBaseURL:       cfg.EdgequakeBaseURL,
+		promptInjector:         cfg.PromptInjector,
+		knowledgeBaseEnabled:   cfg.KnowledgeBaseEnabled,
+		extraConfigFn:          cfg.ExtraConfigFn,
 		configResolver:         cfg.ConfigResolver,
-		ttsResolver:            cfg.TTSResolver,
 		pluginSettingsResolver: cfg.PluginSettingsResolver,
 	}
 
@@ -104,17 +94,7 @@ func (r *RunnerAdapter) buildEngine(ctx context.Context, modelCfg *agent.ModelCo
 		return nil, fmt.Errorf("creating LLM client: %w", err)
 	}
 
-	// Resolve TTS config for this user (non-fatal if unavailable)
-	var ttsAPIKey, ttsModel, ttsVoice string
-	if r.ttsResolver != nil && userID != "" {
-		if key, model, voice, ttsErr := r.ttsResolver.GetTTSConfigForUserFlat(ctx, userID); ttsErr == nil {
-			ttsAPIKey = key
-			ttsModel = model
-			ttsVoice = voice
-		}
-	}
-
-	// Build per-request tool set factory with user's LLM and TTS config.
+	// Build per-request tool set factory with user's config.
 	var toolFactory ToolSetFactory
 	if r.newToolSetFactory != nil {
 		// Resolve per-user plugin settings (non-fatal if unavailable).
@@ -125,14 +105,16 @@ func (r *RunnerAdapter) buildEngine(ctx context.Context, modelCfg *agent.ModelCo
 			}
 		}
 
+		var extra map[string]string
+		if r.extraConfigFn != nil {
+			extra = r.extraConfigFn(ctx, userID)
+		}
+
 		toolFactory = r.newToolSetFactory(ToolFactoryConfig{
-			EdgequakeBaseURL: r.edgequakeBaseURL,
-			ModelAPIKey:      modelCfg.APIKey,
-			ModelID:          modelCfg.Model,
-			TTSAPIKey:        ttsAPIKey,
-			TTSModel:         ttsModel,
-			TTSVoice:         ttsVoice,
-			PluginSettings:   pluginSettings,
+			ModelAPIKey:    modelCfg.APIKey,
+			ModelID:        modelCfg.Model,
+			PluginSettings: pluginSettings,
+			Extra:          extra,
 		})
 	}
 
@@ -147,9 +129,9 @@ func (r *RunnerAdapter) buildEngine(ctx context.Context, modelCfg *agent.ModelCo
 		toolFactory:          toolFactory,
 		permChecker:          r.permChecker,
 		workspacePermChecker: r.workspacePermChecker,
-		edgequakeEnabled:     r.edgequakeEnabled,
+		knowledgeBaseEnabled: r.knowledgeBaseEnabled,
 		mcpResolver:          r.mcpResolver,
-		skillInjector:        r.skillInjector,
+		promptInjector:       r.promptInjector,
 	}
 
 	return engine.New(chatClient, provider, nil, nil), nil
@@ -401,7 +383,7 @@ func (r *RunnerAdapter) toCoreToolCalls(dtcs []thread.ToolCall) []core.ToolCall 
 // RegistryAgentProvider implements engine.AgentProvider using agent.AgentProvider.
 type RegistryAgentProvider struct {
 	provider             agent.AgentProvider
-	profileProvider      agent.StudentProfileProvider
+	profileProvider      agent.UserContextProvider
 	modelProvider        string   // LLM provider name (e.g., "openai", "gemini")
 	modelID              string   // LLM model name (e.g., "gpt-4o", "gemini-2.0-flash")
 	temperature          *float64 // Global temperature from AI settings
@@ -410,9 +392,9 @@ type RegistryAgentProvider struct {
 	toolFactory          ToolSetFactory
 	permChecker          ToolPermissionChecker
 	workspacePermChecker WorkspacePermissionChecker
-	edgequakeEnabled     bool
+	knowledgeBaseEnabled bool
 	mcpResolver          MCPToolResolver
-	skillInjector        SkillPromptInjector
+	promptInjector       PromptInjector
 }
 
 func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (core.AgentConfig, error) {
@@ -445,22 +427,37 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		}
 	}
 
-	// Extract config from the agent — all agents are dbAgent wrappers around CustomAgent.
+	// Extract config from the agent using the Configurable interface.
+	// This is adapter-agnostic: it works via interfaces rather than
+	// concrete type assertions.
 	var agentConfig agent.Config
-	if da, ok := a.(*dbAgent); ok {
-		if inner, ok := da.Agent.(*CustomAgent); ok {
-			agentConfig = inner.Config()
-			agentConfig.Name = da.id
-			agentConfig.Description = da.Description()
-		} else {
-			return core.AgentConfig{}, fmt.Errorf("agent %s has unsupported inner type", name)
-		}
-	} else if ca, ok := a.(*CustomAgent); ok {
-		// Fallback for any non-DB agent (e.g. tests)
+
+	// Strategy 1: Direct Configurable interface (e.g., CustomAgent).
+	if ca, ok := a.(agent.Configurable); ok {
 		agentConfig = ca.Config()
 	} else {
-		return core.AgentConfig{}, fmt.Errorf("agent %s is not a custom agent", name)
+		// Strategy 2: The agent embeds an agent.Agent (e.g., dbAgent wrapper).
+		type embeddedAgentAccessor interface {
+			EmbeddedAgent() agent.Agent
+		}
+		if ea, ok := a.(embeddedAgentAccessor); ok {
+			if inner := ea.EmbeddedAgent(); inner != nil {
+				if ca, ok := inner.(agent.Configurable); ok {
+					agentConfig = ca.Config()
+				} else {
+					return core.AgentConfig{}, fmt.Errorf("agent %s inner type does not implement Configurable", name)
+				}
+			} else {
+				return core.AgentConfig{}, fmt.Errorf("agent %s embedded agent is nil", name)
+			}
+		} else {
+			return core.AgentConfig{}, fmt.Errorf("agent %s does not implement Configurable interface", name)
+		}
 	}
+
+	// Override name and description from the outer wrapper if needed.
+	agentConfig.Name = a.ID()
+	agentConfig.Description = a.Description()
 
 	// Map agent.Config to core.AgentConfig — model, temperature, and max iterations
 	// are always from global AI settings; agents only carry behavioral config (prompt, tools).
@@ -521,8 +518,8 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		}
 	}
 
-	// Inject attached workspace info into system prompt as Knowledge Bases section
-	if p.workspacePermChecker != nil && p.edgequakeEnabled {
+	// Inject workspace knowledge base section into system prompt.
+	if p.workspacePermChecker != nil && p.knowledgeBaseEnabled {
 		// Get user from context to check permissions
 		user := shared.GetUserFromContext(ctx)
 		var userID string
@@ -546,13 +543,12 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		}
 	}
 
-	// Inject activated skill instructions into system prompt.
-	// Skills are activated via the activate_skill tool and stored in the tracker.
-	// By injecting here (instead of returning as tool result), instructions stay
+	// Inject additional prompt content.
+	// Injecting here (instead of returning as tool result) ensures instructions stay
 	// pinned at the system prompt level and don't drift down the conversation.
-	if p.skillInjector != nil {
+	if p.promptInjector != nil {
 		threadID := shared.GetThreadIDFromContext(ctx)
-		if addition := p.skillInjector.BuildPromptAddition(threadID); addition != "" {
+		if addition := p.promptInjector.BuildPromptAddition(threadID); addition != "" {
 			config.SystemPrompt += "\n\n" + addition
 		}
 	}
@@ -593,9 +589,9 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		config.ChatMiddleware = append(config.ChatMiddleware, agent.RequirementMiddleware(agentConfig.Requirements...))
 	}
 
-	// Inject Student Profile as a Chat-level middleware
+	// Inject user context as a Chat-level middleware.
 	if p.profileProvider != nil {
-		config.ChatMiddleware = append(config.ChatMiddleware, smiddleware.NewStudentProfileInjectorMiddleware(p.profileProvider))
+		config.ChatMiddleware = append(config.ChatMiddleware, smiddleware.NewUserContextInjectorMiddleware(p.profileProvider))
 	}
 
 	return config, nil

@@ -39,16 +39,15 @@ type RunnerAdapter struct {
 	agentProvider          AgentProvider
 	threadMgr              ThreadManager
 	configResolver         ModelConfigResolver
-	ttsResolver            TTSConfigResolver
 	pluginSettingsResolver PluginSettingsResolver
-	profileProvider        StudentProfileProvider
+	profileProvider        UserContextProvider
 	permChecker            ToolPermissionChecker
 	workspacePermChecker   WorkspacePermissionChecker
 	mcpResolver            MCPToolResolver
 	newToolSetFactory      NewToolSetFactoryFunc
-	skillInjector          SkillPromptInjector
-	edgequakeEnabled       bool
-	edgequakeBaseURL       string
+	promptInjector         PromptInjector
+	knowledgeBaseEnabled   bool
+	extraConfigFn          ExtraConfigFunc
 }
 
 // RunnerAdapterConfig holds all dependencies for creating a RunnerAdapter.
@@ -57,16 +56,15 @@ type RunnerAdapterConfig struct {
 	ThreadMgr              ThreadManager
 	AgentProvider          AgentProvider
 	ConfigResolver         ModelConfigResolver
-	TTSResolver            TTSConfigResolver
 	PluginSettingsResolver PluginSettingsResolver
-	ProfileProvider        StudentProfileProvider
+	ProfileProvider        UserContextProvider
 	PermChecker            ToolPermissionChecker
 	WorkspacePermChecker   WorkspacePermissionChecker
 	MCPResolver            MCPToolResolver
 	NewToolSetFactory      NewToolSetFactoryFunc
-	SkillInjector          SkillPromptInjector
-	EdgequakeEnabled       bool
-	EdgequakeBaseURL       string
+	PromptInjector         PromptInjector
+	KnowledgeBaseEnabled   bool
+	ExtraConfigFn          ExtraConfigFunc
 }
 
 // NewRunnerAdapter creates a new adk-go runner adapter.
@@ -79,16 +77,15 @@ func NewRunnerAdapter(cfg RunnerAdapterConfig) (*RunnerAdapter, error) {
 		threadMgr:              cfg.ThreadMgr,
 		agentProvider:          cfg.AgentProvider,
 		configResolver:         cfg.ConfigResolver,
-		ttsResolver:            cfg.TTSResolver,
 		pluginSettingsResolver: cfg.PluginSettingsResolver,
 		profileProvider:        cfg.ProfileProvider,
 		permChecker:            cfg.PermChecker,
 		workspacePermChecker:   cfg.WorkspacePermChecker,
 		mcpResolver:            cfg.MCPResolver,
 		newToolSetFactory:      cfg.NewToolSetFactory,
-		skillInjector:          cfg.SkillInjector,
-		edgequakeEnabled:       cfg.EdgequakeEnabled,
-		edgequakeBaseURL:       cfg.EdgequakeBaseURL,
+		promptInjector:         cfg.PromptInjector,
+		knowledgeBaseEnabled:   cfg.KnowledgeBaseEnabled,
+		extraConfigFn:          cfg.ExtraConfigFn,
 	}, nil
 }
 
@@ -164,10 +161,18 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 		agentCfg := extractAgentConfig(foundAgent)
 
 		// 4. Build tools from agent config + enabled tool sets + MCP.
-		adkTools := r.resolveTools(ctx, req.UserID, agentName, modelCfg, req.SessionID, agentCfg)
+		adkTools := r.resolveTools(ctx, req.UserID, agentName, modelCfg, req.SessionID, agentCfg, req)
 
 		// 5. Build system prompt (agent config + requirements + workspace KB + skills + profile).
-		systemPrompt := r.buildSystemPrompt(ctx, foundAgent, req.UserID, agentName, req.SessionID, agentCfg)
+		inv := &fagent.Invocation{
+			ID:        req.InvocationID,
+			SessionID: req.SessionID,
+			UserID:    req.UserID,
+			Message:   req.Message,
+			Config:    req.Config,
+			Context:   req.Context,
+		}
+		systemPrompt := r.buildSystemPrompt(ctx, foundAgent, req.UserID, agentName, req.SessionID, agentCfg, inv)
 
 		// 6. Create model.LLM.
 		llm, mErr := NewModel(ctx, modelCfg.Provider, modelCfg.Model, modelCfg.APIKey)
@@ -187,8 +192,11 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			afterToolCBs = mb.afterToolCallbacks()
 		}
 
-		// Build before-agent callback for requirements system bridging.
-		beforeAgentCBs := buildAgentCallbacks(agentCfg)
+		// Build before-agent hooks for requirements system bridging.
+		beforeAgentCBs := buildBeforeRunHooks(agentCfg, req, agentName)
+
+		// Build after-agent hooks from config.
+		afterAgentCBs := buildAfterRunHooks(agentCfg)
 
 		adkAgent, aErr := llmagent.New(llmagent.Config{
 			Name:                  agentName,
@@ -198,6 +206,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			Tools:                 adkTools,
 			GenerateContentConfig: genCfg,
 			BeforeAgentCallbacks:  beforeAgentCBs,
+			AfterAgentCallbacks:   afterAgentCBs,
 			BeforeToolCallbacks:   beforeToolCBs,
 			AfterToolCallbacks:    afterToolCBs,
 		})
@@ -363,12 +372,17 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 //  2. Requirement-provided tools (ToolProvider interface)
 //  3. Permission-gated tool sets
 //  4. MCP-connected tools
+//  5. Sub-agent tools (if agent has SubAgents, they become callable tools)
+//
+// Tools blocked by Requirements are filtered out at build time, matching
+// ADK-Go's pattern of resolving tools in request processors.
 func (r *RunnerAdapter) resolveTools(
 	ctx context.Context,
 	userID, agentName string,
 	modelCfg *fagent.ModelConfig,
 	threadID string,
 	agentCfg *fagent.Config,
+	req *fagent.RunRequest,
 ) []adktool.Tool {
 	var execTools []fagent.ExecutableTool
 
@@ -391,24 +405,21 @@ func (r *RunnerAdapter) resolveTools(
 	// 3. Build per-request tool factory.
 	var toolFactory ToolSetFactory
 	if r.newToolSetFactory != nil {
-		var ttsAPIKey, ttsModel, ttsVoice string
-		if r.ttsResolver != nil && userID != "" {
-			ttsAPIKey, ttsModel, ttsVoice, _ = r.ttsResolver.GetTTSConfigForUserFlat(ctx, userID)
-		}
-
 		var pluginSettings map[string]map[string]string
 		if r.pluginSettingsResolver != nil && userID != "" {
 			pluginSettings, _ = r.pluginSettingsResolver.GetAllPluginSettingsForUser(ctx, userID)
 		}
 
+		var extra map[string]string
+		if r.extraConfigFn != nil {
+			extra = r.extraConfigFn(ctx, userID)
+		}
+
 		toolFactory = r.newToolSetFactory(ToolFactoryConfig{
-			EdgequakeBaseURL: r.edgequakeBaseURL,
-			ModelAPIKey:      modelCfg.APIKey,
-			ModelID:          modelCfg.Model,
-			TTSAPIKey:        ttsAPIKey,
-			TTSModel:         ttsModel,
-			TTSVoice:         ttsVoice,
-			PluginSettings:   pluginSettings,
+			ModelAPIKey:    modelCfg.APIKey,
+			ModelID:        modelCfg.Model,
+			PluginSettings: pluginSettings,
+			Extra:          extra,
 		})
 	}
 
@@ -444,7 +455,7 @@ func (r *RunnerAdapter) resolveTools(
 		}
 
 		// Enforce workspace KB namespaces.
-		if r.workspacePermChecker != nil && r.edgequakeEnabled {
+		if r.workspacePermChecker != nil && r.knowledgeBaseEnabled {
 			enabledWorkspaceIDs, wErr := r.workspacePermChecker.GetEnabledWorkspaces(ctx, userID, agentName)
 			if wErr == nil && len(enabledWorkspaceIDs) > 0 {
 				toolFactory.SetAllowedKBNamespaces(enabledWorkspaceIDs)
@@ -452,21 +463,75 @@ func (r *RunnerAdapter) resolveTools(
 		}
 	}
 
+	// 5. Pre-filter tools blocked by Requirements at build time.
+	// This mirrors ADK-Go's request processor pattern where tools are resolved
+	// before the LLM call. Blocked tools are removed; hidden tools are omitted.
+	if agentCfg != nil && len(agentCfg.Requirements) > 0 {
+		inv := &fagent.Invocation{
+			ID:        req.InvocationID,
+			SessionID: req.SessionID,
+			UserID:    req.UserID,
+			Message:   req.Message,
+			Config:    req.Config,
+			Context:   req.Context,
+		}
+
+		blocked := make(map[string]bool)
+		for _, requirement := range agentCfg.Requirements {
+			if e, ok := requirement.(fagent.Enableable); ok && !e.Enabled() {
+				continue
+			}
+			rules, rErr := requirement.Run(ctx, inv)
+			if rErr != nil {
+				continue
+			}
+			for _, rule := range rules {
+				if rule.Blocked || rule.Hidden {
+					blocked[rule.TargetTool] = true
+				}
+			}
+		}
+
+		if len(blocked) > 0 {
+			filtered := make([]fagent.ExecutableTool, 0, len(execTools))
+			for _, t := range execTools {
+				if !blocked[t.Name()] {
+					filtered = append(filtered, t)
+				}
+			}
+			execTools = filtered
+		}
+	}
+
 	// Wrap foundation tools as adk-go tools.
 	return WrapExecutableTools(execTools, threadID, userID)
 }
 
-// buildSystemPrompt assembles the system prompt from agent config, KB, skills, profile.
-// It includes requirement-provided prompt additions (PromptProvider interface).
+// buildSystemPrompt assembles the system prompt from agent config, KB, skills, user context.
+// It includes:
+//   - Static SystemPrompt from agent config
+//   - InstructionFunc (runtime-generated prompt additions)
+//   - Requirement-provided prompt additions (PromptProvider interface)
+//   - Workspace knowledge base section
+//   - Activated skill instructions
+//   - User context
 func (r *RunnerAdapter) buildSystemPrompt(
 	ctx context.Context,
 	foundAgent fagent.Agent,
 	userID, agentName, threadID string,
 	agentCfg *fagent.Config,
+	inv *fagent.Invocation,
 ) string {
 	var systemPrompt string
 	if agentCfg != nil {
 		systemPrompt = agentCfg.SystemPrompt
+
+		// Resolve InstructionFunc (runtime-generated prompt additions).
+		if agentCfg.InstructionFunc != nil && inv != nil {
+			if dynamic, err := agentCfg.InstructionFunc(inv); err == nil && dynamic != "" {
+				systemPrompt += "\n\n" + dynamic
+			}
+		}
 	}
 
 	// Collect prompt additions from Requirements that implement PromptProvider.
@@ -479,7 +544,7 @@ func (r *RunnerAdapter) buildSystemPrompt(
 	}
 
 	// Inject workspace knowledge base section.
-	if r.workspacePermChecker != nil && r.edgequakeEnabled && userID != "" {
+	if r.workspacePermChecker != nil && r.knowledgeBaseEnabled && userID != "" {
 		enabledWorkspaceIDs, err := r.workspacePermChecker.GetEnabledWorkspaces(ctx, userID, agentName)
 		if err == nil && len(enabledWorkspaceIDs) > 0 {
 			kbSection := "\n\n## Knowledge Bases\n\nYou have access to the following knowledge base workspaces. Use the query_knowledge_base tool to search them:\n"
@@ -491,36 +556,47 @@ func (r *RunnerAdapter) buildSystemPrompt(
 		}
 	}
 
-	// Inject activated skill instructions.
-	if r.skillInjector != nil {
-		if addition := r.skillInjector.BuildPromptAddition(threadID); addition != "" {
+	// Inject additional prompt content.
+	if r.promptInjector != nil {
+		if addition := r.promptInjector.BuildPromptAddition(threadID); addition != "" {
 			systemPrompt += "\n\n" + addition
 		}
 	}
 
-	// Inject student profile context (structured Markdown, matching custom adapter).
+	// Inject user context (structured Markdown, matching custom adapter).
 	if r.profileProvider != nil && userID != "" {
 		profile, err := r.profileProvider.GetProfile(ctx, userID)
 		if err == nil && len(profile) > 0 {
 			var sb strings.Builder
-			sb.WriteString("\n\n## Student Profile\n")
-			if ls, ok := profile["learning_style"].(string); ok && ls != "" {
-				sb.WriteString(fmt.Sprintf("- **Learning Style**: %s\n", ls))
-			}
-			if goals, ok := profile["goals"].(string); ok && goals != "" {
-				sb.WriteString(fmt.Sprintf("- **Goals**: %s\n", goals))
-			}
-			if strengths, ok := profile["strengths"].([]string); ok && len(strengths) > 0 {
-				sb.WriteString(fmt.Sprintf("- **Strengths**: %s\n", strings.Join(strengths, ", ")))
-			}
-			if struggles, ok := profile["struggles"].([]string); ok && len(struggles) > 0 {
-				sb.WriteString(fmt.Sprintf("- **Struggles**: %s\n", strings.Join(struggles, ", ")))
+			sb.WriteString("\n\n## User Context\n")
+			for key, val := range profile {
+				switch v := val.(type) {
+				case string:
+					if v != "" {
+						sb.WriteString(fmt.Sprintf("- **%s**: %s\n", formatLabel(key), v))
+					}
+				case []string:
+					if len(v) > 0 {
+						sb.WriteString(fmt.Sprintf("- **%s**: %s\n", formatLabel(key), strings.Join(v, ", ")))
+					}
+				}
 			}
 			systemPrompt += sb.String()
 		}
 	}
 
 	return systemPrompt
+}
+
+// formatLabel converts a snake_case key to a Title Case label.
+func formatLabel(key string) string {
+	parts := strings.Split(key, "_")
+	for i, p := range parts {
+		if len(p) > 0 {
+			parts[i] = strings.ToUpper(p[:1]) + p[1:]
+		}
+	}
+	return strings.Join(parts, " ")
 }
 
 // buildGenerateContentConfig creates genai config from model settings.
@@ -672,15 +748,11 @@ func mimeFromDataURL(dataURL string) string {
 }
 
 // extractAgentConfig extracts the foundation agent.Config from an Agent.
-// It tries multiple strategies to unwrap agent wrappers (e.g., dbAgent → CustomAgent)
-// and extract the Config. This is adapter-agnostic: it works via interfaces,
-// never importing concrete types from other packages.
+// Uses the agent.Configurable interface for clean extraction, with
+// fallback to interface-based unwrapping for wrapper agents (e.g., dbAgent).
 func extractAgentConfig(a fagent.Agent) *fagent.Config {
-	// Strategy 1: Direct Config() method (e.g., CustomAgent).
-	type configurable interface {
-		Config() fagent.Config
-	}
-	if ca, ok := a.(configurable); ok {
+	// Strategy 1: Direct Configurable interface (e.g., CustomAgent).
+	if ca, ok := a.(fagent.Configurable); ok {
 		cfg := ca.Config()
 		return &cfg
 	}
@@ -688,14 +760,13 @@ func extractAgentConfig(a fagent.Agent) *fagent.Config {
 	// Strategy 2: The agent embeds an agent.Agent interface field.
 	// dbAgent does this: struct { agent.Agent; ... }
 	// Go's embedding of interfaces doesn't promote concrete-type methods,
-	// so we need to access the embedded field via the EmbeddedAgent() accessor
-	// or try to extract it via reflection-free interface probing.
+	// so we need to access the embedded field via the EmbeddedAgent() accessor.
 	type embeddedAgentAccessor interface {
 		EmbeddedAgent() fagent.Agent
 	}
 	if ea, ok := a.(embeddedAgentAccessor); ok {
 		if inner := ea.EmbeddedAgent(); inner != nil {
-			if ca, ok := inner.(configurable); ok {
+			if ca, ok := inner.(fagent.Configurable); ok {
 				cfg := ca.Config()
 				return &cfg
 			}
@@ -705,13 +776,31 @@ func extractAgentConfig(a fagent.Agent) *fagent.Config {
 	return nil
 }
 
+// extractHookProvider returns the HookProvider from an agent, if available.
+func extractHookProvider(a fagent.Agent) fagent.HookProvider {
+	if cp, ok := a.(fagent.HookProvider); ok {
+		return cp
+	}
+	type embeddedAgentAccessor interface {
+		EmbeddedAgent() fagent.Agent
+	}
+	if ea, ok := a.(embeddedAgentAccessor); ok {
+		if inner := ea.EmbeddedAgent(); inner != nil {
+			if cp, ok := inner.(fagent.HookProvider); ok {
+				return cp
+			}
+		}
+	}
+	return nil
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Middleware Bridge
 //
 // ADK-Go splits tool lifecycle into BeforeToolCallback and AfterToolCallback.
-// The foundation middleware system expects to wrap the entire execution in a
-// single chain (before → execute → after, like HTTP middleware). We bridge
-// these two models by:
+// The foundation middleware system wraps the entire execution in a single
+// chain (before → execute → after, like HTTP middleware). We bridge these
+// two models by:
 //
 //   - BeforeToolCallback: runs the full middleware chain around a no-op
 //     terminal handler. This gives logging, rate-limiting, etc. their
@@ -827,24 +916,124 @@ func (t *adkToolBridge) Name() string           { return t.name }
 func (t *adkToolBridge) Description() string    { return t.desc }
 func (t *adkToolBridge) Schema() *fagent.Schema { return nil }
 
-// buildAgentCallbacks creates ADK-Go BeforeAgentCallbacks to bridge
+// buildBeforeRunHooks creates ADK-Go BeforeAgentCallbacks to bridge
 // the foundation Requirements system into ADK-Go's agent lifecycle.
-// Requirements are evaluated before each agent run; if any requirement
-// produces blocking rules, a guidance message is injected into the LLM context.
-func buildAgentCallbacks(agentCfg *fagent.Config) []agent.BeforeAgentCallback {
+//
+// The Requirements system evaluates rules that constrain tool availability,
+// force specific tools, prevent stopping, etc. In the custom adapter, this
+// runs as Chat-level middleware (RequirementMiddleware). Here we bridge it
+// via ADK-Go's BeforeAgentCallbacks:
+//
+//  1. Evaluate all enabled Requirements against the current Invocation
+//  2. Collect rules (allowed/hidden/forced tools, ToolChoice)
+//  3. Inject blocked-tool guidance into the LLM context via session state
+//  4. Tools were already filtered at build time in resolveTools()
+func buildBeforeRunHooks(
+	agentCfg *fagent.Config,
+	req *fagent.RunRequest,
+	agentName string,
+) []agent.BeforeAgentCallback {
 	if agentCfg == nil || len(agentCfg.Requirements) == 0 {
 		return nil
 	}
 
-	// NOTE: The full RequirementMiddleware runs at the Chat level in the custom
-	// adapter. In ADK-Go, we don't have the same middleware hooks on the LLM call.
-	// Instead, we use BeforeAgentCallback to evaluate requirements and inject
-	// guidance into the session state. The actual tool filtering is handled by
-	// the fact that we already filter tools in resolveTools. Requirements that
-	// produce force/block rules will be communicated to the LLM as a system
-	// message via the session state.
-	//
-	// For the MVP: we log requirements evaluation but don't short-circuit.
-	// Full RequirementMiddleware parity requires deeper ADK-Go integration.
-	return nil
+	return []agent.BeforeAgentCallback{
+		func(ctx agent.CallbackContext) (*genai.Content, error) {
+			// Build an Invocation from the current context for Requirements evaluation.
+			inv := &fagent.Invocation{
+				ID:        req.InvocationID,
+				SessionID: req.SessionID,
+				UserID:    req.UserID,
+				Message:   req.Message,
+				Config:    req.Config,
+				Context:   req.Context,
+			}
+
+			// Evaluate all enabled Requirements → collect Rules.
+			var allRules []fagent.Rule
+			for _, requirement := range agentCfg.Requirements {
+				// Skip disabled requirements.
+				if e, ok := requirement.(fagent.Enableable); ok && !e.Enabled() {
+					continue
+				}
+				rules, err := requirement.Run(ctx, inv)
+				if err != nil {
+					// Log but don't fail — requirements are advisory.
+					continue
+				}
+				allRules = append(allRules, rules...)
+			}
+
+			if len(allRules) == 0 {
+				return nil, nil // Continue normally.
+			}
+
+			// Build guidance message from rules for the LLM.
+			var guidance strings.Builder
+			var hasBlocked bool
+			for _, rule := range allRules {
+				if rule.Blocked && rule.Reason != "" {
+					guidance.WriteString(fmt.Sprintf("IMPORTANT: The tool '%s' is currently disabled: %s\n", rule.TargetTool, rule.Reason))
+					hasBlocked = true
+				}
+				if rule.Forced && rule.Reason != "" {
+					guidance.WriteString(fmt.Sprintf("IMPORTANT: You MUST use the tool '%s': %s\n", rule.TargetTool, rule.Reason))
+				}
+				if rule.PreventStop && rule.Reason != "" {
+					guidance.WriteString(fmt.Sprintf("IMPORTANT: You must not stop yet: %s\n", rule.Reason))
+				}
+			}
+
+			if guidance.Len() > 0 {
+				// Store guidance in session state so the LLM sees it.
+				if err := ctx.State().Set("_adk_requirement_guidance", guidance.String()); err != nil {
+					// Best-effort: don't fail the agent run.
+					_ = err
+				}
+			}
+
+			// If there are hard blocks, inject a system guidance content.
+			if hasBlocked {
+				// We don't short-circuit — we let the agent run but with guidance.
+				// The tools were already filtered in resolveTools().
+				return nil, nil
+			}
+
+			return nil, nil // Continue with normal agent run.
+		},
+	}
+}
+
+// buildAfterRunHooks translates foundation AfterRunHooks to ADK-Go AfterAgentCallbacks.
+func buildAfterRunHooks(agentCfg *fagent.Config) []agent.AfterAgentCallback {
+	if agentCfg == nil || len(agentCfg.AfterRunHooks) == 0 {
+		return nil
+	}
+
+	var callbacks []agent.AfterAgentCallback
+	for _, foundationHook := range agentCfg.AfterRunHooks {
+		hook := foundationHook // capture
+		callbacks = append(callbacks, func(ctx agent.CallbackContext) (*genai.Content, error) {
+			// Bridge foundation hook to ADK-Go callback.
+			hookCtx := &fagent.HookContext{
+				Context:   ctx,
+				AgentName: ctx.AgentName(),
+				SessionID: ctx.SessionID(),
+				UserID:    ctx.UserID(),
+				State:     fagent.NewStateDelta(),
+			}
+			evt, err := hook(hookCtx)
+			if err != nil {
+				return nil, err
+			}
+			if evt != nil {
+				// Convert the foundation event to genai.Content for ADK-Go.
+				if me, ok := evt.(*fagent.MessageEvent); ok && me.Message != nil {
+					return genai.NewContentFromText(me.Message.Text(), "model"), nil
+				}
+			}
+			return nil, nil
+		})
+	}
+	return callbacks
 }

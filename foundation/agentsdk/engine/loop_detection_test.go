@@ -49,10 +49,10 @@ func TestLoopDetector_NoContentLoopWithVariedContent(t *testing.T) {
 	}
 }
 
-func TestLoopDetector_PedagogicalLoop(t *testing.T) {
+func TestLoopDetector_ProgressStall(t *testing.T) {
 	t.Parallel()
 	config := DefaultLoopDetectorConfig()
-	config.PedagogicalThreshold = 3
+	config.ProgressStallThreshold = 3
 	detector := NewLoopDetector(config)
 
 	concept := "quadratic_equations"
@@ -62,28 +62,28 @@ func TestLoopDetector_PedagogicalLoop(t *testing.T) {
 	detector.RecordConceptExplanation(concept)
 	detector.RecordConceptExplanation(concept)
 
-	// Record quiz failures
+	// Record task failures
 	detector.RecordTaskFailure(concept)
 	detector.RecordTaskFailure(concept)
 
-	// Should now detect pedagogical loop
-	loopInfo := detector.CheckPedagogicalLoop(concept)
+	// Should now detect progress stall
+	loopInfo := detector.CheckProgressStall(concept)
 	if loopInfo == nil {
-		t.Fatal("Expected pedagogical loop detection")
+		t.Fatal("Expected progress stall detection")
 	}
 
-	if loopInfo.Type != LoopTypePedagogical {
-		t.Errorf("Expected loop type %s, got %s", LoopTypePedagogical, loopInfo.Type)
+	if loopInfo.Type != LoopTypeProgressStall {
+		t.Errorf("Expected loop type %s, got %s", LoopTypeProgressStall, loopInfo.Type)
 	}
 	if loopInfo.Pattern != concept {
 		t.Errorf("Expected pattern %s, got %s", concept, loopInfo.Pattern)
 	}
 }
 
-func TestLoopDetector_QuizSuccessResetsPedagogicalLoop(t *testing.T) {
+func TestLoopDetector_TaskSuccessResetsProgressStall(t *testing.T) {
 	t.Parallel()
 	config := DefaultLoopDetectorConfig()
-	config.PedagogicalThreshold = 3
+	config.ProgressStallThreshold = 3
 	detector := NewLoopDetector(config)
 
 	concept := "derivatives"
@@ -95,13 +95,13 @@ func TestLoopDetector_QuizSuccessResetsPedagogicalLoop(t *testing.T) {
 	detector.RecordTaskFailure(concept)
 	detector.RecordTaskFailure(concept)
 
-	// Quiz success should reset failure count
+	// Task success should reset failure count
 	detector.RecordTaskSuccess(concept)
 
-	// Should not detect loop anymore
-	loopInfo := detector.CheckPedagogicalLoop(concept)
+	// Should not detect stall anymore
+	loopInfo := detector.CheckProgressStall(concept)
 	if loopInfo != nil {
-		t.Errorf("Expected no pedagogical loop after quiz success, got %v", loopInfo)
+		t.Errorf("Expected no progress stall after task success, got %v", loopInfo)
 	}
 }
 

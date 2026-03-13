@@ -120,10 +120,11 @@ type dbAgent struct {
 	icon        string
 }
 
-func (a *dbAgent) ID() agent.ID        { return a.id }
-func (a *dbAgent) Name() string        { return a.displayName }
-func (a *dbAgent) Description() string { return a.Agent.Description() }
-func (a *dbAgent) Icon() string        { return a.icon }
+func (a *dbAgent) ID() agent.ID             { return a.id }
+func (a *dbAgent) Name() string             { return a.displayName }
+func (a *dbAgent) Description() string      { return a.Agent.Description() }
+func (a *dbAgent) Icon() string             { return a.icon }
+func (a *dbAgent) SubAgents() []agent.Agent { return a.Agent.SubAgents() }
 
 // EmbeddedAgent returns the inner agent.Agent value.
 // This allows adapter-agnostic code (e.g., the ADK-Go adapter) to unwrap

@@ -33,7 +33,7 @@ type ToolPermissionChecker interface {
 	HasPermission(ctx context.Context, userID, agentID, toolSetID, toolID string) bool
 }
 
-// WorkspacePermissionChecker checks workspace access for knowledge-base injection.
+// WorkspacePermissionChecker checks workspace access for knowledge base injection.
 // Satisfied by *workspacepermissions.Service.
 type WorkspacePermissionChecker interface {
 	GetEnabledWorkspaces(ctx context.Context, userID, agentID string) ([]string, error)
@@ -48,14 +48,12 @@ type ToolSetFactory interface {
 	SetAllowedKBNamespaces(namespaces []string)
 }
 
-// ToolFactoryConfig carries per-request LLM and TTS configuration for tool creation.
+// ToolFactoryConfig carries per-request configuration for tool creation.
+// Tool-specific settings (API keys, service URLs) are passed via the Extra map
+// so the adapter layer remains tool-agnostic.
 type ToolFactoryConfig struct {
-	EdgequakeBaseURL string
-	ModelAPIKey      string
-	ModelID          string
-	TTSAPIKey        string
-	TTSModel         string
-	TTSVoice         string
+	ModelAPIKey string
+	ModelID     string
 
 	// PluginSettings carries per-user, per-plugin settings resolved from
 	// the user_plugin_settings table. Outer key = plugin ID, inner key =
@@ -64,11 +62,21 @@ type ToolFactoryConfig struct {
 
 	// AllowedKBNamespaces is the set of workspace IDs the agent may query.
 	AllowedKBNamespaces []string
+
+	// Extra carries additional per-request config (e.g., service URLs, API keys)
+	// so the adapter layer does not need tool-specific fields.
+	Extra map[string]string
 }
 
 // NewToolSetFactoryFunc builds a ToolSetFactory with per-request configuration.
 // Injected by the composition root so the adapter never imports service packages.
 type NewToolSetFactoryFunc func(cfg ToolFactoryConfig) ToolSetFactory
+
+// ExtraConfigFunc resolves per-user, per-request tool configuration.
+// The returned map is passed as ToolFactoryConfig.Extra so the adapter
+// layer remains tool-agnostic while the composition root can provide
+// tool-specific settings (API keys, service URLs, etc.).
+type ExtraConfigFunc func(ctx context.Context, userID string) map[string]string
 
 // MCPToolResolver resolves MCP-connected tools for a user.
 // Satisfied by *mcp.Service.
@@ -87,11 +95,11 @@ type PluginSettingsResolver interface {
 	GetAllPluginSettingsForUser(ctx context.Context, userID string) (map[string]map[string]string, error)
 }
 
-// SkillPromptInjector provides per-thread skill instructions for system prompt injection.
+// PromptInjector provides per-thread prompt additions for system prompt injection.
 // Satisfied by *skills.SkillActivationTracker.
-type SkillPromptInjector interface {
-	// BuildPromptAddition returns activated skill instructions for the given thread,
+type PromptInjector interface {
+	// BuildPromptAddition returns additional instructions for the given thread,
 	// formatted for direct concatenation with the system prompt.
-	// Returns empty string if no skills are activated.
+	// Returns empty string if no additions are needed.
 	BuildPromptAddition(threadID string) string
 }

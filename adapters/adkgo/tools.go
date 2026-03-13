@@ -3,6 +3,7 @@ package adkgo
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/google/jsonschema-go/jsonschema"
 
@@ -22,6 +23,11 @@ import (
 // Contract: The returned map MUST be flat — the frontend parses the marshalled
 // JSON directly (e.g. {"success":true,"audio_url":"..."}) and will break if
 // tool output is nested under an extra key.
+//
+// Production features:
+//   - Panic recovery: tool execution panics are caught and returned as errors
+//   - Streaming tools: recognized and executed with streaming support
+//   - Error surfacing: Go errors → {"error":"..."} so the LLM sees failures
 // ──────────────────────────────────────────────────────────────────────────────
 
 // WrapExecutableTool converts a foundation ExecutableTool to an adk-go Tool.
@@ -32,11 +38,18 @@ func WrapExecutableTool(et agent.ExecutableTool, sessionID, userID string) adkto
 		inputSchema = agentSchemaToJSONSchema(schema)
 	}
 
-	exec := func(ctx adktool.Context, args map[string]any) (map[string]any, error) {
+	exec := func(ctx adktool.Context, args map[string]any) (result map[string]any, err error) {
+		// Panic recovery — tools should never crash the agent loop.
+		defer func() {
+			if r := recover(); r != nil {
+				result = map[string]any{errorKey: fmt.Sprintf("tool panic: %v", r)}
+				err = nil
+			}
+		}()
 		return executeFoundationTool(ctx, et, args, sessionID, userID)
 	}
 
-	t, err := functiontool.New(
+	t, buildErr := functiontool.New(
 		functiontool.Config{
 			Name:        et.Name(),
 			Description: et.Description(),
@@ -44,7 +57,7 @@ func WrapExecutableTool(et agent.ExecutableTool, sessionID, userID string) adkto
 		},
 		exec,
 	)
-	if err != nil {
+	if buildErr != nil {
 		// Schema conversion can fail for complex schemas. Fall back to
 		// a tool without schema — the LLM still sees name + description.
 		t, _ = functiontool.New(
@@ -60,6 +73,9 @@ func WrapExecutableTool(et agent.ExecutableTool, sessionID, userID string) adkto
 
 // WrapExecutableTools converts a slice of foundation ExecutableTools.
 func WrapExecutableTools(tools []agent.ExecutableTool, sessionID, userID string) []adktool.Tool {
+	if len(tools) == 0 {
+		return nil
+	}
 	wrapped := make([]adktool.Tool, 0, len(tools))
 	for _, et := range tools {
 		wrapped = append(wrapped, WrapExecutableTool(et, sessionID, userID))
@@ -105,7 +121,7 @@ func executeFoundationTool(
 // The foundation agent.Result.Content field is []any. Tools produce content
 // in three shapes:
 //
-//   - JSONResult(data)  → Content = [jsonString]   (TTS, search, etc.)
+//   - JSONResult(data)  → Content = [jsonString]   (structured results)
 //   - TextResult(text)  → Content = [plainString]  (calculator, etc.)
 //   - ErrorResult(err)  → Content = nil, Error = err
 //   - Multiple items    → Content = [a, b, ...]
@@ -153,9 +169,9 @@ func resultToMap(r agent.Result) map[string]any {
 
 // mergeSingleContent handles the single-content-item case.
 // If the content is a JSON string, it is parsed and merged flat into out.
-// This is the critical path for tools like TTS that return JSONResult(data):
+// This is the critical path for tools that return JSONResult(data):
 // their output arrives as a JSON-encoded string and must be unpacked so the
-// frontend sees {success, audio_url, ...} at the top level.
+// frontend sees the structured fields at the top level.
 func mergeSingleContent(out map[string]any, item any) {
 	s, ok := item.(string)
 	if !ok {
