@@ -111,20 +111,3 @@ templ BaseLayout(props LayoutProps) {
 		</body>
 	</html>
 }
-
-type AppLayoutProps struct {
-	Title       string
-	User        *shared.User
-	IncludeChat bool // If true, includes chat-specific scripts
-}
-
-// AppLayout provides the main application layout with navbar
-// (Kept for compatibility, now wraps BaseLayout)
-templ AppLayout(props AppLayoutProps) {
-	@BaseLayout(LayoutProps{
-		Title: props.Title,
-		User:  props.User,
-	}) {
-		{ children... }
-	}
-}

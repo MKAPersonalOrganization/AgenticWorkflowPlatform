@@ -101,10 +101,6 @@ func (p *Provider) CreateExecutable(ctx context.Context, toolID string, deps too
 			}
 		}
 
-		if apiKey == "" {
-			apiKey = deps.OpenAIAPIKey() // backward compat
-		}
-
 		return NewSpeakTool(artifactStore, apiKey, model, voice), nil
 	default:
 		return nil, nil

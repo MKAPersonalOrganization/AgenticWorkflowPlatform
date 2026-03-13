@@ -27,7 +27,7 @@ type ProfilePageProps struct {
 }
 
 templ ProfilePage(props ProfilePageProps) {
-	@components.AppLayout(components.AppLayoutProps{
+	@components.BaseLayout(components.LayoutProps{
 		Title: "Personalized Profile",
 		User:  props.User,
 	}) {

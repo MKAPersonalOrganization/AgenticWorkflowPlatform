@@ -188,9 +188,6 @@ func (r *depResolver) TTSConfig() (apiKey, model, voice string) {
 	r.factory.mu.RLock()
 	defer r.factory.mu.RUnlock()
 	apiKey = r.factory.ttsAPIKey
-	if apiKey == "" {
-		apiKey = r.factory.openAIAPIKey // fallback to LLM key for backward compat
-	}
 	return apiKey, r.factory.ttsModel, r.factory.ttsVoice
 }
 

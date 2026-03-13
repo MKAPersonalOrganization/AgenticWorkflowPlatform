@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"school-with-ai/modules/chat/chatcontracts"
 	"school-with-ai/modules/chat/projection/agui"
 	"school-with-ai/shared"
 
@@ -85,10 +84,6 @@ func (m *mockProjection) ListThreads(ctx context.Context, req agui.ThreadListReq
 
 // mockProjectionService implements ProjectionService for testing.
 type mockProjectionService struct{}
-
-func (m *mockProjectionService) ListThreadSummaries() []chatcontracts.ThreadSummary {
-	return nil
-}
 
 // Helper to create test user context.
 func contextWithUser(userID string) context.Context {

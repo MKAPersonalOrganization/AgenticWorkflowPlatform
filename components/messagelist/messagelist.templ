@@ -220,10 +220,6 @@ templ MessageList() {
 				<template x-if="message.type === 'tool_call' && !isSpecialTool(message.name)">
 					@ToolCall(ctx)
 				</template>
-				<!-- Tool Result Message (orphaned - should not happen with new approach, but kept for safety) -->
-				<div x-show="message.type === 'tool_result'" class="my-2" style="display: none;">
-					<!-- Hidden - tool results are now embedded in tool call messages -->
-				</div>
 				<!-- Assistant Message -->
 				@message.AssistantMessage()
 			</div>

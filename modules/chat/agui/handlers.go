@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"school-with-ai/modules/chat/chatcontracts"
 	"school-with-ai/modules/chat/projection/agui"
 	"school-with-ai/shared"
 )
@@ -18,9 +17,7 @@ type AguiProjectionHandler struct {
 }
 
 // ProjectionService provides business logic for projections.
-type ProjectionService interface {
-	ListThreadSummaries() []chatcontracts.ThreadSummary
-}
+type ProjectionService interface{}
 
 // NewAguiProjectionHandler creates a new handler for AGUI projection queries.
 func NewAguiProjectionHandler(projection agui.AguiProjection, projectionService ProjectionService) *AguiProjectionHandler {
