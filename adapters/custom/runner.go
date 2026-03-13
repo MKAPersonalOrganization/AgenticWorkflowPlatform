@@ -113,17 +113,17 @@ func (r *RunnerAdapter) buildEngine(ctx context.Context, modelCfg *agent.ModelCo
 	}
 
 	provider := &RegistryAgentProvider{
-		provider:             r.agentProvider,
-		profileProvider:      r.profileProvider,
-		modelProvider:        modelCfg.Provider,
-		modelID:              modelCfg.Model,
-		temperature:          modelCfg.Temperature,
-		maxIterations:        modelCfg.MaxIterations,
-		maxTokens:            modelCfg.MaxTokens,
-		toolFactory:          toolFactory,
-		permChecker:      r.permChecker,
-		mcpResolver:      r.mcpResolver,
-		promptInjectors:  r.promptInjectors,
+		provider:        r.agentProvider,
+		profileProvider: r.profileProvider,
+		modelProvider:   modelCfg.Provider,
+		modelID:         modelCfg.Model,
+		temperature:     modelCfg.Temperature,
+		maxIterations:   modelCfg.MaxIterations,
+		maxTokens:       modelCfg.MaxTokens,
+		toolFactory:     toolFactory,
+		permChecker:     r.permChecker,
+		mcpResolver:     r.mcpResolver,
+		promptInjectors: r.promptInjectors,
 	}
 
 	return engine.New(chatClient, provider, nil, nil), nil
@@ -374,17 +374,17 @@ func (r *RunnerAdapter) toCoreToolCalls(dtcs []thread.ToolCall) []core.ToolCall 
 
 // RegistryAgentProvider implements engine.AgentProvider using agent.AgentProvider.
 type RegistryAgentProvider struct {
-	provider             agent.AgentProvider
-	profileProvider      agent.UserContextProvider
-	modelProvider        string   // LLM provider name (e.g., "openai", "gemini")
-	modelID              string   // LLM model name (e.g., "gpt-4o", "gemini-2.0-flash")
-	temperature          *float64 // Global temperature from AI settings
-	maxIterations        int      // Global max iterations from AI settings
-	maxTokens            *int     // Global max tokens from AI settings
-	toolFactory          ToolSetFactory
-	permChecker      ToolPermissionChecker
-	mcpResolver      MCPToolResolver
-	promptInjectors  []PromptInjector
+	provider        agent.AgentProvider
+	profileProvider agent.UserContextProvider
+	modelProvider   string   // LLM provider name (e.g., "openai", "gemini")
+	modelID         string   // LLM model name (e.g., "gpt-4o", "gemini-2.0-flash")
+	temperature     *float64 // Global temperature from AI settings
+	maxIterations   int      // Global max iterations from AI settings
+	maxTokens       *int     // Global max tokens from AI settings
+	toolFactory     ToolSetFactory
+	permChecker     ToolPermissionChecker
+	mcpResolver     MCPToolResolver
+	promptInjectors []PromptInjector
 }
 
 func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (core.AgentConfig, error) {
