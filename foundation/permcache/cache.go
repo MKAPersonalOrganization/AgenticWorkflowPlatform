@@ -1,88 +1,106 @@
 package permcache
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"strings"
-	"sync"
+	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 const (
-	// maxUsers is the maximum number of distinct user entries in a
-	// permission cache before random eviction kicks in.
-	maxUsers = 5000
+	// DefaultTTL is the default time-to-live for cache entries in Redis.
+	// Entries expire automatically; no manual eviction is needed.
+	DefaultTTL = 15 * time.Minute
+
+	// keyPrefix namespaces all permission cache keys in Redis.
+	keyPrefix = "permcache:"
 
 	// keySep separates the parts of a composite cache key (agentID, resource IDs).
 	keySep = "\x00"
 )
 
-// Cache is a thread-safe, generic cache keyed by userID plus a composite
-// resource key (agentID + one or more resource IDs).
+// Cache is a distributed, generic cache backed by Redis, keyed by userID plus
+// a composite resource key (agentID + one or more resource IDs).
 //
-// Eviction is per-user: when the number of distinct user entries reaches
-// [maxUsers], half the users are evicted (random order, leveraging Go map
-// iteration non-determinism).
+// Eviction is handled by Redis TTL — entries expire after [DefaultTTL] (or a
+// custom TTL) without any application-side bookkeeping. Because the cache is
+// shared across all application instances, a write on one pod is immediately
+// visible to every other pod.
 //
-// All values are stored as pointers so callers can cheaply copy-on-read when
-// needed. The cache itself never copies values — that is the caller's
-// responsibility.
+// Values are serialised as JSON. The type parameter V must be
+// JSON-marshallable (all current permission types already carry JSON tags).
 type Cache[V any] struct {
-	mu    sync.RWMutex
-	users map[string]map[string]*V // userID → compositeKey → *V
+	rdb    redis.Cmdable
+	prefix string // per-cache key namespace, e.g. "permcache:toolperm:"
+	ttl    time.Duration
 }
 
-// New returns a ready-to-use cache.
-func New[V any]() *Cache[V] {
+// New returns a Redis-backed cache with [DefaultTTL] and the given key prefix.
+// The prefix is used to namespace keys so that different cache instances
+// (e.g. tool permissions vs workspace permissions) don't collide.
+func New[V any](rdb redis.Cmdable, prefix string) *Cache[V] {
+	return NewWithTTL[V](rdb, prefix, DefaultTTL)
+}
+
+// NewWithTTL returns a Redis-backed cache with a custom TTL.
+// If ttl ≤ 0, [DefaultTTL] is used.
+func NewWithTTL[V any](rdb redis.Cmdable, prefix string, ttl time.Duration) *Cache[V] {
+	if ttl <= 0 {
+		ttl = DefaultTTL
+	}
 	return &Cache[V]{
-		users: make(map[string]map[string]*V),
+		rdb:    rdb,
+		prefix: keyPrefix + prefix + ":",
+		ttl:    ttl,
 	}
 }
 
 // Get looks up a cached value. Returns (value, true) on hit, (nil, false) on miss.
-// The returned pointer is the same one stored in the cache — copy it if you
-// intend to expose it to callers.
+// The returned pointer is freshly allocated — callers may mutate it freely.
 func (c *Cache[V]) Get(userID string, resourceKeys ...string) (*V, bool) {
-	key := joinKeys(resourceKeys)
+	ctx := context.Background()
+	rk := c.redisKey(userID, resourceKeys)
 
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	if userMap, ok := c.users[userID]; ok {
-		if v, ok := userMap[key]; ok {
-			return v, true
-		}
+	data, err := c.rdb.Get(ctx, rk).Bytes()
+	if err != nil {
+		// redis.Nil (miss) or transient error — treat as miss.
+		return nil, false
 	}
-	return nil, false
+
+	var v V
+	if err := json.Unmarshal(data, &v); err != nil {
+		return nil, false
+	}
+
+	return &v, true
 }
 
-// Set stores a value in the cache, evicting users if the cache is full.
+// Set stores a value in the cache with the configured TTL.
 func (c *Cache[V]) Set(userID string, value *V, resourceKeys ...string) {
-	key := joinKeys(resourceKeys)
+	ctx := context.Background()
+	rk := c.redisKey(userID, resourceKeys)
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.evictIfNeeded()
-
-	if _, ok := c.users[userID]; !ok {
-		c.users[userID] = make(map[string]*V)
+	data, err := json.Marshal(value)
+	if err != nil {
+		return // best-effort; callers still hit the DB on miss
 	}
-	c.users[userID][key] = value
+
+	_ = c.rdb.Set(ctx, rk, data, c.ttl).Err()
 }
 
-// evictIfNeeded removes approximately half the user entries when the cache
-// exceeds [maxUsers]. Must be called while holding c.mu (write lock).
-func (c *Cache[V]) evictIfNeeded() {
-	if len(c.users) < maxUsers {
-		return
-	}
-	half := len(c.users) / 2
-	count := 0
-	for k := range c.users {
-		delete(c.users, k)
-		count++
-		if count >= half {
-			break
-		}
-	}
+// Delete removes a specific entry from the cache.
+func (c *Cache[V]) Delete(userID string, resourceKeys ...string) {
+	ctx := context.Background()
+	rk := c.redisKey(userID, resourceKeys)
+	_ = c.rdb.Del(ctx, rk).Err()
+}
+
+// redisKey builds the full Redis key for a given user + resource combination.
+func (c *Cache[V]) redisKey(userID string, resourceKeys []string) string {
+	return fmt.Sprintf("%s%s:%s", c.prefix, userID, joinKeys(resourceKeys))
 }
 
 // joinKeys combines resource keys into a single string using a null-byte

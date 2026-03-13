@@ -441,12 +441,21 @@ func run(ctx context.Context, log *logger.Logger) error {
 	mcpModule := mcpmod.New(log, db, cfg.Auth.AppURL+"/v1/mcp/oauth/callback", toolRegistry)
 	log.Info(ctx, "startup", "status", "mcp module initialized")
 
+	// Initialize Redis client for distributed permission caching (shared across pods)
+	permCacheRedis := goredis.NewClient(&goredis.Options{Addr: cfg.Redis.Addr, Password: cfg.Redis.Password})
+	defer func() {
+		if closeErr := permCacheRedis.Close(); closeErr != nil {
+			log.Error(ctx, "shutdown", "status", "failed to close perm-cache Redis client", "ERROR", closeErr)
+		}
+	}()
+	log.Info(ctx, "startup", "status", "perm-cache Redis client initialized", "addr", cfg.Redis.Addr)
+
 	// Create and initialize permissions service
-	permissionsService := permtool.NewService(log, permtool.NewPostgresPermissionsRepository(db))
+	permissionsService := permtool.NewService(log, permtool.NewPostgresPermissionsRepository(db), permCacheRedis)
 	log.Info(ctx, "startup", "status", "permissions service initialized")
 
 	// Create workspace permissions service
-	workspacePermissionsService := permworkspace.NewService(log, permworkspace.NewPostgresWorkspacePermissionsRepository(db))
+	workspacePermissionsService := permworkspace.NewService(log, permworkspace.NewPostgresWorkspacePermissionsRepository(db), permCacheRedis)
 	log.Info(ctx, "startup", "status", "workspace permissions service initialized")
 
 	// Initialize Knowledge module (owns Edgequake / RAG services)
