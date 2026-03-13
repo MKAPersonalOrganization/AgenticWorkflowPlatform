@@ -34,11 +34,6 @@ type ModelConfigResolver interface {
 	GetModelConfigForUser(ctx context.Context, userID string) (*agent.ModelConfig, error)
 }
 
-// TTSConfigResolver resolves per-user text-to-speech configuration.
-type TTSConfigResolver interface {
-	GetTTSConfigForUserFlat(ctx context.Context, userID string) (apiKey, model, voice string, err error)
-}
-
 // AgentProvider retrieves agent definitions for a user.
 type AgentProvider interface {
 	GetForUser(ctx context.Context, name, userID string) (agent.Agent, error)
@@ -51,19 +46,24 @@ type ToolSetFactory interface {
 }
 
 // ToolFactoryConfig carries per-request configuration for tool creation.
+// Tool-specific settings (API keys, service URLs) are passed via the Extra map
+// so the adapter layer remains tool-agnostic.
 type ToolFactoryConfig struct {
-	EdgequakeBaseURL    string
 	ModelAPIKey         string
 	ModelID             string
-	TTSAPIKey           string
-	TTSModel            string
-	TTSVoice            string
 	PluginSettings      map[string]map[string]string
 	AllowedKBNamespaces []string
+	Extra               map[string]string // Additional per-request config (e.g., service URLs, API keys)
 }
 
 // NewToolSetFactoryFunc creates a ToolSetFactory scoped to a single request.
 type NewToolSetFactoryFunc func(cfg ToolFactoryConfig) ToolSetFactory
+
+// ExtraConfigFunc resolves per-user, per-request tool configuration.
+// The returned map is passed as ToolFactoryConfig.Extra so the adapter
+// layer remains tool-agnostic while the composition root can provide
+// tool-specific settings (API keys, service URLs, etc.).
+type ExtraConfigFunc func(ctx context.Context, userID string) map[string]string
 
 // ToolPermissionChecker provides per-user, per-agent tool access control.
 type ToolPermissionChecker interface {
@@ -92,12 +92,12 @@ type PluginSettingsResolver interface {
 	GetAllPluginSettingsForUser(ctx context.Context, userID string) (map[string]map[string]string, error)
 }
 
-// SkillPromptInjector injects skill-specific prompt additions.
-type SkillPromptInjector interface {
+// PromptInjector injects additional prompt content (e.g., activated capabilities).
+type PromptInjector interface {
 	BuildPromptAddition(threadID string) string
 }
 
-// StudentProfileProvider provides student profile information for prompt injection.
-type StudentProfileProvider interface {
+// UserContextProvider provides user context information for prompt injection.
+type UserContextProvider interface {
 	GetProfile(ctx context.Context, userID string) (map[string]any, error)
 }

@@ -47,8 +47,8 @@ const (
 	// LoopTypeContent indicates repeated content patterns.
 	LoopTypeContent LoopType = "content_repetition"
 
-	// LoopTypePedagogical indicates unproductive teaching pattern.
-	LoopTypePedagogical LoopType = "pedagogical_loop"
+	// LoopTypeProgressStall indicates repeated failed attempts on the same concept.
+	LoopTypeProgressStall LoopType = "progress_stall"
 )
 
 // ExecutionResult contains the outcome of an agent execution run.

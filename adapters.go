@@ -12,7 +12,7 @@ import (
 )
 
 // adkgoProfileAdapter bridges identity.StudentProfileRepository to
-// adkgo.StudentProfileProvider (GetProfile → map[string]any).
+// adkgo.UserContextProvider (GetProfile → map[string]any).
 type adkgoProfileAdapter struct {
 	repo identity.StudentProfileRepository
 }

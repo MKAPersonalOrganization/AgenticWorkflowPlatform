@@ -10,8 +10,8 @@ import (
 
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agentsdk/core"
-	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/foundation/agentsdk/io"
+	"school-with-ai/foundation/agentsdk/llm"
 	"school-with-ai/shared"
 
 	"golang.org/x/sync/errgroup"
@@ -164,7 +164,7 @@ func (exec *executionState) finalizeResult() {
 
 func (e *Engine) newExecutionState(ctx context.Context, agentName string, runCtx core.RunContext, yield func(core.Event, error) bool) (*executionState, error) {
 	// Put thread ID in context so AgentProvider.GetConfig can access it
-	// for per-thread state injection (e.g. activated skills).
+	// for per-thread state injection (e.g. prompt additions).
 	ctx = shared.SetThreadIDInContext(ctx, runCtx.ThreadID)
 
 	instance, err := e.newAgentInstance(ctx, agentName)
@@ -489,6 +489,8 @@ func (ai *AgentInstance) ID() agent.ID { return agent.ID(ai.instanceName) }
 func (ai *AgentInstance) Name() string { return ai.instanceName }
 
 func (ai *AgentInstance) Description() string { return "" }
+
+func (ai *AgentInstance) SubAgents() []agent.Agent { return nil }
 
 func (ai *AgentInstance) Run(ctx context.Context, inv *agent.Invocation) iter.Seq2[agent.Event, error] {
 	return func(yield func(agent.Event, error) bool) {

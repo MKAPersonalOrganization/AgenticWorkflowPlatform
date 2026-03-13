@@ -3,6 +3,7 @@ package blades
 import (
 	"context"
 	"iter"
+
 	"school-with-ai/foundation/agent"
 )
 
@@ -40,6 +41,8 @@ func (a *Adapter) Name() string {
 func (a *Adapter) Description() string {
 	return "Blades Agent Adapter"
 }
+
+func (a *Adapter) SubAgents() []agent.Agent { return nil }
 
 func (a *Adapter) Run(ctx context.Context, input *agent.Invocation) iter.Seq2[agent.Event, error] {
 	return func(yield func(agent.Event, error) bool) {

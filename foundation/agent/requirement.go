@@ -76,7 +76,7 @@ type ToolProvider interface {
 }
 
 // PromptProvider is implemented by Requirements that contribute to the
-// agent's system prompt (e.g., instructions about how to use quiz tools).
+// agent's system prompt (e.g., instructions about how to use provided tools).
 type PromptProvider interface {
 	// PromptAddition returns text to append to the system prompt.
 	PromptAddition() string

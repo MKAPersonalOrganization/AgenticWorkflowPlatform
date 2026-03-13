@@ -267,6 +267,7 @@ type mockAgent struct {
 func (m *mockAgent) ID() ID              { return m.id }
 func (m *mockAgent) Name() string        { return m.name }
 func (m *mockAgent) Description() string { return "" }
+func (m *mockAgent) SubAgents() []Agent  { return nil }
 func (m *mockAgent) Run(_ context.Context, _ *Invocation) iter.Seq2[Event, error] {
 	return nil
 }

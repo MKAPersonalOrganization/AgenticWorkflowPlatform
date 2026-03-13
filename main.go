@@ -539,11 +539,12 @@ func run(ctx context.Context, log *logger.Logger) error {
 		f.SetMemoryFactory(func(store artifact.Service) toolregistry.MemoryService {
 			return chatmemory.NewArtifactMemoryService(store)
 		})
-		if cfg.EdgequakeBaseURL != "" {
-			f.SetEdgequakeConfig(cfg.EdgequakeBaseURL, cfg.ModelAPIKey, cfg.ModelID)
+		// Read tool-specific config from the generic Extra map.
+		if url := cfg.Extra["edgequake_base_url"]; url != "" {
+			f.SetEdgequakeConfig(url, cfg.ModelAPIKey, cfg.ModelID)
 		}
-		if cfg.TTSAPIKey != "" {
-			f.SetTTSConfig(cfg.TTSAPIKey, cfg.TTSModel, cfg.TTSVoice)
+		if apiKey := cfg.Extra["tts_api_key"]; apiKey != "" {
+			f.SetTTSConfig(apiKey, cfg.Extra["tts_model"], cfg.Extra["tts_voice"])
 		}
 		if cfg.PluginSettings != nil {
 			f.SetPluginSettings(cfg.PluginSettings)
@@ -554,21 +555,34 @@ func run(ctx context.Context, log *logger.Logger) error {
 		return f
 	})
 
+	// Resolve per-user tool config at request time (TTS, service URLs, etc.)
+	// so the adapter layer stays tool-agnostic.
+	extraConfigFn := adkgo.ExtraConfigFunc(func(ctx context.Context, userID string) map[string]string {
+		extra := map[string]string{
+			"edgequake_base_url": cfg.Edgequake.BaseURL,
+		}
+		if apiKey, model, voice, err := aiSettingsModule.GetTTSConfigForUserFlat(ctx, userID); err == nil && apiKey != "" {
+			extra["tts_api_key"] = apiKey
+			extra["tts_model"] = model
+			extra["tts_voice"] = voice
+		}
+		return extra
+	})
+
 	adkRunner, err := adkgo.NewRunnerAdapter(adkgo.RunnerAdapterConfig{
 		Log:                    log,
 		ThreadMgr:              chatModule.Orchestrator().GetThreadManagement(),
 		AgentProvider:          agentProvider,
 		ConfigResolver:         aiSettingsModule,
-		TTSResolver:            aiSettingsModule,
 		PluginSettingsResolver: pluginSettingsModule,
 		ProfileProvider:        &adkgoProfileAdapter{repo: studentProfileRepo},
 		PermChecker:            permissionsService,
 		WorkspacePermChecker:   workspacePermissionsService,
 		MCPResolver:            mcpModule.Service(),
 		NewToolSetFactory:      newToolSetFactory,
-		SkillInjector:          skillActivationTracker,
-		EdgequakeEnabled:       edgequakeService != nil,
-		EdgequakeBaseURL:       cfg.Edgequake.BaseURL,
+		PromptInjector:         skillActivationTracker,
+		KnowledgeBaseEnabled:   edgequakeService != nil,
+		ExtraConfigFn:          extraConfigFn,
 	})
 	if err != nil {
 		return fmt.Errorf("creating adk-go runner: %w", err)

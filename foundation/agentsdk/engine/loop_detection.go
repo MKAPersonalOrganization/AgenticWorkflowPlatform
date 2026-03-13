@@ -20,10 +20,10 @@ type LoopDetector struct {
 	contentMaxDistance     int
 	contentRepetitionCount int
 
-	// Pedagogical loop detection (for educational contexts)
-	conceptExplanations  map[string]int // concept -> explanation count
-	conceptQuizFailures  map[string]int // concept -> quiz failure count
-	pedagogicalThreshold int
+	// Progress stall detection (repeated failed attempts on the same concept)
+	conceptExplanations    map[string]int // concept -> explanation count
+	conceptTaskFailures    map[string]int // concept -> task failure count
+	progressStallThreshold int
 }
 
 // toolErrorRecord tracks a tool error for error-based loop detection.
@@ -52,9 +52,9 @@ type LoopDetectorConfig struct {
 	// Default: 5 * ContentChunkSize
 	ContentMaxDistance int
 
-	// PedagogicalThreshold is the number of failed explanations before escalation.
+	// ProgressStallThreshold is the number of failed attempts before escalation.
 	// Default: 3
-	PedagogicalThreshold int
+	ProgressStallThreshold int
 }
 
 // DefaultLoopDetectorConfig returns sensible defaults for loop detection.
@@ -64,7 +64,7 @@ func DefaultLoopDetectorConfig() LoopDetectorConfig {
 		ContentChunkSize:     50,
 		ContentLoopThreshold: 10,
 		ContentMaxDistance:   250, // 5 * 50
-		PedagogicalThreshold: 3,
+		ProgressStallThreshold: 3,
 	}
 }
 
@@ -82,20 +82,20 @@ func NewLoopDetector(config LoopDetectorConfig) *LoopDetector {
 	if config.ContentMaxDistance <= 0 {
 		config.ContentMaxDistance = config.ContentChunkSize * 5
 	}
-	if config.PedagogicalThreshold <= 0 {
-		config.PedagogicalThreshold = 3
+	if config.ProgressStallThreshold <= 0 {
+		config.ProgressStallThreshold = 3
 	}
 
 	return &LoopDetector{
-		toolErrorHistory:     make([]toolErrorRecord, 0),
-		toolErrorThreshold:   config.ToolErrorThreshold,
-		contentChunks:        make([]string, 0),
-		contentChunkSize:     config.ContentChunkSize,
-		contentLoopThreshold: config.ContentLoopThreshold,
-		contentMaxDistance:   config.ContentMaxDistance,
-		conceptExplanations:  make(map[string]int),
-		conceptQuizFailures:  make(map[string]int),
-		pedagogicalThreshold: config.PedagogicalThreshold,
+		toolErrorHistory:       make([]toolErrorRecord, 0),
+		toolErrorThreshold:     config.ToolErrorThreshold,
+		contentChunks:          make([]string, 0),
+		contentChunkSize:       config.ContentChunkSize,
+		contentLoopThreshold:   config.ContentLoopThreshold,
+		contentMaxDistance:     config.ContentMaxDistance,
+		conceptExplanations:    make(map[string]int),
+		conceptTaskFailures:    make(map[string]int),
+		progressStallThreshold: config.ProgressStallThreshold,
 	}
 }
 
@@ -244,27 +244,27 @@ func (d *LoopDetector) RecordConceptExplanation(concept string) {
 
 // RecordTaskFailure records that a user failed a task on a concept.
 func (d *LoopDetector) RecordTaskFailure(concept string) {
-	d.conceptQuizFailures[concept]++
+	d.conceptTaskFailures[concept]++
 }
 
 // RecordTaskSuccess records that a user passed a task on a concept.
 // This resets the failure count for that concept.
 func (d *LoopDetector) RecordTaskSuccess(concept string) {
-	d.conceptQuizFailures[concept] = 0
+	d.conceptTaskFailures[concept] = 0
 }
 
-// CheckPedagogicalLoop checks if we're in an unproductive teaching loop.
-// Returns LoopInfo if a pedagogical loop is detected, nil otherwise.
-func (d *LoopDetector) CheckPedagogicalLoop(concept string) *LoopInfo {
+// CheckProgressStall checks if the user is stuck in an unproductive loop.
+// Returns LoopInfo if a progress stall is detected, nil otherwise.
+func (d *LoopDetector) CheckProgressStall(concept string) *LoopInfo {
 	explanations := d.conceptExplanations[concept]
-	failures := d.conceptQuizFailures[concept]
+	failures := d.conceptTaskFailures[concept]
 
-	// If we've explained multiple times and user keeps failing,
+	// If we've attempted multiple times and user keeps failing,
 	// we might need a different approach
-	if explanations >= d.pedagogicalThreshold && failures >= 2 {
+	if explanations >= d.progressStallThreshold && failures >= 2 {
 		return &LoopInfo{
-			Type: LoopTypePedagogical,
-			Description: "User continues to struggle with concept after multiple explanations. " +
+			Type: LoopTypeProgressStall,
+			Description: "User has not made progress after multiple attempts. " +
 				"Consider: different approach, prerequisite review, or human escalation.",
 			Occurrences: explanations,
 			Pattern:     concept,
@@ -280,7 +280,7 @@ func (d *LoopDetector) Reset() {
 	d.contentChunks = make([]string, 0)
 	d.contentRepetitionCount = 0
 	d.conceptExplanations = make(map[string]int)
-	d.conceptQuizFailures = make(map[string]int)
+	d.conceptTaskFailures = make(map[string]int)
 }
 
 // GetStats returns statistics about the current detection state.
@@ -288,7 +288,7 @@ func (d *LoopDetector) GetStats() map[string]any {
 	return map[string]any{
 		"content_repetition_count": d.contentRepetitionCount,
 		"concepts_explained":       len(d.conceptExplanations),
-		"concepts_with_failures":   len(d.conceptQuizFailures),
+		"concepts_with_failures":   len(d.conceptTaskFailures),
 	}
 }
 
@@ -298,7 +298,7 @@ func (d *LoopDetector) Serialize() string {
 		ToolErrorHistory:    d.toolErrorHistory,
 		ContentChunks:       d.contentChunks,
 		ConceptExplanations: d.conceptExplanations,
-		ConceptQuizFailures: d.conceptQuizFailures,
+		ConceptTaskFailures: d.conceptTaskFailures,
 	}
 	b, _ := json.Marshal(state)
 	return hex.EncodeToString(b)
@@ -320,7 +320,7 @@ func (d *LoopDetector) Load(stateHex string) error {
 	d.toolErrorHistory = state.ToolErrorHistory
 	d.contentChunks = state.ContentChunks
 	d.conceptExplanations = state.ConceptExplanations
-	d.conceptQuizFailures = state.ConceptQuizFailures
+	d.conceptTaskFailures = state.ConceptTaskFailures
 	return nil
 }
 
@@ -328,7 +328,7 @@ type loopDetectorState struct {
 	ToolErrorHistory    []toolErrorRecord `json:"toolErrorHistory"`
 	ContentChunks       []string          `json:"contentChunks"`
 	ConceptExplanations map[string]int    `json:"conceptExplanations"`
-	ConceptQuizFailures map[string]int    `json:"conceptQuizFailures"`
+	ConceptTaskFailures map[string]int    `json:"conceptTaskFailures"`
 }
 
 // Helper functions
