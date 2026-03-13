@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/agentsdk/io"
+	"school-with-ai/foundation/agent/io"
 )
 
 // AskUserQuestionType enumerates the supported question types.

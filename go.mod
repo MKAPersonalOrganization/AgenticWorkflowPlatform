@@ -14,7 +14,6 @@ require (
 	github.com/ardanlabs/conf/v3 v3.10.0
 	github.com/ardanlabs/darwin/v3 v3.3.1
 	github.com/arl/statsviz v0.8.0
-	github.com/avast/retry-go/v4 v4.7.0
 	github.com/charmbracelet/log v0.4.2
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/go-redis/redis_rate/v10 v10.0.1
@@ -27,9 +26,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/minio/minio-go/v7 v7.0.98
 	github.com/modelcontextprotocol/go-sdk v1.4.0
-	github.com/ollama/ollama v0.13.5
 	github.com/openai/openai-go/v3 v3.15.0
-	github.com/qmuntal/stateless v1.7.2
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/stretchr/testify v1.11.1
 	github.com/stripe/stripe-go/v84 v84.4.0
@@ -39,8 +36,8 @@ require (
 	go.opentelemetry.io/otel/sdk v1.40.0
 	go.opentelemetry.io/otel/trace v1.40.0
 	golang.org/x/oauth2 v0.34.0
-	golang.org/x/sync v0.19.0
 	golang.org/x/text v0.33.0
+	google.golang.org/adk v0.6.0
 	google.golang.org/genai v1.43.0
 )
 
@@ -88,6 +85,7 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
+	github.com/mattn/go-sqlite3 v1.14.24 // indirect
 	github.com/minio/crc64nvme v1.1.1 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
@@ -119,10 +117,10 @@ require (
 	golang.org/x/exp v0.0.0-20250218142911-aa4b98e5adaa // indirect
 	golang.org/x/mod v0.32.0 // indirect
 	golang.org/x/net v0.49.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	golang.org/x/tools v0.41.0 // indirect
-	google.golang.org/adk v0.6.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260128011058-8636f8732409 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260128011058-8636f8732409 // indirect
 	google.golang.org/grpc v1.78.0 // indirect
