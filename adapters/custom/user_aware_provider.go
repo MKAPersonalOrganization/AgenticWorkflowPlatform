@@ -124,3 +124,9 @@ func (a *dbAgent) ID() agent.ID        { return a.id }
 func (a *dbAgent) Name() string        { return a.displayName }
 func (a *dbAgent) Description() string { return a.Agent.Description() }
 func (a *dbAgent) Icon() string        { return a.icon }
+
+// EmbeddedAgent returns the inner agent.Agent value.
+// This allows adapter-agnostic code (e.g., the ADK-Go adapter) to unwrap
+// the dbAgent → CustomAgent chain and extract Config without importing
+// concrete custom package types.
+func (a *dbAgent) EmbeddedAgent() agent.Agent { return a.Agent }

@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"school-with-ai/adapters/adkgo"
 	"school-with-ai/adapters/custom"
 	"school-with-ai/components"
 	"school-with-ai/components/docs"
@@ -158,7 +159,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 			Password string `conf:"mask"`
 		}
 		Orchestration struct {
-			Framework           string        `conf:"default:custom"`
 			Concurrency         int           `conf:"default:5"`
 			ShutdownTimeout     time.Duration `conf:"default:10s"`
 			HealthCheckInterval time.Duration `conf:"default:15s"`
@@ -533,7 +533,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Build the tool set factory builder — closes over the tool registry so the adapter
 	// never imports service packages (dependency inversion via closure).
-	newToolSetFactory := custom.NewToolSetFactoryFunc(func(cfg custom.ToolFactoryConfig) custom.ToolSetFactory {
+	newToolSetFactory := adkgo.NewToolSetFactoryFunc(func(cfg adkgo.ToolFactoryConfig) adkgo.ToolSetFactory {
 		f := toolregistry.NewExecutableToolFactory(artifactService)
 		f.SetToolRegistry(toolRegistry)
 		f.SetMemoryFactory(func(store artifact.Service) toolregistry.MemoryService {
@@ -554,31 +554,26 @@ func run(ctx context.Context, log *logger.Logger) error {
 		return f
 	})
 
-	switch cfg.Orchestration.Framework {
-	case "custom":
-		runner, err := custom.NewRunnerAdapter(ctx, custom.RunnerAdapterConfig{
-			Log:                    log,
-			ThreadMgr:              chatModule.Orchestrator().GetThreadManagement(),
-			AgentProvider:          agentProvider,
-			ConfigResolver:         aiSettingsModule,
-			TTSResolver:            aiSettingsModule,
-			PluginSettingsResolver: pluginSettingsModule,
-			ProfileProvider:        &custom.StudentProfileAdapter{Repo: studentProfileRepo},
-			PermChecker:            permissionsService,
-			WorkspacePermChecker:   workspacePermissionsService,
-			MCPResolver:            mcpModule.Service(),
-			NewToolSetFactory:      newToolSetFactory,
-			SkillInjector:          skillActivationTracker,
-			EdgequakeEnabled:       edgequakeService != nil,
-			EdgequakeBaseURL:       cfg.Edgequake.BaseURL,
-		})
-		if err != nil {
-			return fmt.Errorf("creating custom runner: %w", err)
-		}
-		chatModule.SetRunner(runner)
-	default:
-		return fmt.Errorf("unsupported agent framework: %s", cfg.Orchestration.Framework)
+	adkRunner, err := adkgo.NewRunnerAdapter(adkgo.RunnerAdapterConfig{
+		Log:                    log,
+		ThreadMgr:              chatModule.Orchestrator().GetThreadManagement(),
+		AgentProvider:          agentProvider,
+		ConfigResolver:         aiSettingsModule,
+		TTSResolver:            aiSettingsModule,
+		PluginSettingsResolver: pluginSettingsModule,
+		ProfileProvider:        &adkgoProfileAdapter{repo: studentProfileRepo},
+		PermChecker:            permissionsService,
+		WorkspacePermChecker:   workspacePermissionsService,
+		MCPResolver:            mcpModule.Service(),
+		NewToolSetFactory:      newToolSetFactory,
+		SkillInjector:          skillActivationTracker,
+		EdgequakeEnabled:       edgequakeService != nil,
+		EdgequakeBaseURL:       cfg.Edgequake.BaseURL,
+	})
+	if err != nil {
+		return fmt.Errorf("creating adk-go runner: %w", err)
 	}
+	chatModule.SetRunner(adkRunner)
 	defer chatModule.Shutdown()
 
 	log.Info(ctx, "startup", "status", "chat module initialized",
