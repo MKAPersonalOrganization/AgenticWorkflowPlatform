@@ -37,6 +37,13 @@ type AgentProvider interface {
 	GetForUser(ctx context.Context, name, userID string) (agent.Agent, error)
 }
 
+// AgentLister is an optional extension of AgentProvider that supports
+// listing all available agents. Providers that implement this interface
+// enable the ListAgents functionality in the RunnerAdapter.
+type AgentLister interface {
+	List() []agent.Agent
+}
+
 // ToolSetFactory creates executable tools from a registered tool set.
 type ToolSetFactory interface {
 	CreateExecutableToolsFromSet(ctx context.Context, toolSetID string) ([]agent.ExecutableTool, error)

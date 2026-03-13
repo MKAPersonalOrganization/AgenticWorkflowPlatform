@@ -122,6 +122,7 @@ func (rl *rateLimiter) allow(userID string) bool {
 }
 
 // global rate limiter instance shared across all WebSearchTool instances.
+// Deprecated: kept as a fallback; new tools receive their own limiter.
 var globalLimiter = newRateLimiter()
 
 // =========================================================================
@@ -132,12 +133,31 @@ var globalLimiter = newRateLimiter()
 // It is decoupled from any specific AI SDK — the concrete client (e.g. Gemini)
 // is injected at construction time from the adapter layer.
 type WebSearchTool struct {
-	client GroundedSearchClient
+	client  GroundedSearchClient
+	limiter *rateLimiter
+}
+
+// WebSearchToolOption configures optional parameters for NewWebSearchTool.
+type WebSearchToolOption func(*WebSearchTool)
+
+// WithRateLimiter sets a custom rate limiter for the tool.
+// Useful for tests or per-instance isolation.
+func WithRateLimiter(rl *rateLimiter) WebSearchToolOption {
+	return func(t *WebSearchTool) {
+		t.limiter = rl
+	}
 }
 
 // NewWebSearchTool creates a new web search tool backed by the given client.
-func NewWebSearchTool(client GroundedSearchClient) *WebSearchTool {
-	return &WebSearchTool{client: client}
+func NewWebSearchTool(client GroundedSearchClient, opts ...WebSearchToolOption) *WebSearchTool {
+	t := &WebSearchTool{
+		client:  client,
+		limiter: newRateLimiter(),
+	}
+	for _, opt := range opts {
+		opt(t)
+	}
+	return t
 }
 
 func (t *WebSearchTool) Name() string          { return "web_search" }
@@ -163,7 +183,7 @@ func (t *WebSearchTool) Execute(ctx context.Context, args agent.Arguments) (agen
 	if userID == "" {
 		userID = "anonymous"
 	}
-	if !globalLimiter.allow(userID) {
+	if !t.limiter.allow(userID) {
 		return agent.ErrorResult(fmt.Errorf("rate limit exceeded: maximum %d searches per minute", rateLimitMax)), nil
 	}
 
@@ -202,7 +222,7 @@ func InsertCitationMarkers(text string, citations []Citation) string {
 	// Sort citations by end index descending so insertions don't shift offsets.
 	sorted := make([]Citation, len(citations))
 	copy(sorted, citations)
-	for i := 0; i < len(sorted); i++ {
+	for i := range len(sorted) {
 		for j := i + 1; j < len(sorted); j++ {
 			if sorted[j].EndIndex > sorted[i].EndIndex {
 				sorted[i], sorted[j] = sorted[j], sorted[i]
@@ -218,13 +238,10 @@ func InsertCitationMarkers(text string, citations []Citation) string {
 
 		var marker strings.Builder
 		for _, idx := range cit.SourceIndices {
-			marker.WriteString(fmt.Sprintf("[%d]", idx))
+			fmt.Fprintf(&marker, "[%d]", idx)
 		}
 
-		endIdx := cit.EndIndex
-		if endIdx > len(runes) {
-			endIdx = len(runes)
-		}
+		endIdx := min(cit.EndIndex, len(runes))
 		if endIdx <= 0 {
 			continue
 		}

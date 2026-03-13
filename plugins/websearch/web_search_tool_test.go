@@ -162,7 +162,7 @@ func TestWebSearchTool_Execute_MissingAPIKey(t *testing.T) {
 
 func TestRateLimiter_AllowsUnderLimit(t *testing.T) {
 	rl := newRateLimiter()
-	for i := 0; i < rateLimitMax; i++ {
+	for i := range rateLimitMax {
 		if !rl.allow("user-1") {
 			t.Fatalf("rate limiter denied request %d (should allow up to %d)", i+1, rateLimitMax)
 		}
@@ -171,7 +171,7 @@ func TestRateLimiter_AllowsUnderLimit(t *testing.T) {
 
 func TestRateLimiter_BlocksOverLimit(t *testing.T) {
 	rl := newRateLimiter()
-	for i := 0; i < rateLimitMax; i++ {
+	for range rateLimitMax {
 		rl.allow("user-2")
 	}
 	if rl.allow("user-2") {
@@ -181,7 +181,7 @@ func TestRateLimiter_BlocksOverLimit(t *testing.T) {
 
 func TestRateLimiter_SeparateUsers(t *testing.T) {
 	rl := newRateLimiter()
-	for i := 0; i < rateLimitMax; i++ {
+	for range rateLimitMax {
 		rl.allow("user-3")
 	}
 	if !rl.allow("user-4") {

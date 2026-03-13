@@ -13,6 +13,8 @@ import (
 
 	adkmodel "google.golang.org/adk/model"
 	"google.golang.org/adk/model/gemini"
+
+	fagent "school-with-ai/foundation/agent"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -441,4 +443,106 @@ func genaiSchemaToMap(s *genai.Schema) map[string]any {
 		m["required"] = s.Required
 	}
 	return m
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Foundation → genai translation helpers
+//
+// These functions translate foundation types to genai types and are
+// co-located with other model-specific code to contain the genai import
+// surface in this single file.
+// ──────────────────────────────────────────────────────────────────────────────
+
+// buildGenerateContentConfig creates genai config from model settings.
+func buildGenerateContentConfig(cfg *fagent.ModelConfig) *genai.GenerateContentConfig {
+	gc := &genai.GenerateContentConfig{}
+
+	if cfg.Temperature != nil {
+		t := float32(*cfg.Temperature)
+		gc.Temperature = &t
+	}
+	if cfg.MaxTokens != nil {
+		gc.MaxOutputTokens = int32(*cfg.MaxTokens)
+	}
+
+	return gc
+}
+
+// buildUserContent converts an agent.Message to genai.Content for the adk-go runner.
+// Supports text, image, audio, and file multimodal content.
+func buildUserContent(msg *fagent.Message) *genai.Content {
+	if msg == nil {
+		return genai.NewContentFromText("", "user")
+	}
+
+	var parts []*genai.Part
+	for _, c := range msg.Content {
+		switch c.Type {
+		case fagent.ContentTypeText:
+			parts = append(parts, &genai.Part{Text: c.Text})
+
+		case fagent.ContentTypeImageURL:
+			if c.ImageURL != nil {
+				mimeType := mimeFromDataURL(c.ImageURL.URL)
+				parts = append(parts, &genai.Part{
+					InlineData: &genai.Blob{
+						MIMEType: mimeType,
+						Data:     []byte(c.ImageURL.URL),
+					},
+				})
+			}
+
+		case fagent.ContentTypeInputAudio:
+			if c.AudioInput != nil {
+				mimeType := "audio/" + c.AudioInput.Format
+				parts = append(parts, &genai.Part{
+					InlineData: &genai.Blob{
+						MIMEType: mimeType,
+						Data:     []byte(c.AudioInput.Data),
+					},
+				})
+			}
+
+		case fagent.ContentTypeFile:
+			if c.FileInput != nil {
+				mimeType := c.FileInput.MimeType
+				if mimeType == "" {
+					mimeType = "application/octet-stream"
+				}
+				parts = append(parts, &genai.Part{
+					InlineData: &genai.Blob{
+						MIMEType: mimeType,
+						Data:     []byte(c.FileInput.Data),
+					},
+				})
+			}
+
+		default:
+			if c.Text != "" {
+				parts = append(parts, &genai.Part{Text: c.Text})
+			}
+		}
+	}
+
+	if len(parts) == 0 {
+		parts = []*genai.Part{{Text: ""}}
+	}
+
+	return &genai.Content{
+		Role:  "user",
+		Parts: parts,
+	}
+}
+
+// mimeFromDataURL extracts the MIME type from a data URL.
+// Returns "image/png" as default if parsing fails.
+func mimeFromDataURL(dataURL string) string {
+	if !strings.HasPrefix(dataURL, "data:") {
+		return "image/png"
+	}
+	rest := dataURL[5:]
+	if idx := strings.Index(rest, ";"); idx > 0 {
+		return rest[:idx]
+	}
+	return "image/png"
 }
