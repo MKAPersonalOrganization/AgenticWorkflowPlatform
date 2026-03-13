@@ -42,39 +42,32 @@ type AgentProvider interface {
 // ToolSetFactory creates executable tools from a registered tool set.
 type ToolSetFactory interface {
 	CreateExecutableToolsFromSet(ctx context.Context, toolSetID string) ([]agent.ExecutableTool, error)
-	SetAllowedKBNamespaces(namespaces []string)
 }
 
 // ToolFactoryConfig carries per-request configuration for tool creation.
 // Tool-specific settings (API keys, service URLs) are passed via the Extra map
 // so the adapter layer remains tool-agnostic.
 type ToolFactoryConfig struct {
-	ModelAPIKey         string
-	ModelID             string
-	PluginSettings      map[string]map[string]string
-	AllowedKBNamespaces []string
-	Extra               map[string]string // Additional per-request config (e.g., service URLs, API keys)
+	ModelAPIKey    string
+	ModelID        string
+	PluginSettings map[string]map[string]string
+	Extra          map[string]string // Additional per-request config (e.g., service URLs, API keys)
 }
 
 // NewToolSetFactoryFunc creates a ToolSetFactory scoped to a single request.
 type NewToolSetFactoryFunc func(cfg ToolFactoryConfig) ToolSetFactory
 
-// ExtraConfigFunc resolves per-user, per-request tool configuration.
+// ExtraConfigFunc resolves per-user, per-agent, per-request tool configuration.
 // The returned map is passed as ToolFactoryConfig.Extra so the adapter
 // layer remains tool-agnostic while the composition root can provide
 // tool-specific settings (API keys, service URLs, etc.).
-type ExtraConfigFunc func(ctx context.Context, userID string) map[string]string
+type ExtraConfigFunc func(ctx context.Context, userID, agentName string) map[string]string
 
 // ToolPermissionChecker provides per-user, per-agent tool access control.
 type ToolPermissionChecker interface {
 	GetEnabledToolSets(ctx context.Context, userID, agentName string) ([]string, error)
 	HasToolSetPermission(ctx context.Context, userID, agentName, toolSetID string) bool
 	HasPermission(ctx context.Context, userID, agentName, toolSetID, toolID string) bool
-}
-
-// WorkspacePermissionChecker provides per-user, per-agent workspace access control.
-type WorkspacePermissionChecker interface {
-	GetEnabledWorkspaces(ctx context.Context, userID, agentName string) ([]string, error)
 }
 
 // MCPToolResolver resolves MCP-based tools for a user.
@@ -92,9 +85,9 @@ type PluginSettingsResolver interface {
 	GetAllPluginSettingsForUser(ctx context.Context, userID string) (map[string]map[string]string, error)
 }
 
-// PromptInjector injects additional prompt content (e.g., activated capabilities).
+// PromptInjector injects additional prompt content at system-prompt level.
 type PromptInjector interface {
-	BuildPromptAddition(threadID string) string
+	BuildPromptAddition(ctx context.Context, agentName, threadID string) string
 }
 
 // UserContextProvider provides user context information for prompt injection.

@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -549,15 +550,15 @@ func run(ctx context.Context, log *logger.Logger) error {
 		if cfg.PluginSettings != nil {
 			f.SetPluginSettings(cfg.PluginSettings)
 		}
-		if len(cfg.AllowedKBNamespaces) > 0 {
-			f.SetAllowedKBNamespaces(cfg.AllowedKBNamespaces)
+		if ns := cfg.Extra["allowed_kb_namespaces"]; ns != "" {
+			f.SetAllowedKBNamespaces(strings.Split(ns, ","))
 		}
 		return f
 	})
 
-	// Resolve per-user tool config at request time (TTS, service URLs, etc.)
+	// Resolve per-user, per-agent tool config at request time (TTS, service URLs, KB namespaces, etc.)
 	// so the adapter layer stays tool-agnostic.
-	extraConfigFn := adkgo.ExtraConfigFunc(func(ctx context.Context, userID string) map[string]string {
+	extraConfigFn := adkgo.ExtraConfigFunc(func(ctx context.Context, userID, agentName string) map[string]string {
 		extra := map[string]string{
 			"edgequake_base_url": cfg.Edgequake.BaseURL,
 		}
@@ -566,8 +567,16 @@ func run(ctx context.Context, log *logger.Logger) error {
 			extra["tts_model"] = model
 			extra["tts_voice"] = voice
 		}
+		// Resolve per-agent knowledge-base workspace permissions.
+		if agentName != "" && edgequakeService != nil {
+			if wsIDs, err := workspacePermissionsService.GetEnabledWorkspaces(ctx, userID, agentName); err == nil && len(wsIDs) > 0 {
+				extra["allowed_kb_namespaces"] = strings.Join(wsIDs, ",")
+			}
+		}
 		return extra
 	})
+
+	kbPromptInjector := &knowledgeBasePromptInjector{workspaceSvc: workspacePermissionsService}
 
 	adkRunner, err := adkgo.NewRunnerAdapter(adkgo.RunnerAdapterConfig{
 		Log:                    log,
@@ -577,11 +586,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 		PluginSettingsResolver: pluginSettingsModule,
 		ProfileProvider:        &adkgoProfileAdapter{repo: studentProfileRepo},
 		PermChecker:            permissionsService,
-		WorkspacePermChecker:   workspacePermissionsService,
 		MCPResolver:            mcpModule.Service(),
 		NewToolSetFactory:      newToolSetFactory,
-		PromptInjector:         skillActivationTracker,
-		KnowledgeBaseEnabled:   edgequakeService != nil,
+		PromptInjectors:        []adkgo.PromptInjector{skillActivationTracker, kbPromptInjector},
 		ExtraConfigFn:          extraConfigFn,
 	})
 	if err != nil {

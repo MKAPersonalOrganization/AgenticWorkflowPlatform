@@ -33,19 +33,12 @@ type ToolPermissionChecker interface {
 	HasPermission(ctx context.Context, userID, agentID, toolSetID, toolID string) bool
 }
 
-// WorkspacePermissionChecker checks workspace access for knowledge base injection.
-// Satisfied by *workspacepermissions.Service.
-type WorkspacePermissionChecker interface {
-	GetEnabledWorkspaces(ctx context.Context, userID, agentID string) ([]string, error)
-}
-
 // ─── Tool Resolution ─────────────────────────────────────────────────────────
 
 // ToolSetFactory creates executable tools from a registered tool set.
 // Satisfied by *toolregistry.ExecutableToolFactory.
 type ToolSetFactory interface {
 	CreateExecutableToolsFromSet(ctx context.Context, toolSetID string) ([]agent.ExecutableTool, error)
-	SetAllowedKBNamespaces(namespaces []string)
 }
 
 // ToolFactoryConfig carries per-request configuration for tool creation.
@@ -60,9 +53,6 @@ type ToolFactoryConfig struct {
 	// setting key, value = setting value.
 	PluginSettings map[string]map[string]string
 
-	// AllowedKBNamespaces is the set of workspace IDs the agent may query.
-	AllowedKBNamespaces []string
-
 	// Extra carries additional per-request config (e.g., service URLs, API keys)
 	// so the adapter layer does not need tool-specific fields.
 	Extra map[string]string
@@ -72,11 +62,11 @@ type ToolFactoryConfig struct {
 // Injected by the composition root so the adapter never imports service packages.
 type NewToolSetFactoryFunc func(cfg ToolFactoryConfig) ToolSetFactory
 
-// ExtraConfigFunc resolves per-user, per-request tool configuration.
+// ExtraConfigFunc resolves per-user, per-agent, per-request tool configuration.
 // The returned map is passed as ToolFactoryConfig.Extra so the adapter
 // layer remains tool-agnostic while the composition root can provide
 // tool-specific settings (API keys, service URLs, etc.).
-type ExtraConfigFunc func(ctx context.Context, userID string) map[string]string
+type ExtraConfigFunc func(ctx context.Context, userID, agentName string) map[string]string
 
 // MCPToolResolver resolves MCP-connected tools for a user.
 // Satisfied by *mcp.Service.
@@ -95,11 +85,10 @@ type PluginSettingsResolver interface {
 	GetAllPluginSettingsForUser(ctx context.Context, userID string) (map[string]map[string]string, error)
 }
 
-// PromptInjector provides per-thread prompt additions for system prompt injection.
-// Satisfied by *skills.SkillActivationTracker.
+// PromptInjector provides per-request prompt additions for system prompt injection.
 type PromptInjector interface {
-	// BuildPromptAddition returns additional instructions for the given thread,
+	// BuildPromptAddition returns additional instructions for the given agent and thread,
 	// formatted for direct concatenation with the system prompt.
 	// Returns empty string if no additions are needed.
-	BuildPromptAddition(threadID string) string
+	BuildPromptAddition(ctx context.Context, agentName, threadID string) string
 }
