@@ -1,6 +1,7 @@
 package skills
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -71,7 +72,7 @@ func (t *SkillActivationTracker) GetActiveSkills(threadID string) []ActivatedSki
 // BuildPromptAddition returns a formatted string suitable for appending to
 // the system prompt, containing all activated skill instructions for the thread.
 // Returns empty string if no skills are activated.
-func (t *SkillActivationTracker) BuildPromptAddition(threadID string) string {
+func (t *SkillActivationTracker) BuildPromptAddition(_ context.Context, _, threadID string) string {
 	skills := t.GetActiveSkills(threadID)
 	if len(skills) == 0 {
 		return ""

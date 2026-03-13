@@ -42,11 +42,9 @@ type RunnerAdapter struct {
 	pluginSettingsResolver PluginSettingsResolver
 	profileProvider        UserContextProvider
 	permChecker            ToolPermissionChecker
-	workspacePermChecker   WorkspacePermissionChecker
 	mcpResolver            MCPToolResolver
 	newToolSetFactory      NewToolSetFactoryFunc
-	promptInjector         PromptInjector
-	knowledgeBaseEnabled   bool
+	promptInjectors        []PromptInjector
 	extraConfigFn          ExtraConfigFunc
 }
 
@@ -59,11 +57,9 @@ type RunnerAdapterConfig struct {
 	PluginSettingsResolver PluginSettingsResolver
 	ProfileProvider        UserContextProvider
 	PermChecker            ToolPermissionChecker
-	WorkspacePermChecker   WorkspacePermissionChecker
 	MCPResolver            MCPToolResolver
 	NewToolSetFactory      NewToolSetFactoryFunc
-	PromptInjector         PromptInjector
-	KnowledgeBaseEnabled   bool
+	PromptInjectors        []PromptInjector
 	ExtraConfigFn          ExtraConfigFunc
 }
 
@@ -80,11 +76,9 @@ func NewRunnerAdapter(cfg RunnerAdapterConfig) (*RunnerAdapter, error) {
 		pluginSettingsResolver: cfg.PluginSettingsResolver,
 		profileProvider:        cfg.ProfileProvider,
 		permChecker:            cfg.PermChecker,
-		workspacePermChecker:   cfg.WorkspacePermChecker,
 		mcpResolver:            cfg.MCPResolver,
 		newToolSetFactory:      cfg.NewToolSetFactory,
-		promptInjector:         cfg.PromptInjector,
-		knowledgeBaseEnabled:   cfg.KnowledgeBaseEnabled,
+		promptInjectors:        cfg.PromptInjectors,
 		extraConfigFn:          cfg.ExtraConfigFn,
 	}, nil
 }
@@ -412,7 +406,7 @@ func (r *RunnerAdapter) resolveTools(
 
 		var extra map[string]string
 		if r.extraConfigFn != nil {
-			extra = r.extraConfigFn(ctx, userID)
+			extra = r.extraConfigFn(ctx, userID, agentName)
 		}
 
 		toolFactory = r.newToolSetFactory(ToolFactoryConfig{
@@ -452,14 +446,6 @@ func (r *RunnerAdapter) resolveTools(
 				},
 			)
 			execTools = append(execTools, mcpTools...)
-		}
-
-		// Enforce workspace KB namespaces.
-		if r.workspacePermChecker != nil && r.knowledgeBaseEnabled {
-			enabledWorkspaceIDs, wErr := r.workspacePermChecker.GetEnabledWorkspaces(ctx, userID, agentName)
-			if wErr == nil && len(enabledWorkspaceIDs) > 0 {
-				toolFactory.SetAllowedKBNamespaces(enabledWorkspaceIDs)
-			}
 		}
 	}
 
@@ -507,13 +493,12 @@ func (r *RunnerAdapter) resolveTools(
 	return WrapExecutableTools(execTools, threadID, userID)
 }
 
-// buildSystemPrompt assembles the system prompt from agent config, KB, skills, user context.
+// buildSystemPrompt assembles the system prompt from agent config and injectors.
 // It includes:
 //   - Static SystemPrompt from agent config
 //   - InstructionFunc (runtime-generated prompt additions)
 //   - Requirement-provided prompt additions (PromptProvider interface)
-//   - Workspace knowledge base section
-//   - Activated skill instructions
+//   - PromptInjector additions (knowledge bases, skills, etc.)
 //   - User context
 func (r *RunnerAdapter) buildSystemPrompt(
 	ctx context.Context,
@@ -543,22 +528,9 @@ func (r *RunnerAdapter) buildSystemPrompt(
 		}
 	}
 
-	// Inject workspace knowledge base section.
-	if r.workspacePermChecker != nil && r.knowledgeBaseEnabled && userID != "" {
-		enabledWorkspaceIDs, err := r.workspacePermChecker.GetEnabledWorkspaces(ctx, userID, agentName)
-		if err == nil && len(enabledWorkspaceIDs) > 0 {
-			kbSection := "\n\n## Knowledge Bases\n\nYou have access to the following knowledge base workspaces. Use the query_knowledge_base tool to search them:\n"
-			for _, wsID := range enabledWorkspaceIDs {
-				kbSection += fmt.Sprintf("- Workspace ID: %s\n", wsID)
-			}
-			kbSection += "\nWhen the user asks about topics that may be covered by these knowledge bases, use the query_knowledge_base tool with the appropriate namespace (workspace ID) and a relevant query to retrieve information."
-			systemPrompt += kbSection
-		}
-	}
-
-	// Inject additional prompt content.
-	if r.promptInjector != nil {
-		if addition := r.promptInjector.BuildPromptAddition(threadID); addition != "" {
+	// Collect prompt additions from PromptInjectors (knowledge bases, skills, etc.).
+	for _, injector := range r.promptInjectors {
+		if addition := injector.BuildPromptAddition(ctx, agentName, threadID); addition != "" {
 			systemPrompt += "\n\n" + addition
 		}
 	}

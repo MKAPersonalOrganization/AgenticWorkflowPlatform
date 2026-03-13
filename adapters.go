@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"strings"
 
 	"school-with-ai/modules/chat/chatcontracts"
 	"school-with-ai/modules/knowledge/edgequake"
 	"school-with-ai/modules/permissions"
+	permworkspace "school-with-ai/modules/permissions/workspace"
 	"school-with-ai/modules/userprofile/identity"
 	"school-with-ai/shared"
 )
@@ -91,4 +94,33 @@ func (a *WorkspaceProviderAdapter) ListWorkspaces(ctx context.Context, tCtx *sha
 	}
 
 	return &permissions.WorkspaceList{Items: workspaces}, nil
+}
+
+// knowledgeBasePromptInjector implements adkgo.PromptInjector.
+// It resolves which knowledge-base workspaces a user has enabled for the current
+// agent and injects instructions into the system prompt so the LLM knows it can
+// query those workspaces via the query_knowledge_base tool.
+//
+// This lives in the composition root — the adapter layer stays tool-agnostic.
+type knowledgeBasePromptInjector struct {
+	workspaceSvc *permworkspace.Service
+}
+
+func (k *knowledgeBasePromptInjector) BuildPromptAddition(ctx context.Context, agentName, _ string) string {
+	user := shared.GetUserFromContext(ctx)
+	if user == nil {
+		return ""
+	}
+	enabledWorkspaceIDs, err := k.workspaceSvc.GetEnabledWorkspaces(ctx, user.ID, agentName)
+	if err != nil || len(enabledWorkspaceIDs) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("## Knowledge Bases\n\nYou have access to the following knowledge base workspaces. Use the query_knowledge_base tool to search them:\n")
+	for _, wsID := range enabledWorkspaceIDs {
+		fmt.Fprintf(&b, "- Workspace ID: %s\n", wsID)
+	}
+	b.WriteString("\nWhen the user asks about topics that may be covered by these knowledge bases, use the query_knowledge_base tool with the appropriate namespace (workspace ID) and a relevant query to retrieve information.")
+	return b.String()
 }

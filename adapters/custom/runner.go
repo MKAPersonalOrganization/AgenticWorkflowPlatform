@@ -36,11 +36,9 @@ type RunnerAdapter struct {
 	configResolver         ModelConfigResolver
 	pluginSettingsResolver PluginSettingsResolver
 	permChecker            ToolPermissionChecker
-	workspacePermChecker   WorkspacePermissionChecker
 	mcpResolver            MCPToolResolver
 	newToolSetFactory      NewToolSetFactoryFunc
-	promptInjector         PromptInjector
-	knowledgeBaseEnabled   bool
+	promptInjectors        []PromptInjector
 	extraConfigFn          ExtraConfigFunc
 }
 
@@ -53,11 +51,9 @@ type RunnerAdapterConfig struct {
 	PluginSettingsResolver PluginSettingsResolver
 	ProfileProvider        agent.UserContextProvider
 	PermChecker            ToolPermissionChecker
-	WorkspacePermChecker   WorkspacePermissionChecker
 	MCPResolver            MCPToolResolver
 	NewToolSetFactory      NewToolSetFactoryFunc
-	PromptInjector         PromptInjector
-	KnowledgeBaseEnabled   bool
+	PromptInjectors        []PromptInjector
 	ExtraConfigFn          ExtraConfigFunc
 }
 
@@ -74,11 +70,9 @@ func NewRunnerAdapter(ctx context.Context, cfg RunnerAdapterConfig) (*RunnerAdap
 		profileProvider:        cfg.ProfileProvider,
 		pipeline:               NewEventPipeline(cfg.Log),
 		permChecker:            cfg.PermChecker,
-		workspacePermChecker:   cfg.WorkspacePermChecker,
 		mcpResolver:            cfg.MCPResolver,
 		newToolSetFactory:      cfg.NewToolSetFactory,
-		promptInjector:         cfg.PromptInjector,
-		knowledgeBaseEnabled:   cfg.KnowledgeBaseEnabled,
+		promptInjectors:        cfg.PromptInjectors,
 		extraConfigFn:          cfg.ExtraConfigFn,
 		configResolver:         cfg.ConfigResolver,
 		pluginSettingsResolver: cfg.PluginSettingsResolver,
@@ -107,7 +101,7 @@ func (r *RunnerAdapter) buildEngine(ctx context.Context, modelCfg *agent.ModelCo
 
 		var extra map[string]string
 		if r.extraConfigFn != nil {
-			extra = r.extraConfigFn(ctx, userID)
+			extra = r.extraConfigFn(ctx, userID, "")
 		}
 
 		toolFactory = r.newToolSetFactory(ToolFactoryConfig{
@@ -127,11 +121,9 @@ func (r *RunnerAdapter) buildEngine(ctx context.Context, modelCfg *agent.ModelCo
 		maxIterations:        modelCfg.MaxIterations,
 		maxTokens:            modelCfg.MaxTokens,
 		toolFactory:          toolFactory,
-		permChecker:          r.permChecker,
-		workspacePermChecker: r.workspacePermChecker,
-		knowledgeBaseEnabled: r.knowledgeBaseEnabled,
-		mcpResolver:          r.mcpResolver,
-		promptInjector:       r.promptInjector,
+		permChecker:      r.permChecker,
+		mcpResolver:      r.mcpResolver,
+		promptInjectors:  r.promptInjectors,
 	}
 
 	return engine.New(chatClient, provider, nil, nil), nil
@@ -390,11 +382,9 @@ type RegistryAgentProvider struct {
 	maxIterations        int      // Global max iterations from AI settings
 	maxTokens            *int     // Global max tokens from AI settings
 	toolFactory          ToolSetFactory
-	permChecker          ToolPermissionChecker
-	workspacePermChecker WorkspacePermissionChecker
-	knowledgeBaseEnabled bool
-	mcpResolver          MCPToolResolver
-	promptInjector       PromptInjector
+	permChecker      ToolPermissionChecker
+	mcpResolver      MCPToolResolver
+	promptInjectors  []PromptInjector
 }
 
 func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (core.AgentConfig, error) {
@@ -518,37 +508,9 @@ func (p *RegistryAgentProvider) GetConfig(ctx context.Context, name string) (cor
 		}
 	}
 
-	// Inject workspace knowledge base section into system prompt.
-	if p.workspacePermChecker != nil && p.knowledgeBaseEnabled {
-		// Get user from context to check permissions
-		user := shared.GetUserFromContext(ctx)
-		var userID string
-		if user != nil {
-			userID = user.ID
-		}
-
-		enabledWorkspaceIDs, err := p.workspacePermChecker.GetEnabledWorkspaces(ctx, userID, config.Name)
-		if err == nil && len(enabledWorkspaceIDs) > 0 {
-			// Enforce allowed namespaces at the tool level (runtime security).
-			if p.toolFactory != nil {
-				p.toolFactory.SetAllowedKBNamespaces(enabledWorkspaceIDs)
-			}
-
-			kbSection := "\n\n## Knowledge Bases\n\nYou have access to the following knowledge base workspaces. Use the query_knowledge_base tool to search them:\n"
-			for _, wsID := range enabledWorkspaceIDs {
-				kbSection += fmt.Sprintf("- Workspace ID: %s\n", wsID)
-			}
-			kbSection += "\nWhen the user asks about topics that may be covered by these knowledge bases, use the query_knowledge_base tool with the appropriate namespace (workspace ID) and a relevant query to retrieve information."
-			config.SystemPrompt += kbSection
-		}
-	}
-
-	// Inject additional prompt content.
-	// Injecting here (instead of returning as tool result) ensures instructions stay
-	// pinned at the system prompt level and don't drift down the conversation.
-	if p.promptInjector != nil {
-		threadID := shared.GetThreadIDFromContext(ctx)
-		if addition := p.promptInjector.BuildPromptAddition(threadID); addition != "" {
+	// Collect prompt additions from PromptInjectors (knowledge bases, skills, etc.).
+	for _, injector := range p.promptInjectors {
+		if addition := injector.BuildPromptAddition(ctx, config.Name, shared.GetThreadIDFromContext(ctx)); addition != "" {
 			config.SystemPrompt += "\n\n" + addition
 		}
 	}
