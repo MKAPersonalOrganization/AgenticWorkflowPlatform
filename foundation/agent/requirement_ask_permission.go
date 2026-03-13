@@ -3,7 +3,8 @@ package agent
 import (
 	"context"
 	"fmt"
-	"school-with-ai/foundation/agentsdk/io"
+
+	"school-with-ai/foundation/agent/io"
 )
 
 // =============================================================================

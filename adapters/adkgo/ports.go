@@ -1,7 +1,5 @@
-// Package adkgo provides an adapter layer that bridges Google's Agent Development
-// Kit (ADK-Go) with SchoolWithAI's chat module. It replaces the former custom
-// engine adapter (adapters/custom) and the event-sourcing infrastructure with a
-// simpler, ADK-Go–native execution model.
+// Package adkgo provides the adapter layer that bridges Google's Agent
+// Development Kit (ADK-Go) with SchoolWithAI's chat module.
 package adkgo
 
 import (

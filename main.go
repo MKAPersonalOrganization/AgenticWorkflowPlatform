@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"school-with-ai/adapters/adkgo"
-	"school-with-ai/adapters/custom"
 	"school-with-ai/components"
 	"school-with-ai/components/docs"
 	"school-with-ai/components/landing"
@@ -430,8 +429,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 	toolregistry.RegisterPlugin(&tracker.Provider{})
 	toolregistry.RegisterPlugin(&tts.Provider{})
 	toolregistry.RegisterPlugin(&websearch.Provider{})
-	toolregistry.RegisterPlugin(&skillsplugin.Provider{SkillResolver: &custom.SkillResolverAdapter{Source: skillStoreModule}, Tracker: skillActivationTracker})
-	toolregistry.RegisterPlugin(&fsplugin.Provider{FS: &custom.AgentFSAdapter{Source: filesystemModule.AgentFS()}})
+	toolregistry.RegisterPlugin(&skillsplugin.Provider{SkillResolver: &skillResolverAdapter{source: skillStoreModule}, Tracker: skillActivationTracker})
+	toolregistry.RegisterPlugin(&fsplugin.Provider{FS: &agentFSAdapter{source: filesystemModule.AgentFS()}})
 	if err := toolRegistry.Initialize(ctx); err != nil {
 		return fmt.Errorf("failed to initialize tool registry: %w", err)
 	}
@@ -483,7 +482,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// All agents (including the default assistant) live in the database.
 	// The provider lazily ensures a starter agent per user on first access.
-	agentProvider := custom.NewUserAwareAgentProvider(
+	agentProvider := newUserAwareAgentProvider(
 		agentStoreModule.AgentDefinitionRepo(),
 		[]agent.Middleware{agentLoggingMw},
 		[]agent.Middleware{chatLoggingMw},
@@ -500,7 +499,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		EventStore:         eventLog,
 		SnapshotStore:      snapshotStore,
 		ArtifactService:    artifactService,
-		StudentProfileRepo: &custom.ChatProfileAdapter{Repo: studentProfileRepo},
+		StudentProfileRepo: &chatProfileAdapter{repo: studentProfileRepo},
 		Emitter:            transientRouter,
 		AgentProvider:      agentProvider,
 		AuthService:        authSvc,

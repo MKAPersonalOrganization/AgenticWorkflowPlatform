@@ -42,7 +42,7 @@ type FileStat struct {
 // ─── Local interface ────────────────────────────────────────────────────────
 // AgentFilesystem is the contract the fsplugin tools depend on.
 // modules/filesystem.AgentFS does NOT satisfy this directly (different return
-// types), so an adapter in adapters/custom bridges the two.
+// types), so an adapter in the composition root (adapters.go) bridges the two.
 
 // AgentFilesystem exposes permission-checked filesystem operations.
 type AgentFilesystem interface {

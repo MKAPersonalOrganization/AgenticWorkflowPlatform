@@ -20,19 +20,18 @@ This package provides framework-agnostic interfaces for building AI agents in th
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                     Adapter Layer                            │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
-│  │   custom/   │  │   adkgo/    │  │   blades/   │          │
-│  │  (agentsdk) │  │  (ADK-Go)   │  │  (Blades)   │          │
-│  └─────────────┘  └─────────────┘  └─────────────┘          │
+│              ┌─────────────────────┐                        │
+│              │   adapters/adkgo    │                        │
+│              │   (Google ADK-Go)   │                        │
+│              └─────────────────────┘                        │
 └─────────────────────────────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                   Framework Layer                            │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
-│  │  agentsdk   │  │  Google     │  │  Go-Kratos  │          │
-│  │   (custom)  │  │  ADK-Go     │  │  Blades     │          │
-│  └─────────────┘  └─────────────┘  └─────────────┘          │
+│              ┌─────────────────────┐                        │
+│              │  Google ADK-Go      │                        │
+│              └─────────────────────┘                        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -170,20 +169,15 @@ config := agent.Config{
     },
 }
 
-// Use an adapter to create the agent
-adapter := custom.NewAgentAdapter(config)
+// Agent definitions are loaded from the database by the agent provider.
+// The ADK-Go adapter in adapters/adkgo/ handles execution.
 ```
 
-## Adapters
-
-### custom/ (agentsdk)
-Wraps the legacy `foundation/agentsdk` implementation.
+## Adapter
 
 ### adkgo/ (ADK-Go)
-Wraps Google's Agent Development Kit for Go.
-
-### blades/ (Go-Kratos)
-Wraps Go-Kratos Blades framework.
+Wraps Google's Agent Development Kit for Go. This is the sole supported
+agent execution adapter. It lives in `adapters/adkgo/`.
 
 ## Event Types
 

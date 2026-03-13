@@ -4,14 +4,24 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"iter"
 	"strings"
+	"time"
 
+	"school-with-ai/foundation/agent"
+	"school-with-ai/modules/agentstore"
 	"school-with-ai/modules/chat/chatcontracts"
+	"school-with-ai/modules/filesystem"
 	"school-with-ai/modules/knowledge/edgequake"
 	"school-with-ai/modules/permissions"
 	permworkspace "school-with-ai/modules/permissions/workspace"
+	"school-with-ai/modules/skillstore"
 	"school-with-ai/modules/userprofile/identity"
+	"school-with-ai/plugins/fsplugin"
+	skillsplugin "school-with-ai/plugins/skills"
 	"school-with-ai/shared"
+
+	"github.com/google/uuid"
 )
 
 // adkgoProfileAdapter bridges identity.StudentProfileRepository to
@@ -124,3 +134,359 @@ func (k *knowledgeBasePromptInjector) BuildPromptAddition(ctx context.Context, a
 	b.WriteString("\nWhen the user asks about topics that may be covered by these knowledge bases, use the query_knowledge_base tool with the appropriate namespace (workspace ID) and a relevant query to retrieve information.")
 	return b.String()
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// chatProfileAdapter bridges identity.StudentProfileRepository to
+// chatcontracts.StudentProfileRepository so the chat module does not import
+// modules/userprofile/identity directly.
+// ──────────────────────────────────────────────────────────────────────────────
+
+type chatProfileAdapter struct {
+	repo identity.StudentProfileRepository
+}
+
+func (a *chatProfileAdapter) GetByUserID(ctx context.Context, userID string) (*chatcontracts.StudentProfile, error) {
+	p, err := a.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return &chatcontracts.StudentProfile{
+		UserID:        p.UserID,
+		LearningStyle: p.LearningStyle,
+		Struggles:     p.Struggles,
+		Strengths:     p.Strengths,
+		Goals:         p.Goals,
+	}, nil
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// skillResolverAdapter bridges skillstore.Module to the skills plugin's
+// SkillResolver interface, converting skillstore.UserSkill → skills.Skill.
+// ──────────────────────────────────────────────────────────────────────────────
+
+type skillResolverSource interface {
+	ListSkillsForAgent(ctx context.Context, userID, agentID string) ([]skillstore.UserSkill, error)
+	GetSkillByNameForAgent(ctx context.Context, userID, agentID, skillName string) (*skillstore.UserSkill, error)
+}
+
+type skillResolverAdapter struct {
+	source skillResolverSource
+}
+
+func (a *skillResolverAdapter) ListSkillsForAgent(ctx context.Context, userID, agentID string) ([]skillsplugin.Skill, error) {
+	raw, err := a.source.ListSkillsForAgent(ctx, userID, agentID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]skillsplugin.Skill, len(raw))
+	for i, s := range raw {
+		out[i] = mapSkill(s)
+	}
+	return out, nil
+}
+
+func (a *skillResolverAdapter) GetSkillByNameForAgent(ctx context.Context, userID, agentID, skillName string) (*skillsplugin.Skill, error) {
+	s, err := a.source.GetSkillByNameForAgent(ctx, userID, agentID, skillName)
+	if err != nil {
+		return nil, err
+	}
+	if s == nil {
+		return nil, nil
+	}
+	out := mapSkill(*s)
+	return &out, nil
+}
+
+func mapSkill(s skillstore.UserSkill) skillsplugin.Skill {
+	return skillsplugin.Skill{
+		Name:         s.Name,
+		Description:  s.Description,
+		Instructions: s.Instructions,
+		Category:     s.Category,
+		Icon:         s.Icon,
+		IsCustom:     s.IsCustom,
+	}
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// agentFSAdapter bridges modules/filesystem.AgentFS → fsplugin.AgentFilesystem.
+// ──────────────────────────────────────────────────────────────────────────────
+
+type agentFSAdapter struct {
+	source filesystem.AgentFS
+}
+
+func (a *agentFSAdapter) ListPermittedFilesystems(ctx context.Context, userID, agentID string) ([]fsplugin.FileSystem, error) {
+	fss, err := a.source.ListPermittedFilesystems(ctx, userID, agentID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]fsplugin.FileSystem, len(fss))
+	for i, f := range fss {
+		out[i] = fsplugin.FileSystem{
+			ID:          f.ID,
+			UserID:      f.UserID,
+			Name:        f.Name,
+			Description: f.Description,
+			Type:        string(f.Type),
+		}
+	}
+	return out, nil
+}
+
+func (a *agentFSAdapter) HasAgentPermission(ctx context.Context, fsID uuid.UUID, userID, agentID string) (bool, error) {
+	return a.source.HasAgentPermission(ctx, fsID, userID, agentID)
+}
+
+func (a *agentFSAdapter) ListDir(ctx context.Context, fsID uuid.UUID, userID, dirPath string) ([]fsplugin.DirEntry, error) {
+	entries, err := a.source.ListDir(ctx, fsID, userID, dirPath)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]fsplugin.DirEntry, len(entries))
+	for i, e := range entries {
+		out[i] = fsplugin.DirEntry{
+			Name:        e.Name,
+			IsDir:       e.IsDir,
+			Size:        e.Size,
+			ContentType: e.ContentType,
+			ModTime:     e.ModTime,
+		}
+	}
+	return out, nil
+}
+
+func (a *agentFSAdapter) Mkdir(ctx context.Context, fsID uuid.UUID, userID, dirPath string) error {
+	return a.source.Mkdir(ctx, fsID, userID, dirPath)
+}
+
+func (a *agentFSAdapter) ReadFile(ctx context.Context, fsID uuid.UUID, userID, filePath string) (io.ReadCloser, *fsplugin.FileStat, error) {
+	rc, stat, err := a.source.ReadFile(ctx, fsID, userID, filePath)
+	if err != nil {
+		return nil, nil, err
+	}
+	return rc, mapFileStat(stat), nil
+}
+
+func (a *agentFSAdapter) WriteFile(ctx context.Context, fsID uuid.UUID, userID, filePath string, content io.Reader, contentType string, size int64) (*fsplugin.FileStat, error) {
+	stat, err := a.source.WriteFile(ctx, fsID, userID, filePath, content, contentType, size)
+	if err != nil {
+		return nil, err
+	}
+	return mapFileStat(stat), nil
+}
+
+func (a *agentFSAdapter) Remove(ctx context.Context, fsID uuid.UUID, userID, entryPath string) error {
+	return a.source.Remove(ctx, fsID, userID, entryPath)
+}
+
+func (a *agentFSAdapter) Stat(ctx context.Context, fsID uuid.UUID, userID, filePath string) (*fsplugin.FileStat, error) {
+	stat, err := a.source.Stat(ctx, fsID, userID, filePath)
+	if err != nil {
+		return nil, err
+	}
+	return mapFileStat(stat), nil
+}
+
+func (a *agentFSAdapter) Rename(ctx context.Context, fsID uuid.UUID, userID, oldPath, newPath string) error {
+	return a.source.Rename(ctx, fsID, userID, oldPath, newPath)
+}
+
+func mapFileStat(s *filesystem.FileStat) *fsplugin.FileStat {
+	if s == nil {
+		return nil
+	}
+	return &fsplugin.FileStat{
+		Name:        s.Name,
+		IsDir:       s.IsDir,
+		Size:        s.Size,
+		ContentType: s.ContentType,
+		ModTime:     s.ModTime,
+	}
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// userAwareAgentProvider implements agent.AgentProvider by loading all agents
+// from the database. Every user gets a starter agent created lazily on first
+// access if they have none.
+// ──────────────────────────────────────────────────────────────────────────────
+
+type userAwareAgentProvider struct {
+	repo                agentstore.AgentDefinitionRepository
+	agentMiddlewares    []agent.Middleware
+	chatMiddlewares     []agent.Middleware
+	functionMiddlewares []agent.Middleware
+}
+
+func newUserAwareAgentProvider(
+	repo agentstore.AgentDefinitionRepository,
+	agentMw []agent.Middleware,
+	chatMw []agent.Middleware,
+	funcMw []agent.Middleware,
+) *userAwareAgentProvider {
+	return &userAwareAgentProvider{
+		repo:                repo,
+		agentMiddlewares:    agentMw,
+		chatMiddlewares:     chatMw,
+		functionMiddlewares: funcMw,
+	}
+}
+
+func (p *userAwareAgentProvider) Get(name string) (agent.Agent, error) {
+	return nil, fmt.Errorf("agent %q requires user context; use GetForUser", name)
+}
+
+func (p *userAwareAgentProvider) GetForUser(ctx context.Context, name, userID string) (agent.Agent, error) {
+	if userID == "" {
+		return nil, fmt.Errorf("user ID is required to resolve agent %q", name)
+	}
+	if name == "" {
+		return nil, fmt.Errorf("an agent ID must be provided")
+	}
+	agentDef, err := p.repo.GetByID(ctx, name, userID)
+	if err != nil {
+		return nil, fmt.Errorf("agent %q not found for user %s: %w", name, userID, err)
+	}
+	return p.agentFromDefinition(agentDef), nil
+}
+
+func (p *userAwareAgentProvider) List() []agent.Agent {
+	return []agent.Agent{}
+}
+
+func (p *userAwareAgentProvider) ListForUser(ctx context.Context, userID string) ([]agent.Agent, error) {
+	if userID == "" {
+		return nil, nil
+	}
+	definitions, err := p.repo.ListByUser(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("listing agents: %w", err)
+	}
+	agents := make([]agent.Agent, 0, len(definitions))
+	for i := range definitions {
+		agents = append(agents, p.agentFromDefinition(&definitions[i]))
+	}
+	return agents, nil
+}
+
+func (p *userAwareAgentProvider) agentFromDefinition(def *agentstore.AgentDefinition) agent.Agent {
+	cfg := agent.Config{
+		Name:                def.ID,
+		Description:         def.Description,
+		SystemPrompt:        def.SystemPrompt,
+		Tools:               []agent.Tool{},
+		Requirements:        []agent.Requirement{},
+		AgentMiddlewares:    p.agentMiddlewares,
+		ChatMiddlewares:     p.chatMiddlewares,
+		FunctionMiddlewares: p.functionMiddlewares,
+	}
+	a := newConfigAgent(cfg)
+	return &dbAgent{
+		Agent:       a,
+		displayName: def.Name,
+		id:          def.ID,
+		icon:        def.Icon,
+	}
+}
+
+// dbAgent wraps a configAgent to carry display metadata from the DB row.
+type dbAgent struct {
+	agent.Agent
+	displayName string
+	id          string
+	icon        string
+}
+
+func (a *dbAgent) ID() agent.ID             { return a.id }
+func (a *dbAgent) Name() string             { return a.displayName }
+func (a *dbAgent) Description() string      { return a.Agent.Description() }
+func (a *dbAgent) Icon() string             { return a.icon }
+func (a *dbAgent) SubAgents() []agent.Agent { return a.Agent.SubAgents() }
+
+// EmbeddedAgent returns the inner agent.Agent value.
+// This allows adapter-agnostic code (e.g., the ADK-Go adapter) to unwrap
+// the dbAgent → configAgent chain and extract Config without importing
+// concrete types.
+func (a *dbAgent) EmbeddedAgent() agent.Agent { return a.Agent }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// configAgent is a concrete agent.Agent that holds an agent.Config.
+// It implements agent.Configurable, agent.HookProvider, and
+// agent.MiddlewareProvider so adapter layers can extract what they need
+// via interfaces.
+// ──────────────────────────────────────────────────────────────────────────────
+
+type configAgent struct {
+	config agent.Config
+}
+
+func newConfigAgent(cfg agent.Config) agent.Agent {
+	return &configAgent{config: cfg}
+}
+
+func (a *configAgent) ID() agent.ID             { return a.config.Name }
+func (a *configAgent) Name() string             { return a.config.Name }
+func (a *configAgent) Description() string      { return a.config.Description }
+func (a *configAgent) SubAgents() []agent.Agent { return a.config.SubAgents }
+
+func (a *configAgent) Run(_ context.Context, inv *agent.Invocation) iter.Seq2[agent.Event, error] {
+	return func(yield func(agent.Event, error) bool) {
+		// Run lifecycle hooks — actual LLM execution is handled by the
+		// RunnerAdapter (adkgo). This Run method is only invoked if the
+		// agent is used standalone, which it never is in production.
+		for _, hook := range a.config.BeforeRunHooks {
+			hookCtx := &agent.HookContext{
+				Context:    context.Background(),
+				Invocation: inv,
+				AgentName:  a.config.Name,
+				SessionID:  inv.SessionID,
+				UserID:     inv.UserID,
+				State:      agent.NewStateDelta(),
+			}
+			evt, err := hook(hookCtx)
+			if err != nil {
+				yield(nil, fmt.Errorf("before-run hook: %w", err))
+				return
+			}
+			if evt != nil {
+				if !yield(evt, nil) {
+					return
+				}
+				return
+			}
+		}
+		if a.config.SystemPrompt != "" {
+			yield(&agent.MessageEvent{
+				Message: &agent.Message{
+					ID:   agent.GenerateID(),
+					Role: agent.RoleSystem,
+					Content: []agent.Content{{
+						Type: agent.ContentTypeText,
+						Text: a.config.SystemPrompt,
+					}},
+					Author: a.config.Name,
+				},
+				EventTime: time.Now(),
+			}, nil)
+		}
+	}
+}
+
+func (a *configAgent) Config() agent.Config                      { return a.config }
+func (a *configAgent) AgentMiddlewares() []agent.Middleware      { return a.config.AgentMiddlewares }
+func (a *configAgent) ChatMiddlewares() []agent.Middleware       { return a.config.ChatMiddlewares }
+func (a *configAgent) FunctionMiddlewares() []agent.Middleware   { return a.config.FunctionMiddlewares }
+func (a *configAgent) Tools() []agent.Tool                       { return a.config.Tools }
+func (a *configAgent) BeforeToolHooks() []agent.BeforeToolHook   { return a.config.BeforeToolHooks }
+func (a *configAgent) AfterToolHooks() []agent.AfterToolHook     { return a.config.AfterToolHooks }
+func (a *configAgent) BeforeModelHooks() []agent.BeforeModelHook { return a.config.BeforeModelHooks }
+func (a *configAgent) AfterModelHooks() []agent.AfterModelHook   { return a.config.AfterModelHooks }
+func (a *configAgent) BeforeRunHooks() []agent.BeforeRunHook     { return a.config.BeforeRunHooks }
+func (a *configAgent) AfterRunHooks() []agent.AfterRunHook       { return a.config.AfterRunHooks }
+
+var (
+	_ agent.Agent              = (*configAgent)(nil)
+	_ agent.Configurable       = (*configAgent)(nil)
+	_ agent.HookProvider       = (*configAgent)(nil)
+	_ agent.MiddlewareProvider = (*configAgent)(nil)
+)
