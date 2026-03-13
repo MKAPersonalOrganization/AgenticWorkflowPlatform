@@ -59,6 +59,7 @@ type Rule struct {
 //   - ToolProvider: provides additional tools to the agent
 //   - PromptProvider: contributes to the system prompt
 //   - Enableable: can be dynamically enabled/disabled
+//   - FunctionMiddlewareProvider: injects middleware into tool execution
 type Requirement interface {
 	// Run evaluates the requirement and returns rules for the current turn.
 	Run(ctx context.Context, inv *Invocation) ([]Rule, error)
@@ -124,4 +125,3 @@ func (r *RequirementFunc) String() string { return r.name }
 
 // Verify interface compliance.
 var _ Requirement = (*RequirementFunc)(nil)
-

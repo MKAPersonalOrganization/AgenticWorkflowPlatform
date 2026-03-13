@@ -393,10 +393,13 @@ func (a *dbAgent) Description() string      { return a.Agent.Description() }
 func (a *dbAgent) Icon() string             { return a.icon }
 func (a *dbAgent) SubAgents() []agent.Agent { return a.Agent.SubAgents() }
 
+// Config implements agent.Configurable, delegating to the inner configAgent.
+// This allows extractAgentConfig to use a single interface check instead of
+// unwrapping via the bespoke embeddedAgentAccessor interface.
+func (a *dbAgent) Config() agent.Config { return a.Agent.(agent.Configurable).Config() }
+
 // EmbeddedAgent returns the inner agent.Agent value.
-// This allows adapter-agnostic code (e.g., the ADK-Go adapter) to unwrap
-// the dbAgent → configAgent chain and extract Config without importing
-// concrete types.
+// Retained for backward compatibility but no longer needed by extractAgentConfig.
 func (a *dbAgent) EmbeddedAgent() agent.Agent { return a.Agent }
 
 // ──────────────────────────────────────────────────────────────────────────────
