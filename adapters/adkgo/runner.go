@@ -316,11 +316,15 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 							return
 						}
 					}
+					if !yield(de, nil) {
+						return
+					}
 
 				case *thread.AssistantMessageAdded:
-					// When streaming, also emit AssistantMessageCompleted so the
-					// frontend receives TEXT_MESSAGE_END. Then fall through so
-					// AssistantMessageAdded reaches ProcessEvents for persistence.
+					// When streaming, emit AssistantMessageCompleted first so the
+					// frontend receives TEXT_MESSAGE_END. AssistantMessageAdded is
+					// always yielded regardless — it is the durable persistence event
+					// and must reach ProcessEvents to be written to the event store.
 					if streamingMsgID != "" {
 						if !yield(&thread.AssistantMessageCompleted{
 							ThreadID:  evt.ThreadID,
@@ -333,13 +337,15 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 							return
 						}
 						streamingMsgID = ""
-						// Fall through to yield(de, nil) below so the event reaches
-						// ProcessEvents and is persisted to the event store.
 					}
-				}
+					if !yield(de, nil) {
+						return
+					}
 
-				if !yield(de, nil) {
-					return
+				default:
+					if !yield(de, nil) {
+						return
+					}
 				}
 			}
 		}
