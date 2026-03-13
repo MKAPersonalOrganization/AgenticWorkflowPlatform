@@ -51,6 +51,7 @@ import (
 	"school-with-ai/plugins/todos"
 	"school-with-ai/plugins/tracker"
 	"school-with-ai/plugins/tts"
+	"school-with-ai/adapters/gemini"
 	"school-with-ai/plugins/websearch"
 	"school-with-ai/shared"
 
@@ -428,7 +429,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	toolregistry.RegisterPlugin(&todos.Provider{})
 	toolregistry.RegisterPlugin(&tracker.Provider{})
 	toolregistry.RegisterPlugin(&tts.Provider{})
-	toolregistry.RegisterPlugin(&websearch.Provider{})
+	toolregistry.RegisterPlugin(websearch.NewProvider(func(apiKey, model string) websearch.GroundedSearchClient {
+		return gemini.NewSearchClient(apiKey, model)
+	}))
 	toolregistry.RegisterPlugin(&skillsplugin.Provider{SkillResolver: &skillResolverAdapter{source: skillStoreModule}, Tracker: skillActivationTracker})
 	toolregistry.RegisterPlugin(&fsplugin.Provider{FS: &agentFSAdapter{source: filesystemModule.AgentFS()}})
 	if err := toolRegistry.Initialize(ctx); err != nil {
@@ -476,17 +479,12 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Initialize Agents
 	slogLogger := slog.New(log)
-	agentLoggingMw := agent.AgentLogging(slogLogger)
-	chatLoggingMw := agent.ChatLogging(slogLogger)
-	toolLoggingMw := agent.ToolLogging(slogLogger)
 
 	// All agents (including the default assistant) live in the database.
 	// The provider lazily ensures a starter agent per user on first access.
 	agentProvider := newUserAwareAgentProvider(
 		agentStoreModule.AgentDefinitionRepo(),
-		[]agent.Middleware{agentLoggingMw},
-		[]agent.Middleware{chatLoggingMw},
-		[]agent.Middleware{toolLoggingMw},
+		[]agent.Middleware{agent.ToolLogging(slogLogger)},
 	)
 
 	// -------------------------------------------------------------------------

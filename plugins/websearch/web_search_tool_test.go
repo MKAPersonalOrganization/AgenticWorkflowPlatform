@@ -9,9 +9,11 @@ import (
 	"school-with-ai/platform/toolregistry"
 )
 
+// =========================================================================
+// Test doubles
+// =========================================================================
+
 // mockDeps implements toolregistry.FactoryDeps for testing.
-// Only PluginSettings is overridden; other methods are provided by the
-// embedded (nil) interface and must not be called.
 type mockDeps struct {
 	toolregistry.FactoryDeps
 	settings map[string]map[string]string
@@ -24,19 +26,50 @@ func (m *mockDeps) PluginSettings(pluginID string) map[string]string {
 	return m.settings[pluginID]
 }
 
+// stubClient is a GroundedSearchClient test double.
+type stubClient struct {
+	configured bool
+	result     *WebSearchResult
+	err        error
+	// capture last call for assertion
+	lastQuery string
+}
+
+func (s *stubClient) Configured() bool { return s.configured }
+
+func (s *stubClient) Search(_ context.Context, query string) (*WebSearchResult, error) {
+	s.lastQuery = query
+	return s.result, s.err
+}
+
+// stubFactory returns a ClientFactory that records the apiKey and model it
+// receives and always vends the given stubClient.
+type stubFactory struct {
+	client   GroundedSearchClient
+	apiKey   string
+	model    string
+	defaults string // the default model string expected when none is supplied
+}
+
+func (f *stubFactory) factory(apiKey, model string) GroundedSearchClient {
+	f.apiKey = apiKey
+	f.model = model
+	return f.client
+}
+
 // =========================================================================
 // Tool identity tests
 // =========================================================================
 
 func TestWebSearchTool_Name(t *testing.T) {
-	tool := NewWebSearchTool("test-key", "")
+	tool := NewWebSearchTool(&stubClient{configured: true})
 	if got := tool.Name(); got != "web_search" {
 		t.Errorf("Name() = %q, want %q", got, "web_search")
 	}
 }
 
 func TestWebSearchTool_Schema(t *testing.T) {
-	tool := NewWebSearchTool("test-key", "")
+	tool := NewWebSearchTool(&stubClient{configured: true})
 	schema := tool.Schema()
 	if schema == nil {
 		t.Fatal("Schema() returned nil")
@@ -52,26 +85,12 @@ func TestWebSearchTool_Schema(t *testing.T) {
 	}
 }
 
-func TestWebSearchTool_DefaultModel(t *testing.T) {
-	tool := NewWebSearchTool("test-key", "")
-	if tool.model != defaultSearchModel {
-		t.Errorf("default model = %q, want %q", tool.model, defaultSearchModel)
-	}
-}
-
-func TestWebSearchTool_CustomModel(t *testing.T) {
-	tool := NewWebSearchTool("test-key", "gemini-2.0-pro")
-	if tool.model != "gemini-2.0-pro" {
-		t.Errorf("model = %q, want %q", tool.model, "gemini-2.0-pro")
-	}
-}
-
 // =========================================================================
 // Validation tests (no API call needed)
 // =========================================================================
 
 func TestWebSearchTool_Execute_EmptyQuery(t *testing.T) {
-	tool := NewWebSearchTool("test-key", "")
+	tool := NewWebSearchTool(&stubClient{configured: true})
 	args := WebSearchArgs{Query: ""}
 	raw, _ := json.Marshal(args)
 	result, err := tool.Execute(context.Background(), agent.Arguments{Raw: raw})
@@ -84,7 +103,7 @@ func TestWebSearchTool_Execute_EmptyQuery(t *testing.T) {
 }
 
 func TestWebSearchTool_Execute_WhitespaceQuery(t *testing.T) {
-	tool := NewWebSearchTool("test-key", "")
+	tool := NewWebSearchTool(&stubClient{configured: true})
 	args := WebSearchArgs{Query: "   \t  "}
 	raw, _ := json.Marshal(args)
 	result, err := tool.Execute(context.Background(), agent.Arguments{Raw: raw})
@@ -97,7 +116,7 @@ func TestWebSearchTool_Execute_WhitespaceQuery(t *testing.T) {
 }
 
 func TestWebSearchTool_Execute_QueryTooLong(t *testing.T) {
-	tool := NewWebSearchTool("test-key", "")
+	tool := NewWebSearchTool(&stubClient{configured: true})
 	longQuery := make([]byte, maxQueryLength+1)
 	for i := range longQuery {
 		longQuery[i] = 'a'
@@ -114,7 +133,7 @@ func TestWebSearchTool_Execute_QueryTooLong(t *testing.T) {
 }
 
 func TestWebSearchTool_Execute_InvalidJSON(t *testing.T) {
-	tool := NewWebSearchTool("test-key", "")
+	tool := NewWebSearchTool(&stubClient{configured: true})
 	result, err := tool.Execute(context.Background(), agent.Arguments{Raw: json.RawMessage(`{invalid}`)})
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -125,7 +144,7 @@ func TestWebSearchTool_Execute_InvalidJSON(t *testing.T) {
 }
 
 func TestWebSearchTool_Execute_MissingAPIKey(t *testing.T) {
-	tool := NewWebSearchTool("", "")
+	tool := NewWebSearchTool(&stubClient{configured: false})
 	args := WebSearchArgs{Query: "what is Go programming language"}
 	raw, _ := json.Marshal(args)
 	result, err := tool.Execute(context.Background(), agent.Arguments{Raw: raw, UserID: "test-user-nokey"})
@@ -133,7 +152,7 @@ func TestWebSearchTool_Execute_MissingAPIKey(t *testing.T) {
 		t.Fatalf("Execute() error = %v", err)
 	}
 	if result.Error == nil {
-		t.Error("expected error for missing API key")
+		t.Error("expected error for unconfigured client (missing API key)")
 	}
 }
 
@@ -171,33 +190,14 @@ func TestRateLimiter_SeparateUsers(t *testing.T) {
 }
 
 // =========================================================================
-// Response parsing tests (unit tests for helper functions)
+// Citation helper tests
 // =========================================================================
-
-func TestExtractDomain(t *testing.T) {
-	tests := []struct {
-		url    string
-		domain string
-	}{
-		{"https://www.example.com/path?q=1", "www.example.com"},
-		{"http://docs.go.dev/doc/tutorial", "docs.go.dev"},
-		{"https://en.wikipedia.org/wiki/Go_(programming_language)", "en.wikipedia.org"},
-		{"ftp://files.example.org/data", "files.example.org"},
-		{"example.com", "example.com"},
-	}
-	for _, tc := range tests {
-		got := extractDomain(tc.url)
-		if got != tc.domain {
-			t.Errorf("extractDomain(%q) = %q, want %q", tc.url, got, tc.domain)
-		}
-	}
-}
 
 func TestInsertCitationMarkers_NoCitations(t *testing.T) {
 	text := "Hello world"
-	got := insertCitationMarkers(text, nil)
+	got := InsertCitationMarkers(text, nil)
 	if got != text {
-		t.Errorf("insertCitationMarkers with no citations should return original text, got %q", got)
+		t.Errorf("InsertCitationMarkers with no citations should return original text, got %q", got)
 	}
 }
 
@@ -206,10 +206,10 @@ func TestInsertCitationMarkers_SingleCitation(t *testing.T) {
 	citations := []Citation{
 		{Text: "Go is a programming language.", SourceIndices: []int{1}, StartIndex: 0, EndIndex: 29},
 	}
-	got := insertCitationMarkers(text, citations)
+	got := InsertCitationMarkers(text, citations)
 	expected := "Go is a programming language.[1]"
 	if got != expected {
-		t.Errorf("insertCitationMarkers = %q, want %q", got, expected)
+		t.Errorf("InsertCitationMarkers = %q, want %q", got, expected)
 	}
 }
 
@@ -218,10 +218,10 @@ func TestInsertCitationMarkers_MultipleSources(t *testing.T) {
 	citations := []Citation{
 		{Text: "Go is fast.", SourceIndices: []int{1, 3}, StartIndex: 0, EndIndex: 11},
 	}
-	got := insertCitationMarkers(text, citations)
+	got := InsertCitationMarkers(text, citations)
 	expected := "Go is fast.[1][3]"
 	if got != expected {
-		t.Errorf("insertCitationMarkers = %q, want %q", got, expected)
+		t.Errorf("InsertCitationMarkers = %q, want %q", got, expected)
 	}
 }
 
@@ -230,7 +230,7 @@ func TestInsertCitationMarkers_MultipleSources(t *testing.T) {
 // =========================================================================
 
 func TestProvider_Interface(t *testing.T) {
-	p := &Provider{}
+	p := NewProvider(func(_, _ string) GroundedSearchClient { return &stubClient{} })
 	if got := p.ID(); got != "websearch" {
 		t.Errorf("ID() = %q, want %q", got, "websearch")
 	}
@@ -259,7 +259,6 @@ func TestProvider_Interface(t *testing.T) {
 		t.Errorf("UIHandledTools() = %v, want [web_search]", handled)
 	}
 
-	// SettingsSchema
 	schema := p.SettingsSchema()
 	if len(schema) != 2 {
 		t.Fatalf("SettingsSchema() returned %d fields, want 2", len(schema))
@@ -273,7 +272,8 @@ func TestProvider_Interface(t *testing.T) {
 }
 
 func TestProvider_CreateExecutable(t *testing.T) {
-	p := &Provider{}
+	sf := &stubFactory{client: &stubClient{configured: true}}
+	p := NewProvider(sf.factory)
 	ctx := context.Background()
 
 	// With plugin settings configured
@@ -288,39 +288,39 @@ func TestProvider_CreateExecutable(t *testing.T) {
 	if tool == nil {
 		t.Fatal("CreateExecutable(web_search) returned nil")
 	}
-	wst, ok := tool.(*WebSearchTool)
-	if !ok {
+	if _, ok := tool.(*WebSearchTool); !ok {
 		t.Fatal("CreateExecutable(web_search) returned wrong type")
 	}
-	if wst.apiKey != "test-key" {
-		t.Errorf("apiKey = %q, want %q", wst.apiKey, "test-key")
+	if sf.apiKey != "test-key" {
+		t.Errorf("factory received apiKey = %q, want %q", sf.apiKey, "test-key")
 	}
-	if wst.model != "gemini-2.0-flash" {
-		t.Errorf("model = %q, want %q", wst.model, "gemini-2.0-flash")
+	if sf.model != "gemini-2.0-flash" {
+		t.Errorf("factory received model = %q, want %q", sf.model, "gemini-2.0-flash")
 	}
 
-	// Without plugin settings (no settings configured)
-	tool2, err := p.CreateExecutable(ctx, "web_search", &mockDeps{})
+	// Without plugin settings
+	sf2 := &stubFactory{client: &stubClient{}}
+	p2 := NewProvider(sf2.factory)
+	tool2, err := p2.CreateExecutable(ctx, "web_search", &mockDeps{})
 	if err != nil {
 		t.Fatalf("CreateExecutable(web_search) no-settings error = %v", err)
 	}
 	if tool2 == nil {
 		t.Fatal("CreateExecutable(web_search) no-settings returned nil")
 	}
-	wst2 := tool2.(*WebSearchTool)
-	if wst2.apiKey != "" {
-		t.Errorf("apiKey = %q, want empty", wst2.apiKey)
+	if sf2.apiKey != "" {
+		t.Errorf("factory received apiKey = %q, want empty", sf2.apiKey)
 	}
-	if wst2.model != defaultSearchModel {
-		t.Errorf("model = %q, want %q", wst2.model, defaultSearchModel)
+	if sf2.model != "" {
+		t.Errorf("factory received model = %q, want empty (factory decides default)", sf2.model)
 	}
 
 	// Unknown tool
-	tool, err = p.CreateExecutable(ctx, "unknown_tool", &mockDeps{})
+	tool3, err := p.CreateExecutable(ctx, "unknown_tool", &mockDeps{})
 	if err != nil {
 		t.Fatalf("CreateExecutable(unknown_tool) error = %v", err)
 	}
-	if tool != nil {
+	if tool3 != nil {
 		t.Error("CreateExecutable(unknown_tool) should return nil")
 	}
 }

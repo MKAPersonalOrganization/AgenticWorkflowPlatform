@@ -125,33 +125,3 @@ func (r *RequirementFunc) String() string { return r.name }
 // Verify interface compliance.
 var _ Requirement = (*RequirementFunc)(nil)
 
-// =============================================================================
-// RequirementRequest — Resolved output from the Reasoner
-// =============================================================================
-
-// RequirementRequest is the resolved output produced by the Reasoner after
-// evaluating all Requirements and resolving conflicts. It represents the
-// final, coherent set of constraints for one LLM turn.
-type RequirementRequest struct {
-	// AllowedTools are the tools the LLM may call (after filtering).
-	AllowedTools []Tool
-
-	// HiddenTools are tools silently omitted from the LLM's view.
-	// They differ from blocked tools: no "CRITICAL" message is injected.
-	HiddenTools []string
-
-	// ToolChoice controls which tool the LLM must use.
-	// Values: "" (auto), "required", or a specific tool name.
-	ToolChoice string
-
-	// CanFinish indicates whether the agent is allowed to produce a final answer.
-	// false when any rule sets PreventStop=true.
-	CanFinish bool
-
-	// Reasons maps tool names to human-readable explanations.
-	// These are included in injected system messages.
-	Reasons map[string]string
-
-	// ForcedTools lists tools that must be used this turn.
-	ForcedTools []string
-}
