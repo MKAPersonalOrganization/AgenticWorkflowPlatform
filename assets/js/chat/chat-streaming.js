@@ -118,13 +118,29 @@ export function createStreamingMethods() {
 
             state.activeJobStreams.add(jobId);
 
-            const streamUrl = `/v1/tasks/${jobId}:subscribe`;
+            // Pass the last received event ID so the server can replay any
+            // events missed while the connection was down. The ID is a Redis
+            // Stream entry ID (e.g. "1717000000000-0") stored in jobSeqIdMap.
+            if (!state.jobSeqIdMap) state.jobSeqIdMap = new Map();
+            const lastSeqId = state.jobSeqIdMap.get(jobId);
+            const streamUrl = lastSeqId
+                ? `/v1/tasks/${jobId}:subscribe?lastEventId=${encodeURIComponent(lastSeqId)}`
+                : `/v1/tasks/${jobId}:subscribe`;
+
             const eventSource = new EventSource(streamUrl);
 
             state.eventSource = eventSource;
 
             eventSource.onmessage = (event) => {
                 state.jobRetryMap.delete(jobId);
+
+                // Track the last SSE id: value so we can resume from here on
+                // reconnect. event.lastEventId is set automatically by the
+                // browser from the most recent "id:" line in the stream.
+                if (event.lastEventId) {
+                    if (!state.jobSeqIdMap) state.jobSeqIdMap = new Map();
+                    state.jobSeqIdMap.set(jobId, event.lastEventId);
+                }
 
                 const data = this.__tryCatch('parse SSE event', { threadId, jobId }, () => {
                     return JSON.parse(event.data);
@@ -153,6 +169,7 @@ export function createStreamingMethods() {
                     console.log('[SSE] Stream ended — run paused for user interaction');
                     state.activeJobStreams.clear();
                     state.jobRetryMap.clear();
+                    state.jobSeqIdMap?.clear();
                     state.currentJobId = null;
                     state.isStreaming = false;
                     state.showTypingIndicator = false;
@@ -166,7 +183,9 @@ export function createStreamingMethods() {
                 state.isStreaming = state.activeJobStreams.size > 0;
                 state.showTypingIndicator = state.isStreaming;
 
-                // Retry with exponential backoff
+                // Retry with exponential backoff. The next __connectToJobStream
+                // call will include ?lastEventId= so the server replays any
+                // events the client missed while disconnected.
                 if (wasConnected || eventSource.readyState === EventSource.CONNECTING) {
                     const currentRetry = state.jobRetryMap.get(jobId) || 0;
                     state.jobRetryMap.set(jobId, currentRetry + 1);

@@ -757,7 +757,7 @@ func buildRootRouter(log *logger.Logger, rateLimitRedis *goredis.Client) (chi.Ro
 	})
 
 	appRouter := chi.NewRouter()
-	appRouter.Use(middleware.RateLimiter(rateLimitRedis, 10, 20))
+	appRouter.Use(middleware.RateLimiter(rateLimitRedis, 20, 60))
 	root.Mount("/", appRouter)
 
 	return root, appRouter

@@ -2,6 +2,7 @@ package agui
 
 import (
 	"context"
+	es "school-with-ai/foundation/eventsourcing"
 	"school-with-ai/modules/chat/thread"
 	"time"
 
@@ -26,9 +27,17 @@ type AguiProjection interface {
 // AguiBroadcaster is an interface for subscribing to real-time events.
 type AguiBroadcaster interface {
 	// Subscribe subscribes to real-time events for a thread.
-	// Returns a channel of events (type thread.Event) and a cancel function.
-	Subscribe(threadID string) (<-chan thread.Event, func())
+	// Returns a channel of BroadcastEnvelopes (each carries a SeqID + event)
+	// and a cancel function. The channel is closed if the subscriber is too
+	// slow to consume events; callers must handle the closed-channel case.
+	Subscribe(threadID string) (<-chan es.BroadcastEnvelope, func())
+
+	// Replay returns buffered events for threadID that arrived after afterSeqID.
+	// afterSeqID is a Redis Stream entry ID (e.g. "1717000000000-0").
+	// Returns an empty slice when no events are available or on error.
+	Replay(threadID string, afterSeqID string) []es.BroadcastEnvelope
 }
+
 
 // AguiThreadState represents the complete UI state for a thread.
 type AguiThreadState struct {

@@ -47,15 +47,9 @@ func (h *TaskManagementHandler) StreamJobEvents(w http.ResponseWriter, r *http.R
 	}
 
 	// 1. Get Task Info to find Thread ID
-	// We need to know which thread to subscribe to.
 	taskInfo, err := h.taskManager.GetTaskInfo("default", jobID)
 	if err != nil {
-		// Try to see if it exists in other states or complete?
 		h.log.Warn(r.Context(), "[API] Failed to get task info", "jobID", jobID, "error", err)
-		// If we can't find the task, we can't get the threadID easily unless we query all threads?
-		// Client should ideally pass threadID, but API is /tasks/{id}:subscribe.
-		// Assuming task is found. If not, maybe it's already done?
-		// If done, we don't need to stream.
 		http.Error(w, "Task not found", http.StatusNotFound)
 		return
 	}
@@ -69,22 +63,41 @@ func (h *TaskManagementHandler) StreamJobEvents(w http.ResponseWriter, r *http.R
 	}
 	threadID := payload.ThreadID
 
-	h.log.Info(r.Context(), "[API] Starting SSE stream from Projection", "jobID", jobID, "threadID", threadID)
-
-	// 3. Subscribe to Broadcaster (Live Path)
+	// 3. Subscribe BEFORE replaying history.
+	//    Subscribing first means any live events published while we are
+	//    draining the replay batch land in the channel buffer and are not
+	//    lost. We deduplicate by SeqID afterwards.
 	eventCh, cancel := h.broadcaster.Subscribe(threadID)
 	defer cancel()
 
-	// 4. Send Initial Snapshot (Historical Path - optional but recommended)
-	// messages := h.threadQueryService.GetThreadMessages(threadID)
-	// if len(messages) > 0 {
-	// 	if err := WriteSSEEvent(w, aguievents.NewMessagesSnapshotEvent(messages)); err != nil {
-	// 		return
-	// 	}
-	// 	flusher.Flush()
-	// }
+	h.log.Info(r.Context(), "[API] Starting SSE stream", "jobID", jobID, "threadID", threadID)
 
-	// 5. Stream events with heartbeat to detect dead connections
+	// 4. Replay missed events when the client reconnects with ?lastEventId=.
+	//    lastEventId is a Redis Stream entry ID (e.g. "1717000000000-0").
+	lastEventID := r.URL.Query().Get("lastEventId")
+	maxReplayedSeqID := ""
+
+	if lastEventID != "" {
+		replayed := h.broadcaster.Replay(threadID, lastEventID)
+		for _, env := range replayed {
+			aguiEvents := taskmanagement.ToAguiEvents(env.Event)
+			for _, ae := range aguiEvents {
+				if err := WriteSSEEvent(w, ae, env.SeqID); err != nil {
+					return
+				}
+			}
+			if maxReplayedSeqID == "" || !streamIDLE(env.SeqID, maxReplayedSeqID) {
+				maxReplayedSeqID = env.SeqID
+			}
+		}
+		if len(replayed) > 0 {
+			flusher.Flush()
+		}
+		h.log.Info(r.Context(), "[API] Replayed events",
+			"jobID", jobID, "count", len(replayed), "upToSeqID", maxReplayedSeqID)
+	}
+
+	// 5. Stream live events with heartbeat to detect dead connections.
 	ctx := r.Context()
 	heartbeat := time.NewTicker(30 * time.Second)
 	defer heartbeat.Stop()
@@ -97,27 +110,33 @@ func (h *TaskManagementHandler) StreamJobEvents(w http.ResponseWriter, r *http.R
 		case <-ctx.Done():
 			return
 		case <-maxTTL.C:
-			// Force close after max TTL to reclaim resources
 			return
 		case <-heartbeat.C:
-			// SSE comment line as keepalive to detect dead connections
 			if _, err := fmt.Fprintf(w, ": heartbeat\n\n"); err != nil {
 				return
 			}
 			flusher.Flush()
-		case event, ok := <-eventCh:
+		case env, ok := <-eventCh:
 			if !ok {
-				// Channel closed
+				// Channel was closed by the broadcaster (slow client).
+				// The client's onerror handler will reconnect with
+				// ?lastEventId= and receive any missed events via Replay.
 				return
 			}
-			// Convert Domain Event to Agui Event(s)
-			aguiEvents := taskmanagement.ToAguiEvents(event)
+
+			// Skip events already sent during the replay phase to avoid
+			// duplicating delta events (e.g. TEXT_MESSAGE_CONTENT).
+			if maxReplayedSeqID != "" && streamIDLE(env.SeqID, maxReplayedSeqID) {
+				continue
+			}
+
+			aguiEvents := taskmanagement.ToAguiEvents(env.Event)
 			for _, ae := range aguiEvents {
-				if err := WriteSSEEvent(w, ae); err != nil {
+				if err := WriteSSEEvent(w, ae, env.SeqID); err != nil {
 					return
 				}
-				flusher.Flush()
 			}
+			flusher.Flush()
 		}
 	}
 }
