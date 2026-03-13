@@ -1,0 +1,258 @@
+package adkgo
+
+import (
+	"encoding/json"
+	"time"
+
+	"google.golang.org/adk/session"
+	"google.golang.org/genai"
+
+	"school-with-ai/modules/chat/thread"
+)
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Event Translation
+//
+// TranslateEvent converts a single adk-go session.Event into zero or more
+// thread domain events. A single adk-go event can fan out to multiple domain
+// events (e.g. assistant message + tool start for each function call).
+//
+// The translation is stateless — streaming lifecycle tracking (message start/
+// end) is handled by the caller in runner.go.
+// ──────────────────────────────────────────────────────────────────────────────
+
+// EventContext carries per-run context needed for event translation.
+type EventContext struct {
+	ThreadID  string
+	RunID     string
+	AgentName string
+	Provider  string
+	Model     string
+}
+
+// TranslateEvent translates a single adk-go session event to thread domain events.
+func TranslateEvent(evt *session.Event, ctx EventContext) []thread.Event {
+	if evt == nil || evt.Content == nil {
+		return translateUsageOnly(evt, ctx)
+	}
+
+	switch evt.Author {
+	case "user":
+		return translateUserEvent(evt, ctx)
+	default:
+		// "model", "", or agent name — all are model/assistant events.
+		return translateModelEvent(evt, ctx)
+	}
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// User Events
+// ──────────────────────────────────────────────────────────────────────────────
+
+func translateUserEvent(evt *session.Event, ctx EventContext) []thread.Event {
+	var events []thread.Event
+
+	if text := extractTextFromContent(evt.Content); text != "" {
+		events = append(events, &thread.UserMessageAdded{
+			ThreadID:  ctx.ThreadID,
+			MessageID: evt.ID,
+			Content:   text,
+			Timestamp: evt.Timestamp,
+		})
+	}
+
+	// Function responses (tool results returned by the runtime on behalf of user).
+	events = append(events, translateFunctionResponses(evt, ctx)...)
+
+	return events
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Model / Assistant Events
+// ──────────────────────────────────────────────────────────────────────────────
+
+func translateModelEvent(evt *session.Event, ctx EventContext) []thread.Event {
+	var events []thread.Event
+	now := coalesceTime(evt.Timestamp)
+
+	text := extractTextFromContent(evt.Content)
+	toolCalls := extractToolCalls(evt.Content)
+
+	// Streaming delta — partial content, no tool calls.
+	if evt.Partial {
+		if text != "" {
+			events = append(events, &thread.AssistantContentStreamed{
+				ThreadID:  ctx.ThreadID,
+				MessageID: evt.ID,
+				Delta:     text,
+				Timestamp: now,
+			})
+		}
+		return events
+	}
+
+	// Complete model turn — assistant message with optional tool calls.
+	if text != "" || len(toolCalls) > 0 {
+		events = append(events, &thread.AssistantMessageAdded{
+			ThreadID:  ctx.ThreadID,
+			MessageID: evt.ID,
+			Content:   text,
+			ToolCalls: toolCalls,
+			AgentName: ctx.AgentName,
+			Timestamp: now,
+		})
+	}
+
+	// ToolStart for each function call the LLM wants to invoke.
+	for _, tc := range toolCalls {
+		events = append(events, &thread.ToolStart{
+			ThreadID:      ctx.ThreadID,
+			MessageID:     evt.ID,
+			ToolCallID:    tc.ID,
+			ToolName:      tc.Name,
+			ToolArguments: tc.Arguments,
+			AgentName:     ctx.AgentName,
+			Timestamp:     now,
+		})
+	}
+
+	// Tool results (function responses) within the same event.
+	events = append(events, translateFunctionResponses(evt, ctx)...)
+
+	// Token usage.
+	if u := translateUsageMetadata(evt, ctx); u != nil {
+		events = append(events, u)
+	}
+
+	return events
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Function Response → ToolResultAdded
+//
+// Convention established in tools.go resultToMap():
+//   - Success: map has content keys at top level (e.g. "success", "audio_url")
+//   - Error:   map has an "error" key and NO "result"/"results"/"success" keys
+//
+// This is the single source of truth for error detection. tools.go guarantees
+// the shape; events.go just reads it.
+// ──────────────────────────────────────────────────────────────────────────────
+
+func translateFunctionResponses(evt *session.Event, ctx EventContext) []thread.Event {
+	var events []thread.Event
+	now := coalesceTime(evt.Timestamp)
+
+	for _, p := range evt.Content.Parts {
+		if p.FunctionResponse == nil {
+			continue
+		}
+
+		resultJSON, _ := json.Marshal(p.FunctionResponse.Response)
+
+		events = append(events, &thread.ToolResultAdded{
+			ThreadID:   ctx.ThreadID,
+			MessageID:  evt.ID,
+			ToolCallID: p.FunctionResponse.ID,
+			ToolName:   p.FunctionResponse.Name,
+			Result:     string(resultJSON),
+			IsError:    isErrorResponse(p.FunctionResponse.Response),
+			AgentName:  ctx.AgentName,
+			Timestamp:  now,
+		})
+	}
+
+	return events
+}
+
+// isErrorResponse returns true when the FunctionResponse map represents an
+// error result. The convention (from tools.go) is: the map contains an "error"
+// key and no success-indicator keys ("result", "results", "success").
+func isErrorResponse(resp map[string]any) bool {
+	if resp == nil {
+		return false
+	}
+	if _, hasError := resp[errorKey]; !hasError {
+		return false
+	}
+	// If the map also has success indicators, it's a partial failure but
+	// not a pure error (the tool returned usable data alongside the error).
+	for _, key := range []string{"result", "results", "success"} {
+		if _, exists := resp[key]; exists {
+			return false
+		}
+	}
+	return true
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Usage-Only Events
+// ──────────────────────────────────────────────────────────────────────────────
+
+func translateUsageOnly(evt *session.Event, ctx EventContext) []thread.Event {
+	if u := translateUsageMetadata(evt, ctx); u != nil {
+		return []thread.Event{u}
+	}
+	return nil
+}
+
+func translateUsageMetadata(evt *session.Event, ctx EventContext) thread.Event {
+	if evt == nil || evt.UsageMetadata == nil || evt.UsageMetadata.TotalTokenCount == 0 {
+		return nil
+	}
+	return &thread.TokenUsageReported{
+		ThreadID:         ctx.ThreadID,
+		MessageID:        evt.ID,
+		Provider:         ctx.Provider,
+		Model:            ctx.Model,
+		PromptTokens:     int(evt.UsageMetadata.PromptTokenCount),
+		CompletionTokens: int(evt.UsageMetadata.CandidatesTokenCount),
+		TotalTokens:      int(evt.UsageMetadata.TotalTokenCount),
+		Timestamp:        coalesceTime(evt.Timestamp),
+	}
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Content Extraction Helpers
+// ──────────────────────────────────────────────────────────────────────────────
+
+// extractTextFromContent concatenates all text parts from genai.Content.
+func extractTextFromContent(c *genai.Content) string {
+	if c == nil {
+		return ""
+	}
+	var text string
+	for _, p := range c.Parts {
+		if p.Text != "" {
+			text += p.Text
+		}
+	}
+	return text
+}
+
+// extractToolCalls extracts FunctionCall parts as thread.ToolCall slice.
+func extractToolCalls(c *genai.Content) []thread.ToolCall {
+	if c == nil {
+		return nil
+	}
+	var calls []thread.ToolCall
+	for _, p := range c.Parts {
+		if p.FunctionCall != nil {
+			argsJSON, _ := json.Marshal(p.FunctionCall.Args)
+			calls = append(calls, thread.ToolCall{
+				ID:        p.FunctionCall.ID,
+				Type:      "function",
+				Name:      p.FunctionCall.Name,
+				Arguments: string(argsJSON),
+			})
+		}
+	}
+	return calls
+}
+
+// coalesceTime returns t if non-zero, otherwise time.Now().
+func coalesceTime(t time.Time) time.Time {
+	if t.IsZero() {
+		return time.Now()
+	}
+	return t
+}

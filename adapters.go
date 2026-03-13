@@ -7,8 +7,33 @@ import (
 	"school-with-ai/modules/chat/chatcontracts"
 	"school-with-ai/modules/knowledge/edgequake"
 	"school-with-ai/modules/permissions"
+	"school-with-ai/modules/userprofile/identity"
 	"school-with-ai/shared"
 )
+
+// adkgoProfileAdapter bridges identity.StudentProfileRepository to
+// adkgo.StudentProfileProvider (GetProfile → map[string]any).
+type adkgoProfileAdapter struct {
+	repo identity.StudentProfileRepository
+}
+
+func (a *adkgoProfileAdapter) GetProfile(ctx context.Context, userID string) (map[string]any, error) {
+	profile, err := a.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if profile == nil {
+		return nil, nil
+	}
+	m := map[string]any{
+		"user_id":        profile.UserID,
+		"learning_style": profile.LearningStyle,
+		"struggles":      profile.Struggles,
+		"strengths":      profile.Strengths,
+		"goals":          profile.Goals,
+	}
+	return m, nil
+}
 
 // DocumentProviderAdapter adapts edgequake.Service to chatcontracts.DocumentProvider
 type DocumentProviderAdapter struct {
