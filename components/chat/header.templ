@@ -6,7 +6,7 @@ import "school-with-ai/components/i18n"
 
 // Header renders the desktop chat header with action buttons.
 templ Header() {
-	<div class="absolute top-0 z-10 hidden md:flex h-14 w-full items-center justify-between bg-gradient-to-b from-background via-background/70 to-transparent p-2 font-semibold">
+	<div class="absolute top-0 z-10 hidden md:flex h-14 w-full items-center justify-between bg-linear-to-b from-background via-background/80 to-transparent backdrop-blur-[2px] p-2 font-semibold">
 		<div class="flex items-center gap-2"></div>
 		<div class="flex items-center gap-2">
 			<!-- Right Side Actions -->
@@ -15,7 +15,7 @@ templ Header() {
 				@button.Button(button.Props{
 					Size:    button.SizeIcon,
 					Variant: button.VariantGhost,
-					Class:   "size-9 text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+					Class:   "size-9 text-muted-foreground hover:text-foreground hover:bg-accent/60 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
 					Attributes: templ.Attributes{
 						"@click": "createNewSession()",
 						"title":  i18n.T(ctx, "New Chat"),

@@ -11,14 +11,14 @@ import "school-with-ai/components/agentcapabilities"
 
 templ ChatInput() {
 	<div
-		class="relative flex w-full flex-grow flex-col overflow-hidden rounded-t-3xl border border-border bg-background shadow-md transition-all duration-200 focus-within:shadow-lg sm:rounded-3xl"
-		:class="isTextAreaFocused ? 'shadow-lg border-border' : 'shadow-md'"
+		class="relative flex w-full flex-grow flex-col overflow-visible rounded-t-[1.75rem] border border-border/60 bg-background/95 backdrop-blur-sm shadow-modern transition-all duration-300 focus-within:shadow-modern-lg focus-within:border-border sm:rounded-[1.75rem]"
+		:class="isTextAreaFocused ? 'shadow-modern-lg border-border ring-1 ring-ring/10' : 'shadow-modern'"
 		x-data="{ isTextAreaFocused: false }"
 		@click="$refs.messageInput.focus()"
 		role="region"
 		aria-label="Message input area"
 	>
-		<form @submit.prevent="sendMessage" class="mx-auto flex flex-col w-full p-1.5">
+		<form @submit.prevent="sendMessage" class="mx-auto flex flex-col w-full p-1.5 overflow-hidden rounded-[inherit]">
 			<!-- File Previews -->
 			@FileRow()
 			<!-- Textarea Area -->
@@ -122,7 +122,7 @@ templ ChatInput() {
 							@button.Button(button.Props{
 								Variant: button.VariantDefault,
 								Size:    button.SizeIcon,
-								Class:   "rounded-full bg-foreground p-1.5 text-background transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-10 hover:bg-foreground/90",
+								Class:   "rounded-full bg-foreground p-1.5 text-background transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-10 hover:bg-foreground/85 hover:scale-105 active:scale-95",
 								Attributes: templ.Attributes{
 									"@click.prevent": "isStreaming ? cancelJob() : sendMessage()",
 									"type":           "button",
