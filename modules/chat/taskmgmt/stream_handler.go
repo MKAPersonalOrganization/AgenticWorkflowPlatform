@@ -68,10 +68,12 @@ func (h *TaskManagementHandler) StreamJobEvents(w http.ResponseWriter, r *http.R
 
 	// 3. Subscribe BEFORE replaying history.
 	//    Subscribing first means any live events published while we are
-	//    draining the replay batch land in the channel buffer and are not
+	//    draining the replay batch land in the ring buffer and are not
 	//    lost. We deduplicate by SeqID afterwards.
-	eventCh, cancel := h.broadcaster.Subscribe(threadID)
-	defer cancel()
+	//
+	//    No cleanup needed — the broadcaster has no per-subscriber state.
+	//    When this handler returns, the subscription is simply GC'd.
+	sub := h.broadcaster.Subscribe(threadID)
 
 	h.log.Info(r.Context(), "[API] Starting SSE stream", "jobID", jobID, "threadID", threadID)
 
@@ -135,27 +137,29 @@ func (h *TaskManagementHandler) StreamJobEvents(w http.ResponseWriter, r *http.R
 				return
 			}
 			flusher.Flush()
-		case env, ok := <-eventCh:
+		case <-sub.Ready():
+			envs, ok := sub.Recv()
 			if !ok {
-				// Channel was closed by the broadcaster (slow client).
-				// The client's onerror handler will reconnect with
-				// ?lastEventId= and receive any missed events via Replay.
+				// Subscriber fell behind the ring buffer — disconnect so the
+				// client reconnects with ?lastEventId= for lossless replay.
 				return
 			}
 
-			// Skip events already sent during the replay phase to avoid
-			// duplicating delta events (e.g. TEXT_MESSAGE_CONTENT).
-			if maxReplayedSeqID != "" && streamIDLE(env.SeqID, maxReplayedSeqID) {
-				continue
-			}
+			for _, env := range envs {
+				// Skip events already sent during the replay phase to avoid
+				// duplicating delta events (e.g. TEXT_MESSAGE_CONTENT).
+				if maxReplayedSeqID != "" && streamIDLE(env.SeqID, maxReplayedSeqID) {
+					continue
+				}
 
-			if err := rc.SetWriteDeadline(time.Now().Add(h.sse.WriteTimeout)); err != nil {
-				return
-			}
-			aguiEvents := taskmanagement.ToAguiEvents(env.Event)
-			for _, ae := range aguiEvents {
-				if err := WriteSSEEvent(w, ae, env.SeqID); err != nil {
+				if err := rc.SetWriteDeadline(time.Now().Add(h.sse.WriteTimeout)); err != nil {
 					return
+				}
+				aguiEvents := taskmanagement.ToAguiEvents(env.Event)
+				for _, ae := range aguiEvents {
+					if err := WriteSSEEvent(w, ae, env.SeqID); err != nil {
+						return
+					}
 				}
 			}
 			flusher.Flush()

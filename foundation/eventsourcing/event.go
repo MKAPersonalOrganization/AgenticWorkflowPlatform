@@ -11,39 +11,40 @@
 package eventsourcing
 
 import (
-"fmt"
-"time"
+	"fmt"
+	"time"
 )
 
 // Event is the base interface for all domain events.
 // Unlike the former domain.Event, this interface is open — any package can
 // implement it, enabling modules to define events locally.
 type Event interface {
-EventType() string
-EventTimestamp() time.Time
-AggregateID() string
+	EventType() string
+	EventTimestamp() time.Time
+	AggregateID() string
 }
 
 // EventEnvelope wraps an event with metadata about its position in the stream.
 type EventEnvelope struct {
-Data           Event
-EventID        string
-StreamPosition int64
-LogPosition    int64
-Timestamp      time.Time
+	Data           Event
+	EventID        string
+	StreamPosition int64
+	LogPosition    int64
+	Timestamp      time.Time
 }
 
-// BroadcastEnvelope wraps a live event with the Redis Stream entry ID assigned
-// at publish time. The SeqID is used as the SSE "id:" field so reconnecting
+// BroadcastEnvelope wraps a live event with a monotonic sequence ID.
+// The SeqID is a UnixNano timestamp generated before publish and embedded
+// in the NATS payload. It is used as the SSE "id:" field so reconnecting
 // clients can request an exact replay position via ?lastEventId=.
 type BroadcastEnvelope struct {
-SeqID string // Redis Stream entry ID, e.g. "1717000000000-0"
-Event Event
+	SeqID string // UnixNano timestamp, e.g. "1717000000000000000"
+	Event Event
 }
 
 // StreamName generates a consistent stream name for an aggregate.
 // Format: {aggregateType}-{aggregateID}
 // Example: "Thread-123e4567-e89b-12d3-a456-426614174000"
 func StreamName(aggregateType, aggregateID string) string {
-return fmt.Sprintf("%s-%s", aggregateType, aggregateID)
+	return fmt.Sprintf("%s-%s", aggregateType, aggregateID)
 }

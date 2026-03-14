@@ -160,6 +160,11 @@ func run(ctx context.Context, log *logger.Logger) error {
 			Addr     string `conf:"default:localhost:6379"`
 			Password string `conf:"mask"`
 		}
+		NATS struct {
+			URL      string `conf:"default:nats://localhost:4222"`
+			Password string `conf:"mask"`
+			Replicas int    `conf:"default:1"`
+		}
 		Orchestration struct {
 			Concurrency         int           `conf:"default:5"`
 			ShutdownTimeout     time.Duration `conf:"default:10s"`
@@ -289,10 +294,15 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Skill activation tracker (in-memory, shared between skill tool and runner)
 	skillActivationTracker := skillsplugin.NewSkillActivationTracker()
 
-	// Run migrations
-	log.Info(ctx, "startup", "status", "running database migrations")
-	if err := migrate.Migrate(ctx, db); err != nil {
-		return fmt.Errorf("migrating database: %w", err)
+	// Run migrations (skipped when SCHOOL_SKIP_MIGRATIONS=true, e.g. in a
+	// cluster where an init container handles migrations before pods start).
+	if os.Getenv("SCHOOL_SKIP_MIGRATIONS") != "true" {
+		log.Info(ctx, "startup", "status", "running database migrations")
+		if err := migrate.Migrate(ctx, db); err != nil {
+			return fmt.Errorf("migrating database: %w", err)
+		}
+	} else {
+		log.Info(ctx, "startup", "status", "skipping migrations (SCHOOL_SKIP_MIGRATIONS=true)")
 	}
 
 	// Seed agent store catalog (only inserts if table is empty)
@@ -315,11 +325,16 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// transientRouter is used by the orchestrator for non-persistent events (streaming deltas, etc.)
 	transientRouter := event.NewRouter()
 
-	// Initialize Redis broadcaster for cross-pod event delivery
-	redisBroadcaster := subscriber.NewRedisBroadcaster(log, cfg.Redis.Addr, cfg.Redis.Password, eventRegistry)
+	// Initialize NATS JetStream broadcaster for cross-pod event fan-out and replay
+	natsCfg := subscriber.DefaultNATSBroadcasterConfig()
+	natsCfg.StreamReplicas = cfg.NATS.Replicas
+	broadcaster, err := subscriber.NewNATSBroadcaster(log, cfg.NATS.URL, cfg.NATS.Password, eventRegistry, natsCfg)
+	if err != nil {
+		return fmt.Errorf("NATS broadcaster: %w", err)
+	}
 	defer func() {
-		if closeErr := redisBroadcaster.Close(); closeErr != nil {
-			log.Error(ctx, "shutdown", "status", "failed to close Redis broadcaster", "ERROR", closeErr)
+		if closeErr := broadcaster.Close(); closeErr != nil {
+			log.Error(ctx, "shutdown", "status", "failed to close NATS broadcaster", "ERROR", closeErr)
 		}
 	}()
 
@@ -335,7 +350,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Register Redis broadcaster ONLY to transientRouter.
 	// The orchestrator directly dispatches all events (Durable and Transient) to transientRouter.
 	// persistenceRouter is strictly for updating Read Models (Projections) and should not re-broadcast.
-	transientRouter.RegisterAny(redisBroadcaster.Broadcast)
+	transientRouter.RegisterAny(broadcaster.Broadcast)
 
 	// Use the Postgres event store directly as the write model
 	eventLog := baseEventStore
@@ -508,7 +523,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		TenantID:           cfg.Edgequake.TenantID,
 		AllowedOrigin:      cfg.Auth.AppURL,
 		SSE:                taskmgmthandlers.DefaultSSEConfig(),
-		Broadcaster:        redisBroadcaster,
+		Broadcaster:        broadcaster,
 		AsynqConfig: taskmanagement.AsynqConfig{
 			RedisAddr:           cfg.Redis.Addr,
 			RedisPassword:       cfg.Redis.Password,
