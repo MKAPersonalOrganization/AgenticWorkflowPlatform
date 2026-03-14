@@ -7,7 +7,6 @@ import (
 	"school-with-ai/components/i18n"
 	"school-with-ai/components/nav"
 	"school-with-ai/components/resources"
-	"school-with-ai/components/skills"
 	"school-with-ai/components/tools"
 	"school-with-ai/platform/toolregistry"
 	"school-with-ai/shared"
@@ -102,8 +101,7 @@ templ BaseLayout(props LayoutProps) {
 				<div x-cloak>
 					@resources.ResourcesDialog()
 					@agents.AgentsDialog()
-					@skills.SkillsDialog()
-					@tools.ToolsDialog()
+						@tools.ToolsDialog()
 					@convsearch.SearchDialog()
 					@filesystem.FilesystemDialog()
 				</div>

@@ -8,7 +8,6 @@ import { resourcesDialog } from './components/resources-dialog.js';
 import { toolsDialog } from './components/tools-sidebar.js';
 import { agentsManager } from './components/agents-dialog.js';
 import { agentCapabilities } from './components/agent-capabilities.js';
-import { skillsManager } from './components/skills-dialog.js';
 import { convSearchDialog } from './components/conv-search-dialog.js';
 import { mcpConnectors } from './components/mcp-connectors.js';
 import { renderMarkdown } from './chat/markdown-renderer.js';
@@ -26,7 +25,6 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('toolsDialog', toolsDialog);
     Alpine.data('agentsManager', agentsManager);
     Alpine.data('agentCapabilities', agentCapabilities);
-    Alpine.data('skillsManager', skillsManager);
     Alpine.data('convSearchDialog', convSearchDialog);
     Alpine.data('mcpConnectors', mcpConnectors);
 });

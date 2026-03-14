@@ -8,7 +8,6 @@ import (
 	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
 	"school-with-ai/components/resources"
-	"school-with-ai/components/skills"
 	"school-with-ai/components/threads"
 	"school-with-ai/components/tools"
 	"school-with-ai/shared"
@@ -43,10 +42,6 @@ templ Navbar(props ...NavbarProps) {
 			<!-- Agent Store Button -->
 			<div class="hidden md:block">
 				@agents.AgentStoreNavButtonTrigger()
-			</div>
-			<!-- Skills Button -->
-			<div class="hidden md:block">
-				@skills.SkillStoreNavButtonTrigger()
 			</div>
 			<!-- Search Conversations Button -->
 			<div class="hidden md:block">

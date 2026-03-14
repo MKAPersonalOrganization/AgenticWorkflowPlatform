@@ -48,7 +48,6 @@ import (
 	"school-with-ai/plugins/knowledgebase"
 	"school-with-ai/plugins/library"
 	"school-with-ai/plugins/planmode"
-	skillsplugin "school-with-ai/plugins/skills"
 	"school-with-ai/plugins/todos"
 	"school-with-ai/plugins/tracker"
 	"school-with-ai/plugins/tts"
@@ -80,7 +79,6 @@ import (
 	permissionsmod "school-with-ai/modules/permissions"
 	pluginsettingsmod "school-with-ai/modules/pluginsettings"
 	resourcesmod "school-with-ai/modules/resources"
-	skillstoremod "school-with-ai/modules/skillstore"
 	userprofilemod "school-with-ai/modules/userprofile"
 
 	"github.com/ardanlabs/conf/v3"
@@ -288,12 +286,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Initialize Agent Store module (agent definitions + catalog)
 	agentStoreModule := agentstoremod.New(log, db)
 
-	// Initialize Skill Store module (skills marketplace + library + permissions)
-	skillStoreModule := skillstoremod.New(log, db)
-
-	// Skill activation tracker (in-memory, shared between skill tool and runner)
-	skillActivationTracker := skillsplugin.NewSkillActivationTracker()
-
 	// Run migrations (skipped when SCHOOL_SKIP_MIGRATIONS=true, e.g. in a
 	// cluster where an init container handles migrations before pods start).
 	if os.Getenv("SCHOOL_SKIP_MIGRATIONS") != "true" {
@@ -309,12 +301,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	log.Info(ctx, "startup", "status", "seeding agent store catalog")
 	if err := agentStoreModule.SeedCatalog(ctx); err != nil {
 		return fmt.Errorf("seeding agent catalog: %w", err)
-	}
-
-	// Seed skill store catalog (only inserts if table is empty)
-	log.Info(ctx, "startup", "status", "seeding skill store catalog")
-	if err := skillStoreModule.SeedCatalog(ctx); err != nil {
-		return fmt.Errorf("seeding skill catalog: %w", err)
 	}
 
 	// -------------------------------------------------------------------------
@@ -448,7 +434,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	toolregistry.RegisterPlugin(websearch.NewProvider(func(apiKey, model string) websearch.GroundedSearchClient {
 		return gemini.NewSearchClient(apiKey, model)
 	}))
-	toolregistry.RegisterPlugin(&skillsplugin.Provider{SkillResolver: &skillResolverAdapter{source: skillStoreModule}, Tracker: skillActivationTracker})
 	toolregistry.RegisterPlugin(&fsplugin.Provider{FS: &agentFSAdapter{source: filesystemModule.AgentFS()}})
 	if err := toolRegistry.Initialize(ctx); err != nil {
 		return fmt.Errorf("failed to initialize tool registry: %w", err)
@@ -611,7 +596,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		PermChecker:            permissionsService,
 		MCPResolver:            mcpModule.Service(),
 		NewToolSetFactory:      newToolSetFactory,
-		PromptInjectors:        []adkgo.PromptInjector{skillActivationTracker, kbPromptInjector},
+		PromptInjectors:        []adkgo.PromptInjector{kbPromptInjector},
 		ExtraConfigFn:          extraConfigFn,
 	})
 	if err != nil {
@@ -676,7 +661,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 		aiSettings:     aiSettingsModule,
 		pluginSettings: pluginSettingsModule,
 		agentStore:     agentStoreModule,
-		skillStore:     skillStoreModule,
 		knowledge:      knowledgeModule,
 		mcp:            mcpModule,
 		resources:      resourcesModule,
@@ -795,9 +779,6 @@ type routeModules struct {
 	agentStore interface {
 		RegisterRoutes(chi.Router, *auth.Middleware)
 	}
-	skillStore interface {
-		RegisterRoutes(chi.Router, *auth.Middleware)
-	}
 	knowledge interface {
 		RegisterRoutes(chi.Router, *auth.Middleware)
 	}
@@ -838,7 +819,6 @@ func registerRoutes(
 	mods.filesystem.RegisterRoutes(r, authMW)
 	mods.permissions.RegisterRoutes(r, authMW)
 	mods.agentStore.RegisterRoutes(r, authMW)
-	mods.skillStore.RegisterRoutes(r, authMW)
 	mods.userProfile.RegisterRoutes(r, authMW)
 	mods.aiSettings.RegisterRoutes(r, authMW)
 	mods.pluginSettings.RegisterRoutes(r, authMW)
