@@ -14,13 +14,6 @@ type Specialty struct {
 	Description string
 }
 
-// Skill defines a specialized agent capability.
-type Skill struct {
-	Name        string
-	Description string
-	Location    string
-}
-
 // LearningPath defines related concepts and resources for progressive learning.
 type LearningPath struct {
 	Prerequisites []string // Concepts the student should know first
@@ -37,7 +30,6 @@ type TeacherPromptConfig struct {
 	Mission        string   // Clear mission statement for the agent
 	Objectives     []string // Specific objectives to achieve
 	Specialists    []Specialty
-	Skills         []Skill
 	StudentProfile *chatcontracts.StudentProfile
 	LearningPath   *LearningPath // Guidance for progressive learning
 	ExtraRules     string
@@ -107,18 +99,6 @@ You are a non-interactive academic agent. Do your best to complete the task at h
 {{template "StudentProfile" .}}
 {{template "LearningPath" .}}
 {{template "Instructions" .}}
-
-{{if .Skills}}
-# Available Agent Skills
-You have access to the following specialized skills.
-<available_skills>
-{{range .Skills}}  <skill>
-    <name>{{.Name}}</name>
-    <description>{{.Description}}</description>
-    <location>{{.Location}}</location>
-  </skill>
-{{end}}</available_skills>
-{{end}}
 
 {{if .Specialists}}
 # Available Specialists

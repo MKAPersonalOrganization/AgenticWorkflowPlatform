@@ -13,10 +13,8 @@ import (
 	"school-with-ai/modules/knowledge/edgequake"
 	"school-with-ai/modules/permissions"
 	permworkspace "school-with-ai/modules/permissions/workspace"
-	"school-with-ai/modules/skillstore"
 	"school-with-ai/modules/userprofile/identity"
 	"school-with-ai/plugins/fsplugin"
-	skillsplugin "school-with-ai/plugins/skills"
 	"school-with-ai/shared"
 
 	"github.com/google/uuid"
@@ -155,55 +153,6 @@ func (a *chatProfileAdapter) GetByUserID(ctx context.Context, userID string) (*c
 		Strengths:     p.Strengths,
 		Goals:         p.Goals,
 	}, nil
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// skillResolverAdapter bridges skillstore.Module to the skills plugin's
-// SkillResolver interface, converting skillstore.UserSkill → skills.Skill.
-// ──────────────────────────────────────────────────────────────────────────────
-
-type skillResolverSource interface {
-	ListSkillsForAgent(ctx context.Context, userID, agentID string) ([]skillstore.UserSkill, error)
-	GetSkillByNameForAgent(ctx context.Context, userID, agentID, skillName string) (*skillstore.UserSkill, error)
-}
-
-type skillResolverAdapter struct {
-	source skillResolverSource
-}
-
-func (a *skillResolverAdapter) ListSkillsForAgent(ctx context.Context, userID, agentID string) ([]skillsplugin.Skill, error) {
-	raw, err := a.source.ListSkillsForAgent(ctx, userID, agentID)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]skillsplugin.Skill, len(raw))
-	for i, s := range raw {
-		out[i] = mapSkill(s)
-	}
-	return out, nil
-}
-
-func (a *skillResolverAdapter) GetSkillByNameForAgent(ctx context.Context, userID, agentID, skillName string) (*skillsplugin.Skill, error) {
-	s, err := a.source.GetSkillByNameForAgent(ctx, userID, agentID, skillName)
-	if err != nil {
-		return nil, err
-	}
-	if s == nil {
-		return nil, nil
-	}
-	out := mapSkill(*s)
-	return &out, nil
-}
-
-func mapSkill(s skillstore.UserSkill) skillsplugin.Skill {
-	return skillsplugin.Skill{
-		Name:         s.Name,
-		Description:  s.Description,
-		Instructions: s.Instructions,
-		Category:     s.Category,
-		Icon:         s.Icon,
-		IsCustom:     s.IsCustom,
-	}
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
