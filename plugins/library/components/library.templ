@@ -1,6 +1,5 @@
 package library
 
-
 templ Library() {
 	<div
 		class="block w-full my-8 relative"
@@ -9,7 +8,6 @@ templ Library() {
 		<div
 			class="absolute -start-4 top-1 bottom-1 w-[3px] rounded-full bg-primary/30 transition-colors duration-500"
 		></div>
-		
 		<!-- Content Wrapper -->
 		<div class="flex flex-col gap-3 ps-4 w-full">
 			<!-- Header / Intent -->
@@ -23,7 +21,6 @@ templ Library() {
 					class="text-[10px] font-bold tracking-[0.2em] uppercase text-muted-foreground/50"
 				>Collection Indexed</span>
 			</div>
-
 			<!-- Breadcrumbs: Specialized Typography -->
 			<div class="flex items-center gap-1.5 flex-wrap">
 				<span class="text-[11px] font-semibold text-foreground/40 italic font-serif">DeepSearch Path:</span>
@@ -36,11 +33,10 @@ templ Library() {
 					</div>
 				</template>
 			</div>
-
 			<!-- Results Grid/List -->
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-2 w-full mt-2">
 				<template x-for="(node, nIndex) in message.parsedResult?.nodes" :key="nIndex">
-					<div 
+					<div
 						class="flex items-center gap-3 p-2.5 rounded-md bg-muted/5 border border-transparent hover:border-primary/20 hover:bg-primary/[0.02] transition-all group/node cursor-default"
 					>
 						<!-- Minimalist Icon -->
@@ -58,7 +54,6 @@ templ Library() {
 								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
 							</template>
 						</div>
-
 						<div class="flex-1 min-w-0">
 							<p class="text-[13px] font-medium text-foreground/80 truncate font-serif italic" x-text="node.name"></p>
 							<div class="flex items-center gap-2 mt-0.5">
@@ -69,18 +64,16 @@ templ Library() {
 					</div>
 				</template>
 			</div>
-
 			<!-- Empty State -->
 			<template x-if="!message.parsedResult?.nodes || message.parsedResult.nodes.length === 0">
 				<div class="flex items-center gap-3 py-4 border-y border-dashed border-muted/20 w-full justify-center">
 					<span class="text-[10px] font-bold tracking-widest text-muted-foreground/30 uppercase italic">No resources matched index query</span>
 				</div>
 			</template>
-
 			<!-- Footer Acknowledgment -->
 			<div class="flex items-center gap-3 mt-2 w-full">
 				<div class="h-[1px] flex-1 bg-muted/10"></div>
-				<span class="text-[9px] font-medium text-muted-foreground/30 italic">Collection results verified via SchoolAI Library</span>
+				<span class="text-[9px] font-medium text-muted-foreground/30 italic">Collection results verified via Knowledge Library</span>
 				<div class="size-1.5 rounded-full bg-primary/20"></div>
 			</div>
 		</div>

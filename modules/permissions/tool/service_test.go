@@ -31,7 +31,7 @@ func TestToolSetPermissionsService(t *testing.T) {
 	userID := "test-user"
 
 	// Test setting a tool set permission
-	agentID := "math-instructor"
+	agentID := "math-expert"
 	toolSetID := "calculator-set"
 
 	if err := service.SetToolSetPermission(ctx, userID, agentID, toolSetID, true); err != nil {
@@ -69,7 +69,7 @@ func TestToolSetDisabling(t *testing.T) {
 	ctx := context.Background()
 
 	userID := "test-user"
-	agentID := "math-instructor"
+	agentID := "math-expert"
 	toolSetID := "calculator-set"
 
 	// First enable the tool set
@@ -114,8 +114,8 @@ func TestDefaultToolSets(t *testing.T) {
 		agentID  string
 		expected int
 	}{
-		{"math-instructor", 0},
-		{"statistics-instructor", 0},
+		{"math-expert", 0},
+		{"statistics-expert", 0},
 		{"unknown-agent", 0},
 	}
 

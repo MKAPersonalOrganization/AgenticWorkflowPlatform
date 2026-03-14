@@ -5,15 +5,16 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"school-with-ai/infra/sqldb"
 	"time"
+
+	"school-with-ai/infra/sqldb"
 )
 
 func main() {
 	email := flag.String("email", "", "Email of the user to promote")
 	role := flag.String("role", "admin", "Role to assign (default: admin)")
 	dbHost := flag.String("db-host", "localhost:5435", "Database host:port")
-	dbUser := flag.String("db-user", "schoolai", "Database user")
+	dbUser := flag.String("db-user", "appuser", "Database user")
 	dbPass := flag.String("db-pass", "dev-password", "Database password")
 	dbName := flag.String("db-name", "projections", "Database name")
 	flag.Parse()

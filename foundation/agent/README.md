@@ -1,6 +1,6 @@
 # Agent Abstraction Layer
 
-This package provides framework-agnostic interfaces for building AI agents in the SchoolWithAI application.
+This package provides framework-agnostic interfaces for building AI agents in the AI Chat Platform application.
 
 ## Architecture
 

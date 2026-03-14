@@ -12,9 +12,9 @@ import (
 	"strings"
 )
 
-// StudentProfileDTO is a view-layer data transfer object for the profile page.
+// UserProfileDTO is a view-layer data transfer object for the profile page.
 // Components accept DTOs, not domain types — the module handler maps domain → DTO.
-type StudentProfileDTO struct {
+type UserProfileDTO struct {
 	LearningStyle string
 	Struggles     []string
 	Strengths     []string
@@ -23,7 +23,7 @@ type StudentProfileDTO struct {
 
 type ProfilePageProps struct {
 	User    *shared.User
-	Profile StudentProfileDTO
+	Profile UserProfileDTO
 }
 
 templ ProfilePage(props ProfilePageProps) {

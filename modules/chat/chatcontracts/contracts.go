@@ -15,10 +15,10 @@ type ThreadQueryService interface {
 
 // ThreadSummary represents a summary of a thread for list views.
 type ThreadSummary struct {
-	ID                string               `json:"id"`
-	Title             string               `json:"title"`
-	Messages          []aguievents.Message `json:"messages"`
-	CreatedAt         string               `json:"createdAt"`
-	UpdatedAt         string               `json:"updatedAt"`
-	CurrentInstructor string               `json:"currentInstructor,omitempty"`
+	ID           string               `json:"id"`
+	Title        string               `json:"title"`
+	Messages     []aguievents.Message `json:"messages"`
+	CreatedAt    string               `json:"createdAt"`
+	UpdatedAt    string               `json:"updatedAt"`
+	CurrentAgent string               `json:"currentAgent,omitempty"`
 }

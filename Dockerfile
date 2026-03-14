@@ -30,7 +30,7 @@ RUN npx @tailwindcss/cli \
 # Compile binary — inject build tag "production"
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags="-s -w -X main.build=production" \
-    -o /bin/school-with-ai .
+    -o /bin/ai-chat-platform .
 
 # =============================================================================
 # Stage 2: Runtime — minimal image, no toolchain
@@ -42,7 +42,7 @@ RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /app
 
 # Binary
-COPY --from=builder /bin/school-with-ai .
+COPY --from=builder /bin/ai-chat-platform .
 
 # Static assets (CSS, JS, images, etc.)
 COPY --from=builder /app/assets ./assets
@@ -56,4 +56,4 @@ COPY --from=builder /app/assets/locales ./assets/locales
 
 EXPOSE 8090
 
-CMD ["./school-with-ai"]
+CMD ["./ai-chat-platform"]

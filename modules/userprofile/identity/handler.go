@@ -11,14 +11,14 @@ import (
 	"school-with-ai/shared"
 )
 
-// handler manages student profile HTTP requests.
+// handler manages user profile HTTP requests.
 type handler struct {
 	log  *logger.Logger
-	repo StudentProfileRepository
+	repo UserProfileRepository
 }
 
 // newHandler creates a new profile handler.
-func newHandler(log *logger.Logger, repo StudentProfileRepository) *handler {
+func newHandler(log *logger.Logger, repo UserProfileRepository) *handler {
 	return &handler{log: log, repo: repo}
 }
 
@@ -37,12 +37,12 @@ func (h *handler) handleProfilePage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if profileData == nil {
-		profileData = &StudentProfile{UserID: user.ID}
+		profileData = &UserProfile{UserID: user.ID}
 	}
 
 	component := profile.ProfilePage(profile.ProfilePageProps{
 		User: user,
-		Profile: profile.StudentProfileDTO{
+		Profile: profile.UserProfileDTO{
 			LearningStyle: profileData.LearningStyle,
 			Struggles:     profileData.Struggles,
 			Strengths:     profileData.Strengths,
@@ -72,7 +72,7 @@ func (h *handler) getProfile(w http.ResponseWriter, r *http.Request) {
 
 	if p == nil {
 		// Return empty default profile instead of 404 for better UX in form
-		p = &StudentProfile{UserID: user.ID}
+		p = &UserProfile{UserID: user.ID}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -117,7 +117,7 @@ func (h *handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 		return result
 	}
 
-	p := &StudentProfile{
+	p := &UserProfile{
 		UserID:        user.ID,
 		LearningStyle: req.LearningStyle,
 		Struggles:     parseList(req.Struggles),

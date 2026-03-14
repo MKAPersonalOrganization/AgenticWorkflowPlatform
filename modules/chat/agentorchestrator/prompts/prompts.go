@@ -8,43 +8,43 @@ import (
 	"school-with-ai/modules/chat/chatcontracts"
 )
 
-// Specialty defines an academic specialist for the learning coordinator.
+// Specialty defines a domain specialist for the coordinator agent.
 type Specialty struct {
 	Name        string
 	Description string
 }
 
-// LearningPath defines related concepts and resources for progressive learning.
-type LearningPath struct {
-	Prerequisites []string // Concepts the student should know first
+// ProgressionPath defines related concepts and resources for progressive guidance.
+type ProgressionPath struct {
+	Prerequisites []string // Concepts the user should know first
 	NextConcepts  []string // Logical next topics to explore
 	RelatedTopics []string // Cross-domain connections
 	PracticeAreas []string // Suggested practice problems or exercises
 }
 
-// TeacherPromptConfig defines data for the academic system prompt template.
-type TeacherPromptConfig struct {
-	Role           string
-	Preamble       string
-	Topic          string
-	Mission        string   // Clear mission statement for the agent
-	Objectives     []string // Specific objectives to achieve
-	Specialists    []Specialty
-	StudentProfile *chatcontracts.StudentProfile
-	LearningPath   *LearningPath // Guidance for progressive learning
-	ExtraRules     string
-	Interactive    bool
+// AgentPromptConfig defines data for the agent system prompt template.
+type AgentPromptConfig struct {
+	Role            string
+	Preamble        string
+	Topic           string
+	Mission         string   // Clear mission statement for the agent
+	Objectives      []string // Specific objectives to achieve
+	Specialists     []Specialty
+	UserProfile     *chatcontracts.UserProfile
+	ProgressionPath *ProgressionPath // Guidance for progressive exploration
+	ExtraRules      string
+	Interactive     bool
 }
 
-// TeacherSystemPromptTemplate uses Go template define blocks for modularity.
-const TeacherSystemPromptTemplate = `
+// AgentSystemPromptTemplate uses Go template define blocks for modularity.
+const AgentSystemPromptTemplate = `
 {{define "Preamble"}}
 # Role: {{.Role}}
 {{.Preamble}}
 {{- if .Interactive}}
-You are a supportive and rigorous Secondary School Teacher. Your goal is to help the student learn and master the material through clear explanations and active verification. Balance extreme conciseness with pedagogical clarity.
+You are a knowledgeable and supportive AI Assistant. Your goal is to help the user understand and master the material through clear explanations and active verification. Balance conciseness with clarity.
 {{- else}}
-You are a non-interactive academic agent. Do your best to complete the task at hand and avoid asking user for any additional information.
+You are a non-interactive AI agent. Do your best to complete the task at hand and avoid asking user for any additional information.
 {{- end}}
 {{- end}}
 
@@ -62,42 +62,42 @@ You are a non-interactive academic agent. Do your best to complete the task at h
 {{- end}}
 {{- end}}
 
-{{define "StudentProfile"}}
-{{- if .StudentProfile}}
-# Student Profile
-- **Name:** {{.StudentProfile.UserID}}
-- **Learning Style:** {{.StudentProfile.LearningStyle}}
-{{- if .StudentProfile.Struggles}}
-- **Current Struggles:** {{range $i, $s := .StudentProfile.Struggles}}{{if $i}}, {{end}}{{$s}}{{end}}
+{{define "UserProfile"}}
+{{- if .UserProfile}}
+# User Profile
+- **Name:** {{.UserProfile.UserID}}
+- **Preferred Style:** {{.UserProfile.LearningStyle}}
+{{- if .UserProfile.Struggles}}
+- **Current Challenges:** {{range $i, $s := .UserProfile.Struggles}}{{if $i}}, {{end}}{{$s}}{{end}}
 {{- end}}
-{{- if .StudentProfile.Strengths}}
-- **Strengths:** {{range $i, $s := .StudentProfile.Strengths}}{{if $i}}, {{end}}{{$s}}{{end}}
+{{- if .UserProfile.Strengths}}
+- **Strengths:** {{range $i, $s := .UserProfile.Strengths}}{{if $i}}, {{end}}{{$s}}{{end}}
 {{- end}}
 {{- end}}
 {{- end}}
 
-{{define "LearningPath"}}
-{{- if .LearningPath}}
-# Learning Path
-{{- if .LearningPath.Prerequisites}}
-**Prerequisites:** {{range $i, $s := .LearningPath.Prerequisites}}{{if $i}}, {{end}}{{$s}}{{end}}
+{{define "ProgressionPath"}}
+{{- if .ProgressionPath}}
+# Progression Path
+{{- if .ProgressionPath.Prerequisites}}
+**Prerequisites:** {{range $i, $s := .ProgressionPath.Prerequisites}}{{if $i}}, {{end}}{{$s}}{{end}}
 {{- end}}
-{{- if .LearningPath.NextConcepts}}
-**Next Concepts:** {{range $i, $s := .LearningPath.NextConcepts}}{{if $i}}, {{end}}{{$s}}{{end}}
+{{- if .ProgressionPath.NextConcepts}}
+**Next Concepts:** {{range $i, $s := .ProgressionPath.NextConcepts}}{{if $i}}, {{end}}{{$s}}{{end}}
 {{- end}}
 {{- end}}
 {{- end}}
 
 {{define "Instructions"}}
 # Instructions
-- **Active Teaching:** You are a teacher, not a search engine. You must frequently pause to VERIFY student understanding by administering short quizzes using the available tools.
-- **Student Interaction:** You MUST use the appropriate tools for ANY interaction requiring student response. **STOP and use the tool.** You are PROHIBITED from asking questions directly in your text response.
+- **Active Guidance:** You are an expert assistant, not a search engine. You must frequently pause to VERIFY user understanding by administering short quizzes using the available tools.
+- **User Interaction:** You MUST use the appropriate tools for ANY interaction requiring user response. **STOP and use the tool.** You are PROHIBITED from asking questions directly in your text response.
 {{- end}}
 
 {{template "Preamble" .}}
 {{template "Mission" .}}
-{{template "StudentProfile" .}}
-{{template "LearningPath" .}}
+{{template "UserProfile" .}}
+{{template "ProgressionPath" .}}
 {{template "Instructions" .}}
 
 {{if .Specialists}}
@@ -116,9 +116,9 @@ You are a non-interactive academic agent. Do your best to complete the task at h
 {{end}}
 `
 
-// GenerateTeacherSystemPrompt generates a system prompt from the generic teacher template.
-func GenerateTeacherSystemPrompt(config TeacherPromptConfig) (string, error) {
-	tmpl, err := template.New("teacher_system_prompt").Parse(strings.TrimSpace(TeacherSystemPromptTemplate))
+// GenerateAgentSystemPrompt generates a system prompt from the agent template.
+func GenerateAgentSystemPrompt(config AgentPromptConfig) (string, error) {
+	tmpl, err := template.New("agent_system_prompt").Parse(strings.TrimSpace(AgentSystemPromptTemplate))
 	if err != nil {
 		return "", err
 	}

@@ -147,7 +147,7 @@ func (s *service) createPaymentIntent(ctx context.Context, userID, email string)
 		AutomaticPaymentMethods: &stripe.PaymentIntentAutomaticPaymentMethodsParams{
 			Enabled: stripe.Bool(true),
 		},
-		Description:  stripe.String("SchoolWithAI — Monthly subscription"),
+		Description:  stripe.String("AI Platform — Monthly subscription"),
 		ReceiptEmail: stripe.String(email),
 		Metadata: map[string]string{
 			MetadataKeyUserID:    userID,

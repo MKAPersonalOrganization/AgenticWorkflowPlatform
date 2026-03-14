@@ -2,22 +2,23 @@ package agentorchestrator_test
 
 import (
 	"context"
+	"testing"
+
 	"school-with-ai/foundation/agent"
 	"school-with-ai/modules/chat/agentorchestrator/agents/math"
-	"testing"
 )
 
-func TestInstructorConfigurations(t *testing.T) {
+func TestAgentConfigurations(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
 	// Math
-	mathConfig, err := math.NewMathInstructorConfig(ctx, nil)
+	mathConfig, err := math.NewMathExpertConfig(ctx, nil)
 	if err != nil {
-		t.Fatalf("Failed to create math instructor config: %v", err)
+		t.Fatalf("Failed to create math expert config: %v", err)
 	}
-	if mathConfig.Name != "math-instructor" {
-		t.Errorf("Expected math name 'math-instructor', got '%s'", mathConfig.Name)
+	if mathConfig.Name != "math-expert" {
+		t.Errorf("Expected math name 'math-expert', got '%s'", mathConfig.Name)
 	}
 }
 

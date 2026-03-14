@@ -32,7 +32,7 @@ func New(log *logger.Logger, db *sqlx.DB) *Module {
 // This replaces the three separate RegisterRoutes calls that were previously
 // made in main.go for identity, preferences, and banner.
 func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
-	// Identity (student profile) routes
+	// Identity (user profile) routes
 	m.identity.RegisterRoutes(r, authMW)
 
 	// Preferences routes
@@ -42,8 +42,8 @@ func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 	r.Get("/api/banner", authMW.RequireAuthFunc(m.banner.getBanner))
 }
 
-// StudentProfileRepo returns the student profile repository for cross-module
+// UserProfileRepo returns the user profile repository for cross-module
 // consumers (e.g., agent orchestrator, custom runner).
-func (m *Module) StudentProfileRepo() identity.StudentProfileRepository {
-	return m.identity.StudentProfileRepo()
+func (m *Module) UserProfileRepo() identity.UserProfileRepository {
+	return m.identity.UserProfileRepo()
 }

@@ -36,7 +36,7 @@ type Service struct {
 	threadRepo    *thread.ThreadRepository
 	emitter       EventEmitter
 	artifactStore artifact.Service
-	profileRepo   chatcontracts.StudentProfileRepository
+	profileRepo   chatcontracts.UserProfileRepository
 	snapshotStore es.SnapshotStore
 
 	runnerMu sync.RWMutex
@@ -86,8 +86,8 @@ func WithArtifactService(store artifact.Service) Option {
 	}
 }
 
-// WithStudentProfileRepository configures the agent with a student profile repository.
-func WithStudentProfileRepository(repo chatcontracts.StudentProfileRepository) Option {
+// WithUserProfileRepository configures the agent with a user profile repository.
+func WithUserProfileRepository(repo chatcontracts.UserProfileRepository) Option {
 	return func(s *Service) {
 		s.profileRepo = repo
 	}

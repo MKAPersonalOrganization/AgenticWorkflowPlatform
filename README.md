@@ -1,4 +1,4 @@
-# School with AI
+# AI Chat Platform
 
 An event-sourced, multi-agent AI chat platform built with Go, Templ, Tailwind CSS, and Alpine.js. Implements the AG-UI protocol for real-time agent interactions, with a modular plugin system for tools and MCP connector support for remote tool servers.
 
@@ -15,7 +15,7 @@ An event-sourced, multi-agent AI chat platform built with Go, Templ, Tailwind CS
 graph TB
     User["<b>Student / Teacher</b><br/>[Person]<br/>Interacts with AI agents for<br/>learning and content creation."]
 
-    System["<b>School with AI</b><br/>[Software System]<br/>Event-sourced multi-agent platform<br/>with knowledge graph RAG."]
+    System["<b>AI Chat Platform</b><br/>[Software System]<br/>Event-sourced multi-agent platform<br/>with knowledge graph RAG."]
 
     GoogleOAuth["<b>Google OAuth 2.0</b><br/>[External System]<br/>Identity provider for<br/>authentication."]
     LLMAPIs["<b>LLM APIs</b><br/>[External System]<br/>OpenAI, Google Gemini"]
@@ -220,7 +220,7 @@ graph TB
 | **Billing Service** | `services/billing` | Event-sourced payment aggregate with Stripe SDK. Subscription lifecycle, lazy expiration, idempotent webhook processing. |
 | **EdgeQuake Service** | `services/edgequake` | HTTP facade to the Rust RAG API — documents, query, workspaces, pipeline, graph, entities, relationships. |
 | **Artifact Service** | `services/artifact` | S3/MinIO storage for user files, audio, images. Pre-upload pattern with HTTP Range streaming (ADR-011). |
-| **Memory Service** | `services/memory` | Long-term memory stored as `SCHOOLAI.md` in S3. Read/write via memory plugin tool. |
+| **Memory Service** | `services/memory` | Long-term memory stored as `MEMORIES.md` in S3. Read/write via memory plugin tool. |
 | **Plugin Layer** | `plugins/*` | 9 self-contained plugins each implementing `PluginProvider`: calculator, codebase, cognitive, document, elicitation, knowledgebase, library, memory, tts. Each provides backend logic + Templ UI templates (ADR-008). |
 | **Agent SDK** | `foundation/agentsdk` | Framework-isolated agent engine with LLM iteration loop, tool execution, stream processing, and human-in-the-loop I/O. LLM adapters for OpenAI, Gemini, and Ollama (ADR-001, ADR-005). |
 | **Agent Framework** | `foundation/agent` | Framework-agnostic interfaces: `Agent`, `Runner`, `ExecutableTool`, `StreamingExecutor`, `AgentProvider`, `Middleware` (ADR-006). |

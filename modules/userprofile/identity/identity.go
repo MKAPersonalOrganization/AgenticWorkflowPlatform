@@ -8,15 +8,15 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// SubModule is the identity (student profile) sub-module.
+// SubModule is the identity (user profile) sub-module.
 type SubModule struct {
 	handler     *handler
-	profileRepo StudentProfileRepository
+	profileRepo UserProfileRepository
 }
 
 // New creates the identity sub-module.
 func New(log *logger.Logger, db *sqlx.DB) *SubModule {
-	repo := newPostgresStudentProfileRepository(db)
+	repo := newPostgresUserProfileRepository(db)
 	h := newHandler(log, repo)
 
 	return &SubModule{
@@ -32,8 +32,8 @@ func (m *SubModule) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 	r.Put("/api/profile", authMW.RequireAuthFunc(m.handler.updateProfile))
 }
 
-// StudentProfileRepo returns the student profile repository for cross-module
+// UserProfileRepo returns the user profile repository for cross-module
 // consumers (e.g., agent orchestrator, custom runner).
-func (m *SubModule) StudentProfileRepo() StudentProfileRepository {
+func (m *SubModule) UserProfileRepo() UserProfileRepository {
 	return m.profileRepo
 }

@@ -12,7 +12,7 @@ import (
 
 func TestTryAcquireAdvisoryLock_AcquiresOnce(t *testing.T) {
 	// Integration test — requires a real PostgreSQL. Set TEST_DATABASE_URL
-	// (e.g. "postgres://schoolai:dev-password@localhost:5435/projections?sslmode=disable")
+	// (e.g. "postgres://appuser:dev-password@localhost:5435/projections?sslmode=disable")
 	// to run. Skipped otherwise.
 	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {

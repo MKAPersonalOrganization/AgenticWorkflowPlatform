@@ -73,11 +73,11 @@ func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 		ghNotConfigured := func(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusOK, map[string]any{
 				"connected": false,
-				"error":     "GitHub OAuth is not configured. Set SCHOOL_AUTH_GITHUB_CLIENT_ID and SCHOOL_AUTH_GITHUB_CLIENT_SECRET.",
+				"error":     "GitHub OAuth is not configured. Set APP_AUTH_GITHUB_CLIENT_ID and APP_AUTH_GITHUB_CLIENT_SECRET.",
 			})
 		}
 		r.Get("/api/github/connect", authMW.RequireAuthFunc(func(w http.ResponseWriter, r *http.Request) {
-			writeError(w, http.StatusServiceUnavailable, "GitHub OAuth is not configured. Set SCHOOL_AUTH_GITHUB_CLIENT_ID and SCHOOL_AUTH_GITHUB_CLIENT_SECRET.")
+			writeError(w, http.StatusServiceUnavailable, "GitHub OAuth is not configured. Set APP_AUTH_GITHUB_CLIENT_ID and APP_AUTH_GITHUB_CLIENT_SECRET.")
 		}))
 		r.Get("/api/github/callback", authMW.RequireAuthFunc(ghNotConfigured))
 		r.Get("/api/github/status", authMW.RequireAuthFunc(ghNotConfigured))

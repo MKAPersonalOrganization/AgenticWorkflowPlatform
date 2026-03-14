@@ -5,9 +5,9 @@ import (
 	"time"
 )
 
-// StudentProfile represents the extended academic profile of a student.
+// UserProfile represents the extended profile of a user.
 // This is separate from the User identity (Kratos).
-type StudentProfile struct {
+type UserProfile struct {
 	UserID        string    `json:"user_id" db:"user_id"`
 	LearningStyle string    `json:"learning_style" db:"learning_style"`
 	Struggles     []string  `json:"struggles" db:"struggles"`
@@ -17,8 +17,8 @@ type StudentProfile struct {
 	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
 }
 
-// StudentProfileRepository defines the interface for student profile storage.
-type StudentProfileRepository interface {
-	GetByUserID(ctx context.Context, userID string) (*StudentProfile, error)
-	Upsert(ctx context.Context, profile *StudentProfile) error
+// UserProfileRepository defines the interface for user profile storage.
+type UserProfileRepository interface {
+	GetByUserID(ctx context.Context, userID string) (*UserProfile, error)
+	Upsert(ctx context.Context, profile *UserProfile) error
 }

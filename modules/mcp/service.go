@@ -687,7 +687,7 @@ func (s *Service) probeConnector(ctx context.Context, connector *MCPConnector, h
 		// Create a fresh Client per session — avoids accumulating session
 		// references in a shared Client (the go-sdk tracks sessions internally).
 		client := mcp.NewClient(
-			&mcp.Implementation{Name: "schoolwithai", Version: "1.0.0"},
+			&mcp.Implementation{Name: "ai-platform", Version: "1.0.0"},
 			&mcp.ClientOptions{},
 		)
 
@@ -742,7 +742,7 @@ func (s *Service) openEphemeralSession(ctx context.Context, serverURL string, ht
 
 	// Create a fresh Client per session — avoids shared session tracking.
 	client := mcp.NewClient(
-		&mcp.Implementation{Name: "schoolwithai", Version: "1.0.0"},
+		&mcp.Implementation{Name: "ai-platform", Version: "1.0.0"},
 		&mcp.ClientOptions{},
 	)
 

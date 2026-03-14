@@ -49,10 +49,10 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN go build -o bin/school-with-ai .
+RUN go build -o bin/ai-chat-platform .
 
 # Expose port
 EXPOSE 8080
 
 # Run the application
-CMD ["./bin/school-with-ai"]
+CMD ["./bin/ai-chat-platform"]

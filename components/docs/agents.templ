@@ -125,7 +125,7 @@ templ docsAgentStore() {
 				</tr>
 			</thead>
 			<tbody>
-				@docsTableRow("Education", "Tutors and learning assistants", "Math Tutor, Science Guide, Language Coach")
+				@docsTableRow("Learning", "Guides and learning assistants", "Math Expert, Science Guide, Language Coach")
 				@docsTableRow("Writing", "Content creation and editing", "Writing Coach, Essay Reviewer, Creative Writer")
 				@docsTableRow("Development", "Programming and technical help", "Code Mentor, Debug Assistant, API Designer")
 				@docsTableRow("Research", "Analysis and information synthesis", "Research Analyst, Paper Reviewer, Fact Checker")
@@ -186,7 +186,7 @@ templ docsCustomAgents() {
 			use relevant capabilities:
 		</p>
 		<ul class="space-y-2 my-4">
-			<li>• A <strong>Math Tutor</strong> might only need Calculator and Knowledge Base</li>
+			<li>• A <strong>Math Expert</strong> might only need Calculator and Knowledge Base</li>
 			<li>• A <strong>Research Assistant</strong> might need Knowledge Base and Document tools</li>
 			<li>• A <strong>Code Mentor</strong> might need Codebase and Cognitive tools</li>
 		</ul>
@@ -200,7 +200,7 @@ templ docsCustomAgents() {
 }
 
 // ─── Personalized Profile ─────────────────────────────────────────────────────────
-templ docsStudentProfile() {
+templ docsUserProfile() {
 	@docsSection("personalized-profile", "Personalized Profile", iconUser, "text-amber-500") {
 		<p>
 			The Personalized Profile is a powerful adaptation feature that makes Compass.AI truly yours.

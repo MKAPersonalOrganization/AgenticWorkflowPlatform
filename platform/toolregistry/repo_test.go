@@ -14,18 +14,18 @@ import (
 )
 
 func TestPostgresToolRegistryRepository(t *testing.T) {
-	host := os.Getenv("SCHOOL_DB_HOST")
+	host := os.Getenv("APP_DB_HOST")
 	if host == "" {
 		host = "localhost:5435"
 	}
 
-	password := os.Getenv("SCHOOL_DB_PASSWORD")
+	password := os.Getenv("APP_DB_PASSWORD")
 	if password == "" {
 		password = "dev-password"
 	}
 
 	cfg := sqldb.Config{
-		User:         "schoolai",
+		User:         "appuser",
 		Password:     password,
 		Host:         host,
 		Name:         "projections",
