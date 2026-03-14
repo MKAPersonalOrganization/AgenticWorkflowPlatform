@@ -16,6 +16,8 @@
 package taskmgmt
 
 import (
+	"time"
+
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/modules/chat/chatcontracts"
@@ -27,6 +29,37 @@ import (
 	"school-with-ai/platform/toolregistry"
 	"school-with-ai/shared"
 )
+
+// SSEConfig holds tunable parameters for Server-Sent Event connections.
+// All values have safe production defaults via DefaultSSEConfig().
+type SSEConfig struct {
+	// WriteTimeout is the deadline applied to every individual SSE write
+	// (heartbeat or event frame). If a write cannot complete within this
+	// window the connection is torn down and the client reconnects with
+	// ?lastEventId= for lossless replay.
+	WriteTimeout time.Duration
+
+	// HeartbeatInterval controls how often an SSE comment line is sent to
+	// probe the connection. Should be ≤ WriteTimeout so idle connections
+	// are tested within one deadline window.
+	HeartbeatInterval time.Duration
+
+	// MaxConnectionTTL is the maximum lifetime of a single SSE connection.
+	// After this duration the server closes the connection with a retry: 0
+	// hint so the client reconnects immediately (to any healthy pod).
+	// This is a safety net for graceful rolling deploys — with per-write
+	// deadlines, dead clients are caught much sooner.
+	MaxConnectionTTL time.Duration
+}
+
+// DefaultSSEConfig returns production-safe defaults.
+func DefaultSSEConfig() SSEConfig {
+	return SSEConfig{
+		WriteTimeout:      15 * time.Second,
+		HeartbeatInterval: 15 * time.Second,
+		MaxConnectionTTL:  30 * time.Minute,
+	}
+}
 
 // TaskManagementHandler encapsulates dependencies for HTTP handlers for task management.
 type TaskManagementHandler struct {
@@ -45,6 +78,7 @@ type TaskManagementHandler struct {
 	documentProvider   chatcontracts.DocumentProvider
 	tenantID           string
 	allowedOrigin      string
+	sse                SSEConfig
 }
 
 // NewTaskManagementHandler creates a new HTTP handler for task management.
@@ -64,6 +98,7 @@ func NewTaskManagementHandler(
 	documentProvider chatcontracts.DocumentProvider,
 	tenantID string,
 	allowedOrigin string,
+	sse SSEConfig,
 ) *TaskManagementHandler {
 	return &TaskManagementHandler{
 		log:                log,
@@ -81,5 +116,6 @@ func NewTaskManagementHandler(
 		documentProvider:   documentProvider,
 		tenantID:           tenantID,
 		allowedOrigin:      allowedOrigin,
+		sse:                sse,
 	}
 }
