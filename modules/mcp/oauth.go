@@ -178,7 +178,7 @@ func (o *OAuthService) RegisterClient(ctx context.Context, registrationEndpoint,
 	}
 
 	body := map[string]any{
-		"client_name":                "SchoolWithAI - " + serverName,
+		"client_name":                "AI Platform - " + serverName,
 		"redirect_uris":              []string{o.callbackURL},
 		"grant_types":                []string{"authorization_code", "refresh_token"},
 		"response_types":             []string{"code"},

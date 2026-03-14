@@ -20,10 +20,10 @@ import (
 	"github.com/google/uuid"
 )
 
-// adkgoProfileAdapter bridges identity.StudentProfileRepository to
+// adkgoProfileAdapter bridges identity.UserProfileRepository to
 // adkgo.UserContextProvider (GetProfile → map[string]any).
 type adkgoProfileAdapter struct {
-	repo identity.StudentProfileRepository
+	repo identity.UserProfileRepository
 }
 
 func (a *adkgoProfileAdapter) GetProfile(ctx context.Context, userID string) (map[string]any, error) {
@@ -132,21 +132,21 @@ func (k *knowledgeBasePromptInjector) BuildPromptAddition(ctx context.Context, a
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// chatProfileAdapter bridges identity.StudentProfileRepository to
-// chatcontracts.StudentProfileRepository so the chat module does not import
+// chatProfileAdapter bridges identity.UserProfileRepository to
+// chatcontracts.UserProfileRepository so the chat module does not import
 // modules/userprofile/identity directly.
 // ──────────────────────────────────────────────────────────────────────────────
 
 type chatProfileAdapter struct {
-	repo identity.StudentProfileRepository
+	repo identity.UserProfileRepository
 }
 
-func (a *chatProfileAdapter) GetByUserID(ctx context.Context, userID string) (*chatcontracts.StudentProfile, error) {
+func (a *chatProfileAdapter) GetByUserID(ctx context.Context, userID string) (*chatcontracts.UserProfile, error) {
 	p, err := a.repo.GetByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	return &chatcontracts.StudentProfile{
+	return &chatcontracts.UserProfile{
 		UserID:        p.UserID,
 		LearningStyle: p.LearningStyle,
 		Struggles:     p.Struggles,

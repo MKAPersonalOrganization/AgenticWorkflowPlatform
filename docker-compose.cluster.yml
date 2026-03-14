@@ -43,7 +43,7 @@ services:
   # ensuring migrations complete exactly once before any pod accepts requests.
   # ===========================================================================
   migrate:
-    image: school-with-ai:local
+    image: ai-chat-platform:local
     deploy:
       replicas: 1
     expose:
@@ -51,42 +51,42 @@ services:
     networks:
       - intranet
     environment:
-      - SCHOOL_WEB_API_HOST=0.0.0.0:8090
-      - SCHOOL_WEB_TLS_CERT=/app/tls/cert.pem
-      - SCHOOL_WEB_TLS_KEY=/app/tls/key.pem
-      - SCHOOL_REDIS_ADDR=redis-master:6379
-      - SCHOOL_REDIS_PASSWORD=${REDIS_PASSWORD}
-      - SCHOOL_DB_HOST=app-postgres:5432
-      - SCHOOL_DB_USER=schoolai
-      - SCHOOL_DB_PASSWORD=${SCHOOL_DB_PASSWORD}
-      - SCHOOL_DB_NAME=projections
-      - SCHOOL_DB_DISABLE_TLS=true
-      - SCHOOL_AUTH_APP_URL=https://localhost:8090
-      - SCHOOL_AUTH_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - SCHOOL_AUTH_GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - SCHOOL_AUTH_SESSION_SECRET=${SESSION_SECRET}
-      - SCHOOL_AUTH_GIT_HUB_CLIENT_ID=${SCHOOL_AUTH_GIT_HUB_CLIENT_ID}
-      - SCHOOL_AUTH_GIT_HUB_CLIENT_SECRET=${SCHOOL_AUTH_GIT_HUB_CLIENT_SECRET}
-      - SCHOOL_EDGEQUAKE_BASE_URL=http://edgequake-api:8080
-      - SCHOOL_EDGEQUAKE_TENANT_ID=${SCHOOL_EDGEQUAKE_TENANT_ID}
-      - SCHOOL_ARTIFACTS_S_3_ENDPOINT=minio:9000
-      - SCHOOL_ARTIFACTS_S_3_ACCESS_KEY=${SCHOOL_ARTIFACTS_S_3_ACCESS_KEY}
-      - SCHOOL_ARTIFACTS_S_3_SECRET_KEY=${SCHOOL_ARTIFACTS_S_3_SECRET_KEY}
-      - SCHOOL_ARTIFACTS_S_3_BUCKET=artifacts
-      - SCHOOL_ARTIFACTS_S_3_USE_SSL=false
-      - SCHOOL_DASHBOARD_ADMIN_USER=${SCHOOL_DASHBOARD_ADMIN_USER:-admin}
-      - SCHOOL_DASHBOARD_ADMIN_PASS=${SCHOOL_DASHBOARD_ADMIN_PASS}
-      - SCHOOL_STRIPE_SECRET_KEY=${SCHOOL_STRIPE_SECRET_KEY}
-      - SCHOOL_STRIPE_PUBLISHABLE_KEY=${SCHOOL_STRIPE_PUBLISHABLE_KEY}
-      - SCHOOL_STRIPE_WEBHOOK_SECRET=${SCHOOL_STRIPE_WEBHOOK_SECRET}
-      - SCHOOL_STRIPE_PRICE_ID=${SCHOOL_STRIPE_PRICE_ID}
-      # This pod runs migrations (no SCHOOL_SKIP_MIGRATIONS)
-      - SCHOOL_DB_MAX_IDLE_CONNS=10
-      - SCHOOL_DB_MAX_OPEN_CONNS=20
+      - APP_WEB_API_HOST=0.0.0.0:8090
+      - APP_WEB_TLS_CERT=/app/tls/cert.pem
+      - APP_WEB_TLS_KEY=/app/tls/key.pem
+      - APP_REDIS_ADDR=redis-master:6379
+      - APP_REDIS_PASSWORD=${REDIS_PASSWORD}
+      - APP_DB_HOST=app-postgres:5432
+      - APP_DB_USER=appuser
+      - APP_DB_PASSWORD=${APP_DB_PASSWORD}
+      - APP_DB_NAME=projections
+      - APP_DB_DISABLE_TLS=true
+      - APP_AUTH_APP_URL=https://localhost:8090
+      - APP_AUTH_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - APP_AUTH_GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - APP_AUTH_SESSION_SECRET=${SESSION_SECRET}
+      - APP_AUTH_GIT_HUB_CLIENT_ID=${APP_AUTH_GIT_HUB_CLIENT_ID}
+      - APP_AUTH_GIT_HUB_CLIENT_SECRET=${APP_AUTH_GIT_HUB_CLIENT_SECRET}
+      - APP_EDGEQUAKE_BASE_URL=http://edgequake-api:8080
+      - APP_EDGEQUAKE_TENANT_ID=${APP_EDGEQUAKE_TENANT_ID}
+      - APP_ARTIFACTS_S_3_ENDPOINT=minio:9000
+      - APP_ARTIFACTS_S_3_ACCESS_KEY=${APP_ARTIFACTS_S_3_ACCESS_KEY}
+      - APP_ARTIFACTS_S_3_SECRET_KEY=${APP_ARTIFACTS_S_3_SECRET_KEY}
+      - APP_ARTIFACTS_S_3_BUCKET=artifacts
+      - APP_ARTIFACTS_S_3_USE_SSL=false
+      - APP_DASHBOARD_ADMIN_USER=${APP_DASHBOARD_ADMIN_USER:-admin}
+      - APP_DASHBOARD_ADMIN_PASS=${APP_DASHBOARD_ADMIN_PASS}
+      - APP_STRIPE_SECRET_KEY=${APP_STRIPE_SECRET_KEY}
+      - APP_STRIPE_PUBLISHABLE_KEY=${APP_STRIPE_PUBLISHABLE_KEY}
+      - APP_STRIPE_WEBHOOK_SECRET=${APP_STRIPE_WEBHOOK_SECRET}
+      - APP_STRIPE_PRICE_ID=${APP_STRIPE_PRICE_ID}
+      # This pod runs migrations (no APP_SKIP_MIGRATIONS)
+      - APP_DB_MAX_IDLE_CONNS=10
+      - APP_DB_MAX_OPEN_CONNS=20
       # NATS JetStream — event fan-out and replay
-      - SCHOOL_NATS_URL=nats://nats-1:4222,nats://nats-2:4222,nats://nats-3:4222
-      - SCHOOL_NATS_PASSWORD=${NATS_PASSWORD}
-      - SCHOOL_NATS_REPLICAS=3
+      - APP_NATS_URL=nats://nats-1:4222,nats://nats-2:4222,nats://nats-3:4222
+      - APP_NATS_PASSWORD=${NATS_PASSWORD}
+      - APP_NATS_REPLICAS=3
     volumes:
       - ./tls:/app/tls:ro
     depends_on:
@@ -120,60 +120,60 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: school-with-ai:local
+    image: ai-chat-platform:local
     deploy:
       replicas: 10
     # No host port — only reachable via the load balancer.
     expose:
       - "8090"
     environment:
-      - SCHOOL_WEB_API_HOST=0.0.0.0:8090
-      - SCHOOL_WEB_DEBUG_HOST=127.0.0.1:4015
+      - APP_WEB_API_HOST=0.0.0.0:8090
+      - APP_WEB_DEBUG_HOST=127.0.0.1:4015
       # TLS terminated at Nginx; app speaks plain HTTPS internally
-      - SCHOOL_WEB_TLS_CERT=/app/tls/cert.pem
-      - SCHOOL_WEB_TLS_KEY=/app/tls/key.pem
+      - APP_WEB_TLS_CERT=/app/tls/cert.pem
+      - APP_WEB_TLS_KEY=/app/tls/key.pem
       # Redis Sentinel — app connects to sentinel which routes to current master
-      - SCHOOL_REDIS_ADDR=redis-master:6379
-      - SCHOOL_REDIS_PASSWORD=${REDIS_PASSWORD}
+      - APP_REDIS_ADDR=redis-master:6379
+      - APP_REDIS_PASSWORD=${REDIS_PASSWORD}
       # Database
-      - SCHOOL_DB_HOST=app-postgres:5432
-      - SCHOOL_DB_USER=schoolai
-      - SCHOOL_DB_PASSWORD=${SCHOOL_DB_PASSWORD}
-      - SCHOOL_DB_NAME=projections
-      - SCHOOL_DB_DISABLE_TLS=true
+      - APP_DB_HOST=app-postgres:5432
+      - APP_DB_USER=appuser
+      - APP_DB_PASSWORD=${APP_DB_PASSWORD}
+      - APP_DB_NAME=projections
+      - APP_DB_DISABLE_TLS=true
       # Auth
-      - SCHOOL_AUTH_APP_URL=https://localhost:8090
-      - SCHOOL_AUTH_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - SCHOOL_AUTH_GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - SCHOOL_AUTH_SESSION_SECRET=${SESSION_SECRET}
-      - SCHOOL_AUTH_GIT_HUB_CLIENT_ID=${SCHOOL_AUTH_GIT_HUB_CLIENT_ID}
-      - SCHOOL_AUTH_GIT_HUB_CLIENT_SECRET=${SCHOOL_AUTH_GIT_HUB_CLIENT_SECRET}
+      - APP_AUTH_APP_URL=https://localhost:8090
+      - APP_AUTH_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - APP_AUTH_GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - APP_AUTH_SESSION_SECRET=${SESSION_SECRET}
+      - APP_AUTH_GIT_HUB_CLIENT_ID=${APP_AUTH_GIT_HUB_CLIENT_ID}
+      - APP_AUTH_GIT_HUB_CLIENT_SECRET=${APP_AUTH_GIT_HUB_CLIENT_SECRET}
       # MinIO
-      - SCHOOL_ARTIFACTS_S_3_ENDPOINT=minio:9000
-      - SCHOOL_ARTIFACTS_S_3_ACCESS_KEY=${SCHOOL_ARTIFACTS_S_3_ACCESS_KEY}
-      - SCHOOL_ARTIFACTS_S_3_SECRET_KEY=${SCHOOL_ARTIFACTS_S_3_SECRET_KEY}
-      - SCHOOL_ARTIFACTS_S_3_BUCKET=artifacts
-      - SCHOOL_ARTIFACTS_S_3_USE_SSL=false
+      - APP_ARTIFACTS_S_3_ENDPOINT=minio:9000
+      - APP_ARTIFACTS_S_3_ACCESS_KEY=${APP_ARTIFACTS_S_3_ACCESS_KEY}
+      - APP_ARTIFACTS_S_3_SECRET_KEY=${APP_ARTIFACTS_S_3_SECRET_KEY}
+      - APP_ARTIFACTS_S_3_BUCKET=artifacts
+      - APP_ARTIFACTS_S_3_USE_SSL=false
       # EdgeQuake
-      - SCHOOL_EDGEQUAKE_BASE_URL=http://edgequake-api:8080
-      - SCHOOL_EDGEQUAKE_TENANT_ID=${SCHOOL_EDGEQUAKE_TENANT_ID}
+      - APP_EDGEQUAKE_BASE_URL=http://edgequake-api:8080
+      - APP_EDGEQUAKE_TENANT_ID=${APP_EDGEQUAKE_TENANT_ID}
       # Dashboard admin
-      - SCHOOL_DASHBOARD_ADMIN_USER=${SCHOOL_DASHBOARD_ADMIN_USER:-admin}
-      - SCHOOL_DASHBOARD_ADMIN_PASS=${SCHOOL_DASHBOARD_ADMIN_PASS}
+      - APP_DASHBOARD_ADMIN_USER=${APP_DASHBOARD_ADMIN_USER:-admin}
+      - APP_DASHBOARD_ADMIN_PASS=${APP_DASHBOARD_ADMIN_PASS}
       # Stripe
-      - SCHOOL_STRIPE_SECRET_KEY=${SCHOOL_STRIPE_SECRET_KEY}
-      - SCHOOL_STRIPE_PUBLISHABLE_KEY=${SCHOOL_STRIPE_PUBLISHABLE_KEY}
-      - SCHOOL_STRIPE_WEBHOOK_SECRET=${SCHOOL_STRIPE_WEBHOOK_SECRET}
-      - SCHOOL_STRIPE_PRICE_ID=${SCHOOL_STRIPE_PRICE_ID}
+      - APP_STRIPE_SECRET_KEY=${APP_STRIPE_SECRET_KEY}
+      - APP_STRIPE_PUBLISHABLE_KEY=${APP_STRIPE_PUBLISHABLE_KEY}
+      - APP_STRIPE_WEBHOOK_SECRET=${APP_STRIPE_WEBHOOK_SECRET}
+      - APP_STRIPE_PRICE_ID=${APP_STRIPE_PRICE_ID}
       # Cluster mode — migrations are handled by the migrate init container
-      - SCHOOL_SKIP_MIGRATIONS=true
+      - APP_SKIP_MIGRATIONS=true
       # Tuning for cluster mode — lower per-pod DB connections since 10 pods share the pool
-      - SCHOOL_DB_MAX_IDLE_CONNS=10
-      - SCHOOL_DB_MAX_OPEN_CONNS=20
+      - APP_DB_MAX_IDLE_CONNS=10
+      - APP_DB_MAX_OPEN_CONNS=20
       # NATS JetStream — event fan-out and replay
-      - SCHOOL_NATS_URL=nats://nats-1:4222,nats://nats-2:4222,nats://nats-3:4222
-      - SCHOOL_NATS_PASSWORD=${NATS_PASSWORD}
-      - SCHOOL_NATS_REPLICAS=3
+      - APP_NATS_URL=nats://nats-1:4222,nats://nats-2:4222,nats://nats-3:4222
+      - APP_NATS_PASSWORD=${NATS_PASSWORD}
+      - APP_NATS_REPLICAS=3
     volumes:
       - ./tls:/app/tls:ro
     networks:
@@ -413,8 +413,8 @@ services:
       - -c
       - idle_in_transaction_session_timeout=30000
     environment:
-      - POSTGRES_USER=schoolai
-      - POSTGRES_PASSWORD=${SCHOOL_DB_PASSWORD}
+      - POSTGRES_USER=appuser
+      - POSTGRES_PASSWORD=${APP_DB_PASSWORD}
       - POSTGRES_DB=projections
     ports:
       - "5435:5432"
@@ -423,7 +423,7 @@ services:
     networks:
       - intranet
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U schoolai"]
+      test: ["CMD-SHELL", "pg_isready -U appuser"]
       interval: 10s
       timeout: 5s
       retries: 5

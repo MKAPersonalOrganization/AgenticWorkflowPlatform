@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	MemoryHeader      = "## SchoolAI Memories"
-	MemoryHeaderCheck = "## SchoolAI Memories"
+	MemoryHeader      = "## Memories"
+	MemoryHeaderCheck = "## Memories"
 )
 
 // MemoryTool saves individual facts to the user's long-term memory.
@@ -31,7 +31,7 @@ func NewMemoryTool(service toolregistry.MemoryService) *MemoryTool {
 
 func (t *MemoryTool) Name() string { return "save_memory" }
 func (t *MemoryTool) Description() string {
-	return "Saves a single important fact about the user to long-term memory. Use this to remember key information like the user's name, preferences, learning goals, or important insights that should persist across all future conversations. Each fact is stored as a separate item."
+	return "Saves a single important fact about the user to long-term memory. Use this to remember key information like the user's name, preferences, goals, or important insights that should persist across all future conversations. Each fact is stored as a separate item."
 }
 
 func (t *MemoryTool) Schema() *agent.Schema {
@@ -40,7 +40,7 @@ func (t *MemoryTool) Schema() *agent.Schema {
 		Properties: map[string]*agent.Schema{
 			"fact": {
 				Type:        agent.TypeString,
-				Description: "A clear, concise fact to remember (e.g., 'User's name is Sarah', 'Prefers visual learning', 'Working towards calculus proficiency'). Avoid duplicates of existing memories.",
+				Description: "A clear, concise fact to remember (e.g., 'User's name is Sarah', 'Prefers visual explanations', 'Working towards project deadline'). Avoid duplicates of existing memories.",
 			},
 		},
 		Required: []string{"fact"},

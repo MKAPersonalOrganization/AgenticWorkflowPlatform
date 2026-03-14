@@ -5,11 +5,11 @@ import (
 	"testing"
 )
 
-func TestGenerateTeacherSystemPrompt_MissionAndObjectives(t *testing.T) {
+func TestGenerateAgentSystemPrompt_MissionAndObjectives(t *testing.T) {
 	t.Parallel()
-	config := TeacherPromptConfig{
-		Role:     "Test Instructor",
-		Preamble: "You are a test instructor.",
+	config := AgentPromptConfig{
+		Role:     "Test Expert",
+		Preamble: "You are a test expert.",
 		Topic:    "Testing",
 		Mission:  "Ensure quality through rigorous testing.",
 		Objectives: []string{
@@ -19,7 +19,7 @@ func TestGenerateTeacherSystemPrompt_MissionAndObjectives(t *testing.T) {
 		Interactive: true,
 	}
 
-	prompt, err := GenerateTeacherSystemPrompt(config)
+	prompt, err := GenerateAgentSystemPrompt(config)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -39,13 +39,13 @@ func TestGenerateTeacherSystemPrompt_MissionAndObjectives(t *testing.T) {
 	}
 }
 
-func TestGenerateTeacherSystemPrompt_LearningPath(t *testing.T) {
+func TestGenerateAgentSystemPrompt_ProgressionPath(t *testing.T) {
 	t.Parallel()
-	config := TeacherPromptConfig{
-		Role:     "Math Instructor",
-		Preamble: "You are a math instructor.",
+	config := AgentPromptConfig{
+		Role:     "Math Expert",
+		Preamble: "You are a math expert.",
 		Topic:    "Mathematics",
-		LearningPath: &LearningPath{
+		ProgressionPath: &ProgressionPath{
 			Prerequisites: []string{"Basic arithmetic", "Algebra fundamentals"},
 			NextConcepts:  []string{"Calculus", "Linear algebra"},
 			RelatedTopics: []string{"Physics", "Computer Science"},
@@ -54,14 +54,14 @@ func TestGenerateTeacherSystemPrompt_LearningPath(t *testing.T) {
 		Interactive: true,
 	}
 
-	prompt, err := GenerateTeacherSystemPrompt(config)
+	prompt, err := GenerateAgentSystemPrompt(config)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Verify learning path sections
-	if !strings.Contains(prompt, "# Learning Path") {
-		t.Error("missing Learning Path section")
+	// Verify progression path sections
+	if !strings.Contains(prompt, "# Progression Path") {
+		t.Error("missing Progression Path section")
 	}
 	if !strings.Contains(prompt, "**Prerequisites:**") {
 		t.Error("missing Prerequisites subsection")
@@ -77,28 +77,28 @@ func TestGenerateTeacherSystemPrompt_LearningPath(t *testing.T) {
 	}
 }
 
-func TestGenerateTeacherSystemPrompt_Instructions(t *testing.T) {
+func TestGenerateAgentSystemPrompt_Instructions(t *testing.T) {
 	t.Parallel()
-	config := TeacherPromptConfig{
-		Role:        "Physics Instructor",
-		Preamble:    "You are a physics instructor.",
+	config := AgentPromptConfig{
+		Role:        "Physics Expert",
+		Preamble:    "You are a physics expert.",
 		Topic:       "Physics",
 		Interactive: true,
 	}
 
-	prompt, err := GenerateTeacherSystemPrompt(config)
+	prompt, err := GenerateAgentSystemPrompt(config)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Verify pedagogical instructions
+	// Verify instructions
 	if !strings.Contains(prompt, "# Instructions") {
 		t.Error("missing Instructions section")
 	}
-	if !strings.Contains(prompt, "- **Active Teaching:**") {
-		t.Error("missing Active Teaching instruction")
+	if !strings.Contains(prompt, "- **Active Guidance:**") {
+		t.Error("missing Active Guidance instruction")
 	}
-	if !strings.Contains(prompt, "- **Student Interaction:**") {
-		t.Error("missing Student Interaction instruction")
+	if !strings.Contains(prompt, "- **User Interaction:**") {
+		t.Error("missing User Interaction instruction")
 	}
 }

@@ -57,7 +57,7 @@ type Dependencies struct {
 	EventStore         thread.EventStore
 	SnapshotStore      es.SnapshotStore // optional — accelerates thread loading
 	ArtifactService    artifact.Service
-	StudentProfileRepo chatcontracts.StudentProfileRepository
+	UserProfileRepo    chatcontracts.UserProfileRepository
 	Emitter            agentorchestrator.EventEmitter // transient event router
 	AgentProvider      agent.AgentProvider
 	AuthService        shared.AuthService
@@ -122,7 +122,7 @@ func New(deps Dependencies) *Module {
 	// Agent orchestrator — runner is set later via SetRunner()
 	orchestrator := agentorchestrator.New(log, deps.EventStore,
 		agentorchestrator.WithArtifactService(deps.ArtifactService),
-		agentorchestrator.WithStudentProfileRepository(deps.StudentProfileRepo),
+		agentorchestrator.WithUserProfileRepository(deps.UserProfileRepo),
 		agentorchestrator.WithEmitter(deps.Emitter),
 		agentorchestrator.WithSnapshotStore(deps.SnapshotStore),
 	)

@@ -20,7 +20,7 @@ import (
 // thread event store remains the single source of truth.
 // ──────────────────────────────────────────────────────────────────────────────
 
-const appName = "school-with-ai"
+const appName = "ai-chat-platform"
 
 // BuildSessionFromThread creates a session.Session from thread history.
 func BuildSessionFromThread(

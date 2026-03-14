@@ -16,7 +16,7 @@ const (
 	MemorySessionID = "long_term_memory"
 
 	// MemoryFileName is the name of the markdown file storing the memories.
-	MemoryFileName = "SCHOOLAI.md"
+	MemoryFileName = "MEMORIES.md"
 
 	// maxMemorySize caps the memory file read to 2 MB to prevent OOM.
 	maxMemorySize = 2 << 20

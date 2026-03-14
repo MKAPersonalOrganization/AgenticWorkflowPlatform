@@ -19,10 +19,10 @@ type ToolPermissionService interface {
 	SetPermission(ctx context.Context, userID, agentID, toolSetID, toolID string, enabled bool) error
 }
 
-// StudentProfile represents the extended academic profile of a student.
-// This is a local DTO mirroring identity.StudentProfile so that the chat
+// UserProfile represents the extended profile of a user.
+// This is a local DTO mirroring identity.UserProfile so that the chat
 // module does not import modules/userprofile/identity directly.
-type StudentProfile struct {
+type UserProfile struct {
 	UserID        string   `json:"user_id"`
 	LearningStyle string   `json:"learning_style"`
 	Struggles     []string `json:"struggles"`
@@ -30,9 +30,9 @@ type StudentProfile struct {
 	Goals         string   `json:"goals"`
 }
 
-// StudentProfileRepository reads student profiles.
-// The concrete identity.StudentProfileRepository satisfies this interface
-// with a thin adapter that maps identity.StudentProfile → chatcontracts.StudentProfile.
-type StudentProfileRepository interface {
-	GetByUserID(ctx context.Context, userID string) (*StudentProfile, error)
+// UserProfileRepository reads user profiles.
+// The concrete identity.UserProfileRepository satisfies this interface
+// with a thin adapter that maps identity.UserProfile → chatcontracts.UserProfile.
+type UserProfileRepository interface {
+	GetByUserID(ctx context.Context, userID string) (*UserProfile, error)
 }

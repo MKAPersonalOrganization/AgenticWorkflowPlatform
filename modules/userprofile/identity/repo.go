@@ -11,18 +11,18 @@ import (
 	"github.com/lib/pq"
 )
 
-// postgresStudentProfileRepository implements StudentProfileRepository (domain.StudentProfileRepository).
-type postgresStudentProfileRepository struct {
+// postgresUserProfileRepository implements UserProfileRepository.
+type postgresUserProfileRepository struct {
 	db *sqlx.DB
 }
 
-// newPostgresStudentProfileRepository creates a new repository.
-func newPostgresStudentProfileRepository(db *sqlx.DB) *postgresStudentProfileRepository {
-	return &postgresStudentProfileRepository{db: db}
+// newPostgresUserProfileRepository creates a new repository.
+func newPostgresUserProfileRepository(db *sqlx.DB) *postgresUserProfileRepository {
+	return &postgresUserProfileRepository{db: db}
 }
 
 // GetByUserID retrieves a profile by User ID.
-func (r *postgresStudentProfileRepository) GetByUserID(ctx context.Context, userID string) (*StudentProfile, error) {
+func (r *postgresUserProfileRepository) GetByUserID(ctx context.Context, userID string) (*UserProfile, error) {
 	query := `
 		SELECT user_id, learning_style, struggles, strengths, goals, created_at, updated_at
 		FROM student_profiles
@@ -30,7 +30,7 @@ func (r *postgresStudentProfileRepository) GetByUserID(ctx context.Context, user
 	`
 	row := r.db.QueryRowContext(ctx, query, userID)
 
-	var profile StudentProfile
+	var profile UserProfile
 	var struggles, strengths []string
 
 	err := row.Scan(
@@ -46,7 +46,7 @@ func (r *postgresStudentProfileRepository) GetByUserID(ctx context.Context, user
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil // Return nil if not found, let caller handle
 		}
-		return nil, fmt.Errorf("failed to get student profile: %w", err)
+		return nil, fmt.Errorf("failed to get user profile: %w", err)
 	}
 
 	profile.Struggles = struggles
@@ -55,8 +55,8 @@ func (r *postgresStudentProfileRepository) GetByUserID(ctx context.Context, user
 	return &profile, nil
 }
 
-// Upsert creates or updates a student profile.
-func (r *postgresStudentProfileRepository) Upsert(ctx context.Context, profile *StudentProfile) error {
+// Upsert creates or updates a user profile.
+func (r *postgresUserProfileRepository) Upsert(ctx context.Context, profile *UserProfile) error {
 	query := `
 		INSERT INTO student_profiles (user_id, learning_style, struggles, strengths, goals, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -84,7 +84,7 @@ func (r *postgresStudentProfileRepository) Upsert(ctx context.Context, profile *
 		profile.UpdatedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to upsert student profile: %w", err)
+		return fmt.Errorf("failed to upsert user profile: %w", err)
 	}
 
 	return nil

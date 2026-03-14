@@ -1,5 +1,5 @@
 // Package adkgo provides the adapter layer that bridges Google's Agent
-// Development Kit (ADK-Go) with SchoolWithAI's chat module.
+// Development Kit (ADK-Go) with the application's chat module.
 package adkgo
 
 import (

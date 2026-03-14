@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+
 	"school-with-ai/foundation/agent"
 	"school-with-ai/platform/artifact"
-	"strings"
 )
 
 // CreateMarkdownTool allows agents to create new markdown files.
@@ -19,13 +20,13 @@ func (t *CreateMarkdownTool) Name() string {
 }
 
 func (t *CreateMarkdownTool) Description() string {
-	return "Create a new markdown file for the student."
+	return "Create a new markdown file for the user."
 }
 
 func (t *CreateMarkdownTool) Schema() *agent.Schema {
 	return &agent.Schema{
 		Type:        agent.TypeObject,
-		Description: "Create a new markdown file for the student.",
+		Description: "Create a new markdown file for the user.",
 		Properties: map[string]*agent.Schema{
 			"filename": {
 				Type:        agent.TypeString,

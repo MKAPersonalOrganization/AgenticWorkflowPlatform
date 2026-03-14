@@ -99,7 +99,7 @@ func main() {
 		},
 	}
 
-	log = logger.NewTextWithEvents(os.Stdout, logger.LevelInfo, "SCHOOL", nil, events)
+	log = logger.NewTextWithEvents(os.Stdout, logger.LevelInfo, "APP", nil, events)
 
 	// -------------------------------------------------------------------------
 
@@ -146,7 +146,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 			Pass string `conf:"default:admin,mask"`
 		}
 		DB struct {
-			User         string `conf:"default:schoolai"`
+			User         string `conf:"default:appuser"`
 			Password     string `conf:"default:dev-password,mask"`
 			Host         string `conf:"default:localhost:5435"`
 			Name         string `conf:"default:projections"`
@@ -189,11 +189,11 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}{
 		Version: conf.Version{
 			Build: build,
-			Desc:  "School with AI",
+			Desc:  "AI Chat Platform",
 		},
 	}
 
-	const prefix = "SCHOOL"
+	const prefix = "APP"
 	help, err := conf.Parse(prefix, &cfg)
 	if err != nil {
 		if errors.Is(err, conf.ErrHelpWanted) {
@@ -281,20 +281,20 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Initialize User Profile module (identity + preferences + banner)
 	userProfileModule := userprofilemod.New(log, db)
-	studentProfileRepo := userProfileModule.StudentProfileRepo()
+	userProfileRepo := userProfileModule.UserProfileRepo()
 
 	// Initialize Agent Store module (agent definitions + catalog)
 	agentStoreModule := agentstoremod.New(log, db)
 
-	// Run migrations (skipped when SCHOOL_SKIP_MIGRATIONS=true, e.g. in a
+	// Run migrations (skipped when APP_SKIP_MIGRATIONS=true, e.g. in a
 	// cluster where an init container handles migrations before pods start).
-	if os.Getenv("SCHOOL_SKIP_MIGRATIONS") != "true" {
+	if os.Getenv("APP_SKIP_MIGRATIONS") != "true" {
 		log.Info(ctx, "startup", "status", "running database migrations")
 		if err := migrate.Migrate(ctx, db); err != nil {
 			return fmt.Errorf("migrating database: %w", err)
 		}
 	} else {
-		log.Info(ctx, "startup", "status", "skipping migrations (SCHOOL_SKIP_MIGRATIONS=true)")
+		log.Info(ctx, "startup", "status", "skipping migrations (APP_SKIP_MIGRATIONS=true)")
 	}
 
 	// Seed agent store catalog (only inserts if table is empty)
@@ -498,7 +498,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		EventStore:         eventLog,
 		SnapshotStore:      snapshotStore,
 		ArtifactService:    artifactService,
-		StudentProfileRepo: &chatProfileAdapter{repo: studentProfileRepo},
+		UserProfileRepo:    &chatProfileAdapter{repo: userProfileRepo},
 		Emitter:            transientRouter,
 		AgentProvider:      agentProvider,
 		AuthService:        authSvc,
@@ -592,7 +592,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		AgentProvider:          agentProvider,
 		ConfigResolver:         aiSettingsModule,
 		PluginSettingsResolver: pluginSettingsModule,
-		ProfileProvider:        &adkgoProfileAdapter{repo: studentProfileRepo},
+		ProfileProvider:        &adkgoProfileAdapter{repo: userProfileRepo},
 		PermChecker:            permissionsService,
 		MCPResolver:            mcpModule.Service(),
 		NewToolSetFactory:      newToolSetFactory,
@@ -969,7 +969,7 @@ func validateProductionConfig(log *logger.Logger, buildTag, adminUser, adminPass
 		return fmt.Errorf("production config guard: Stripe secret key is empty — payment features require this value")
 	}
 	if stripeWebhook == "" {
-		log.Info(context.Background(), "production config guard: WARNING — Stripe webhook secret is empty. Payment confirmations will rely on lazy-verification only. Set SCHOOL_STRIPE_WEBHOOK_SECRET for reliable webhook processing.")
+		log.Info(context.Background(), "production config guard: WARNING — Stripe webhook secret is empty. Payment confirmations will rely on lazy-verification only. Set APP_STRIPE_WEBHOOK_SECRET for reliable webhook processing.")
 	}
 
 	return nil

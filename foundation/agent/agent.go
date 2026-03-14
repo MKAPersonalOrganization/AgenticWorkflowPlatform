@@ -11,7 +11,7 @@ type Agent interface {
 	// ID returns the unique identifier for this agent.
 	ID() ID
 
-	// Name returns the agent's human-readable name (e.g., "math-instructor").
+	// Name returns the agent's human-readable name (e.g., "math-expert").
 	Name() string
 
 	// Description returns a human-readable description of the agent's capabilities.
