@@ -1,0 +1,17 @@
+#!/bin/sh
+# sentinel-entrypoint.sh — substitutes env vars into sentinel.conf at startup.
+set -e
+
+CONF=/tmp/sentinel.conf
+
+cat > "$CONF" <<EOF
+port 26379
+
+sentinel monitor mymaster redis-master 6379 2
+sentinel auth-pass mymaster ${REDIS_PASSWORD}
+sentinel down-after-milliseconds mymaster 5000
+sentinel failover-timeout mymaster 10000
+sentinel parallel-syncs mymaster 1
+EOF
+
+exec redis-sentinel "$CONF"
