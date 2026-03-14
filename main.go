@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"school-with-ai/adapters/adkgo"
+	"school-with-ai/adapters/gemini"
 	"school-with-ai/components"
 	"school-with-ai/components/docs"
 	"school-with-ai/components/landing"
@@ -51,7 +52,6 @@ import (
 	"school-with-ai/plugins/todos"
 	"school-with-ai/plugins/tracker"
 	"school-with-ai/plugins/tts"
-	"school-with-ai/adapters/gemini"
 	"school-with-ai/plugins/websearch"
 	"school-with-ai/shared"
 
@@ -73,6 +73,7 @@ import (
 	analyticsmod "school-with-ai/modules/analytics"
 	billingmod "school-with-ai/modules/billing"
 	chatmod "school-with-ai/modules/chat"
+	taskmgmthandlers "school-with-ai/modules/chat/taskmgmt"
 	filesystemmod "school-with-ai/modules/filesystem"
 	knowledgemod "school-with-ai/modules/knowledge"
 	mcpmod "school-with-ai/modules/mcp"
@@ -506,6 +507,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		DocumentProvider:   &DocumentProviderAdapter{svc: edgequakeService},
 		TenantID:           cfg.Edgequake.TenantID,
 		AllowedOrigin:      cfg.Auth.AppURL,
+		SSE:                taskmgmthandlers.DefaultSSEConfig(),
 		Broadcaster:        redisBroadcaster,
 		AsynqConfig: taskmanagement.AsynqConfig{
 			RedisAddr:           cfg.Redis.Addr,

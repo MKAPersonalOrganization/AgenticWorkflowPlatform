@@ -27,12 +27,15 @@ func (h *TaskManagementHandler) StreamJobEvents(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Override the server's WriteTimeout for this long-lived SSE connection
+	// Per-write deadline pattern: instead of disabling the server's
+	// WriteTimeout globally (which lets zombie clients pin goroutines
+	// indefinitely), we set a short deadline before every individual
+	// write. If a write cannot complete within h.sse.WriteTimeout (e.g.
+	// the client's TCP receive buffer is full), the write fails with a
+	// deadline-exceeded error and we tear down the connection. The
+	// client reconnects with ?lastEventId= and replays via Redis
+	// Streams — no data is lost.
 	rc := http.NewResponseController(w)
-	if err := rc.SetWriteDeadline(time.Time{}); err != nil {
-		h.log.Error(r.Context(), "[API] Failed to disable write deadline", "error", err)
-		// Continue anyway - connection might still work
-	}
 
 	// Setup SSE headers
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -80,6 +83,9 @@ func (h *TaskManagementHandler) StreamJobEvents(w http.ResponseWriter, r *http.R
 	if lastEventID != "" {
 		replayed := h.broadcaster.Replay(threadID, lastEventID)
 		for _, env := range replayed {
+			if err := rc.SetWriteDeadline(time.Now().Add(h.sse.WriteTimeout)); err != nil {
+				return
+			}
 			aguiEvents := taskmanagement.ToAguiEvents(env.Event)
 			for _, ae := range aguiEvents {
 				if err := WriteSSEEvent(w, ae, env.SeqID); err != nil {
@@ -98,11 +104,16 @@ func (h *TaskManagementHandler) StreamJobEvents(w http.ResponseWriter, r *http.R
 	}
 
 	// 5. Stream live events with heartbeat to detect dead connections.
+	//
+	// HeartbeatInterval should be ≤ WriteTimeout so that even fully idle
+	// connections are probed within one deadline window.
 	ctx := r.Context()
-	heartbeat := time.NewTicker(30 * time.Second)
+	heartbeat := time.NewTicker(h.sse.HeartbeatInterval)
 	defer heartbeat.Stop()
-	// Maximum connection duration to prevent indefinite goroutine leaks
-	maxTTL := time.NewTimer(30 * time.Minute)
+	// Maximum connection duration to prevent indefinite goroutine leaks.
+	// With per-write deadlines the max-TTL cap is a safety net, not the
+	// primary defense — dead clients are caught much sooner.
+	maxTTL := time.NewTimer(h.sse.MaxConnectionTTL)
 	defer maxTTL.Stop()
 
 	for {
@@ -110,8 +121,16 @@ func (h *TaskManagementHandler) StreamJobEvents(w http.ResponseWriter, r *http.R
 		case <-ctx.Done():
 			return
 		case <-maxTTL.C:
+			// Send a final retry hint so well-behaved clients reconnect
+			// immediately to another pod.
+			_ = rc.SetWriteDeadline(time.Now().Add(h.sse.WriteTimeout))
+			_, _ = fmt.Fprintf(w, "retry: 0\n: max-ttl reached\n\n")
+			flusher.Flush()
 			return
 		case <-heartbeat.C:
+			if err := rc.SetWriteDeadline(time.Now().Add(h.sse.WriteTimeout)); err != nil {
+				return
+			}
 			if _, err := fmt.Fprintf(w, ": heartbeat\n\n"); err != nil {
 				return
 			}
@@ -130,6 +149,9 @@ func (h *TaskManagementHandler) StreamJobEvents(w http.ResponseWriter, r *http.R
 				continue
 			}
 
+			if err := rc.SetWriteDeadline(time.Now().Add(h.sse.WriteTimeout)); err != nil {
+				return
+			}
 			aguiEvents := taskmanagement.ToAguiEvents(env.Event)
 			for _, ae := range aguiEvents {
 				if err := WriteSSEEvent(w, ae, env.SeqID); err != nil {

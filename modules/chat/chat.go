@@ -66,6 +66,7 @@ type Dependencies struct {
 	DocumentProvider   chatcontracts.DocumentProvider
 	TenantID           string
 	AllowedOrigin      string
+	SSE                taskmgmthandlers.SSEConfig
 	Broadcaster        agui.AguiBroadcaster
 	AsynqConfig        taskmanagement.AsynqConfig
 }
@@ -172,6 +173,7 @@ func (m *Module) SetRunner(runner agentorchestrator.Runner) {
 		m.deps.DocumentProvider,
 		m.deps.TenantID,
 		m.deps.AllowedOrigin,
+		m.deps.SSE,
 	)
 
 	m.aguiHandler = aguihandlers.NewAguiProjectionHandler(m.aguiProjection, m.threadQuery)
