@@ -18,7 +18,7 @@ templ MCPAddDialog() {
 			@dialog.Header(dialog.HeaderProps{}) {
 				@dialog.Title(dialog.TitleProps{}) {
 					<div class="flex items-center gap-2">
-						@icon.Globe(icon.Props{Class: "size-5 text-primary"})
+						@icon.MCPLogo("size-5 text-primary")
 						{ i18n.T(ctx, "Add MCP Server") }
 					</div>
 				}
@@ -146,7 +146,7 @@ templ MCPConnectorCard() {
 				<div
 					class="size-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 bg-blue-500/10 text-blue-500"
 				>
-					@icon.Globe(icon.Props{Class: "size-4"})
+					@icon.MCPLogo("size-4")
 				</div>
 				<!-- Status dot -->
 				<span

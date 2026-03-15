@@ -29,7 +29,7 @@ templ A2ADialog() {
 								<div>
 									@dialog.Title() {
 										<div class="flex items-center gap-2">
-											@icon.Waypoints(icon.Props{Class: "size-5 text-primary"})
+											@icon.A2ALogo("size-5 text-primary")
 											{ i18n.T(ctx, "A2A Agents") }
 										</div>
 									}
@@ -85,7 +85,7 @@ templ A2ADialog() {
 							<!-- Empty state -->
 							<template x-if="!loading && connectors.length === 0">
 								<div class="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
-									@icon.Waypoints(icon.Props{Class: "size-12 opacity-20"})
+									@icon.A2ALogo("size-12 opacity-20")
 									<p class="text-sm font-medium">{ i18n.T(ctx, "No A2A agents connected") }</p>
 									<p class="text-xs">{ i18n.T(ctx, "Connect to remote AI agents that support the A2A protocol.") }</p>
 									@button.Button(button.Props{
@@ -148,7 +148,7 @@ templ A2ADialog() {
 								}
 								<!-- Icon -->
 								<div class="size-11 rounded-lg bg-violet-500/10 flex items-center justify-center text-violet-500 shrink-0">
-									@icon.Waypoints(icon.Props{Class: "size-5"})
+									@icon.A2ALogo("size-5")
 								</div>
 								<div class="flex-1 min-w-0">
 									@dialog.Title(dialog.TitleProps{Class: "flex items-center gap-2"}) {
@@ -181,7 +181,7 @@ templ A2ADialog() {
 									<template x-if="detailItem.agent_name">
 										<span class="flex items-center gap-1.5">
 											<span class="text-border">|</span>
-											@icon.Bot(icon.Props{Class: "size-3 opacity-60"})
+											@icon.A2ALogo("size-3 opacity-60")
 											<span x-text="detailItem.agent_name"></span>
 											<template x-if="detailItem.agent_version">
 												<span x-text="'v' + detailItem.agent_version" class="text-muted-foreground/60"></span>
@@ -318,7 +318,7 @@ templ A2AConnectorCard() {
 			<div class="flex items-start gap-3 mb-2">
 				<div class="relative">
 					<div class="size-10 rounded-lg flex items-center justify-center shrink-0 bg-violet-500/10 text-violet-500">
-						@icon.Waypoints(icon.Props{Class: "size-5"})
+						@icon.A2ALogo("size-5")
 					</div>
 					<span
 						class="absolute -bottom-0.5 -end-0.5 size-2.5 rounded-full border-2 border-background"
@@ -384,7 +384,7 @@ templ A2AButtonTrigger() {
 				"title":  i18n.T(ctx, "A2A Agents"),
 			},
 		}) {
-			@icon.Waypoints(icon.Props{Class: "size-5"})
+			@icon.A2ALogo("size-5")
 			<span class="sr-only">{ i18n.T(ctx, "A2A Agents") }</span>
 		}
 	}
