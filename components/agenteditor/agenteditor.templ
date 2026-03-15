@@ -41,7 +41,7 @@ templ AgentDesignerDialog() {
 								</span>
 							}
 							@dialog.Description() {
-								{ i18n.T(ctx, "Design individual agent nodes or compose them into pipelines.") }
+								{ i18n.T(ctx, "Build LLM Agents or compose them into Workflow Agents — Sequential, Parallel, and Loop — powered by ADK-Go.") }
 							}
 						</div>
 						<div class="flex items-center gap-1">
@@ -72,7 +72,7 @@ templ AgentDesignerDialog() {
 							:class="mode === 'node' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'"
 						>
 							@icon.Bot(icon.Props{Class: "size-4"})
-							{ i18n.T(ctx, "Node Design") }
+							{ i18n.T(ctx, "LLM Agent") }
 						</button>
 						<button
 							type="button"
@@ -81,7 +81,7 @@ templ AgentDesignerDialog() {
 							:class="mode === 'pipeline' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'"
 						>
 							@icon.GitBranch(icon.Props{Class: "size-4"})
-							{ i18n.T(ctx, "Pipeline Compose") }
+							{ i18n.T(ctx, "Workflow Agent") }
 						</button>
 					</div>
 				}
@@ -97,7 +97,7 @@ templ AgentDesignerDialog() {
 									<div class="flex-1">
 										@input.Input(input.Props{
 											Type:        input.TypeSearch,
-											Placeholder: i18n.T(ctx, "Search agent nodes..."),
+											Placeholder: i18n.T(ctx, "Search LLM agents..."),
 											Class:       "h-9 bg-muted/40 border-transparent focus-within:bg-background",
 											Attributes: templ.Attributes{
 												"x-model.debounce.300ms": "searchQuery",
@@ -114,7 +114,7 @@ templ AgentDesignerDialog() {
 										},
 									}) {
 										@icon.Plus(icon.Props{Class: "size-4"})
-										{ i18n.T(ctx, "New Agent") }
+										{ i18n.T(ctx, "New LLM Agent") }
 									}
 								</div>
 								<div class="flex-1 overflow-y-auto px-4 pb-4 scrollbar-thin min-h-[300px]">
@@ -138,14 +138,14 @@ templ AgentDesignerDialog() {
 													@icon.Bot(icon.Props{Class: "size-12 opacity-20"})
 													<template x-if="searchQuery">
 														<div class="text-center">
-															<p class="text-sm font-medium">{ i18n.T(ctx, "No agent nodes found") }</p>
+															<p class="text-sm font-medium">{ i18n.T(ctx, "No LLM agents found") }</p>
 															<p class="text-xs mt-1">{ i18n.T(ctx, "Try a different search term.") }</p>
 														</div>
 													</template>
 													<template x-if="!searchQuery">
 														<div class="text-center">
-															<p class="text-sm font-medium">{ i18n.T(ctx, "No agent nodes yet") }</p>
-															<p class="text-xs mt-1">{ i18n.T(ctx, "Create your first agent node to start building.") }</p>
+															<p class="text-sm font-medium">{ i18n.T(ctx, "No LLM agents yet") }</p>
+															<p class="text-xs mt-1">{ i18n.T(ctx, "Create your first LLM agent to get started.") }</p>
 															@button.Button(button.Props{
 																Size:    button.SizeSm,
 																Variant: button.VariantOutline,
@@ -155,7 +155,7 @@ templ AgentDesignerDialog() {
 																},
 															}) {
 																@icon.Plus(icon.Props{Class: "size-3.5"})
-																{ i18n.T(ctx, "Create Agent Node") }
+																{ i18n.T(ctx, "Create LLM Agent") }
 															}
 														</div>
 													</template>
@@ -183,7 +183,7 @@ templ AgentDesignerDialog() {
 															<div class="flex items-center gap-2 mt-3 pt-2 border-t border-border/50">
 																@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "text-[9px] px-1.5 py-0 h-4"}) {
 																	@icon.Bot(icon.Props{Class: "size-2.5 me-0.5"})
-																	{ i18n.T(ctx, "Node") }
+																	{ i18n.T(ctx, "LLM Agent") }
 																}
 																<span class="text-[10px] text-muted-foreground" x-text="formatDate(ag.createdAt || ag.created_at)"></span>
 																<div class="flex-1"></div>
@@ -224,8 +224,8 @@ templ AgentDesignerDialog() {
 									}) {
 										@icon.ArrowLeft(icon.Props{Class: "size-4"})
 									}
-									<h3 class="text-sm font-semibold" x-text="editingAgent ? 'Edit Agent Node' : 'Create Agent Node'"></h3>
-									<span class="text-[10px] text-muted-foreground" x-text="editingAgent ? 'Modify agent configuration' : 'Design a new agent node'"></span>
+									<h3 class="text-sm font-semibold" x-text="editingAgent ? 'Edit LLM Agent' : 'Create LLM Agent'"></h3>
+									<span class="text-[10px] text-muted-foreground" x-text="editingAgent ? 'Modify agent instruction &amp; settings' : 'Define the agent\'s role and instruction'"></span>
 								</div>
 								<div class="flex-1 overflow-y-auto p-4 scrollbar-thin space-y-4">
 									@agentNodeForm()
@@ -249,7 +249,7 @@ templ AgentDesignerDialog() {
 											":disabled": "saving || !form.name.trim()",
 										},
 									}) {
-										<span x-show="!saving" x-text="editingAgent ? 'Save Changes' : 'Create Agent'"></span>
+										<span x-show="!saving" x-text="editingAgent ? 'Save Changes' : 'Create LLM Agent'"></span>
 										<span x-show="saving" class="flex items-center gap-1.5">
 											<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
 											{ i18n.T(ctx, "Saving...") }
@@ -276,7 +276,7 @@ templ AgentDesignerDialog() {
 									<div class="flex-1">
 										@input.Input(input.Props{
 											Type:        input.TypeSearch,
-											Placeholder: i18n.T(ctx, "Search pipelines..."),
+											Placeholder: i18n.T(ctx, "Search workflow agents..."),
 											Class:       "h-9 bg-muted/40 border-transparent focus-within:bg-background",
 											Attributes: templ.Attributes{
 												"x-model.debounce.300ms": "pipelineSearchQuery",
@@ -293,7 +293,7 @@ templ AgentDesignerDialog() {
 										},
 									}) {
 										@icon.Plus(icon.Props{Class: "size-4"})
-										{ i18n.T(ctx, "New Pipeline") }
+										{ i18n.T(ctx, "New Workflow Agent") }
 									}
 								</div>
 								<div class="flex-1 overflow-y-auto px-4 pb-4 scrollbar-thin min-h-[300px]">
@@ -318,9 +318,9 @@ templ AgentDesignerDialog() {
 												<div class="flex flex-col items-center justify-center py-12 gap-4 text-muted-foreground">
 													@icon.GitBranch(icon.Props{Class: "size-12 opacity-20"})
 													<div class="text-center">
-														<p class="text-sm font-medium">{ i18n.T(ctx, "No pipelines yet") }</p>
+														<p class="text-sm font-medium">{ i18n.T(ctx, "No Workflow Agents yet") }</p>
 														<p class="text-xs mt-1 max-w-sm">
-															{ i18n.T(ctx, "Compose agent nodes into workflows using sequential, parallel, and loop patterns — mapping directly to ADK execution.") }
+															{ i18n.T(ctx, "Compose LLM Agents into Workflow Agents using Sequential, Parallel, and Loop patterns — mapping directly to ADK-Go's sequentialagent, parallelagent, and loopagent.") }
 														</p>
 													</div>
 													@button.Button(button.Props{
@@ -332,13 +332,14 @@ templ AgentDesignerDialog() {
 														},
 													}) {
 														@icon.Plus(icon.Props{Class: "size-3.5"})
-														{ i18n.T(ctx, "Create Pipeline") }
+														{ i18n.T(ctx, "Create Workflow Agent") }
 													}
 													<!-- Quick explanation cards -->
-													<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 w-full max-w-2xl">
-														@pipelineTypeCard("sequential", "↓ Sequential", "Run agents one after another in order. Output flows from each agent to the next.", "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20")
-														@pipelineTypeCard("parallel", "∥ Parallel", "Run agents simultaneously. Each gets an isolated branch of the conversation.", "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20")
-														@pipelineTypeCard("loop", "↻ Loop", "Repeat agents until max iterations or the agent uses exit_loop tool.", "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20")
+													<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4 w-full max-w-2xl">
+														@pipelineTypeCard("sequential", "↓ Sequential", "Runs sub-agents one after another. Each agent completes before the next starts. Use OutputKey + {var} to pass results downstream.", "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20")
+														@pipelineTypeCard("parallel", "∥ Parallel", "Runs sub-agents concurrently in isolated branches. Each branch gets its own conversation context. Results are collected and merged.", "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20")
+														@pipelineTypeCard("loop", "↻ Loop", "Repeatedly runs sub-agents up to MaxIterations or until a sub-agent signals Escalate. Ideal for iterative refinement cycles.", "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20")
+														@pipelineTypeCard("agent", "● LLM Agent", "A leaf node backed by an LLM Agent you created. Set OutputKey to save its output to session state for downstream agents.", "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20")
 													</div>
 												</div>
 											</template>
@@ -359,7 +360,7 @@ templ AgentDesignerDialog() {
 																		<h3 class="text-sm font-semibold text-foreground truncate" x-text="pipeline.name"></h3>
 																		@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "text-[9px] px-1.5 py-0 h-4 shrink-0 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"}) {
 																			@icon.GitBranch(icon.Props{Class: "size-2.5 me-0.5"})
-																			{ i18n.T(ctx, "Pipeline") }
+																			{ i18n.T(ctx, "Workflow Agent") }
 																		}
 																	</div>
 																	<p class="text-xs text-muted-foreground mt-0.5 line-clamp-2" x-text="pipeline.description || 'No description'"></p>
@@ -412,7 +413,7 @@ templ AgentDesignerDialog() {
 									}) {
 										@icon.ArrowLeft(icon.Props{Class: "size-4"})
 									}
-									<h3 class="text-sm font-semibold" x-text="editingPipeline ? 'Edit Pipeline' : 'Create Pipeline'"></h3>
+									<h3 class="text-sm font-semibold" x-text="editingPipeline ? 'Edit Workflow Agent' : 'Create Workflow Agent'"></h3>
 									<div class="flex-1"></div>
 									<!-- Validation indicator -->
 									<div class="flex items-center gap-1.5">
@@ -474,7 +475,7 @@ templ AgentDesignerDialog() {
 								<!-- Save Footer -->
 								<div class="px-4 py-3 border-t bg-muted/50 flex items-center justify-between">
 									<span class="text-[10px] text-muted-foreground">
-										{ i18n.T(ctx, "Pipelines map to ADK-Go workflow agents: sequential → parallel → loop composition") }
+										{ i18n.T(ctx, "Workflow Agents compose LLM Agents via Sequential → Parallel → Loop. Set OutputKey on each agent node and reference it as {key} in downstream Instructions.") }
 									</span>
 									<div class="flex items-center gap-2">
 										@button.Button(button.Props{
@@ -494,7 +495,7 @@ templ AgentDesignerDialog() {
 												":disabled": "pipelineSaving || !pipelineName.trim() || !isPipelineValid",
 											},
 										}) {
-											<span x-show="!pipelineSaving" x-text="editingPipeline ? 'Save Pipeline' : 'Create Pipeline'"></span>
+											<span x-show="!pipelineSaving" x-text="editingPipeline ? 'Save Workflow Agent' : 'Create Workflow Agent'"></span>
 											<span x-show="pipelineSaving" class="flex items-center gap-1.5">
 												<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
 												{ i18n.T(ctx, "Saving...") }
@@ -516,10 +517,10 @@ templ AgentDesignerDialog() {
 						<div class="flex items-center justify-between w-full">
 							<span class="text-xs text-muted-foreground">
 								<template x-if="mode === 'node'">
-									<span x-text="`${filteredAgents.length} agent node${filteredAgents.length !== 1 ? 's' : ''}`"></span>
+									<span x-text="`${filteredAgents.length} LLM agent${filteredAgents.length !== 1 ? 's' : ''}`"></span>
 								</template>
 								<template x-if="mode === 'pipeline'">
-									<span x-text="`${filteredPipelines.length} pipeline${filteredPipelines.length !== 1 ? 's' : ''}`"></span>
+									<span x-text="`${filteredPipelines.length} workflow agent${filteredPipelines.length !== 1 ? 's' : ''}`"></span>
 								</template>
 							</span>
 							@dialog.Close() {
@@ -568,11 +569,11 @@ templ agentNodeForm() {
 	<!-- System Prompt (maps to llmagent Instruction) -->
 	<div class="space-y-2">
 		@label.Label(label.Props{}) {
-			{ i18n.T(ctx, "System Prompt") }
+			{ i18n.T(ctx, "Instruction") }
 			<span class="text-destructive">*</span>
 		}
 		@textarea.Textarea(textarea.Props{
-			Placeholder: i18n.T(ctx, "Instructions for how the agent should behave..."),
+			Placeholder: i18n.T(ctx, "Define this agent's role, expertise, and behavior. Use {output_key} syntax to reference results from upstream agents in a workflow."),
 			Class:       "min-h-[120px] resize-y",
 			Rows:        5,
 			Attributes: templ.Attributes{
@@ -580,7 +581,7 @@ templ agentNodeForm() {
 			},
 		})
 		<p class="text-[11px] text-muted-foreground">
-			{ i18n.T(ctx, "Maps to the ADK-Go agent Instruction field — the system-level prompt defining this agent's behavior.") }
+			{ i18n.T(ctx, "Maps to llmagent.Config.Instruction. In a Workflow Agent, use {output_key} to read session state set by upstream agents (e.g., {research_data} or {temp:review_comments}).") }
 		</p>
 	</div>
 	<!-- Multi-Agent Orchestration Section -->
@@ -977,11 +978,11 @@ templ pipelineConfigForm() {
 	<!-- Pipeline Name -->
 	<div class="space-y-2">
 		@label.Label(label.Props{}) {
-			{ i18n.T(ctx, "Pipeline Name") }
+			{ i18n.T(ctx, "Workflow Agent Name") }
 			<span class="text-destructive">*</span>
 		}
 		@input.Input(input.Props{
-			Placeholder: i18n.T(ctx, "e.g., Research & Write, Code Review Pipeline..."),
+			Placeholder: i18n.T(ctx, "e.g., Code Review Pipeline, Research & Report..."),
 			Attributes: templ.Attributes{
 				"x-model":   "pipelineName",
 				"maxlength": "100",
@@ -994,7 +995,7 @@ templ pipelineConfigForm() {
 			{ i18n.T(ctx, "Description") }
 		}
 		@input.Input(input.Props{
-			Placeholder: i18n.T(ctx, "What does this pipeline do?"),
+			Placeholder: i18n.T(ctx, "What does this workflow agent do?"),
 			Attributes: templ.Attributes{
 				"x-model":   "pipelineDescription",
 				"maxlength": "500",
@@ -1004,10 +1005,10 @@ templ pipelineConfigForm() {
 	<!-- System Prompt (for the root orchestrator) -->
 	<div class="space-y-2">
 		@label.Label(label.Props{}) {
-			{ i18n.T(ctx, "Root System Prompt") }
+			{ i18n.T(ctx, "Root Instruction (optional)") }
 		}
 		@textarea.Textarea(textarea.Props{
-			Placeholder: i18n.T(ctx, "System prompt for the pipeline orchestrator..."),
+			Placeholder: i18n.T(ctx, "Shared instruction for the root orchestrator (Sequential/Parallel/Loop agents rarely need this)."),
 			Class:       "min-h-[80px] resize-y text-xs",
 			Rows:        3,
 			Attributes: templ.Attributes{
@@ -1021,7 +1022,7 @@ templ pipelineConfigForm() {
 			<summary class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors cursor-pointer select-none">
 				<span class="flex items-center gap-2">
 					@icon.Settings2(icon.Props{Class: "size-4 text-muted-foreground"})
-					{ i18n.T(ctx, "Pipeline Settings") }
+					{ i18n.T(ctx, "Workflow Settings") }
 				</span>
 				<span class="transition-transform duration-200 group-open:rotate-180">
 					@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
@@ -1035,7 +1036,7 @@ templ pipelineConfigForm() {
 						{ i18n.T(ctx, "Global Instruction") }
 					</span>
 					@textarea.Textarea(textarea.Props{
-						Placeholder: i18n.T(ctx, "Applied to all agents in this pipeline..."),
+						Placeholder: i18n.T(ctx, "Applied to every agent in this workflow tree. Use for cross-cutting rules like language or tone."),
 						Class:       "min-h-[48px] resize-y text-[11px]",
 						Rows:        2,
 						Attributes: templ.Attributes{
@@ -1050,7 +1051,7 @@ templ pipelineConfigForm() {
 						{ i18n.T(ctx, "Output Key") }
 					</span>
 					@input.Input(input.Props{
-						Placeholder: i18n.T(ctx, "Pipeline output key..."),
+						Placeholder: i18n.T(ctx, "Save this workflow's final output under this key..."),
 						Class:       "h-7 text-[11px]",
 						Attributes: templ.Attributes{
 							"x-model": "pipelineOrchestration.outputKey",
@@ -1096,7 +1097,10 @@ templ pipelineConfigForm() {
 			</div>
 			<div class="flex items-center gap-1.5">
 				<span class="size-2 rounded-full bg-emerald-500"></span>
-				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Agent — leaf LLM agent") }</span>
+				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Agent — LLM Agent (leaf)") }</span>
+			</div>
+			<div class="col-span-2 flex items-start gap-1.5 mt-0.5">
+				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "💡 Set OutputKey on each agent node, then reference it as {key} in downstream Instructions.") }</span>
 			</div>
 		</div>
 	</div>

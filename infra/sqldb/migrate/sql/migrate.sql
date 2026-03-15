@@ -934,3 +934,18 @@ ON CONFLICT (id) DO NOTHING;
 -- 5. Clear workflow_id on sub-agents so they become visible standalone agents.
 -- In the unified model, all agents are first-class and reusable.
 UPDATE user_agents SET workflow_id = '' WHERE workflow_id != '';
+
+-- Version: 1.65
+-- Description: Replace agent catalog with ADK-Go example entries (one per ADK-Go example).
+-- Removes all previous catalog entries so the Go seed can populate the catalog
+-- with exactly one entry per ADK-Go example: quickstart, sequential,
+-- sequentialCode, parallel, and loop.
+DELETE FROM agent_store_catalog;
+
+-- Version: 1.66
+-- Description: Fix name unique constraint on agent_store_catalog for fresh installs.
+-- Migration 1.30 created a non-unique index; 1.62 could not replace it on fresh installs
+-- because IF NOT EXISTS skips creation when any index with that name already exists.
+-- Drop and recreate as unique so ON CONFLICT (name) works correctly.
+DROP INDEX IF EXISTS idx_agent_store_catalog_name;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_store_catalog_name ON agent_store_catalog(name);

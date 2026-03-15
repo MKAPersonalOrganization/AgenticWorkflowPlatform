@@ -51,7 +51,7 @@ export function workflowTreeBuilder() {
                 sequential: '↓ Sequential',
                 parallel: '∥ Parallel',
                 loop: '↻ Loop',
-                agent: '● Agent',
+                agent: '● LLM Agent',
             }[node.type] || node.type;
 
             let html = `<div class="${indent}rounded-lg border ${borderColor} ${bgColor} p-3 space-y-2">`;
@@ -68,7 +68,7 @@ export function workflowTreeBuilder() {
             html += `">`;
             for (const t of ['agent', 'sequential', 'parallel', 'loop']) {
                 const selected = t === node.type ? ' selected' : '';
-                const label = { agent: 'Agent', sequential: 'Sequential', parallel: 'Parallel', loop: 'Loop' }[t];
+                const label = { agent: 'LLM Agent', sequential: 'Sequential', parallel: 'Parallel', loop: 'Loop' }[t];
                 html += `<option value="${t}"${selected}>${label}</option>`;
             }
             html += `</select>`;
@@ -100,7 +100,7 @@ export function workflowTreeBuilder() {
                 html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
                 html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.agent_id = this.value; }`;
                 html += `">`;
-                html += `<option value="">Select an agent...</option>`;
+                html += `<option value="">Select an LLM agent...</option>`;
                 // Populate from parent agentsManager's agents array
                 const mgr = Alpine.closestDataStack(this.$el).find(d => d.agents);
                 const agentsList = mgr ? (mgr.agents || []) : [];
@@ -112,7 +112,7 @@ export function workflowTreeBuilder() {
                 html += `</select>`;
 
                 // Output key
-                html += `<input type="text" placeholder="Output key (optional, for state sharing)" maxlength="50" class="w-full h-7 rounded-md border border-border bg-background px-3 text-[11px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" `;
+                html += `<input type="text" placeholder="Output Key — saved to session state (reference as {key} in downstream Instructions)" maxlength="50" class="w-full h-7 rounded-md border border-border bg-background px-3 text-[11px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" `;
                 html += `value="${this._escapeAttr(node.output_key || '')}" `;
                 html += `oninput="`;
                 html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
@@ -124,7 +124,7 @@ export function workflowTreeBuilder() {
                 html += `<details class="group" ${hasOverrides ? 'open' : ''}>`;
                 html += `<summary class="cursor-pointer text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors select-none flex items-center gap-1">`;
                 html += `<svg xmlns="http://www.w3.org/2000/svg" class="size-3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>`;
-                html += `Transfer &amp; Context Overrides`;
+                html += `Agent Transfer &amp; Context`;
                 html += `</summary>`;
                 html += `<div class="mt-1.5 space-y-1.5 pl-4 border-l border-border/50">`;
 
@@ -136,7 +136,7 @@ export function workflowTreeBuilder() {
                 html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
                 html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.disallow_transfer_to_parent = this.checked || null; }`;
                 html += `">`;
-                html += `<span class="text-[10px] text-muted-foreground">Block transfer to parent</span>`;
+                html += `<span class="text-[10px] text-muted-foreground">Block transfer to parent (DisallowTransferToParent)</span>`;
                 html += `</label>`;
 
                 // Transfer to peers toggle
@@ -147,19 +147,19 @@ export function workflowTreeBuilder() {
                 html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
                 html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.disallow_transfer_to_peers = this.checked || null; }`;
                 html += `">`;
-                html += `<span class="text-[10px] text-muted-foreground">Block transfer to peers</span>`;
+                html += `<span class="text-[10px] text-muted-foreground">Block transfer to peers (DisallowTransferToPeers)</span>`;
                 html += `</label>`;
 
                 // Include contents selector
                 html += `<div class="flex items-center gap-2">`;
-                html += `<span class="text-[10px] text-muted-foreground whitespace-nowrap">History:</span>`;
+                html += `<span class="text-[10px] text-muted-foreground whitespace-nowrap">Include Contents:</span>`;
                 html += `<select class="h-6 rounded border border-border bg-background px-1.5 text-[10px] text-foreground focus:outline-none" `;
                 html += `onchange="`;
                 html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
                 html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.include_contents = this.value; }`;
                 html += `">`;
-                html += `<option value=""${!node.include_contents ? ' selected' : ''}>Default (include)</option>`;
-                html += `<option value="none"${node.include_contents === 'none' ? ' selected' : ''}>Fresh context</option>`;
+                html += `<option value=""${!node.include_contents ? ' selected' : ''}>default (include history)</option>`;
+                html += `<option value="none"${node.include_contents === 'none' ? ' selected' : ''}>none (fresh context)</option>`;
                 html += `</select>`;
                 html += `</div>`;
 
@@ -170,7 +170,7 @@ export function workflowTreeBuilder() {
             // ── Loop-specific: max iterations ──
             if (node.type === 'loop') {
                 html += `<div class="flex items-center gap-2">`;
-                html += `<span class="text-[11px] text-muted-foreground">Max iterations:</span>`;
+                html += `<span class="text-[11px] text-muted-foreground">Max Iterations:</span>`;
                 html += `<input type="number" min="1" max="100" class="w-20 h-7 rounded-md border border-border bg-background px-2 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring" `;
                 html += `value="${node.max_iterations || 3}" `;
                 html += `oninput="`;
@@ -200,11 +200,12 @@ export function workflowTreeBuilder() {
                         parallel: 'hover:bg-amber-500/10 hover:text-amber-600',
                         loop: 'hover:bg-purple-500/10 hover:text-purple-600',
                     }[childType];
+                    const childLabel = { agent: 'LLM Agent', sequential: 'Sequential', parallel: 'Parallel', loop: 'Loop' }[childType] || childType;
                     html += `<button type="button" class="h-6 px-2 rounded text-[10px] font-medium border border-dashed border-border text-muted-foreground ${btnColor} transition-colors" `;
                     html += `onclick="`;
                     html += `  const mgr = Alpine.closestDataStack(this).find(d => d.addChildToNode);`;
                     html += `  if (mgr) mgr.addChildToNode('${path}', '${childType}');`;
-                    html += `">${icon} ${childType[0].toUpperCase() + childType.slice(1)}</button>`;
+                    html += `">${icon} ${childLabel}</button>`;
                 }
                 html += `</div>`;
             }
@@ -248,7 +249,7 @@ export function workflowTreeBuilder() {
                 sequential: '↓ Sequential',
                 parallel: '∥ Parallel',
                 loop: '↻ Loop',
-                agent: '● Agent',
+                agent: '● LLM Agent',
             }[node.type] || node.type;
 
             let html = `<div class="${indent}rounded-lg border ${borderColor} ${bgColor} p-3 space-y-2">`;
@@ -265,7 +266,7 @@ export function workflowTreeBuilder() {
             html += `">`;
             for (const t of ['agent', 'sequential', 'parallel', 'loop']) {
                 const selected = t === node.type ? ' selected' : '';
-                const label = { agent: 'Agent', sequential: 'Sequential', parallel: 'Parallel', loop: 'Loop' }[t];
+                const label = { agent: 'LLM Agent', sequential: 'Sequential', parallel: 'Parallel', loop: 'Loop' }[t];
                 html += `<option value="${t}"${selected}>${label}</option>`;
             }
             html += `</select>`;
@@ -295,7 +296,7 @@ export function workflowTreeBuilder() {
                 html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
                 html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.agent_id = this.value; }`;
                 html += `">`;
-                html += `<option value="">Select an agent node...</option>`;
+                html += `<option value="">Select an LLM agent...</option>`;
                 // Read agents from the agentDesigner component (simple agents only)
                 const designer = Alpine.closestDataStack(this.$el).find(d => d.agents && d.pipelineGraph !== undefined);
                 const agentsList = designer ? (designer.agents || []) : [];
@@ -307,7 +308,7 @@ export function workflowTreeBuilder() {
                 html += `</select>`;
 
                 // Output key
-                html += `<input type="text" placeholder="Output key (maps to ADK-Go OutputKey)" maxlength="50" class="w-full h-7 rounded-md border border-border bg-background px-3 text-[11px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" `;
+                html += `<input type="text" placeholder="Output Key — saves to session state (reference as {key} in downstream Instructions)" maxlength="50" class="w-full h-7 rounded-md border border-border bg-background px-3 text-[11px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" `;
                 html += `value="${this._escapeAttr(node.output_key || '')}" `;
                 html += `oninput="`;
                 html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
@@ -319,7 +320,7 @@ export function workflowTreeBuilder() {
                 html += `<details class="group" ${hasOverrides ? 'open' : ''}>`;
                 html += `<summary class="cursor-pointer text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors select-none flex items-center gap-1">`;
                 html += `<svg xmlns="http://www.w3.org/2000/svg" class="size-3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>`;
-                html += `Transfer &amp; Context Overrides`;
+                html += `Agent Transfer &amp; Context`;
                 html += `</summary>`;
                 html += `<div class="mt-1.5 space-y-1.5 pl-4 border-l border-border/50">`;
 
@@ -330,7 +331,7 @@ export function workflowTreeBuilder() {
                 html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
                 html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.disallow_transfer_to_parent = this.checked || null; }`;
                 html += `">`;
-                html += `<span class="text-[10px] text-muted-foreground">Block transfer to parent</span>`;
+                html += `<span class="text-[10px] text-muted-foreground">Block transfer to parent (DisallowTransferToParent)</span>`;
                 html += `</label>`;
 
                 const peersChecked = node.disallow_transfer_to_peers ? ' checked' : '';
@@ -340,18 +341,18 @@ export function workflowTreeBuilder() {
                 html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
                 html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.disallow_transfer_to_peers = this.checked || null; }`;
                 html += `">`;
-                html += `<span class="text-[10px] text-muted-foreground">Block transfer to peers</span>`;
+                html += `<span class="text-[10px] text-muted-foreground">Block transfer to peers (DisallowTransferToPeers)</span>`;
                 html += `</label>`;
 
                 html += `<div class="flex items-center gap-2">`;
-                html += `<span class="text-[10px] text-muted-foreground whitespace-nowrap">History:</span>`;
+                html += `<span class="text-[10px] text-muted-foreground whitespace-nowrap">Include Contents:</span>`;
                 html += `<select class="h-6 rounded border border-border bg-background px-1.5 text-[10px] text-foreground focus:outline-none" `;
                 html += `onchange="`;
                 html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
                 html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.include_contents = this.value; }`;
                 html += `">`;
-                html += `<option value=""${!node.include_contents ? ' selected' : ''}>Default (include)</option>`;
-                html += `<option value="none"${node.include_contents === 'none' ? ' selected' : ''}>Fresh context</option>`;
+                html += `<option value=""${!node.include_contents ? ' selected' : ''}>default (include history)</option>`;
+                html += `<option value="none"${node.include_contents === 'none' ? ' selected' : ''}>none (fresh context)</option>`;
                 html += `</select>`;
                 html += `</div>`;
 
@@ -362,7 +363,7 @@ export function workflowTreeBuilder() {
             // Loop-specific
             if (node.type === 'loop') {
                 html += `<div class="flex items-center gap-2">`;
-                html += `<span class="text-[11px] text-muted-foreground">Max iterations:</span>`;
+                html += `<span class="text-[11px] text-muted-foreground">Max Iterations:</span>`;
                 html += `<input type="number" min="1" max="100" class="w-20 h-7 rounded-md border border-border bg-background px-2 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring" `;
                 html += `value="${node.max_iterations || 3}" `;
                 html += `oninput="`;
@@ -391,11 +392,12 @@ export function workflowTreeBuilder() {
                         parallel: 'hover:bg-amber-500/10 hover:text-amber-600',
                         loop: 'hover:bg-purple-500/10 hover:text-purple-600',
                     }[childType];
+                    const childLabel = { agent: 'LLM Agent', sequential: 'Sequential', parallel: 'Parallel', loop: 'Loop' }[childType] || childType;
                     html += `<button type="button" class="h-6 px-2 rounded text-[10px] font-medium border border-dashed border-border text-muted-foreground ${btnColor} transition-colors" `;
                     html += `onclick="`;
                     html += `  const mgr = Alpine.closestDataStack(this).find(d => d.addChildToNode);`;
                     html += `  if (mgr) mgr.addChildToNode('${path}', '${childType}');`;
-                    html += `">${icon} ${childType[0].toUpperCase() + childType.slice(1)}</button>`;
+                    html += `">${icon} ${childLabel}</button>`;
                 }
                 html += `</div>`;
             }
