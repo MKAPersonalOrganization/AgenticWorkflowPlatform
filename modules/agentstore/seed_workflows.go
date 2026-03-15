@@ -6,50 +6,52 @@ import (
 	"github.com/google/uuid"
 )
 
-// workflowCatalog returns workflow-based catalog entries. Each entry includes
-// a workflow_graph template (with placeholder agent IDs) and the sub_agents
-// definitions. When a user forks one of these, the system creates the
-// sub-agents as real user_agents and a workflow_definition with remapped IDs.
+// workflowCatalog returns one Workflow Agent entry per ADK-Go example.
+//
+// ADK-Go examples → catalog entries (1:1):
+//   - examples/workflowagents/sequential/main.go       → Sequential Agent
+//   - examples/workflowagents/sequentialCode/main.go   → Code Generation Pipeline
+//   - examples/workflowagents/parallel/main.go         → Parallel Agent
+//   - examples/workflowagents/loop/main.go             → Loop Agent
 func workflowCatalog() []AgentCatalogEntry {
 	return []AgentCatalogEntry{
-		// ── Research & Analysis Workflows ──
-		researchPipelineEntry(),
-		deepDiveAnalysisEntry(),
-
-		// ── Content Creation Workflows ──
-		contentCreationPipelineEntry(),
-		blogPostFactoryEntry(),
-
-		// ── Professional Workflows ──
-		interviewBootcampEntry(),
-		codeReviewPipelineEntry(),
+		sequentialAgentEntry(),
+		codeGenerationPipelineEntry(),
+		parallelAgentEntry(),
+		loopAgentEntry(),
 	}
 }
 
-// ─── Research Pipeline (Sequential) ─────────────────────────────────────────
+// ─── Sequential Agent ────────────────────────────────────────────────────────
+// Mirrors: examples/workflowagents/sequential/main.go
+//
+// Two sub-agents (my_custom_agent_1, my_custom_agent_2) run one after another
+// inside a sequentialagent. Each completes fully before the next starts.
+// Output from each agent is visible downstream in the conversation history.
 
-func researchPipelineEntry() AgentCatalogEntry {
+func sequentialAgentEntry() AgentCatalogEntry {
 	subs := []CatalogSubAgent{
 		{
-			ID:           "sub-researcher",
-			Name:         "Research Gatherer",
-			Description:  "Collects and organizes raw information on a topic",
-			SystemPrompt: "You are a thorough research specialist. When given a topic, gather comprehensive information covering key facts, different perspectives, recent developments, and relevant statistics. Organize findings into clear sections. Always note your sources when possible. Present raw research material for further analysis.",
-			Icon:         iconMicroscope,
+			ID:          "sub-seq-agent-1",
+			Name:        "Agent 1",
+			Description: "First agent in the sequence — runs before Agent 2.",
+			Icon:        iconBot,
+			SystemPrompt: `You are the first agent in a sequential pipeline.
+
+Respond to the user's message with a clear, direct answer. Your output becomes part of the conversation history that Agent 2 will receive.
+
+State your response and end with: "— Agent 1 complete."`,
 		},
 		{
-			ID:           "sub-analyst",
-			Name:         "Research Analyst",
-			Description:  "Analyzes research findings and extracts insights",
-			SystemPrompt: "You are an expert analyst. You receive raw research data and extract meaningful insights. Identify patterns, contradictions, and gaps. Evaluate source reliability. Highlight the most significant findings. Draw connections between different pieces of information. Present your analysis in a structured format with clear conclusions.",
-			Icon:         iconChartBar,
-		},
-		{
-			ID:           "sub-writer",
-			Name:         "Report Writer",
-			Description:  "Produces polished reports from analyzed research",
-			SystemPrompt: "You are a professional report writer. Transform analyzed research into a well-structured, readable report. Include an executive summary, key findings, detailed analysis sections, and actionable recommendations. Use clear headings, bullet points, and transitions. Maintain a professional but accessible tone. Cite sources where appropriate.",
-			Icon:         iconFileText,
+			ID:          "sub-seq-agent-2",
+			Name:        "Agent 2",
+			Description: "Second agent in the sequence — runs after Agent 1 completes.",
+			Icon:        iconBot,
+			SystemPrompt: `You are the second agent in a sequential pipeline.
+
+You can see everything Agent 1 said. Build on it, extend it, or provide a complementary perspective.
+
+State your response and end with: "— Agent 2 complete."`,
 		},
 	}
 
@@ -57,132 +59,17 @@ func researchPipelineEntry() AgentCatalogEntry {
 		"id":   "root",
 		"type": "sequential",
 		"children": []map[string]interface{}{
-			{"id": "n1", "type": "agent", "agent_id": "sub-researcher", "output_key": "raw_research"},
-			{"id": "n2", "type": "agent", "agent_id": "sub-analyst", "output_key": "analysis"},
-			{"id": "n3", "type": "agent", "agent_id": "sub-writer"},
+			{"id": "n1", "type": "agent", "agent_id": "sub-seq-agent-1"},
+			{"id": "n2", "type": "agent", "agent_id": "sub-seq-agent-2"},
 		},
 	}
 
 	return catalogWorkflowEntry(
-		"Research Pipeline",
-		"A 3-agent sequential pipeline: a Researcher gathers data, an Analyst extracts insights, and a Writer produces a polished report.",
-		"Research → Analysis → Report in one click.",
-		"Workflows",
-		[]string{"research", "analysis", "report", "pipeline", "sequential"},
-		iconPipeline,
-		true, // featured
-		subs,
-		graph,
-	)
-}
-
-// ─── Deep Dive Analysis (Parallel) ──────────────────────────────────────────
-
-func deepDiveAnalysisEntry() AgentCatalogEntry {
-	subs := []CatalogSubAgent{
-		{
-			ID:           "sub-technical",
-			Name:         "Technical Analyst",
-			Description:  "Analyzes technical and scientific aspects",
-			SystemPrompt: "You are a technical analyst. Examine the given topic from a technical and scientific perspective. Evaluate feasibility, technical challenges, implementation details, and scientific evidence. Use precise terminology. Present technical findings clearly with supporting data.",
-			Icon:         iconAtom,
-		},
-		{
-			ID:           "sub-business",
-			Name:         "Business Analyst",
-			Description:  "Analyzes market and business implications",
-			SystemPrompt: "You are a business and market analyst. Examine the given topic from a business perspective. Evaluate market opportunity, competitive landscape, financial implications, risks, and strategic value. Use frameworks like SWOT, Porter's Five Forces, or cost-benefit analysis when appropriate.",
-			Icon:         iconBriefcase,
-		},
-		{
-			ID:           "sub-creative",
-			Name:         "Creative Strategist",
-			Description:  "Explores unconventional angles and opportunities",
-			SystemPrompt: "You are a creative strategist. Look at the given topic from unconventional angles. Identify hidden opportunities, novel applications, potential pivots, and creative solutions others might miss. Think laterally. Challenge assumptions. Propose bold but defensible ideas.",
-			Icon:         iconLightbulb,
-		},
-		{
-			ID:           "sub-synthesizer",
-			Name:         "Synthesis Editor",
-			Description:  "Combines parallel analyses into a unified report",
-			SystemPrompt: "You are a synthesis editor. You receive multiple analyses of the same topic from different perspectives (technical, business, creative). Combine them into one cohesive, well-structured report. Highlight areas of agreement, tension, and synergy. Produce a balanced conclusion with prioritized recommendations.",
-			Icon:         iconFileText,
-		},
-	}
-
-	graph := map[string]interface{}{
-		"id":   "root",
-		"type": "sequential",
-		"children": []map[string]interface{}{
-			{
-				"id":   "parallel-analysis",
-				"type": "parallel",
-				"children": []map[string]interface{}{
-					{"id": "n1", "type": "agent", "agent_id": "sub-technical", "output_key": "technical_analysis"},
-					{"id": "n2", "type": "agent", "agent_id": "sub-business", "output_key": "business_analysis"},
-					{"id": "n3", "type": "agent", "agent_id": "sub-creative", "output_key": "creative_analysis"},
-				},
-			},
-			{"id": "n4", "type": "agent", "agent_id": "sub-synthesizer"},
-		},
-	}
-
-	return catalogWorkflowEntry(
-		"Deep Dive Analysis",
-		"Three specialist agents analyze a topic in parallel from technical, business, and creative angles, then a synthesizer merges their findings into a unified report.",
-		"Multi-perspective analysis with parallel execution.",
-		"Workflows",
-		[]string{"analysis", "parallel", "multi-perspective", "strategy"},
-		iconWorkflow,
-		true, // featured
-		subs,
-		graph,
-	)
-}
-
-// ─── Content Creation Pipeline (Sequential) ─────────────────────────────────
-
-func contentCreationPipelineEntry() AgentCatalogEntry {
-	subs := []CatalogSubAgent{
-		{
-			ID:           "sub-outliner",
-			Name:         "Content Outliner",
-			Description:  "Creates structured outlines from topic briefs",
-			SystemPrompt: "You are a content strategist specializing in outlines. Given a topic or brief, create a detailed, well-structured outline with main sections, subsections, and key points to cover. Consider audience, tone, and purpose. Include suggested hooks, transitions, and calls to action. Format clearly with numbered sections.",
-			Icon:         iconNotebookPen,
-		},
-		{
-			ID:           "sub-drafter",
-			Name:         "Content Drafter",
-			Description:  "Writes full first drafts from outlines",
-			SystemPrompt: "You are a skilled content writer. Transform outlines into complete, engaging first drafts. Write naturally with a clear voice. Use compelling openings, smooth transitions, and strong conclusions. Include examples and anecdotes where appropriate. Match the tone and style specified in the outline.",
-			Icon:         iconFeather,
-		},
-		{
-			ID:           "sub-editor",
-			Name:         "Content Editor",
-			Description:  "Polishes drafts for clarity, flow, and impact",
-			SystemPrompt: "You are a meticulous editor. Review content for grammar, spelling, punctuation, clarity, flow, and impact. Tighten prose, eliminate redundancy, strengthen weak passages, and improve transitions. Preserve the author's voice while elevating quality. Flag any factual claims that need verification. Return the polished final version.",
-			Icon:         iconSpellCheck,
-		},
-	}
-
-	graph := map[string]interface{}{
-		"id":   "root",
-		"type": "sequential",
-		"children": []map[string]interface{}{
-			{"id": "n1", "type": "agent", "agent_id": "sub-outliner", "output_key": "outline"},
-			{"id": "n2", "type": "agent", "agent_id": "sub-drafter", "output_key": "draft"},
-			{"id": "n3", "type": "agent", "agent_id": "sub-editor"},
-		},
-	}
-
-	return catalogWorkflowEntry(
-		"Content Creation Pipeline",
-		"A 3-stage writing pipeline: an Outliner structures the content, a Drafter writes the full piece, and an Editor polishes it to publication quality.",
-		"From topic to polished content in three steps.",
-		"Workflows",
-		[]string{"writing", "content", "pipeline", "editing", "sequential"},
+		"Sequential Agent",
+		"Two LLM agents that run one after another. Mirrors ADK-Go's sequential example: my_custom_agent_1 → my_custom_agent_2 inside sequentialagent.New().",
+		"Run two agents in order inside a sequentialagent.",
+		"Examples",
+		[]string{"sequential", "two-agents", "ordered", "adk-example"},
 		iconPipeline,
 		false,
 		subs,
@@ -190,157 +77,209 @@ func contentCreationPipelineEntry() AgentCatalogEntry {
 	)
 }
 
-// ─── Blog Post Factory (Loop + Sequential) ──────────────────────────────────
+// ─── Code Generation Pipeline ────────────────────────────────────────────────
+// Mirrors: examples/workflowagents/sequentialCode/main.go
+//
+// Three LLM agents in a sequentialagent. Demonstrates the key ADK-Go pattern:
+// OutputKey saves an agent's output to session state; downstream agents read it
+// via {variable} template syntax in their Instruction.
+//
+//	CodeWriterAgent    → output_key: "generated_code"
+//	CodeReviewerAgent  → reads {generated_code}, output_key: "temp:review_comments"
+//	CodeRefactorerAgent → reads {generated_code} + {temp:review_comments}
 
-func blogPostFactoryEntry() AgentCatalogEntry {
+func codeGenerationPipelineEntry() AgentCatalogEntry {
+	fence := "```"
+
 	subs := []CatalogSubAgent{
 		{
-			ID:           "sub-blog-writer",
-			Name:         "Blog Writer",
-			Description:  "Writes engaging blog posts with SEO awareness",
-			SystemPrompt: "You are a blog writer skilled at creating engaging, SEO-friendly content. Write blog posts with compelling headlines, clear structure, relevant keywords, and a conversational yet authoritative tone. Include an introduction hook, well-organized body sections with subheadings, and a strong conclusion with a call to action.",
-			Icon:         iconFeather,
+			ID:          "sub-code-writer",
+			Name:        "CodeWriterAgent",
+			Description: "Generates Python code from the user's specification. Stores output in session state via OutputKey.",
+			Icon:        iconTerminal,
+			SystemPrompt: `You are a Python Code Generator.
+Based *only* on the user's request, write Python code that fulfills the requirement.
+Output *only* the complete Python code block, enclosed in triple backticks.
+Do not add any other text before or after the code block.`,
 		},
 		{
-			ID:           "sub-blog-reviewer",
-			Name:         "Blog Reviewer",
-			Description:  "Reviews blog posts and suggests improvements",
-			SystemPrompt: "You are a critical blog content reviewer. Evaluate blog posts for: headline effectiveness, opening hook strength, logical flow, readability (aim for grade 8 reading level), SEO optimization, factual accuracy, and engagement factor. Provide specific, actionable feedback. Rate each aspect 1-5 and explain how to improve weak areas. If the post is excellent, say 'APPROVED' at the start.",
-			Icon:         iconSearchCode,
+			ID:          "sub-code-reviewer",
+			Name:        "CodeReviewerAgent",
+			Description: "Reviews the generated code. Reads {generated_code} from session state — set by CodeWriterAgent's OutputKey.",
+			Icon:        iconSearchCode,
+			SystemPrompt: `You are an expert Python Code Reviewer.
+Your task is to provide constructive feedback on the provided code.
+
+**Code to Review:**
+` + fence + `python
+{generated_code}
+` + fence + `
+
+**Review Criteria:**
+1. **Correctness:** Does the code work as intended? Are there logic errors?
+2. **Readability:** Is the code clear and easy to understand? Follows PEP 8?
+3. **Efficiency:** Is the code reasonably efficient? Any obvious performance bottlenecks?
+4. **Edge Cases:** Does the code handle potential edge cases or invalid inputs gracefully?
+5. **Best Practices:** Does the code follow common Python best practices?
+
+**Output:**
+Provide your feedback as a concise, bulleted list. Focus on the most important points for improvement.
+If the code is excellent and requires no changes, simply state: "No major issues found."
+Output *only* the review comments or the "No major issues" statement.`,
+		},
+		{
+			ID:          "sub-code-refactorer",
+			Name:        "CodeRefactorerAgent",
+			Description: "Refactors the code using review feedback. Reads both {generated_code} and {temp:review_comments} from session state.",
+			Icon:        iconCode,
+			SystemPrompt: `You are a Python Code Refactoring AI.
+Your goal is to improve the given Python code based on the provided review comments.
+
+**Original Code:**
+` + fence + `python
+{generated_code}
+` + fence + `
+
+**Review Comments:**
+{temp:review_comments}
+
+**Task:**
+Carefully apply the suggestions from the review comments to refactor the original code.
+If the review comments state "No major issues found," return the original code unchanged.
+Ensure the final code is complete, functional, and includes necessary imports and docstrings.
+
+**Output:**
+Output *only* the final, refactored Python code block, enclosed in triple backticks.
+Do not add any other text before or after the code block.`,
 		},
 	}
 
 	graph := map[string]interface{}{
 		"id":   "root",
-		"type": "loop",
-		// Writer writes, reviewer reviews. Loop continues until reviewer approves
-		// or max iterations reached.
+		"type": "sequential",
+		"children": []map[string]interface{}{
+			// OutputKey saves output to session.State["generated_code"].
+			// Downstream agents reference it via {generated_code} in their Instruction.
+			{"id": "n1", "type": "agent", "agent_id": "sub-code-writer", "output_key": "generated_code"},
+			// temp: prefix → discarded from state after the invocation ends.
+			{"id": "n2", "type": "agent", "agent_id": "sub-code-reviewer", "output_key": "temp:review_comments"},
+			{"id": "n3", "type": "agent", "agent_id": "sub-code-refactorer", "output_key": "refactored_code"},
+		},
+	}
+
+	return catalogWorkflowEntry(
+		"Code Generation Pipeline",
+		"Mirrors ADK-Go's sequentialCode example: CodeWriterAgent → CodeReviewerAgent → CodeRefactorerAgent. Demonstrates OutputKey → {variable} state passing between agents in a sequentialagent.",
+		"Write, review, and refactor Python code using sequential state passing.",
+		"Examples",
+		[]string{"sequential", "state-passing", "output-key", "code", "adk-example"},
+		iconGitBranch,
+		true,
+		subs,
+		graph,
+	)
+}
+
+// ─── Parallel Agent ───────────────────────────────────────────────────────────
+// Mirrors: examples/workflowagents/parallel/main.go
+//
+// Two sub-agents run concurrently inside a parallelagent. Each gets its own
+// isolated branch of the conversation (branch = "parent.agent_name").
+// Neither agent sees the other's output. Results are collected after both finish.
+
+func parallelAgentEntry() AgentCatalogEntry {
+	subs := []CatalogSubAgent{
+		{
+			ID:          "sub-par-agent-1",
+			Name:        "Agent 1",
+			Description: "Runs concurrently alongside Agent 2 in its own isolated branch.",
+			Icon:        iconBot,
+			SystemPrompt: `You are the first agent running in a parallel branch.
+
+You and Agent 2 are running at the same time — you cannot see each other's output.
+
+Respond to the user's message from your own perspective. Be direct and complete.
+
+End your response with: "— Agent 1 (parallel branch 1)"`,
+		},
+		{
+			ID:          "sub-par-agent-2",
+			Name:        "Agent 2",
+			Description: "Runs concurrently alongside Agent 1 in its own isolated branch.",
+			Icon:        iconBot,
+			SystemPrompt: `You are the second agent running in a parallel branch.
+
+You and Agent 1 are running at the same time — you cannot see each other's output.
+
+Respond to the user's message from a different angle than Agent 1 might take. Offer a fresh perspective.
+
+End your response with: "— Agent 2 (parallel branch 2)"`,
+		},
+	}
+
+	graph := map[string]interface{}{
+		"id":   "root",
+		"type": "parallel",
+		"children": []map[string]interface{}{
+			{"id": "n1", "type": "agent", "agent_id": "sub-par-agent-1"},
+			{"id": "n2", "type": "agent", "agent_id": "sub-par-agent-2"},
+		},
+	}
+
+	return catalogWorkflowEntry(
+		"Parallel Agent",
+		"Two LLM agents that run concurrently in isolated branches. Mirrors ADK-Go's parallel example: my_custom_agent_1 ∥ my_custom_agent_2 inside parallelagent.New().",
+		"Run two agents simultaneously in isolated conversation branches.",
+		"Examples",
+		[]string{"parallel", "concurrent", "two-agents", "branches", "adk-example"},
+		iconWorkflow,
+		false,
+		subs,
+		graph,
+	)
+}
+
+// ─── Loop Agent ───────────────────────────────────────────────────────────────
+// Mirrors: examples/workflowagents/loop/main.go
+//
+// A single sub-agent runs repeatedly inside a loopagent. The loop terminates
+// when MaxIterations is reached (3, same as the ADK-Go example) or when the
+// agent sets event.Actions.Escalate = true (exit_loop tool).
+
+func loopAgentEntry() AgentCatalogEntry {
+	subs := []CatalogSubAgent{
+		{
+			ID:          "sub-loop-agent",
+			Name:        "My Agent",
+			Description: "Runs repeatedly up to MaxIterations=3, or until it calls exit_loop.",
+			Icon:        iconRefresh,
+			SystemPrompt: `You are an iterative refinement agent. You run in a loop — up to 3 times.
+
+On each iteration:
+1. Review what you produced in previous iterations (visible in conversation history).
+2. Improve your answer: fix errors, add depth, sharpen clarity.
+3. If your answer is already excellent and needs no further improvement, call the exit_loop tool to end the loop early.
+
+Always label your response with the current pass: "Pass 1:", "Pass 2:", "Pass 3:".`,
+		},
+	}
+
+	graph := map[string]interface{}{
+		"id":             "root",
+		"type":           "loop",
 		"max_iterations": 3,
 		"children": []map[string]interface{}{
-			{"id": "n1", "type": "agent", "agent_id": "sub-blog-writer", "output_key": "blog_draft"},
-			{"id": "n2", "type": "agent", "agent_id": "sub-blog-reviewer"},
+			{"id": "n1", "type": "agent", "agent_id": "sub-loop-agent"},
 		},
 	}
 
 	return catalogWorkflowEntry(
-		"Blog Post Factory",
-		"An iterative write-review loop: a Writer creates a blog post, a Reviewer evaluates it and provides feedback. The loop repeats until the post is approved or 3 iterations pass.",
-		"Self-improving blog posts through iterative review.",
-		"Workflows",
-		[]string{"blog", "writing", "review", "loop", "iterative"},
-		iconWorkflow,
-		false,
-		subs,
-		graph,
-	)
-}
-
-// ─── Interview Bootcamp (Sequential + Parallel) ─────────────────────────────
-
-func interviewBootcampEntry() AgentCatalogEntry {
-	subs := []CatalogSubAgent{
-		{
-			ID:           "sub-behavioral",
-			Name:         "Behavioral Interviewer",
-			Description:  "Conducts behavioral interview questions using STAR method",
-			SystemPrompt: "You are a behavioral interviewer. Ask one behavioral question at a time using common frameworks (STAR method). Focus on: leadership, teamwork, conflict resolution, problem-solving, and failure/growth stories. After the user responds, provide detailed feedback on their answer structure, specificity, and impact. Suggest how to improve weak responses.",
-			Icon:         iconBriefcase,
-		},
-		{
-			ID:           "sub-technical-int",
-			Name:         "Technical Interviewer",
-			Description:  "Conducts technical interview assessments",
-			SystemPrompt: "You are a technical interviewer. Ask progressively harder technical questions relevant to the user's target role. Cover system design, coding concepts, problem-solving approaches, and domain-specific knowledge. Evaluate responses for correctness, depth, and communication clarity. Provide hints when the user is stuck and detailed explanations after each question.",
-			Icon:         iconCode,
-		},
-		{
-			ID:           "sub-coach",
-			Name:         "Interview Coach",
-			Description:  "Synthesizes performance and builds an improvement plan",
-			SystemPrompt: "You are a career coach specializing in interview preparation. You receive notes from behavioral and technical interview sessions. Synthesize the feedback into: overall readiness assessment, top 3 strengths demonstrated, top 3 areas for improvement, specific practice exercises for each weakness, and a prioritized 1-week preparation plan. Be encouraging but honest.",
-			Icon:         iconTarget,
-		},
-	}
-
-	graph := map[string]interface{}{
-		"id":   "root",
-		"type": "sequential",
-		"children": []map[string]interface{}{
-			{
-				"id":   "interviews",
-				"type": "parallel",
-				"children": []map[string]interface{}{
-					{"id": "n1", "type": "agent", "agent_id": "sub-behavioral", "output_key": "behavioral_feedback"},
-					{"id": "n2", "type": "agent", "agent_id": "sub-technical-int", "output_key": "technical_feedback"},
-				},
-			},
-			{"id": "n3", "type": "agent", "agent_id": "sub-coach"},
-		},
-	}
-
-	return catalogWorkflowEntry(
-		"Interview Bootcamp",
-		"Two interviewers (behavioral + technical) run in parallel, then a Coach synthesizes their feedback into a personalized improvement plan.",
-		"Parallel mock interviews with coaching synthesis.",
-		"Workflows",
-		[]string{"interview", "career", "practice", "parallel", "coaching"},
-		iconWorkflow,
-		true, // featured
-		subs,
-		graph,
-	)
-}
-
-// ─── Code Review Pipeline (Sequential) ──────────────────────────────────────
-
-func codeReviewPipelineEntry() AgentCatalogEntry {
-	subs := []CatalogSubAgent{
-		{
-			ID:           "sub-security",
-			Name:         "Security Auditor",
-			Description:  "Reviews code for security vulnerabilities",
-			SystemPrompt: "You are a security-focused code reviewer. Analyze code for: injection vulnerabilities (SQL, XSS, command), authentication/authorization flaws, insecure data handling, secrets in code, OWASP Top 10 issues, and dependency vulnerabilities. Classify findings by severity (Critical/High/Medium/Low). Provide specific fix suggestions for each finding.",
-			Icon:         iconSearchCode,
-		},
-		{
-			ID:           "sub-quality",
-			Name:         "Quality Engineer",
-			Description:  "Reviews code for quality, patterns, and maintainability",
-			SystemPrompt: "You are a software quality engineer. Review code for: design pattern adherence, SOLID principles, code duplication, naming conventions, error handling, test coverage gaps, performance bottlenecks, and documentation quality. Suggest specific refactoring improvements. Prioritize findings by impact on maintainability.",
-			Icon:         iconTerminal,
-		},
-		{
-			ID:           "sub-summarizer",
-			Name:         "Review Summarizer",
-			Description:  "Creates actionable review summary from multiple reviews",
-			SystemPrompt: "You are a technical project lead. You receive security and quality review findings. Create a unified, prioritized action plan: group related findings, eliminate duplicates, rank by impact and effort, and produce a clear checklist the developer can follow. Include a risk assessment summary and suggested PR review comments.",
-			Icon:         iconFileText,
-		},
-	}
-
-	graph := map[string]interface{}{
-		"id":   "root",
-		"type": "sequential",
-		"children": []map[string]interface{}{
-			{
-				"id":   "reviews",
-				"type": "parallel",
-				"children": []map[string]interface{}{
-					{"id": "n1", "type": "agent", "agent_id": "sub-security", "output_key": "security_findings"},
-					{"id": "n2", "type": "agent", "agent_id": "sub-quality", "output_key": "quality_findings"},
-				},
-			},
-			{"id": "n3", "type": "agent", "agent_id": "sub-summarizer"},
-		},
-	}
-
-	return catalogWorkflowEntry(
-		"Code Review Pipeline",
-		"A Security Auditor and Quality Engineer review code in parallel, then a Summarizer merges their findings into a prioritized action plan.",
-		"Comprehensive automated code review from two angles.",
-		"Workflows",
-		[]string{"code-review", "security", "quality", "parallel", "pipeline"},
-		iconPipeline,
+		"Loop Agent",
+		"A single LLM agent that runs up to MaxIterations=3, improving its output each pass. Mirrors ADK-Go's loop example: my_custom_agent inside loopagent.New(MaxIterations: 3).",
+		"Run one agent in a refinement loop, improving output each iteration.",
+		"Examples",
+		[]string{"loop", "iterative", "max-iterations", "escalate", "adk-example"},
+		iconRefresh,
 		false,
 		subs,
 		graph,
@@ -349,9 +288,6 @@ func codeReviewPipelineEntry() AgentCatalogEntry {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-// catalogWorkflowEntry is a convenience constructor for workflow catalog entries.
-// Uses a deterministic ID based on the name so ON CONFLICT (id) DO NOTHING
-// works correctly across restarts.
 func catalogWorkflowEntry(
 	name, description, systemPrompt, category string,
 	tags []string,
@@ -362,10 +298,7 @@ func catalogWorkflowEntry(
 ) AgentCatalogEntry {
 	graphJSON, _ := json.Marshal(graph)
 	subsJSON, _ := json.Marshal(subs)
-
-	// Deterministic UUID v5 from a fixed namespace + name.
 	id := deterministicID("catalog-workflow:" + name)
-
 	return AgentCatalogEntry{
 		ID:                id,
 		Name:              name,
@@ -373,7 +306,7 @@ func catalogWorkflowEntry(
 		SystemPrompt:      systemPrompt,
 		Category:          category,
 		Tags:              tags,
-		AuthorName:        "AI Platform",
+		AuthorName:        "ADK-Go",
 		Icon:              icon,
 		Featured:          featured,
 		WorkflowGraphJSON: string(graphJSON),
@@ -381,7 +314,6 @@ func catalogWorkflowEntry(
 	}
 }
 
-// deterministicID generates a stable UUID v5 from a seed string.
 func deterministicID(seed string) string {
 	return uuid.NewSHA1(uuid.NameSpaceDNS, []byte(seed)).String()
 }
