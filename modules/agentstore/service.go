@@ -223,7 +223,14 @@ func (s *service) forkShared(ctx context.Context, token, targetUserID string) (*
 // ── Composition Graph Validation ──
 
 // validateGraph recursively validates the entire composition tree.
+// A workflow agent's root must be a composite node (sequential/parallel/loop)
+// since its purpose is to orchestrate sub-agents.
 func (s *service) validateGraph(ctx context.Context, node *CompositionNode, userID string) error {
+	// Root must be composite — a workflow agent orchestrates sub-agents.
+	// A single agent doesn't need a composition graph.
+	if node.Type == NodeAgent {
+		return fmt.Errorf("root node must be sequential, parallel, or loop (use a simple agent definition for a single LLM agent)")
+	}
 	if node.CountNodes() > maxTreeNodes {
 		return fmt.Errorf("tree exceeds maximum of %d nodes", maxTreeNodes)
 	}

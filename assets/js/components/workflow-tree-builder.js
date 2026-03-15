@@ -1,413 +1,256 @@
 /**
- * Workflow Tree Builder
+ * Workflow Tree Builder — ADK-Go Aligned Composition Tree Renderer
  *
- * An Alpine.js component that renders a recursive composition tree for
- * multi-agent workflows. Each node can be:
- *   - agent: a leaf node referencing an existing AgentDefinition
- *   - sequential: runs children one after another
- *   - parallel: runs all children concurrently
- *   - loop: repeats children until max iterations or exit
+ * Renders a recursive composition tree where each node maps 1:1 to an ADK-Go
+ * agent constructor:
  *
- * Nodes can be arbitrarily nested, e.g.:
- *   sequential → [agent, parallel → [agent, loop → [agent, agent]]]
+ *   ● Agent (leaf)      → llmagent.New(llmagent.Config{Name, Instruction, Tools, ...})
+ *   ↓ Sequential         → sequentialagent.New(sequentialagent.Config{AgentConfig: agent.Config{Name, SubAgents}})
+ *   ∥ Parallel           → parallelagent.New(parallelagent.Config{AgentConfig: agent.Config{Name, SubAgents}})
+ *   ↻ Loop               → loopagent.New(loopagent.Config{AgentConfig: agent.Config{Name, SubAgents}, MaxIterations})
+ *
+ * Key ADK-Go behaviors surfaced:
+ *   - Every agent has a Name (agent.Config.Name) — composite nodes expose a Label input
+ *   - Loop's last direct child agent automatically receives the exit_loop tool (backend)
+ *   - Agent nodes can override TransferPolicy & IncludeContents per-workflow
+ *   - OutputKey saves agent output to session state for {key} template references
+ *
+ * This single component works in any Alpine.js context that provides:
+ *   agents, _getNodeByPath, changeNodeType, addChildToNode, removeChildFromNode
  */
 export function workflowTreeBuilder() {
     return {
-        init() {
-            // The parent agentsManager owns the data; we just render it.
-        },
+        init() { },
+
+        // ══════════════════════════════════════════════════════════════════
+        // Main render — single unified method (replaces the former
+        // duplicated renderNode / renderPipelineNode pair)
+        // ══════════════════════════════════════════════════════════════════
 
         /**
-         * Recursively render a node and its children as HTML.
-         * Uses onclick handlers that call methods on the parent agentsManager.
+         * Recursively render a composition node and its children.
+         *
+         * @param {Object}  node         - CompositionNode to render
+         * @param {string}  path         - Dot-notation path for mutations (e.g. "graph.0.1")
+         * @param {number}  depth        - Nesting depth (controls indentation)
+         * @param {boolean} canRemove    - Whether this node can be removed
+         * @param {boolean} isLastInLoop - Whether this agent node is the last direct child of a loop
          */
+        renderCompositionNode(node, path, depth, canRemove, isLastInLoop) {
+            if (!node) return '';
+
+            const isComposite = node.type === 'sequential' || node.type === 'parallel' || node.type === 'loop';
+            const indent = depth > 0 ? 'ml-4 ' : '';
+            const s = this._style(node.type);
+
+            let html = `<div class="${indent}rounded-lg border ${s.border} ${s.bg} p-3 space-y-2">`;
+
+            // ── Header: badge + type selector + name (composites) + remove ──
+            html += `<div class="flex items-center gap-2 flex-wrap">`;
+            html += `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold select-none ${s.badge}">${s.label}</span>`;
+
+            // Type selector — shows ADK-Go type for clarity
+            html += `<select class="h-7 rounded-md border border-border bg-background px-2 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring" `;
+            html += `onchange="Alpine.closestDataStack(this).find(d=>d.changeNodeType)?.changeNodeType('${path}',this.value)">`;
+            for (const [val, lbl] of [
+                ['agent', 'LLM Agent → llmagent'],
+                ['sequential', 'Sequential → sequentialagent'],
+                ['parallel', 'Parallel → parallelagent'],
+                ['loop', 'Loop → loopagent'],
+            ]) {
+                html += `<option value="${val}"${val === node.type ? ' selected' : ''}>${lbl}</option>`;
+            }
+            html += `</select>`;
+
+            // Name/Label for composite nodes → maps to agent.Config.Name in ADK-Go
+            if (isComposite) {
+                html += `<input type="text" placeholder="Name → agent.Config.Name" maxlength="60" `;
+                html += `class="flex-1 min-w-[140px] h-7 rounded-md border border-border bg-background px-2 text-[11px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring" `;
+                html += `value="${this._esc(node.label || '')}" `;
+                html += `oninput="const n=Alpine.closestDataStack(this).find(d=>d._getNodeByPath)?._getNodeByPath('${path}');if(n)n.label=this.value">`;
+            }
+
+            html += `<div class="flex-1"></div>`;
+
+            // Remove button (not for root)
+            if (canRemove) {
+                const parentPath = path.substring(0, path.lastIndexOf('.'));
+                const childIdx = path.substring(path.lastIndexOf('.') + 1);
+                html += `<button type="button" class="size-6 rounded-md flex items-center justify-center text-destructive hover:bg-destructive/10 transition-colors" `;
+                html += `title="Remove this node" `;
+                html += `onclick="Alpine.closestDataStack(this).find(d=>d.removeChildFromNode)?.removeChildFromNode('${parentPath}',${childIdx})">`;
+                html += `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>`;
+                html += `</button>`;
+            }
+            html += `</div>`;
+
+            // ── Agent leaf node fields ──
+            if (node.type === 'agent') {
+                html += this._renderAgentFields(node, path, isLastInLoop);
+            }
+
+            // ── Loop: max iterations ──
+            if (node.type === 'loop') {
+                html += this._renderLoopFields(node, path);
+            }
+
+            // ── Composite: children ──
+            if (isComposite && node.children && node.children.length > 0) {
+                html += `<div class="space-y-2 mt-1">`;
+                for (let i = 0; i < node.children.length; i++) {
+                    // Last direct child of a loop gets exit_loop indicator
+                    const lastInLoop = node.type === 'loop' && i === node.children.length - 1;
+                    html += this.renderCompositionNode(
+                        node.children[i], `${path}.${i}`, depth + 1,
+                        node.children.length > 1, lastInLoop,
+                    );
+                }
+                html += `</div>`;
+            }
+
+            // ── Composite: add child buttons ──
+            if (isComposite) {
+                html += this._renderAddButtons(path);
+            }
+
+            html += `</div>`;
+            return html;
+        },
+
+        // Backward-compatible aliases
         renderNode(node, path, depth, canRemove) {
-            if (!node) return '';
-
-            const isComposite = ['sequential', 'parallel', 'loop'].includes(node.type);
-            const indent = depth > 0 ? 'ml-4 ' : '';
-            const borderColor = {
-                sequential: 'border-blue-500/30',
-                parallel: 'border-amber-500/30',
-                loop: 'border-purple-500/30',
-                agent: 'border-emerald-500/30',
-            }[node.type] || 'border-border';
-
-            const bgColor = {
-                sequential: 'bg-blue-500/5',
-                parallel: 'bg-amber-500/5',
-                loop: 'bg-purple-500/5',
-                agent: 'bg-emerald-500/5',
-            }[node.type] || 'bg-muted/20';
-
-            const badgeClass = {
-                sequential: 'bg-blue-500/15 text-blue-600 dark:text-blue-400',
-                parallel: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
-                loop: 'bg-purple-500/15 text-purple-600 dark:text-purple-400',
-                agent: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
-            }[node.type] || '';
-
-            const typeLabel = {
-                sequential: '↓ Sequential',
-                parallel: '∥ Parallel',
-                loop: '↻ Loop',
-                agent: '● LLM Agent',
-            }[node.type] || node.type;
-
-            let html = `<div class="${indent}rounded-lg border ${borderColor} ${bgColor} p-3 space-y-2">`;
-
-            // ── Header: type badge + type selector + remove button ──
-            html += `<div class="flex items-center gap-2">`;
-            html += `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold select-none ${badgeClass}">${typeLabel}</span>`;
-
-            // Type selector
-            html += `<select class="h-7 rounded-md border border-border bg-background px-2 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring" `;
-            html += `onchange="`;
-            html += `  const mgr = Alpine.closestDataStack(this).find(d => d.changeNodeType);`;
-            html += `  if (mgr) mgr.changeNodeType('${path}', this.value);`;
-            html += `">`;
-            for (const t of ['agent', 'sequential', 'parallel', 'loop']) {
-                const selected = t === node.type ? ' selected' : '';
-                const label = { agent: 'LLM Agent', sequential: 'Sequential', parallel: 'Parallel', loop: 'Loop' }[t];
-                html += `<option value="${t}"${selected}>${label}</option>`;
-            }
-            html += `</select>`;
-
-            // Spacer
-            html += `<div class="flex-1"></div>`;
-
-            // Remove button (not for root)
-            if (canRemove) {
-                const parentPath = path.substring(0, path.lastIndexOf('.'));
-                const childIdx = path.substring(path.lastIndexOf('.') + 1);
-                html += `<button type="button" class="size-6 rounded-md flex items-center justify-center text-destructive hover:bg-destructive/10 transition-colors" `;
-                html += `onclick="`;
-                html += `  const mgr = Alpine.closestDataStack(this).find(d => d.removeChildFromNode);`;
-                html += `  if (mgr) mgr.removeChildFromNode('${parentPath}', ${childIdx});`;
-                html += `">`;
-                html += `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>`;
-                html += `</button>`;
-            }
-
-            html += `</div>`;
-
-            // ── Agent-specific: agent selector + output key + orchestration overrides ──
-            if (node.type === 'agent') {
-                html += `<div class="space-y-2">`;
-                // Agent dropdown — we read agents from the parent scope
-                html += `<select class="w-full h-8 rounded-md border border-border bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" `;
-                html += `onchange="`;
-                html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
-                html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.agent_id = this.value; }`;
-                html += `">`;
-                html += `<option value="">Select an LLM agent...</option>`;
-                // Populate from parent agentsManager's agents array
-                const mgr = Alpine.closestDataStack(this.$el).find(d => d.agents);
-                const agentsList = mgr ? (mgr.agents || []) : [];
-                for (const ag of agentsList) {
-                    const selected = ag.id === node.agent_id ? ' selected' : '';
-                    const name = this._escapeAttr(ag.name || ag.id);
-                    html += `<option value="${this._escapeAttr(ag.id)}"${selected}>${name}</option>`;
-                }
-                html += `</select>`;
-
-                // Output key
-                html += `<input type="text" placeholder="Output Key — saved to session state (reference as {key} in downstream Instructions)" maxlength="50" class="w-full h-7 rounded-md border border-border bg-background px-3 text-[11px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" `;
-                html += `value="${this._escapeAttr(node.output_key || '')}" `;
-                html += `oninput="`;
-                html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
-                html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.output_key = this.value; }`;
-                html += `">`;
-
-                // ── Orchestration overrides (collapsible) ──
-                const hasOverrides = node.disallow_transfer_to_parent || node.disallow_transfer_to_peers || node.include_contents;
-                html += `<details class="group" ${hasOverrides ? 'open' : ''}>`;
-                html += `<summary class="cursor-pointer text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors select-none flex items-center gap-1">`;
-                html += `<svg xmlns="http://www.w3.org/2000/svg" class="size-3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>`;
-                html += `Agent Transfer &amp; Context`;
-                html += `</summary>`;
-                html += `<div class="mt-1.5 space-y-1.5 pl-4 border-l border-border/50">`;
-
-                // Transfer to parent toggle
-                const parentChecked = node.disallow_transfer_to_parent ? ' checked' : '';
-                html += `<label class="flex items-center gap-2 cursor-pointer">`;
-                html += `<input type="checkbox" class="size-3.5 rounded border-border accent-primary" ${parentChecked} `;
-                html += `onchange="`;
-                html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
-                html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.disallow_transfer_to_parent = this.checked || null; }`;
-                html += `">`;
-                html += `<span class="text-[10px] text-muted-foreground">Block transfer to parent (DisallowTransferToParent)</span>`;
-                html += `</label>`;
-
-                // Transfer to peers toggle
-                const peersChecked = node.disallow_transfer_to_peers ? ' checked' : '';
-                html += `<label class="flex items-center gap-2 cursor-pointer">`;
-                html += `<input type="checkbox" class="size-3.5 rounded border-border accent-primary" ${peersChecked} `;
-                html += `onchange="`;
-                html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
-                html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.disallow_transfer_to_peers = this.checked || null; }`;
-                html += `">`;
-                html += `<span class="text-[10px] text-muted-foreground">Block transfer to peers (DisallowTransferToPeers)</span>`;
-                html += `</label>`;
-
-                // Include contents selector
-                html += `<div class="flex items-center gap-2">`;
-                html += `<span class="text-[10px] text-muted-foreground whitespace-nowrap">Include Contents:</span>`;
-                html += `<select class="h-6 rounded border border-border bg-background px-1.5 text-[10px] text-foreground focus:outline-none" `;
-                html += `onchange="`;
-                html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
-                html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.include_contents = this.value; }`;
-                html += `">`;
-                html += `<option value=""${!node.include_contents ? ' selected' : ''}>default (include history)</option>`;
-                html += `<option value="none"${node.include_contents === 'none' ? ' selected' : ''}>none (fresh context)</option>`;
-                html += `</select>`;
-                html += `</div>`;
-
-                html += `</div></details>`;
-                html += `</div>`;
-            }
-
-            // ── Loop-specific: max iterations ──
-            if (node.type === 'loop') {
-                html += `<div class="flex items-center gap-2">`;
-                html += `<span class="text-[11px] text-muted-foreground">Max Iterations:</span>`;
-                html += `<input type="number" min="1" max="100" class="w-20 h-7 rounded-md border border-border bg-background px-2 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring" `;
-                html += `value="${node.max_iterations || 3}" `;
-                html += `oninput="`;
-                html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
-                html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.max_iterations = parseInt(this.value) || 3; }`;
-                html += `">`;
-                html += `</div>`;
-            }
-
-            // ── Composite: render children + add child buttons ──
-            if (isComposite) {
-                if (node.children && node.children.length > 0) {
-                    html += `<div class="space-y-2 mt-1">`;
-                    for (let i = 0; i < node.children.length; i++) {
-                        html += this.renderNode(node.children[i], `${path}.${i}`, depth + 1, node.children.length > 1);
-                    }
-                    html += `</div>`;
-                }
-
-                // Add child buttons
-                html += `<div class="flex items-center gap-1.5 mt-1">`;
-                for (const childType of ['agent', 'sequential', 'parallel', 'loop']) {
-                    const icon = { agent: '+●', sequential: '+↓', parallel: '+∥', loop: '+↻' }[childType];
-                    const btnColor = {
-                        agent: 'hover:bg-emerald-500/10 hover:text-emerald-600',
-                        sequential: 'hover:bg-blue-500/10 hover:text-blue-600',
-                        parallel: 'hover:bg-amber-500/10 hover:text-amber-600',
-                        loop: 'hover:bg-purple-500/10 hover:text-purple-600',
-                    }[childType];
-                    const childLabel = { agent: 'LLM Agent', sequential: 'Sequential', parallel: 'Parallel', loop: 'Loop' }[childType] || childType;
-                    html += `<button type="button" class="h-6 px-2 rounded text-[10px] font-medium border border-dashed border-border text-muted-foreground ${btnColor} transition-colors" `;
-                    html += `onclick="`;
-                    html += `  const mgr = Alpine.closestDataStack(this).find(d => d.addChildToNode);`;
-                    html += `  if (mgr) mgr.addChildToNode('${path}', '${childType}');`;
-                    html += `">${icon} ${childLabel}</button>`;
-                }
-                html += `</div>`;
-            }
-
-            html += `</div>`;
-            return html;
+            return this.renderCompositionNode(node, path, depth, canRemove, false);
         },
-
-        /**
-         * Render a pipeline node for the Agent Designer dialog.
-         * Same rendering logic as renderNode, but reads agents from the
-         * agentDesigner component and calls its methods for mutations.
-         */
         renderPipelineNode(node, path, depth, canRemove) {
-            if (!node) return '';
+            return this.renderCompositionNode(node, path, depth, canRemove, false);
+        },
 
-            const isComposite = ['sequential', 'parallel', 'loop'].includes(node.type);
-            const indent = depth > 0 ? 'ml-4 ' : '';
-            const borderColor = {
-                sequential: 'border-blue-500/30',
-                parallel: 'border-amber-500/30',
-                loop: 'border-purple-500/30',
-                agent: 'border-emerald-500/30',
-            }[node.type] || 'border-border';
+        // ══════════════════════════════════════════════════════════════════
+        // Agent leaf node fields
+        // ══════════════════════════════════════════════════════════════════
 
-            const bgColor = {
-                sequential: 'bg-blue-500/5',
-                parallel: 'bg-amber-500/5',
-                loop: 'bg-purple-500/5',
-                agent: 'bg-emerald-500/5',
-            }[node.type] || 'bg-muted/20';
+        _renderAgentFields(node, path, isLastInLoop) {
+            // Resolve agents from nearest Alpine parent scope
+            const src = Alpine.closestDataStack(this.$el).find(d => d.agents);
+            const agents = src ? (src.agents || []) : [];
 
-            const badgeClass = {
-                sequential: 'bg-blue-500/15 text-blue-600 dark:text-blue-400',
-                parallel: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
-                loop: 'bg-purple-500/15 text-purple-600 dark:text-purple-400',
-                agent: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
-            }[node.type] || '';
+            let html = `<div class="space-y-2">`;
 
-            const typeLabel = {
-                sequential: '↓ Sequential',
-                parallel: '∥ Parallel',
-                loop: '↻ Loop',
-                agent: '● LLM Agent',
-            }[node.type] || node.type;
-
-            let html = `<div class="${indent}rounded-lg border ${borderColor} ${bgColor} p-3 space-y-2">`;
-
-            // Header
-            html += `<div class="flex items-center gap-2">`;
-            html += `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold select-none ${badgeClass}">${typeLabel}</span>`;
-
-            // Type selector
-            html += `<select class="h-7 rounded-md border border-border bg-background px-2 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring" `;
-            html += `onchange="`;
-            html += `  const mgr = Alpine.closestDataStack(this).find(d => d.changeNodeType);`;
-            html += `  if (mgr) mgr.changeNodeType('${path}', this.value);`;
-            html += `">`;
-            for (const t of ['agent', 'sequential', 'parallel', 'loop']) {
-                const selected = t === node.type ? ' selected' : '';
-                const label = { agent: 'LLM Agent', sequential: 'Sequential', parallel: 'Parallel', loop: 'Loop' }[t];
-                html += `<option value="${t}"${selected}>${label}</option>`;
+            // Agent selector → resolves to an AgentDefinition → llmagent.New(...)
+            html += `<select class="w-full h-8 rounded-md border border-border bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" `;
+            html += `onchange="const n=Alpine.closestDataStack(this).find(d=>d._getNodeByPath)?._getNodeByPath('${path}');if(n)n.agent_id=this.value">`;
+            html += `<option value="">Select an LLM Agent (→ resolves to llmagent.New)...</option>`;
+            for (const ag of agents) {
+                html += `<option value="${this._esc(ag.id)}"${ag.id === node.agent_id ? ' selected' : ''}>${this._esc(ag.name || ag.id)}</option>`;
             }
             html += `</select>`;
 
-            html += `<div class="flex-1"></div>`;
+            // OutputKey → llmagent.Config.OutputKey
+            html += `<input type="text" placeholder="OutputKey → saves output to session state (reference as {key} downstream)" maxlength="50" `;
+            html += `class="w-full h-7 rounded-md border border-border bg-background px-3 text-[11px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring" `;
+            html += `value="${this._esc(node.output_key || '')}" `;
+            html += `oninput="const n=Alpine.closestDataStack(this).find(d=>d._getNodeByPath)?._getNodeByPath('${path}');if(n)n.output_key=this.value">`;
 
-            // Remove button (not for root)
-            if (canRemove) {
-                const parentPath = path.substring(0, path.lastIndexOf('.'));
-                const childIdx = path.substring(path.lastIndexOf('.') + 1);
-                html += `<button type="button" class="size-6 rounded-md flex items-center justify-center text-destructive hover:bg-destructive/10 transition-colors" `;
-                html += `onclick="`;
-                html += `  const mgr = Alpine.closestDataStack(this).find(d => d.removeChildFromNode);`;
-                html += `  if (mgr) mgr.removeChildFromNode('${parentPath}', ${childIdx});`;
-                html += `">`;
-                html += `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>`;
-                html += `</button>`;
+            // exit_loop indicator — ADK-Go auto-injects exit_loop tool on last child of loop
+            if (isLastInLoop) {
+                html += `<div class="flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-purple-500/10 border border-purple-500/20">`;
+                html += `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5 text-purple-600 dark:text-purple-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>`;
+                html += `<span class="text-[10px] text-purple-600 dark:text-purple-400">ADK-Go auto-injects the <strong>exit_loop</strong> tool into this agent (last child of loop). The LLM can call it to break out early.</span>`;
+                html += `</div>`;
             }
 
+            // Workflow overrides (collapsible)
+            const hasOverrides = node.disallow_transfer_to_parent || node.disallow_transfer_to_peers || node.include_contents;
+            html += `<details class="group" ${hasOverrides ? 'open' : ''}>`;
+            html += `<summary class="cursor-pointer text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors select-none flex items-center gap-1">`;
+            html += `<svg xmlns="http://www.w3.org/2000/svg" class="size-3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>`;
+            html += `Workflow Overrides (TransferPolicy &amp; IncludeContents)`;
+            html += `</summary>`;
+            html += `<div class="mt-1.5 space-y-1.5 pl-4 border-l border-border/50">`;
+
+            // DisallowTransferToParent
+            html += `<label class="flex items-center gap-2 cursor-pointer">`;
+            html += `<input type="checkbox" class="size-3.5 rounded border-border accent-primary" ${node.disallow_transfer_to_parent ? 'checked' : ''} `;
+            html += `onchange="const n=Alpine.closestDataStack(this).find(d=>d._getNodeByPath)?._getNodeByPath('${path}');if(n)n.disallow_transfer_to_parent=this.checked||null">`;
+            html += `<span class="text-[10px] text-muted-foreground">DisallowTransferToParent — block escalation to parent agent</span>`;
+            html += `</label>`;
+
+            // DisallowTransferToPeers
+            html += `<label class="flex items-center gap-2 cursor-pointer">`;
+            html += `<input type="checkbox" class="size-3.5 rounded border-border accent-primary" ${node.disallow_transfer_to_peers ? 'checked' : ''} `;
+            html += `onchange="const n=Alpine.closestDataStack(this).find(d=>d._getNodeByPath)?._getNodeByPath('${path}');if(n)n.disallow_transfer_to_peers=this.checked||null">`;
+            html += `<span class="text-[10px] text-muted-foreground">DisallowTransferToPeers — block delegation to sibling agents</span>`;
+            html += `</label>`;
+
+            // IncludeContents
+            html += `<div class="flex items-center gap-2">`;
+            html += `<span class="text-[10px] text-muted-foreground whitespace-nowrap">IncludeContents:</span>`;
+            html += `<select class="h-6 rounded border border-border bg-background px-1.5 text-[10px] text-foreground focus:outline-none" `;
+            html += `onchange="const n=Alpine.closestDataStack(this).find(d=>d._getNodeByPath)?._getNodeByPath('${path}');if(n)n.include_contents=this.value">`;
+            html += `<option value=""${!node.include_contents ? ' selected' : ''}>default — receives conversation history</option>`;
+            html += `<option value="none"${node.include_contents === 'none' ? ' selected' : ''}>none — starts with fresh context</option>`;
+            html += `</select>`;
             html += `</div>`;
 
-            // Agent-specific
-            if (node.type === 'agent') {
-                html += `<div class="space-y-2">`;
-                html += `<select class="w-full h-8 rounded-md border border-border bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" `;
-                html += `onchange="`;
-                html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
-                html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.agent_id = this.value; }`;
-                html += `">`;
-                html += `<option value="">Select an LLM agent...</option>`;
-                // Read agents from the agentDesigner component (simple agents only)
-                const designer = Alpine.closestDataStack(this.$el).find(d => d.agents && d.pipelineGraph !== undefined);
-                const agentsList = designer ? (designer.agents || []) : [];
-                for (const ag of agentsList) {
-                    const selected = ag.id === node.agent_id ? ' selected' : '';
-                    const name = this._escapeAttr(ag.name || ag.id);
-                    html += `<option value="${this._escapeAttr(ag.id)}"${selected}>${name}</option>`;
-                }
-                html += `</select>`;
-
-                // Output key
-                html += `<input type="text" placeholder="Output Key — saves to session state (reference as {key} in downstream Instructions)" maxlength="50" class="w-full h-7 rounded-md border border-border bg-background px-3 text-[11px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" `;
-                html += `value="${this._escapeAttr(node.output_key || '')}" `;
-                html += `oninput="`;
-                html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
-                html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.output_key = this.value; }`;
-                html += `">`;
-
-                // Orchestration overrides
-                const hasOverrides = node.disallow_transfer_to_parent || node.disallow_transfer_to_peers || node.include_contents;
-                html += `<details class="group" ${hasOverrides ? 'open' : ''}>`;
-                html += `<summary class="cursor-pointer text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors select-none flex items-center gap-1">`;
-                html += `<svg xmlns="http://www.w3.org/2000/svg" class="size-3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>`;
-                html += `Agent Transfer &amp; Context`;
-                html += `</summary>`;
-                html += `<div class="mt-1.5 space-y-1.5 pl-4 border-l border-border/50">`;
-
-                const parentChecked = node.disallow_transfer_to_parent ? ' checked' : '';
-                html += `<label class="flex items-center gap-2 cursor-pointer">`;
-                html += `<input type="checkbox" class="size-3.5 rounded border-border accent-primary" ${parentChecked} `;
-                html += `onchange="`;
-                html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
-                html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.disallow_transfer_to_parent = this.checked || null; }`;
-                html += `">`;
-                html += `<span class="text-[10px] text-muted-foreground">Block transfer to parent (DisallowTransferToParent)</span>`;
-                html += `</label>`;
-
-                const peersChecked = node.disallow_transfer_to_peers ? ' checked' : '';
-                html += `<label class="flex items-center gap-2 cursor-pointer">`;
-                html += `<input type="checkbox" class="size-3.5 rounded border-border accent-primary" ${peersChecked} `;
-                html += `onchange="`;
-                html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
-                html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.disallow_transfer_to_peers = this.checked || null; }`;
-                html += `">`;
-                html += `<span class="text-[10px] text-muted-foreground">Block transfer to peers (DisallowTransferToPeers)</span>`;
-                html += `</label>`;
-
-                html += `<div class="flex items-center gap-2">`;
-                html += `<span class="text-[10px] text-muted-foreground whitespace-nowrap">Include Contents:</span>`;
-                html += `<select class="h-6 rounded border border-border bg-background px-1.5 text-[10px] text-foreground focus:outline-none" `;
-                html += `onchange="`;
-                html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
-                html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.include_contents = this.value; }`;
-                html += `">`;
-                html += `<option value=""${!node.include_contents ? ' selected' : ''}>default (include history)</option>`;
-                html += `<option value="none"${node.include_contents === 'none' ? ' selected' : ''}>none (fresh context)</option>`;
-                html += `</select>`;
-                html += `</div>`;
-
-                html += `</div></details>`;
-                html += `</div>`;
-            }
-
-            // Loop-specific
-            if (node.type === 'loop') {
-                html += `<div class="flex items-center gap-2">`;
-                html += `<span class="text-[11px] text-muted-foreground">Max Iterations:</span>`;
-                html += `<input type="number" min="1" max="100" class="w-20 h-7 rounded-md border border-border bg-background px-2 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring" `;
-                html += `value="${node.max_iterations || 3}" `;
-                html += `oninput="`;
-                html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
-                html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.max_iterations = parseInt(this.value) || 3; }`;
-                html += `">`;
-                html += `</div>`;
-            }
-
-            // Composite: children + add buttons
-            if (isComposite) {
-                if (node.children && node.children.length > 0) {
-                    html += `<div class="space-y-2 mt-1">`;
-                    for (let i = 0; i < node.children.length; i++) {
-                        html += this.renderPipelineNode(node.children[i], `${path}.${i}`, depth + 1, node.children.length > 1);
-                    }
-                    html += `</div>`;
-                }
-
-                html += `<div class="flex items-center gap-1.5 mt-1">`;
-                for (const childType of ['agent', 'sequential', 'parallel', 'loop']) {
-                    const icon = { agent: '+●', sequential: '+↓', parallel: '+∥', loop: '+↻' }[childType];
-                    const btnColor = {
-                        agent: 'hover:bg-emerald-500/10 hover:text-emerald-600',
-                        sequential: 'hover:bg-blue-500/10 hover:text-blue-600',
-                        parallel: 'hover:bg-amber-500/10 hover:text-amber-600',
-                        loop: 'hover:bg-purple-500/10 hover:text-purple-600',
-                    }[childType];
-                    const childLabel = { agent: 'LLM Agent', sequential: 'Sequential', parallel: 'Parallel', loop: 'Loop' }[childType] || childType;
-                    html += `<button type="button" class="h-6 px-2 rounded text-[10px] font-medium border border-dashed border-border text-muted-foreground ${btnColor} transition-colors" `;
-                    html += `onclick="`;
-                    html += `  const mgr = Alpine.closestDataStack(this).find(d => d.addChildToNode);`;
-                    html += `  if (mgr) mgr.addChildToNode('${path}', '${childType}');`;
-                    html += `">${icon} ${childLabel}</button>`;
-                }
-                html += `</div>`;
-            }
-
+            html += `</div></details>`;
             html += `</div>`;
             return html;
         },
 
-        _escapeAttr(str) {
-            return str.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        // ══════════════════════════════════════════════════════════════════
+        // Loop fields
+        // ══════════════════════════════════════════════════════════════════
+
+        _renderLoopFields(node, path) {
+            let html = `<div class="flex items-center gap-2">`;
+            html += `<span class="text-[11px] text-muted-foreground whitespace-nowrap">MaxIterations:</span>`;
+            html += `<input type="number" min="1" max="100" `;
+            html += `class="w-20 h-7 rounded-md border border-border bg-background px-2 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring" `;
+            html += `value="${node.max_iterations || 3}" `;
+            html += `oninput="const n=Alpine.closestDataStack(this).find(d=>d._getNodeByPath)?._getNodeByPath('${path}');if(n)n.max_iterations=parseInt(this.value)||3">`;
+            html += `<span class="text-[10px] text-muted-foreground">→ loopagent.Config.MaxIterations (0 = run until exit_loop)</span>`;
+            html += `</div>`;
+            return html;
+        },
+
+        // ══════════════════════════════════════════════════════════════════
+        // Add child buttons for composite nodes
+        // ══════════════════════════════════════════════════════════════════
+
+        _renderAddButtons(path) {
+            const types = [
+                { type: 'agent', icon: '+●', color: 'hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400', label: 'LLM Agent' },
+                { type: 'sequential', icon: '+↓', color: 'hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400', label: 'Sequential' },
+                { type: 'parallel', icon: '+∥', color: 'hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400', label: 'Parallel' },
+                { type: 'loop', icon: '+↻', color: 'hover:bg-purple-500/10 hover:text-purple-600 dark:hover:text-purple-400', label: 'Loop' },
+            ];
+            let html = `<div class="flex items-center gap-1.5 mt-1">`;
+            for (const { type, icon, color, label } of types) {
+                html += `<button type="button" class="h-6 px-2 rounded text-[10px] font-medium border border-dashed border-border text-muted-foreground ${color} transition-colors" `;
+                html += `title="Add ${label} child (→ ${type === 'agent' ? 'llmagent' : type + 'agent'}.New)" `;
+                html += `onclick="Alpine.closestDataStack(this).find(d=>d.addChildToNode)?.addChildToNode('${path}','${type}')"`;
+                html += `>${icon} ${label}</button>`;
+            }
+            html += `</div>`;
+            return html;
+        },
+
+        // ══════════════════════════════════════════════════════════════════
+        // Helpers
+        // ══════════════════════════════════════════════════════════════════
+
+        _style(type) {
+            const styles = {
+                sequential: { border: 'border-blue-500/30', bg: 'bg-blue-500/5', badge: 'bg-blue-500/15 text-blue-600 dark:text-blue-400', label: '↓ Sequential' },
+                parallel: { border: 'border-amber-500/30', bg: 'bg-amber-500/5', badge: 'bg-amber-500/15 text-amber-600 dark:text-amber-400', label: '∥ Parallel' },
+                loop: { border: 'border-purple-500/30', bg: 'bg-purple-500/5', badge: 'bg-purple-500/15 text-purple-600 dark:text-purple-400', label: '↻ Loop' },
+                agent: { border: 'border-emerald-500/30', bg: 'bg-emerald-500/5', badge: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400', label: '● LLM Agent' },
+            };
+            return styles[type] || styles.agent;
+        },
+
+        _esc(str) {
+            return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         },
     };
 }
