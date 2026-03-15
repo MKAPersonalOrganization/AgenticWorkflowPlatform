@@ -10,7 +10,7 @@ templ a2aSection() {
 				<!-- Text content -->
 				<div class="order-1">
 					<div class="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-4 py-1.5 text-sm text-muted-foreground">
-						@icon.Waypoints(icon.Props{Class: "size-4 text-violet-500"})
+						@icon.A2ALogo("size-4 text-violet-500")
 						<span>Agent-to-Agent Protocol</span>
 					</div>
 					<h2 class="text-3xl font-bold tracking-tight sm:text-4xl">
@@ -34,7 +34,7 @@ templ a2aSection() {
 					<div class="rounded-xl border border-border bg-card p-6">
 						<div class="mb-4 flex items-center justify-between">
 							<h4 class="text-sm font-semibold flex items-center gap-2">
-								@icon.Waypoints(icon.Props{Class: "size-4 text-violet-500"})
+								@icon.A2ALogo("size-4 text-violet-500")
 								A2A Agent Connectors
 							</h4>
 							<span class="text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-muted">Live</span>
@@ -49,7 +49,7 @@ templ a2aSection() {
 						<div class="mt-6 rounded-lg border border-dashed border-violet-500/30 bg-violet-500/5 p-4">
 							<div class="flex items-center gap-3 text-sm">
 								<div class="flex items-center gap-1.5">
-									@icon.Bot(icon.Props{Class: "size-4 text-primary"})
+									@icon.A2ALogo("size-4 text-primary")
 									<span class="font-medium">Your Agent</span>
 								</div>
 								<div class="flex-1 border-t border-dashed border-violet-500/40 relative">
@@ -74,7 +74,7 @@ templ a2aSection() {
 templ a2aAgentRow(name, status, provider, skills, accentColor string) {
 	<div class="flex items-center justify-between rounded-lg border border-border bg-background px-4 py-3">
 		<div class="flex items-center gap-3">
-			@icon.Bot(icon.Props{Class: "size-4 text-muted-foreground"})
+			@icon.A2ALogo("size-4 text-muted-foreground")
 			<div>
 				<div class="text-sm font-medium">{ name }</div>
 				<div class="text-xs text-muted-foreground">{ provider }</div>

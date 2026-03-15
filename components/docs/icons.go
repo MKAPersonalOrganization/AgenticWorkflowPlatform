@@ -48,7 +48,9 @@ var (
 	iconRepeatDoc        = iconSized(icon.Repeat)
 	iconWandDoc          = iconSized(icon.WandSparkles)
 
+	// ── MCP section icon ──
+	iconMCPLogo = icon.MCPLogo("size-5")
+
 	// ── A2A section icon ──
-	iconWaypoints = iconSized(icon.Waypoints)
-	iconBot       = iconSized(icon.Bot)
+	iconA2ALogo = icon.A2ALogo("size-5")
 )
