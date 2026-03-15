@@ -47,4 +47,8 @@ var (
 	iconBookOpenCheckDoc = iconSized(icon.BookOpenCheck)
 	iconRepeatDoc        = iconSized(icon.Repeat)
 	iconWandDoc          = iconSized(icon.WandSparkles)
+
+	// ── A2A section icon ──
+	iconWaypoints = iconSized(icon.Waypoints)
+	iconBot       = iconSized(icon.Bot)
 )
