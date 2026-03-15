@@ -22,7 +22,8 @@ templ AgentsDialog() {
 			ID: "agents-manager-dialog",
 		}) {
 			@dialog.Content(dialog.ContentProps{
-				Class: "sm:max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden transition-all duration-300 ease-in-out",
+				HideCloseButton: true,
+				Class:           "sm:max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden transition-all duration-300 ease-in-out",
 				Attributes: templ.Attributes{
 					":class": "expanded ? '!max-w-[calc(100vw-2rem)] !max-h-[calc(100vh-2rem)] !w-[calc(100vw-2rem)] !h-[calc(100vh-2rem)]' : ''",
 				},
@@ -40,22 +41,36 @@ templ AgentsDialog() {
 										{ i18n.T(ctx, "Manage personal agents or browse the store.") }
 									}
 								</div>
-								@button.Button(button.Props{
-									Size:    button.SizeIcon,
-									Variant: button.VariantGhost,
-									Class:   "size-7 text-muted-foreground",
-									Attributes: templ.Attributes{
-										"@click": "toggleExpand()",
-										"title":  i18n.T(ctx, "Toggle fullscreen"),
-									},
-								}) {
-									<span x-show="!expanded">
-										@icon.Maximize2(icon.Props{Class: "size-3.5"})
-									</span>
-									<span x-show="expanded">
-										@icon.Minimize2(icon.Props{Class: "size-3.5"})
-									</span>
-								}
+								<div class="flex items-center gap-1">
+									@button.Button(button.Props{
+										Size:    button.SizeIcon,
+										Variant: button.VariantGhost,
+										Class:   "size-7 text-muted-foreground",
+										Attributes: templ.Attributes{
+											"@click": "toggleExpand()",
+											"title":  i18n.T(ctx, "Toggle fullscreen"),
+										},
+									}) {
+										<span x-show="!expanded">
+											@icon.Maximize2(icon.Props{Class: "size-3.5"})
+										</span>
+										<span x-show="expanded">
+											@icon.Minimize2(icon.Props{Class: "size-3.5"})
+										</span>
+									}
+									@dialog.Close() {
+										@button.Button(button.Props{
+											Size:    button.SizeIcon,
+											Variant: button.VariantGhost,
+											Class:   "size-7 text-muted-foreground",
+											Attributes: templ.Attributes{
+												"title": i18n.T(ctx, "Close"),
+											},
+										}) {
+											@icon.X(icon.Props{Class: "size-3.5"})
+										}
+									}
+								</div>
 							</div>
 							<!-- Tab Bar -->
 							<div class="flex gap-0 -mb-px">

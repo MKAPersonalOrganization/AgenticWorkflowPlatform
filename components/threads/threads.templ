@@ -15,6 +15,7 @@ import (
 // session data (getGroupedSessions, switchSession, etc.) directly.
 templ ThreadsDialog() {
 	<div
+		x-data="{ expanded: false, toggleExpand() { this.expanded = !this.expanded } }"
 		@open-threads-dialog.window="$nextTick(() => {
 			$refs.threadSearchInput?.focus();
 			setTimeout(() => {
@@ -30,7 +31,10 @@ templ ThreadsDialog() {
 		}) {
 			@dialog.Content(dialog.ContentProps{
 				HideCloseButton: true,
-				Class:           "sm:max-w-[920px] max-h-[85vh] h-[620px] flex flex-col p-0 overflow-hidden rounded-2xl border-border/50 shadow-[0_25px_60px_-12px_rgba(0,0,0,0.25)]",
+				Class:           "sm:max-w-[920px] max-h-[85vh] h-[620px] flex flex-col p-0 overflow-hidden rounded-2xl border-border/50 shadow-[0_25px_60px_-12px_rgba(0,0,0,0.25)] transition-all duration-300 ease-in-out",
+				Attributes: templ.Attributes{
+					":class": "expanded ? '!max-w-[calc(100vw-2rem)] !max-h-[calc(100vh-2rem)] !w-[calc(100vw-2rem)] !h-[calc(100vh-2rem)] !h-full !rounded-none' : ''",
+				},
 			}) {
 				<!-- Split Layout: left thread list + right preview -->
 				<div class="flex flex-1 overflow-hidden h-full">
@@ -52,17 +56,47 @@ templ ThreadsDialog() {
 										</p>
 									</div>
 								</div>
-								@button.Button(button.Props{
-									Size:    button.SizeSm,
-									Variant: button.VariantDefault,
-									Class:   "gap-1.5 shrink-0 h-8 rounded-lg text-xs font-medium",
-									Attributes: templ.Attributes{
-										"@click": "createNewSession(); document.querySelector('[data-tui-dialog-close=\"threads-dialog\"]')?.click()",
-									},
-								}) {
-									@icon.Plus(icon.Props{Class: "size-3.5"})
-									{ i18n.T(ctx, "New") }
-								}
+								<div class="flex items-center gap-1">
+									@button.Button(button.Props{
+										Size:    button.SizeSm,
+										Variant: button.VariantDefault,
+										Class:   "gap-1.5 shrink-0 h-8 rounded-lg text-xs font-medium",
+										Attributes: templ.Attributes{
+											"@click": "createNewSession(); document.querySelector('[data-tui-dialog-close=\"threads-dialog\"]')?.click()",
+										},
+									}) {
+										@icon.Plus(icon.Props{Class: "size-3.5"})
+										{ i18n.T(ctx, "New") }
+									}
+									@button.Button(button.Props{
+										Size:    button.SizeIcon,
+										Variant: button.VariantGhost,
+										Class:   "size-7 text-muted-foreground/60 hover:text-muted-foreground",
+										Attributes: templ.Attributes{
+											"@click": "toggleExpand()",
+											"title":  i18n.T(ctx, "Toggle fullscreen"),
+										},
+									}) {
+										<span x-show="!expanded">
+											@icon.Maximize2(icon.Props{Class: "size-3.5"})
+										</span>
+										<span x-show="expanded">
+											@icon.Minimize2(icon.Props{Class: "size-3.5"})
+										</span>
+									}
+									@dialog.Close(dialog.CloseProps{For: "threads-dialog"}) {
+										@button.Button(button.Props{
+											Size:    button.SizeIcon,
+											Variant: button.VariantGhost,
+											Class:   "size-7 text-muted-foreground/60 hover:text-muted-foreground",
+											Attributes: templ.Attributes{
+												"title": i18n.T(ctx, "Close"),
+											},
+										}) {
+											@icon.X(icon.Props{Class: "size-3.5"})
+										}
+									}
+								</div>
 							</div>
 						</div>
 						<!-- Search Input -->
