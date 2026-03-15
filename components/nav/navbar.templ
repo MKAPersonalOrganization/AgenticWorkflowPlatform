@@ -5,8 +5,7 @@ import (
 	"school-with-ai/components/agenteditor"
 	"school-with-ai/components/agents"
 	"school-with-ai/components/button"
-	"school-with-ai/components/convsearch"
-	"school-with-ai/components/filesystem"
+"school-with-ai/components/filesystem"
 	"school-with-ai/components/i18n"
 	"school-with-ai/components/icon"
 	"school-with-ai/components/resources"
@@ -41,11 +40,7 @@ templ Navbar(props ...NavbarProps) {
 			<div class="hidden md:block">
 				@agenteditor.AgentDesignerNavButtonTrigger()
 			</div>
-			<!-- Search Conversations Button -->
-			<div class="hidden md:block">
-				@convsearch.SearchButtonTrigger()
-			</div>
-			<!-- A2A Agents Button -->
+<!-- A2A Agents Button -->
 			<div class="hidden md:block">
 				@a2acomp.A2AButtonTrigger()
 			</div>
