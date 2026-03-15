@@ -179,15 +179,7 @@ templ ChatInputScreen(user *shared.User) {
 									class="w-full"
 									:class="(!hasMessages && !isStreaming) ? 'max-w-3xl xl:max-w-4xl mx-auto transition-all duration-200' : ''"
 								>
-									<!-- Landing Page Logo (appears above chat input when no messages) -->
-									<div x-show="!hasMessages && !isStreaming" x-cloak class="flex flex-col items-center justify-center mb-14 animate-fade-in-up">
-										<div class="h-[4.5rem] w-[4.5rem] flex items-center justify-center bg-gradient-to-br from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-900 text-zinc-500 dark:text-zinc-400 rounded-2xl mb-5 shadow-modern ring-1 ring-border/30">
-											@icon.CompassLogoAnimated("size-9")
-										</div>
-										<p class="text-muted-foreground/80 text-center max-w-md text-[0.9375rem] leading-relaxed">
-											Your intelligent AI companion
-										</p>
-									</div>
+
 									<div
 										class="mx-auto flex w-full flex-row gap-3 transition-[max-width] duration-300 sm:px-2"
 										:class="(hasMessages || isStreaming) ? 'max-w-3xl xl:max-w-4xl sm:mb-4' : 'sm:mb-28'"

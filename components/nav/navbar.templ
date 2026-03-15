@@ -37,10 +37,6 @@ templ Navbar(props ...NavbarProps) {
 			<div class="hidden md:block">
 				@resources.ResourcesButtonTrigger()
 			</div>
-			<!-- Tools Button -->
-			<div class="hidden md:block">
-				@tools.ToolsButtonTrigger()
-			</div>
 			<!-- Agent Store Button -->
 			<div class="hidden md:block">
 				@agents.AgentStoreNavButtonTrigger()
@@ -60,6 +56,10 @@ templ Navbar(props ...NavbarProps) {
 			<!-- A2A Agents Button -->
 			<div class="hidden md:block">
 				@a2acomp.A2AButtonTrigger()
+			</div>
+			<!-- Tools Button -->
+			<div class="hidden md:block">
+				@tools.ToolsButtonTrigger()
 			</div>
 		}
 		<!-- Admin Indicator -->
