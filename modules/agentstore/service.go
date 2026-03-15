@@ -100,13 +100,51 @@ func (s *service) getByID(ctx context.Context, id, userID string) (*AgentDefinit
 }
 
 // listByUser returns all agents created by a specific user.
+// Agents that are referenced as sub-agents inside a workflow graph are
+// excluded so they don't appear as standalone entries in the list.
 func (s *service) listByUser(ctx context.Context, userID string) ([]AgentDefinition, error) {
-	return s.repo.ListByUser(ctx, userID)
+	agents, err := s.repo.ListByUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return excludeSubAgents(agents), nil
 }
 
 // search finds agents matching a query string within a user's agents.
+// Sub-agents consumed by workflows are excluded from results.
 func (s *service) search(ctx context.Context, userID, query string) ([]AgentDefinition, error) {
-	return s.repo.Search(ctx, userID, query)
+	agents, err := s.repo.Search(ctx, userID, query)
+	if err != nil {
+		return nil, err
+	}
+	return excludeSubAgents(agents), nil
+}
+
+// excludeSubAgents removes agents that are referenced as leaf nodes inside
+// any workflow agent's composition graph. This keeps the list clean —
+// users see only top-level agents and workflows, not the internal building
+// blocks that are already represented inside a workflow tree.
+func excludeSubAgents(agents []AgentDefinition) []AgentDefinition {
+	// Collect every agent ID that appears as a sub-agent in any graph.
+	consumed := make(map[string]bool)
+	for i := range agents {
+		if agents[i].Graph != nil {
+			for _, id := range agents[i].Graph.CollectAgentIDs() {
+				consumed[id] = true
+			}
+		}
+	}
+	if len(consumed) == 0 {
+		return agents
+	}
+
+	filtered := make([]AgentDefinition, 0, len(agents))
+	for i := range agents {
+		if !consumed[agents[i].ID] {
+			filtered = append(filtered, agents[i])
+		}
+	}
+	return filtered
 }
 
 // ── Sharing ──
