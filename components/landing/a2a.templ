@@ -1,0 +1,100 @@
+package landing
+
+import "school-with-ai/components/icon"
+
+// ─── A2A (Agent-to-Agent) Integration ────────────────────────────────────────
+templ a2aSection() {
+	<section id="a2a" class="py-24 border-t border-border">
+		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+			<div class="grid gap-12 lg:grid-cols-2 lg:items-center">
+				<!-- Text content -->
+				<div class="order-1">
+					<div class="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-4 py-1.5 text-sm text-muted-foreground">
+						@icon.Waypoints(icon.Props{Class: "size-4 text-violet-500"})
+						<span>Agent-to-Agent Protocol</span>
+					</div>
+					<h2 class="text-3xl font-bold tracking-tight sm:text-4xl">
+						Connect to any
+						<span class="text-primary">remote AI agent</span>
+					</h2>
+					<p class="mt-4 text-lg text-muted-foreground">
+						The A2A (Agent-to-Agent) protocol lets your agents collaborate with external AI agents running anywhere — different servers, different frameworks, different teams. One click to connect; your agent handles the rest.
+					</p>
+					<ul class="mt-8 space-y-4">
+						@checkListItem("One-click agent discovery via .well-known/agent-card.json")
+						@checkListItem("Each remote agent becomes a single callable tool — LLM decides when to delegate")
+						@checkListItem("Skills auto-discovered and embedded in the tool description for smart routing")
+						@checkListItem("Bearer token, API key, and custom header authentication")
+						@checkListItem("Works with any A2A-compliant agent — Python, Node.js, Go, or any framework")
+						@checkListItem("Built-in SSRF protection and Docker-aware networking")
+					</ul>
+				</div>
+				<!-- Visual -->
+				<div class="order-2">
+					<div class="rounded-xl border border-border bg-card p-6">
+						<div class="mb-4 flex items-center justify-between">
+							<h4 class="text-sm font-semibold flex items-center gap-2">
+								@icon.Waypoints(icon.Props{Class: "size-4 text-violet-500"})
+								A2A Agent Connectors
+							</h4>
+							<span class="text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-muted">Live</span>
+						</div>
+						<div class="space-y-3">
+							@a2aAgentRow("Research Assistant", "connected", "University of Oxford", "3 skills", "violet")
+							@a2aAgentRow("Code Reviewer", "connected", "DevOps Team", "5 skills", "violet")
+							@a2aAgentRow("Translation Agent", "discovering", "Lang Services Inc.", "—", "blue")
+							@a2aAgentRow("Data Analyst", "error", "analytics.internal", "—", "red")
+						</div>
+						<!-- How it works -->
+						<div class="mt-6 rounded-lg border border-dashed border-violet-500/30 bg-violet-500/5 p-4">
+							<div class="flex items-center gap-3 text-sm">
+								<div class="flex items-center gap-1.5">
+									@icon.Bot(icon.Props{Class: "size-4 text-primary"})
+									<span class="font-medium">Your Agent</span>
+								</div>
+								<div class="flex-1 border-t border-dashed border-violet-500/40 relative">
+									<span class="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-card px-2 text-xs text-violet-600 dark:text-violet-400">A2A Protocol</span>
+								</div>
+								<div class="flex items-center gap-1.5">
+									@icon.Globe(icon.Props{Class: "size-4 text-violet-500"})
+									<span class="font-medium">Remote Agent</span>
+								</div>
+							</div>
+							<p class="mt-2 text-xs text-muted-foreground">
+								Your agent sends a natural-language request. The remote agent uses its own skills and tools to produce a response.
+							</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+templ a2aAgentRow(name, status, provider, skills, accentColor string) {
+	<div class="flex items-center justify-between rounded-lg border border-border bg-background px-4 py-3">
+		<div class="flex items-center gap-3">
+			@icon.Bot(icon.Props{Class: "size-4 text-muted-foreground"})
+			<div>
+				<div class="text-sm font-medium">{ name }</div>
+				<div class="text-xs text-muted-foreground">{ provider }</div>
+			</div>
+		</div>
+		<div class="flex items-center gap-3">
+			<span class="text-xs text-muted-foreground">{ skills }</span>
+			<div class="flex items-center gap-1.5">
+				switch status {
+					case "connected":
+						<div class="h-2 w-2 rounded-full bg-green-500"></div>
+						<span class="text-xs text-green-600 dark:text-green-400">Connected</span>
+					case "discovering":
+						<div class="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></div>
+						<span class="text-xs text-blue-600 dark:text-blue-400">Discovering</span>
+					case "error":
+						<div class="h-2 w-2 rounded-full bg-red-500"></div>
+						<span class="text-xs text-red-600 dark:text-red-400">Error</span>
+				}
+			</div>
+		</div>
+	</div>
+}

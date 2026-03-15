@@ -31,4 +31,6 @@ var (
 	iconActivity    = iconSized(icon.Activity)
 	iconZap         = iconSized(icon.Zap)
 	iconSparkles    = iconSized(icon.Sparkles)
+	iconWaypoints   = iconSized(icon.Waypoints)
+	iconBot         = iconSized(icon.Bot)
 )

@@ -46,10 +46,11 @@ templ docsPlugins() {
 			This flexibility lets you create highly specialized agents. For example, a "Software Engineer" agent might
 			have the Codebase plugin fully enabled, but only the <code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">evaluate</code> tool from the Calculator plugin.
 		</p>
-		<h3>MCP Tools Integration</h3>
+		<h3>MCP & A2A Integration</h3>
 		<p>
-			MCP connectors are also registered as dynamic plugins in the tool registry. This means tools
-			discovered from remote MCP servers appear alongside built-in plugins in the agent's tool configuration
+			MCP connectors and A2A agent connectors are both registered as dynamic plugins in the tool
+			registry. MCP servers expose individual tools; A2A agents appear as a single callable tool
+			per remote agent. Both show up alongside built-in plugins in the agent's tool configuration
 			panel, providing a unified management experience.
 		</p>
 	}
@@ -196,6 +197,107 @@ templ docsMCP() {
 				@docsTableRow2("Tool Discovery", "Automatic — refreshable on demand")
 				@docsTableRow2("Security", "SSRF protection, encrypted tokens at rest")
 				@docsTableRow2("Proxy", "Authenticated reverse proxy to MCP servers")
+			</tbody>
+		}
+	}
+}
+
+// ─── A2A Integration ─────────────────────────────────────────────────────────
+templ docsA2A() {
+	@docsSection("a2a", "A2A Integration", iconWaypoints, "text-violet-500") {
+		<p>
+			The <strong>Agent-to-Agent (A2A) protocol</strong> is an open standard for AI-to-AI communication.
+			While MCP connects agents to <em>tools and data sources</em>, A2A connects agents to <em>other agents</em> — running
+			on different servers, built with different frameworks, maintained by different teams.
+		</p>
+		@docsInfoBox("A2A vs MCP — When to Use Which") {
+			<ul class="space-y-1 mt-2 text-sm">
+				<li>• <strong>MCP</strong> — Connect to <em>tools</em> (GitHub, Slack, filesystem, APIs). Each server exposes individual tools.</li>
+				<li>• <strong>A2A</strong> — Connect to <em>agents</em> (research bots, code reviewers, translators). Each agent is one callable tool.</li>
+			</ul>
+		}
+		<h3>How A2A Works</h3>
+		<p>
+			Every A2A-compliant agent publishes an <strong>agent card</strong> at
+			<code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">/.well-known/agent-card.json</code>.
+			This card describes the agent's name, skills, authentication requirements, and capabilities.
+			When you connect a remote agent in Compass.AI, it:
+		</p>
+		<ol class="list-decimal list-inside space-y-2 my-4">
+			<li>Fetches and validates the agent card from the remote URL</li>
+			<li>Extracts the agent's skills, description, and provider information</li>
+			<li>Registers the entire agent as <strong>one tool</strong> in the tool registry</li>
+			<li>Embeds the agent's skills in the tool description so the LLM knows when to delegate</li>
+		</ol>
+		@docsInfoBox("One Tool per Agent") {
+			<p class="mt-1 text-sm">
+				Unlike MCP (which creates one tool per server endpoint), A2A treats each remote agent as
+				<strong>a single atomic tool</strong>. Your agent sends a natural-language request; the remote
+				agent decides which of its own skills to use. Enable/disable is at the agent level — you cannot
+				toggle individual skills.
+			</p>
+		}
+		<h3>Connector Lifecycle</h3>
+		@docsInfoBox("Status Flow") {
+			<div class="flex flex-wrap items-center gap-2 mt-2 text-sm">
+				@statusBadge("Created", "bg-gray-500")
+				<span class="text-muted-foreground">→</span>
+				@statusBadge("Discovering", "bg-blue-500")
+				<span class="text-muted-foreground">→</span>
+				@statusBadge("Connected", "bg-green-500")
+				<span class="text-muted-foreground">or</span>
+				@statusBadge("Auth Required", "bg-yellow-500")
+				<span class="text-muted-foreground">or</span>
+				@statusBadge("Error", "bg-red-500")
+			</div>
+		}
+		<h3>Setting Up an A2A Connector</h3>
+		<ol class="list-decimal list-inside space-y-2 my-4">
+			<li>Click the <strong>A2A icon</strong> in the navigation bar</li>
+			<li>Click <strong>"Add A2A Agent"</strong></li>
+			<li>Enter the agent's base URL (e.g., <code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">http://agent.example.com:4030</code>)</li>
+			<li>Optionally provide a title and authentication credentials</li>
+			<li>Compass.AI discovers the agent card and extracts skills automatically</li>
+			<li>The agent appears as a tool you can assign to any of your agents</li>
+		</ol>
+		<h3>Authentication</h3>
+		<p>
+			A2A connectors support multiple authentication methods for secure inter-agent communication:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>• <strong>None</strong> — For development or trusted network environments</li>
+			<li>• <strong>Bearer Token</strong> — Standard Authorization header with Bearer scheme</li>
+			<li>• <strong>API Key</strong> — Token sent in <code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">X-API-Key</code> header (customizable)</li>
+			<li>• <strong>Custom Header</strong> — Any header name + value for proprietary auth schemes</li>
+		</ul>
+		<h3>For Developers — Building A2A-Compatible Agents</h3>
+		<p>
+			Any agent that publishes a valid agent card can be connected to Compass.AI. Your agent needs:
+		</p>
+		<ol class="list-decimal list-inside space-y-2 my-4">
+			<li>A <code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">/.well-known/agent-card.json</code> endpoint returning your agent's metadata</li>
+			<li>A message endpoint that accepts A2A protocol messages and returns responses</li>
+			<li>Skills defined in the agent card so Compass.AI knows what your agent can do</li>
+		</ol>
+		<p>
+			Use any language or framework — <strong>Google ADK (Python/Go)</strong>, <strong>LangChain</strong>,
+			<strong>CrewAI</strong>, or a custom implementation. As long as it speaks A2A, it works.
+		</p>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Feature</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Details</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow2("Protocol", "Agent-to-Agent (A2A) open standard")
+				@docsTableRow2("Discovery", "Automatic via /.well-known/agent-card.json")
+				@docsTableRow2("Granularity", "One tool per agent (not per skill)")
+				@docsTableRow2("Auth Methods", "None, Bearer, API Key, Custom Header")
+				@docsTableRow2("Max Connectors", "20 per user")
+				@docsTableRow2("Security", "SSRF protection, private network support for Docker")
+				@docsTableRow2("Compatibility", "Any A2A-compliant agent (Python, Go, Node.js, etc.)")
 			</tbody>
 		}
 	}
