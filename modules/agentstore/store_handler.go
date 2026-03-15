@@ -9,67 +9,71 @@ import (
 	"school-with-ai/shared"
 )
 
-// storeHandler encapsulates HTTP handlers for agent CRUD operations.
+// storeHandler encapsulates HTTP handlers for agent CRUD and sharing operations.
 type storeHandler struct {
 	log *logger.Logger
 	svc *service
 }
 
-// newStoreHandler creates a new agent store HTTP handler.
 func newStoreHandler(log *logger.Logger, svc *service) *storeHandler {
 	return &storeHandler{log: log, svc: svc}
 }
 
-// createRequest represents the request body for creating an agent.
+// ── Request / Response Types ──
+// These use camelCase JSON tags for the frontend.
+
 type createRequest struct {
-	Name                     string `json:"name"`
-	Description              string `json:"description"`
-	SystemPrompt             string `json:"systemPrompt"`
-	Icon                     string `json:"icon"`
-	DisallowTransferToParent bool   `json:"disallowTransferToParent"`
-	DisallowTransferToPeers  bool   `json:"disallowTransferToPeers"`
-	OutputKey                string `json:"outputKey"`
-	IncludeContents          string `json:"includeContents"`
-	GlobalInstruction        string `json:"globalInstruction"`
-	InputSchema              string `json:"inputSchema"`
-	OutputSchema             string `json:"outputSchema"`
+	Name                     string           `json:"name"`
+	Description              string           `json:"description"`
+	SystemPrompt             string           `json:"systemPrompt"`
+	Icon                     string           `json:"icon"`
+	Graph                    *CompositionNode `json:"graph,omitempty"`
+	DisallowTransferToParent bool             `json:"disallowTransferToParent"`
+	DisallowTransferToPeers  bool             `json:"disallowTransferToPeers"`
+	OutputKey                string           `json:"outputKey"`
+	IncludeContents          string           `json:"includeContents"`
+	GlobalInstruction        string           `json:"globalInstruction"`
+	InputSchema              string           `json:"inputSchema"`
+	OutputSchema             string           `json:"outputSchema"`
 }
 
-// updateRequest represents the request body for updating an agent.
 type updateRequest struct {
-	Name                     string `json:"name"`
-	Description              string `json:"description"`
-	SystemPrompt             string `json:"systemPrompt"`
-	Icon                     string `json:"icon"`
-	DisallowTransferToParent bool   `json:"disallowTransferToParent"`
-	DisallowTransferToPeers  bool   `json:"disallowTransferToPeers"`
-	OutputKey                string `json:"outputKey"`
-	IncludeContents          string `json:"includeContents"`
-	GlobalInstruction        string `json:"globalInstruction"`
-	InputSchema              string `json:"inputSchema"`
-	OutputSchema             string `json:"outputSchema"`
+	Name                     string           `json:"name"`
+	Description              string           `json:"description"`
+	SystemPrompt             string           `json:"systemPrompt"`
+	Icon                     string           `json:"icon"`
+	Graph                    *CompositionNode `json:"graph"`
+	DisallowTransferToParent bool             `json:"disallowTransferToParent"`
+	DisallowTransferToPeers  bool             `json:"disallowTransferToPeers"`
+	OutputKey                string           `json:"outputKey"`
+	IncludeContents          string           `json:"includeContents"`
+	GlobalInstruction        string           `json:"globalInstruction"`
+	InputSchema              string           `json:"inputSchema"`
+	OutputSchema             string           `json:"outputSchema"`
 }
 
-// agentResponse represents a single agent in API responses.
 type agentResponse struct {
-	ID                       string `json:"id"`
-	Name                     string `json:"name"`
-	Description              string `json:"description"`
-	SystemPrompt             string `json:"systemPrompt"`
-	Icon                     string `json:"icon"`
-	SourceCatalogID          string `json:"sourceCatalogId,omitempty"`
-	DisallowTransferToParent bool   `json:"disallowTransferToParent"`
-	DisallowTransferToPeers  bool   `json:"disallowTransferToPeers"`
-	OutputKey                string `json:"outputKey,omitempty"`
-	IncludeContents          string `json:"includeContents,omitempty"`
-	GlobalInstruction        string `json:"globalInstruction,omitempty"`
-	InputSchema              string `json:"inputSchema,omitempty"`
-	OutputSchema             string `json:"outputSchema,omitempty"`
-	CreatedAt                string `json:"createdAt"`
-	UpdatedAt                string `json:"updatedAt"`
+	ID                       string           `json:"id"`
+	Name                     string           `json:"name"`
+	Description              string           `json:"description"`
+	SystemPrompt             string           `json:"systemPrompt"`
+	Icon                     string           `json:"icon"`
+	SourceCatalogID          string           `json:"sourceCatalogId,omitempty"`
+	Graph                    *CompositionNode `json:"graph,omitempty"`
+	IsComposed               bool             `json:"isComposed"`
+	DisallowTransferToParent bool             `json:"disallowTransferToParent"`
+	DisallowTransferToPeers  bool             `json:"disallowTransferToPeers"`
+	OutputKey                string           `json:"outputKey,omitempty"`
+	IncludeContents          string           `json:"includeContents,omitempty"`
+	GlobalInstruction        string           `json:"globalInstruction,omitempty"`
+	InputSchema              string           `json:"inputSchema,omitempty"`
+	OutputSchema             string           `json:"outputSchema,omitempty"`
+	ShareToken               string           `json:"shareToken,omitempty"`
+	Visibility               string           `json:"visibility,omitempty"`
+	CreatedAt                string           `json:"createdAt"`
+	UpdatedAt                string           `json:"updatedAt"`
 }
 
-// listResponse represents the response for listing agents.
 type listResponse struct {
 	Agents []agentResponse `json:"agents"`
 }
@@ -77,7 +81,6 @@ type listResponse struct {
 // defaultAgentIconSVG is the fallback icon (compass) for agents without a valid SVG icon.
 var defaultAgentIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" /></svg>`
 
-// agentIconOrDefault returns the icon if it's a valid SVG, otherwise the default compass icon.
 func agentIconOrDefault(icon string) string {
 	if strings.HasPrefix(icon, "<svg") {
 		return icon
@@ -93,6 +96,8 @@ func toAgentResponse(a *AgentDefinition) agentResponse {
 		SystemPrompt:             a.SystemPrompt,
 		Icon:                     agentIconOrDefault(a.Icon),
 		SourceCatalogID:          a.SourceCatalogID,
+		Graph:                    a.Graph,
+		IsComposed:               a.IsComposed(),
 		DisallowTransferToParent: a.DisallowTransferToParent,
 		DisallowTransferToPeers:  a.DisallowTransferToPeers,
 		OutputKey:                a.OutputKey,
@@ -100,10 +105,14 @@ func toAgentResponse(a *AgentDefinition) agentResponse {
 		GlobalInstruction:        a.GlobalInstruction,
 		InputSchema:              a.InputSchemaJSON,
 		OutputSchema:             a.OutputSchemaJSON,
+		ShareToken:               a.ShareToken,
+		Visibility:               a.Visibility,
 		CreatedAt:                a.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt:                a.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 }
+
+// ── CRUD Handlers ──
 
 // create handles POST /v1/agent-definitions
 func (h *storeHandler) create(w http.ResponseWriter, r *http.Request) {
@@ -130,6 +139,7 @@ func (h *storeHandler) create(w http.ResponseWriter, r *http.Request) {
 		Description:              req.Description,
 		SystemPrompt:             req.SystemPrompt,
 		Icon:                     agentIconOrDefault(req.Icon),
+		Graph:                    req.Graph,
 		DisallowTransferToParent: req.DisallowTransferToParent,
 		DisallowTransferToPeers:  req.DisallowTransferToPeers,
 		OutputKey:                req.OutputKey,
@@ -141,7 +151,7 @@ func (h *storeHandler) create(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.svc.create(r.Context(), agent); err != nil {
 		h.log.Error(r.Context(), "failed to create agent", "error", err)
-		http.Error(w, "Failed to create agent", http.StatusInternalServerError)
+		writeJSONError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -196,6 +206,7 @@ func (h *storeHandler) update(w http.ResponseWriter, r *http.Request) {
 		Description:              req.Description,
 		SystemPrompt:             req.SystemPrompt,
 		Icon:                     iconValue,
+		Graph:                    req.Graph,
 		DisallowTransferToParent: req.DisallowTransferToParent,
 		DisallowTransferToPeers:  req.DisallowTransferToPeers,
 		OutputKey:                req.OutputKey,
@@ -207,11 +218,10 @@ func (h *storeHandler) update(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.svc.update(r.Context(), agent); err != nil {
 		h.log.Error(r.Context(), "failed to update agent", "error", err)
-		http.Error(w, "Failed to update agent", http.StatusInternalServerError)
+		writeJSONError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Fetch the updated agent to return complete data
 	updated, err := h.svc.getByID(r.Context(), agentID, user.ID)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to fetch updated agent", "error", err)
@@ -310,7 +320,6 @@ func (h *storeHandler) search(w http.ResponseWriter, r *http.Request) {
 
 	query := r.URL.Query().Get("q")
 	if query == "" {
-		// Return all agents if no search query
 		h.list(w, r)
 		return
 	}
@@ -331,4 +340,127 @@ func (h *storeHandler) search(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+// ── Sharing Handlers ──
+
+// shareAgent handles POST /v1/agent-definitions/{id}/share
+func (h *storeHandler) shareAgent(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	agentID := r.PathValue("id")
+	if agentID == "" {
+		http.Error(w, "Agent ID is required", http.StatusBadRequest)
+		return
+	}
+
+	token, err := h.svc.share(r.Context(), agentID, user.ID)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to share agent", "error", err)
+		writeJSONError(w, "Failed to share agent", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"shareToken": token,
+		"shareUrl":   "/shared/agents/" + token,
+	})
+}
+
+// unshareAgent handles DELETE /v1/agent-definitions/{id}/share
+func (h *storeHandler) unshareAgent(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	agentID := r.PathValue("id")
+	if agentID == "" {
+		http.Error(w, "Agent ID is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.svc.unshare(r.Context(), agentID, user.ID); err != nil {
+		h.log.Error(r.Context(), "failed to unshare agent", "error", err)
+		writeJSONError(w, "Failed to unshare agent", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "unshared"})
+}
+
+// getSharedAgent handles GET /v1/shared/agents/{token}
+func (h *storeHandler) getSharedAgent(w http.ResponseWriter, r *http.Request) {
+	token := r.PathValue("token")
+	if token == "" {
+		http.Error(w, "Share token is required", http.StatusBadRequest)
+		return
+	}
+
+	agent, err := h.svc.getShared(r.Context(), token)
+	if err != nil {
+		http.Error(w, "Shared agent not found", http.StatusNotFound)
+		return
+	}
+
+	// Return a sanitized response (no user ID, no internal fields).
+	resp := agentResponse{
+		ID:                       agent.ID,
+		Name:                     agent.Name,
+		Description:              agent.Description,
+		SystemPrompt:             agent.SystemPrompt,
+		Icon:                     agentIconOrDefault(agent.Icon),
+		Graph:                    agent.Graph,
+		IsComposed:               agent.IsComposed(),
+		DisallowTransferToParent: agent.DisallowTransferToParent,
+		DisallowTransferToPeers:  agent.DisallowTransferToPeers,
+		OutputKey:                agent.OutputKey,
+		IncludeContents:          agent.IncludeContents,
+		GlobalInstruction:        agent.GlobalInstruction,
+		CreatedAt:                agent.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:                agent.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// forkSharedAgent handles POST /v1/shared/agents/{token}/fork
+func (h *storeHandler) forkSharedAgent(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	token := r.PathValue("token")
+	if token == "" {
+		http.Error(w, "Share token is required", http.StatusBadRequest)
+		return
+	}
+
+	forked, err := h.svc.forkShared(r.Context(), token, user.ID)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to fork shared agent", "error", err)
+		writeJSONError(w, "Failed to fork agent", http.StatusInternalServerError)
+		return
+	}
+
+	resp := toAgentResponse(forked)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(resp)
+}
+
+// writeJSONError writes a JSON error response.
+func writeJSONError(w http.ResponseWriter, msg string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }

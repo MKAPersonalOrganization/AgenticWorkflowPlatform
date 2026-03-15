@@ -1,6 +1,7 @@
 package components
 
 import (
+	"school-with-ai/components/agenteditor"
 	"school-with-ai/components/agents"
 	"school-with-ai/components/convsearch"
 	"school-with-ai/components/filesystem"
@@ -101,7 +102,8 @@ templ BaseLayout(props LayoutProps) {
 				<div x-cloak>
 					@resources.ResourcesDialog()
 					@agents.AgentsDialog()
-						@tools.ToolsDialog()
+					@agenteditor.AgentDesignerDialog()
+					@tools.ToolsDialog()
 					@convsearch.SearchDialog()
 					@filesystem.FilesystemDialog()
 				</div>

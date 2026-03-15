@@ -19,6 +19,16 @@ func nullIfEmpty(s string) sql.NullString {
 	return sql.NullString{String: s, Valid: true}
 }
 
+// agentSelectColumns is the standard column set for agent queries.
+// graph is included so composed agents are fully loaded.
+const agentSelectColumns = `id, user_id, name, description, system_prompt, icon, source_catalog_id,
+    disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
+    global_instruction, COALESCE(input_schema::text, '') as input_schema,
+    COALESCE(output_schema::text, '') as output_schema,
+    COALESCE(graph::text, '') as graph,
+    share_token, visibility,
+    created_at, updated_at`
+
 // postgresAgentDefinitionRepository implements AgentDefinitionRepository using PostgreSQL.
 type postgresAgentDefinitionRepository struct {
 	db *sqlx.DB
@@ -26,6 +36,11 @@ type postgresAgentDefinitionRepository struct {
 
 func newPostgresAgentDefinitionRepository(db *sqlx.DB) *postgresAgentDefinitionRepository {
 	return &postgresAgentDefinitionRepository{db: db}
+}
+
+// hydrateAgent populates the Graph field from GraphJSON after scanning.
+func hydrateAgent(a *AgentDefinition) {
+	_ = a.UnmarshalGraph()
 }
 
 func (r *postgresAgentDefinitionRepository) Create(ctx context.Context, agent *AgentDefinition) error {
@@ -37,11 +52,17 @@ func (r *postgresAgentDefinitionRepository) Create(ctx context.Context, agent *A
 	agent.CreatedAt = now
 	agent.UpdatedAt = now
 
+	// Marshal composition graph to JSON for storage.
+	if err := agent.MarshalGraph(); err != nil {
+		return err
+	}
+
 	query := `
-INSERT INTO user_agents (id, user_id, name, description, system_prompt, icon, source_catalog_id, workflow_id,
+INSERT INTO user_agents (id, user_id, name, description, system_prompt, icon, source_catalog_id,
     disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
-    global_instruction, input_schema, output_schema, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`
+    global_instruction, input_schema, output_schema, graph,
+    share_token, visibility, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`
 
 	_, err := r.db.ExecContext(ctx, query,
 		agent.ID,
@@ -51,7 +72,6 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $
 		agent.SystemPrompt,
 		agent.Icon,
 		agent.SourceCatalogID,
-		agent.WorkflowID,
 		agent.DisallowTransferToParent,
 		agent.DisallowTransferToPeers,
 		agent.OutputKey,
@@ -59,6 +79,9 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $
 		agent.GlobalInstruction,
 		nullIfEmpty(agent.InputSchemaJSON),
 		nullIfEmpty(agent.OutputSchemaJSON),
+		nullIfEmpty(agent.GraphJSON),
+		agent.ShareToken,
+		coalesceVisibility(agent.Visibility),
 		agent.CreatedAt,
 		agent.UpdatedAt,
 	)
@@ -72,14 +95,19 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $
 func (r *postgresAgentDefinitionRepository) Update(ctx context.Context, agent *AgentDefinition) error {
 	agent.UpdatedAt = time.Now().UTC()
 
+	// Marshal composition graph to JSON for storage.
+	if err := agent.MarshalGraph(); err != nil {
+		return err
+	}
+
 	query := `
 UPDATE user_agents
 SET name = $1, description = $2, system_prompt = $3,
     icon = $4, updated_at = $5,
     disallow_transfer_to_parent = $6, disallow_transfer_to_peers = $7,
     output_key = $8, include_contents = $9, global_instruction = $10,
-    input_schema = $11, output_schema = $12
-WHERE id = $13 AND user_id = $14`
+    input_schema = $11, output_schema = $12, graph = $13
+WHERE id = $14 AND user_id = $15`
 
 	result, err := r.db.ExecContext(ctx, query,
 		agent.Name,
@@ -94,6 +122,7 @@ WHERE id = $13 AND user_id = $14`
 		agent.GlobalInstruction,
 		nullIfEmpty(agent.InputSchemaJSON),
 		nullIfEmpty(agent.OutputSchemaJSON),
+		nullIfEmpty(agent.GraphJSON),
 		agent.ID,
 		agent.UserID,
 	)
@@ -132,42 +161,35 @@ func (r *postgresAgentDefinitionRepository) Delete(ctx context.Context, id, user
 }
 
 func (r *postgresAgentDefinitionRepository) GetByID(ctx context.Context, id, userID string) (*AgentDefinition, error) {
-	query := `SELECT id, user_id, name, description, system_prompt, icon, source_catalog_id, workflow_id,
-    disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
-    global_instruction, COALESCE(input_schema::text, '') as input_schema, COALESCE(output_schema::text, '') as output_schema,
-    created_at, updated_at
+	query := `SELECT ` + agentSelectColumns + `
 FROM user_agents WHERE id = $1 AND user_id = $2`
 
 	var agent AgentDefinition
 	if err := r.db.GetContext(ctx, &agent, query, id, userID); err != nil {
 		return nil, fmt.Errorf("getting agent definition: %w", err)
 	}
-
+	hydrateAgent(&agent)
 	return &agent, nil
 }
 
 func (r *postgresAgentDefinitionRepository) ListByUser(ctx context.Context, userID string) ([]AgentDefinition, error) {
-	query := `SELECT id, user_id, name, description, system_prompt, icon, source_catalog_id, workflow_id,
-    disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
-    global_instruction, COALESCE(input_schema::text, '') as input_schema, COALESCE(output_schema::text, '') as output_schema,
-    created_at, updated_at
-FROM user_agents WHERE user_id = $1 AND workflow_id = '' ORDER BY created_at ASC`
+	query := `SELECT ` + agentSelectColumns + `
+FROM user_agents WHERE user_id = $1 ORDER BY created_at ASC`
 
 	var agents []AgentDefinition
 	if err := r.db.SelectContext(ctx, &agents, query, userID); err != nil {
 		return nil, fmt.Errorf("listing agent definitions: %w", err)
 	}
-
+	for i := range agents {
+		hydrateAgent(&agents[i])
+	}
 	return agents, nil
 }
 
 func (r *postgresAgentDefinitionRepository) Search(ctx context.Context, userID, query string) ([]AgentDefinition, error) {
-	sqlQuery := `SELECT id, user_id, name, description, system_prompt, icon, source_catalog_id, workflow_id,
-    disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
-    global_instruction, COALESCE(input_schema::text, '') as input_schema, COALESCE(output_schema::text, '') as output_schema,
-    created_at, updated_at
+	sqlQuery := `SELECT ` + agentSelectColumns + `
 FROM user_agents
-WHERE user_id = $1 AND workflow_id = '' AND (name ILIKE $2 OR description ILIKE $2)
+WHERE user_id = $1 AND (name ILIKE $2 OR description ILIKE $2)
 ORDER BY created_at ASC`
 
 	pattern := "%" + query + "%"
@@ -176,7 +198,9 @@ ORDER BY created_at ASC`
 	if err := r.db.SelectContext(ctx, &agents, sqlQuery, userID, pattern); err != nil {
 		return nil, fmt.Errorf("searching agent definitions: %w", err)
 	}
-
+	for i := range agents {
+		hydrateAgent(&agents[i])
+	}
 	return agents, nil
 }
 
@@ -197,4 +221,45 @@ func (r *postgresAgentDefinitionRepository) ExistsByCatalogID(ctx context.Contex
 		return false, fmt.Errorf("checking catalog agent existence: %w", err)
 	}
 	return exists, nil
+}
+
+func (r *postgresAgentDefinitionRepository) GetByShareToken(ctx context.Context, token string) (*AgentDefinition, error) {
+	if token == "" {
+		return nil, fmt.Errorf("share token is required")
+	}
+	query := `SELECT ` + agentSelectColumns + `
+FROM user_agents WHERE share_token = $1 AND visibility = 'shared'`
+
+	var agent AgentDefinition
+	if err := r.db.GetContext(ctx, &agent, query, token); err != nil {
+		return nil, fmt.Errorf("agent not found for share token: %w", err)
+	}
+	hydrateAgent(&agent)
+	return &agent, nil
+}
+
+func (r *postgresAgentDefinitionRepository) UpdateShareToken(ctx context.Context, id, userID, token, visibility string) error {
+	query := `UPDATE user_agents SET share_token = $1, visibility = $2, updated_at = $3
+WHERE id = $4 AND user_id = $5`
+
+	result, err := r.db.ExecContext(ctx, query, token, visibility, time.Now().UTC(), id, userID)
+	if err != nil {
+		return fmt.Errorf("updating share token: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("agent not found or not owned by user")
+	}
+	return nil
+}
+
+// coalesceVisibility returns "private" for empty visibility values.
+func coalesceVisibility(v string) string {
+	if v == "" {
+		return "private"
+	}
+	return v
 }

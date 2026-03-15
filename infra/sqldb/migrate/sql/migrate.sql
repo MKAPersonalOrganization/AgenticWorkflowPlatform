@@ -893,3 +893,44 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_store_catalog_name ON agent_store_ca
 -- forking a workflow are hidden from the main agent list. Only agents with
 -- an empty workflow_id are top-level user agents.
 ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS workflow_id VARCHAR(255) NOT NULL DEFAULT '';
+
+-- Version: 1.64
+-- Description: Unify agents and workflows into a single entity. An agent with
+-- a non-null composition graph is a "composed agent" — it composes sub-agents
+-- via sequential, parallel, or loop orchestration patterns. This eliminates the
+-- separate workflow_definitions table dependency and aligns with ADK-Go where
+-- every agent type (LLM, sequential, parallel, loop) implements the same Agent interface.
+--
+-- Also adds sharing support: users can generate a share_token to allow other
+-- users to fork their agent definition.
+
+-- 1. Add composition graph to user_agents (nullable JSONB).
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS graph JSONB;
+
+-- 2. Add sharing support columns.
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS share_token VARCHAR(64) NOT NULL DEFAULT '';
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) NOT NULL DEFAULT 'private';
+
+-- 3. Index for share token lookups (sparse — most agents have no token).
+CREATE INDEX IF NOT EXISTS idx_user_agents_share_token ON user_agents(share_token) WHERE share_token != '';
+
+-- 4. Migrate existing workflow_definitions into user_agents.
+-- Each workflow becomes a composed agent with its graph embedded.
+INSERT INTO user_agents (id, user_id, name, description, icon, graph, source_catalog_id, created_at, updated_at)
+SELECT
+    wd.id,
+    wd.user_id,
+    wd.name,
+    wd.description,
+    wd.icon,
+    wd.graph,
+    wd.source_catalog_id,
+    wd.created_at,
+    wd.updated_at
+FROM workflow_definitions wd
+WHERE NOT EXISTS (SELECT 1 FROM user_agents ua WHERE ua.id = wd.id)
+ON CONFLICT (id) DO NOTHING;
+
+-- 5. Clear workflow_id on sub-agents so they become visible standalone agents.
+-- In the unified model, all agents are first-class and reusable.
+UPDATE user_agents SET workflow_id = '' WHERE workflow_id != '';

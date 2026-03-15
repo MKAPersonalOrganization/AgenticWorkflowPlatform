@@ -76,7 +76,6 @@ import (
 	filesystemmod "school-with-ai/modules/filesystem"
 	knowledgemod "school-with-ai/modules/knowledge"
 	mcpmod "school-with-ai/modules/mcp"
-	multiagentmod "school-with-ai/modules/multiagent"
 	permissionsmod "school-with-ai/modules/permissions"
 	pluginsettingsmod "school-with-ai/modules/pluginsettings"
 	resourcesmod "school-with-ai/modules/resources"
@@ -284,17 +283,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 	userProfileModule := userprofilemod.New(log, db)
 	userProfileRepo := userProfileModule.UserProfileRepo()
 
-	// Initialize Agent Store module (agent definitions + catalog)
+	// Initialize Agent Store module (agent definitions + catalog + composition + sharing)
 	agentStoreModule := agentstoremod.New(log, db)
-
-	// Initialize Multi-Agent Workflow module (ADR 019)
-	multiAgentModule := multiagentmod.New(log, db, agentStoreModule.AgentDefinitionRepo())
-
-	// Wire workflow forker into catalog handler so forking a workflow catalog
-	// entry creates sub-agents + workflow_definition for the user.
-	agentStoreModule.SetWorkflowForker(
-		multiagentmod.NewCatalogWorkflowForker(log, agentStoreModule.AgentDefinitionRepo(), multiAgentModule.WorkflowRepo()),
-	)
 
 	// Run migrations (skipped when APP_SKIP_MIGRATIONS=true, e.g. in a
 	// cluster where an init container handles migrations before pods start).
@@ -492,10 +482,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	slogLogger := slog.New(log)
 
 	// All agents (including the default assistant) live in the database.
-	// The provider lazily ensures a starter agent per user on first access.
+	// In the unified model, both simple and composed agents are AgentDefinitions.
 	agentProvider := newUserAwareAgentProvider(
 		agentStoreModule.AgentDefinitionRepo(),
-		multiAgentModule.WorkflowRepo(),
 		[]agent.Middleware{agent.ToolLogging(slogLogger)},
 	)
 
@@ -679,7 +668,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 		billing:        billingModule,
 		permissions:    permissionsmod.New(log, workspacePermissionsService, &WorkspaceProviderAdapter{svc: edgequakeService}, agentProvider, cfg.Edgequake.TenantID),
 		analytics:      analyticsmod.New(log, statsProjection, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass),
-		multiAgent:     multiAgentModule,
 	}, edgequakeService)
 
 	// Set Stripe API key — must be done before any Stripe SDK calls
@@ -814,9 +802,6 @@ type routeModules struct {
 			Get(string, http.HandlerFunc)
 		})
 	}
-	multiAgent interface {
-		RegisterRoutes(chi.Router, *auth.Middleware)
-	}
 }
 
 // registerRoutes wires all module and page routes onto the app router.
@@ -842,7 +827,6 @@ func registerRoutes(
 	mods.mcp.RegisterRoutes(r, authMW)
 	mods.knowledge.RegisterRoutes(r, authMW)
 	mods.analytics.RegisterRoutes(r)
-	mods.multiAgent.RegisterRoutes(r, authMW)
 
 	// Health check endpoints (public)
 	r.Get("/liveness", healthHandler.Liveness)

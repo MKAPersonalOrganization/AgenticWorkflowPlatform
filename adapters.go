@@ -11,7 +11,6 @@ import (
 	"school-with-ai/modules/chat/chatcontracts"
 	"school-with-ai/modules/filesystem"
 	"school-with-ai/modules/knowledge/edgequake"
-	"school-with-ai/modules/multiagent"
 	"school-with-ai/modules/permissions"
 	permworkspace "school-with-ai/modules/permissions/workspace"
 	"school-with-ai/modules/userprofile/identity"
@@ -255,24 +254,22 @@ func mapFileStat(s *filesystem.FileStat) *fsplugin.FileStat {
 
 // ──────────────────────────────────────────────────────────────────────────────
 // userAwareAgentProvider implements agent.AgentProvider by loading all agents
-// from the database. Every user gets a starter agent created lazily on first
-// access if they have none.
+// from the database. In the unified model, every agent — simple or composed —
+// is an AgentDefinition. Composed agents (those with a graph) implement
+// agent.WorkflowAgent so the ADK-Go adapter can detect them.
 // ──────────────────────────────────────────────────────────────────────────────
 
 type userAwareAgentProvider struct {
 	repo                agentstore.AgentDefinitionRepository
-	workflowRepo        multiagent.WorkflowDefinitionRepository
 	functionMiddlewares []agent.Middleware
 }
 
 func newUserAwareAgentProvider(
 	repo agentstore.AgentDefinitionRepository,
-	workflowRepo multiagent.WorkflowDefinitionRepository,
 	funcMw []agent.Middleware,
 ) *userAwareAgentProvider {
 	return &userAwareAgentProvider{
 		repo:                repo,
-		workflowRepo:        workflowRepo,
 		functionMiddlewares: funcMw,
 	}
 }
@@ -289,21 +286,11 @@ func (p *userAwareAgentProvider) GetForUser(ctx context.Context, name, userID st
 		return nil, fmt.Errorf("an agent ID must be provided")
 	}
 
-	// Try regular agent first.
 	agentDef, err := p.repo.GetByID(ctx, name, userID)
-	if err == nil {
-		return p.agentFromDefinition(agentDef), nil
+	if err != nil {
+		return nil, fmt.Errorf("agent %q not found for user %s: %w", name, userID, err)
 	}
-
-	// Fall back to workflow definitions.
-	if p.workflowRepo != nil {
-		wf, wfErr := p.workflowRepo.GetByID(ctx, name, userID)
-		if wfErr == nil {
-			return workflowAgentFromDefinition(wf), nil
-		}
-	}
-
-	return nil, fmt.Errorf("agent %q not found for user %s: %w", name, userID, err)
+	return p.agentFromDefinition(agentDef), nil
 }
 
 func (p *userAwareAgentProvider) List() []agent.Agent {
@@ -315,7 +302,6 @@ func (p *userAwareAgentProvider) ListForUser(ctx context.Context, userID string)
 		return nil, nil
 	}
 
-	// Load regular agents.
 	definitions, err := p.repo.ListByUser(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("listing agents: %w", err)
@@ -324,17 +310,6 @@ func (p *userAwareAgentProvider) ListForUser(ctx context.Context, userID string)
 	for i := range definitions {
 		agents = append(agents, p.agentFromDefinition(&definitions[i]))
 	}
-
-	// Load workflow agents.
-	if p.workflowRepo != nil {
-		workflows, wfErr := p.workflowRepo.ListByUser(ctx, userID)
-		if wfErr == nil {
-			for i := range workflows {
-				agents = append(agents, workflowAgentFromDefinition(&workflows[i]))
-			}
-		}
-	}
-
 	return agents, nil
 }
 
@@ -346,7 +321,6 @@ func (p *userAwareAgentProvider) agentFromDefinition(def *agentstore.AgentDefini
 		Tools:               []agent.Tool{},
 		Requirements:        []agent.Requirement{},
 		FunctionMiddlewares: p.functionMiddlewares,
-		// Multi-agent orchestration fields
 		TransferPolicy: agent.TransferPolicy{
 			DisallowTransferToParent: def.DisallowTransferToParent,
 			DisallowTransferToPeers:  def.DisallowTransferToPeers,
@@ -356,6 +330,20 @@ func (p *userAwareAgentProvider) agentFromDefinition(def *agentstore.AgentDefini
 		GlobalInstruction: def.GlobalInstruction,
 	}
 	a := newConfigAgent(cfg)
+
+	// Composed agents (those with a graph) also implement WorkflowAgent.
+	if def.IsComposed() {
+		return &composedAgentAdapter{
+			dbAgent: dbAgent{
+				Agent:       a,
+				displayName: def.Name,
+				id:          def.ID,
+				icon:        def.Icon,
+			},
+			graph: convertCompositionNode(def.Graph),
+		}
+	}
+
 	return &dbAgent{
 		Agent:       a,
 		displayName: def.Name,
@@ -377,16 +365,49 @@ func (a *dbAgent) Name() string             { return a.displayName }
 func (a *dbAgent) Description() string      { return a.Agent.Description() }
 func (a *dbAgent) Icon() string             { return a.icon }
 func (a *dbAgent) SubAgents() []agent.Agent { return a.Agent.SubAgents() }
+func (a *dbAgent) Config() agent.Config     { return a.Agent.(agent.Configurable).Config() }
 
-// Config implements agent.Configurable, delegating to the inner configAgent.
-// This allows extractAgentConfig to use a single interface check instead of
-// unwrapping via the bespoke embeddedAgentAccessor interface.
-func (a *dbAgent) Config() agent.Config { return a.Agent.(agent.Configurable).Config() }
+// ──────────────────────────────────────────────────────────────────────────────
+// composedAgentAdapter extends dbAgent with the WorkflowAgent interface.
+// In the unified model, a composed agent IS an agent with a composition graph.
+// ──────────────────────────────────────────────────────────────────────────────
+
+type composedAgentAdapter struct {
+	dbAgent
+	graph agent.WorkflowNodeInfo
+}
+
+func (a *composedAgentAdapter) WorkflowGraph() agent.WorkflowNodeInfo { return a.graph }
+
+var _ agent.WorkflowAgent = (*composedAgentAdapter)(nil)
+
+// convertCompositionNode recursively maps agentstore.CompositionNode to agent.WorkflowNodeInfo.
+func convertCompositionNode(n *agentstore.CompositionNode) agent.WorkflowNodeInfo {
+	if n == nil {
+		return agent.WorkflowNodeInfo{}
+	}
+	info := agent.WorkflowNodeInfo{
+		ID:                       n.ID,
+		Type:                     string(n.Type),
+		Label:                    n.Label,
+		AgentID:                  n.AgentID,
+		OutputKey:                n.OutputKey,
+		MaxIterations:            n.MaxIterations,
+		DisallowTransferToParent: n.DisallowTransferToParent,
+		DisallowTransferToPeers:  n.DisallowTransferToPeers,
+		IncludeContents:          n.IncludeContents,
+	}
+	if len(n.Children) > 0 {
+		info.Children = make([]agent.WorkflowNodeInfo, len(n.Children))
+		for i := range n.Children {
+			info.Children[i] = convertCompositionNode(&n.Children[i])
+		}
+	}
+	return info
+}
 
 // ──────────────────────────────────────────────────────────────────────────────
 // configAgent is a concrete agent.Agent that holds an agent.Config.
-// It implements agent.Configurable so the adapter layer can extract the
-// full configuration without importing concrete types.
 // ──────────────────────────────────────────────────────────────────────────────
 
 type configAgent struct {
@@ -404,65 +425,3 @@ func (a *configAgent) SubAgents() []agent.Agent { return a.config.SubAgents }
 func (a *configAgent) Config() agent.Config     { return a.config }
 
 var _ agent.Configurable = (*configAgent)(nil)
-
-// ──────────────────────────────────────────────────────────────────────────────
-// workflowAgent adapts a multiagent.WorkflowDefinition to the foundation
-// agent.WorkflowAgent interface so the ADK-Go adapter can detect it and
-// recursively build the appropriate nested agent tree at runtime.
-//
-// The composition tree supports arbitrary nesting:
-//   sequential → [agent, parallel → [agent, loop → [agent, agent]]]
-//
-// See arch/adr/019-multi-agent-workflow-composition.md.
-// ──────────────────────────────────────────────────────────────────────────────
-
-type workflowAgentAdapter struct {
-	id          string
-	name        string
-	description string
-	icon        string
-	graph       agent.WorkflowNodeInfo
-}
-
-func workflowAgentFromDefinition(wf *multiagent.WorkflowDefinition) agent.Agent {
-	return &workflowAgentAdapter{
-		id:          wf.ID,
-		name:        wf.Name,
-		description: wf.Description,
-		icon:        wf.Icon,
-		graph:       convertNode(wf.Graph),
-	}
-}
-
-// convertNode recursively maps a multiagent.WorkflowNode to agent.WorkflowNodeInfo.
-func convertNode(n multiagent.WorkflowNode) agent.WorkflowNodeInfo {
-	info := agent.WorkflowNodeInfo{
-		ID:                       n.ID,
-		Type:                     string(n.Type),
-		Label:                    n.Label,
-		AgentID:                  n.AgentID,
-		OutputKey:                n.OutputKey,
-		MaxIterations:            n.MaxIterations,
-		DisallowTransferToParent: n.DisallowTransferToParent,
-		DisallowTransferToPeers:  n.DisallowTransferToPeers,
-		IncludeContents:          n.IncludeContents,
-	}
-	if len(n.Children) > 0 {
-		info.Children = make([]agent.WorkflowNodeInfo, len(n.Children))
-		for i, child := range n.Children {
-			info.Children[i] = convertNode(child)
-		}
-	}
-	return info
-}
-
-func (a *workflowAgentAdapter) ID() agent.ID             { return a.id }
-func (a *workflowAgentAdapter) Name() string             { return a.name }
-func (a *workflowAgentAdapter) Description() string      { return a.description }
-func (a *workflowAgentAdapter) SubAgents() []agent.Agent { return nil }
-func (a *workflowAgentAdapter) Icon() string             { return a.icon }
-
-// WorkflowAgent interface implementation.
-func (a *workflowAgentAdapter) WorkflowGraph() agent.WorkflowNodeInfo { return a.graph }
-
-var _ agent.WorkflowAgent = (*workflowAgentAdapter)(nil)
