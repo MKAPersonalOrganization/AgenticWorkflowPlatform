@@ -30,6 +30,49 @@ type Configurable interface {
 	Config() Config
 }
 
+// WorkflowAgent is an optional interface for agents that represent a
+// multi-agent workflow composed as an arbitrary tree of nodes.
+// Each node can be a leaf (referencing an AgentDefinition) or a composite
+// (sequential, parallel, loop) containing child nodes — enabling arbitrary
+// nesting like: Sequential → [Agent, Parallel → [Agent, Loop → [Agent, Agent]]].
+//
+// The adapter layer uses this to recursively build the appropriate ADK-Go
+// workflow agent tree at runtime.
+//
+// See arch/adr/019-multi-agent-workflow-composition.md.
+type WorkflowAgent interface {
+	Agent
+
+	// WorkflowGraph returns the root node of the composition tree.
+	WorkflowGraph() WorkflowNodeInfo
+}
+
+// WorkflowNodeInfo describes a single node in a multi-agent workflow tree.
+// Composite nodes (sequential, parallel, loop) contain children.
+// Leaf nodes (agent) reference an AgentDefinition by ID.
+type WorkflowNodeInfo struct {
+	// ID is a unique identifier within this tree.
+	ID string
+
+	// Type is "agent", "sequential", "parallel", or "loop".
+	Type string
+
+	// Label is an optional display name for this node.
+	Label string
+
+	// AgentID is the ID of the AgentDefinition (only for Type="agent").
+	AgentID string
+
+	// OutputKey optionally stores this node's output in session state.
+	OutputKey string
+
+	// MaxIterations limits loop repetitions (only for Type="loop").
+	MaxIterations int
+
+	// Children are the sub-nodes (only for composite types).
+	Children []WorkflowNodeInfo
+}
+
 // AgentMetadata represents metadata for an agent exposed via the API.
 type AgentMetadata struct {
 	ID          string `json:"id"`

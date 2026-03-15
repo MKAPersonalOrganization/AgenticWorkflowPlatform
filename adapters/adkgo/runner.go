@@ -167,63 +167,87 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			inv.History = threadHistoryToMessages(agg.Messages)
 		}
 
-		// 5. Evaluate requirements once and reuse the rules for both tool
-		// filtering (resolveTools) and guidance injection (buildBeforeRunHooks).
-		var precomputedRules []fagent.Rule
-		if agentCfg != nil {
-			for _, requirement := range agentCfg.Requirements {
-				if e, ok := requirement.(fagent.Enableable); ok && !e.Enabled() {
-					continue
-				}
-				rules, rErr := requirement.Run(ctx, inv)
-				if rErr != nil {
-					continue
-				}
-				precomputedRules = append(precomputedRules, rules...)
-			}
-		}
-
-		// 6. Build tools from agent config + enabled tool sets + MCP.
-		adkTools := r.resolveTools(ctx, req.UserID, agentName, modelCfg, req.SessionID, agentCfg, req, precomputedRules)
-
-		// 7. Build system prompt (agent config + requirements + workspace KB + skills + profile).
-		systemPrompt := r.buildSystemPrompt(ctx, foundAgent, req.UserID, agentName, req.SessionID, agentCfg, inv)
-
-		// 8. Create model.LLM.
+		// 8. Create model.LLM (needed for both regular and workflow agents).
 		llm, mErr := NewModel(ctx, modelCfg.Provider, modelCfg.Model, modelCfg.APIKey)
 		if mErr != nil {
 			yield(nil, fmt.Errorf("creating LLM model: %w", mErr))
 			return
 		}
 
-		// 9. Build adk-go LLM agent with callbacks for middleware bridging.
-		genCfg := buildGenerateContentConfig(modelCfg)
+		// 9. Build the ADK-Go agent — either a workflow agent or a regular LLM agent.
+		var adkAgent agent.Agent
 
-		// Bridge foundation function middlewares into ADK-Go's tool lifecycle.
-		var beforeToolCBs []llmagent.BeforeToolCallback
-		var afterToolCBs []llmagent.AfterToolCallback
-		if mb := newMiddlewareBridge(agentCfg, agentName, req.SessionID, req.UserID); mb != nil {
-			beforeToolCBs = mb.beforeToolCallbacks()
-			afterToolCBs = mb.afterToolCallbacks()
-		}
+		if wa, isWF := isWorkflowAgent(foundAgent); isWF {
+			// ── Workflow Agent Path ──
+			// Build a sequential/parallel/loop agent from the workflow steps.
+			wbc := &workflowBuildContext{
+				ctx:      ctx,
+				adapter:  r,
+				userID:   req.UserID,
+				modelCfg: modelCfg,
+				llm:      llm,
+				threadID: req.SessionID,
+				req:      req,
+			}
+			var wErr error
+			adkAgent, wErr = buildWorkflowAgent(wbc, wa)
+			if wErr != nil {
+				yield(nil, fmt.Errorf("building workflow agent: %w", wErr))
+				return
+			}
+		} else {
+			// ── Regular LLM Agent Path ──
+			// 5. Evaluate requirements once and reuse the rules for both tool
+			// filtering (resolveTools) and guidance injection (buildBeforeRunHooks).
+			var precomputedRules []fagent.Rule
+			if agentCfg != nil {
+				for _, requirement := range agentCfg.Requirements {
+					if e, ok := requirement.(fagent.Enableable); ok && !e.Enabled() {
+						continue
+					}
+					rules, rErr := requirement.Run(ctx, inv)
+					if rErr != nil {
+						continue
+					}
+					precomputedRules = append(precomputedRules, rules...)
+				}
+			}
 
-		// Build before-agent callbacks for requirements guidance injection.
-		beforeAgentCBs := buildBeforeRunHooks(precomputedRules)
+			// 6. Build tools from agent config + enabled tool sets + MCP.
+			adkTools := r.resolveTools(ctx, req.UserID, agentName, modelCfg, req.SessionID, agentCfg, req, precomputedRules)
 
-		adkAgent, aErr := llmagent.New(llmagent.Config{
-			Name:                  agentName,
-			Description:           foundAgent.Description(),
-			Model:                 llm,
-			Instruction:           systemPrompt,
-			Tools:                 adkTools,
-			GenerateContentConfig: genCfg,
-			BeforeAgentCallbacks:  beforeAgentCBs,
-			BeforeToolCallbacks:   beforeToolCBs,
-			AfterToolCallbacks:    afterToolCBs,
-		})
-		if aErr != nil {
-			yield(nil, fmt.Errorf("creating adk-go agent: %w", aErr))
-			return
+			// 7. Build system prompt (agent config + requirements + workspace KB + skills + profile).
+			systemPrompt := r.buildSystemPrompt(ctx, foundAgent, req.UserID, agentName, req.SessionID, agentCfg, inv)
+
+			genCfg := buildGenerateContentConfig(modelCfg)
+
+			// Bridge foundation function middlewares into ADK-Go's tool lifecycle.
+			var beforeToolCBs []llmagent.BeforeToolCallback
+			var afterToolCBs []llmagent.AfterToolCallback
+			if mb := newMiddlewareBridge(agentCfg, agentName, req.SessionID, req.UserID); mb != nil {
+				beforeToolCBs = mb.beforeToolCallbacks()
+				afterToolCBs = mb.afterToolCallbacks()
+			}
+
+			// Build before-agent callbacks for requirements guidance injection.
+			beforeAgentCBs := buildBeforeRunHooks(precomputedRules)
+
+			var aErr error
+			adkAgent, aErr = llmagent.New(llmagent.Config{
+				Name:                  agentName,
+				Description:           foundAgent.Description(),
+				Model:                 llm,
+				Instruction:           systemPrompt,
+				Tools:                 adkTools,
+				GenerateContentConfig: genCfg,
+				BeforeAgentCallbacks:  beforeAgentCBs,
+				BeforeToolCallbacks:   beforeToolCBs,
+				AfterToolCallbacks:    afterToolCBs,
+			})
+			if aErr != nil {
+				yield(nil, fmt.Errorf("creating adk-go agent: %w", aErr))
+				return
+			}
 		}
 
 		// 10. Build session from thread history.

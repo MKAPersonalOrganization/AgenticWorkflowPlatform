@@ -6,7 +6,7 @@
 export const agentsManager = () => ({
     // State
     view: 'list', // 'list' | 'form' | 'delete'
-    activeTab: 'my-agents', // 'my-agents' | 'store'
+    activeTab: 'my-agents', // 'my-agents' | 'store' | 'workflows'
     agents: [],
     filteredAgents: [],
     loading: false,
@@ -49,6 +49,20 @@ export const agentsManager = () => ({
     storeSuccessId: null, // catalog ID that was just successfully added (for inline toast)
     storeTotal: 0,
 
+    // ── Workflow state ──
+    workflows: [],
+    filteredWorkflows: [],
+    workflowsLoading: false,
+    workflowSearchQuery: '',
+    editingWorkflow: null, // null = create mode, object = edit mode
+    deletingWorkflow: null,
+    _nodeCounter: 0, // auto-increment for unique node IDs
+    workflowForm: {
+        name: '',
+        description: '',
+        graph: { id: 'node-1', type: 'sequential', label: '', children: [] },
+    },
+
     async open() {
         this.view = 'list';
         this.searchQuery = '';
@@ -59,6 +73,10 @@ export const agentsManager = () => ({
         // Pre-fetch store data in background
         if (this.storeEntries.length === 0) {
             await this.fetchCatalog();
+        }
+        // Pre-fetch workflows in background
+        if (this.workflows.length === 0) {
+            this.fetchWorkflows();
         }
     },
 
@@ -405,6 +423,9 @@ export const agentsManager = () => ({
         if (tab === 'store' && this.storeEntries.length === 0) {
             this.fetchCatalog();
         }
+        if (tab === 'workflows' && this.workflows.length === 0) {
+            this.fetchWorkflows();
+        }
     },
 
     async fetchCatalog() {
@@ -513,6 +534,284 @@ export const agentsManager = () => ({
 
     get filteredStoreEntries() {
         return this.storeEntries;
+    },
+
+    // ============================================
+    // Workflows (multi-agent composition)
+    // ============================================
+
+    async fetchWorkflows() {
+        this.workflowsLoading = true;
+        try {
+            const response = await fetch('/v1/workflows');
+            if (response.ok) {
+                const data = await response.json();
+                this.workflows = data.workflows || [];
+                this.filterWorkflows();
+            }
+        } catch (err) {
+            console.error('Failed to fetch workflows:', err);
+        } finally {
+            this.workflowsLoading = false;
+        }
+    },
+
+    filterWorkflows() {
+        if (!this.workflowSearchQuery.trim()) {
+            this.filteredWorkflows = [...this.workflows];
+        } else {
+            const q = this.workflowSearchQuery.toLowerCase();
+            this.filteredWorkflows = this.workflows.filter(wf =>
+                wf.name.toLowerCase().includes(q) ||
+                (wf.description && wf.description.toLowerCase().includes(q))
+            );
+        }
+    },
+
+    // ── Node ID generator ──
+    _nextNodeId() {
+        this._nodeCounter++;
+        return `node-${this._nodeCounter}`;
+    },
+
+    // ── Tree helpers ──
+
+    /** Create a new node of the given type. */
+    createNode(type) {
+        const id = this._nextNodeId();
+        if (type === 'agent') {
+            return { id, type: 'agent', label: '', agent_id: '', output_key: '' };
+        }
+        const node = { id, type, label: '', children: [] };
+        if (type === 'loop') {
+            node.max_iterations = 3;
+        }
+        return node;
+    },
+
+    /** Count total nodes in a subtree. */
+    countNodes(node) {
+        if (!node) return 0;
+        let count = 1;
+        if (node.children) {
+            for (const child of node.children) {
+                count += this.countNodes(child);
+            }
+        }
+        return count;
+    },
+
+    /** Get max depth of a subtree. */
+    nodeDepth(node) {
+        if (!node || !node.children || node.children.length === 0) return 1;
+        let maxD = 0;
+        for (const child of node.children) {
+            const d = this.nodeDepth(child);
+            if (d > maxD) maxD = d;
+        }
+        return 1 + maxD;
+    },
+
+    /** Check if we can add more nodes (max 50 total). */
+    canAddNode() {
+        return this.countNodes(this.workflowForm.graph) < 50;
+    },
+
+    /** Add a child to a composite node by path. */
+    addChildToNode(parentPath, childType) {
+        const parent = this._getNodeByPath(parentPath);
+        if (!parent || !parent.children) return;
+        if (!this.canAddNode()) return;
+        parent.children.push(this.createNode(childType));
+    },
+
+    /** Remove a child from a composite node by path and index. */
+    removeChildFromNode(parentPath, index) {
+        const parent = this._getNodeByPath(parentPath);
+        if (!parent || !parent.children) return;
+        if (parent.children.length <= 1) return; // keep at least one
+        parent.children.splice(index, 1);
+    },
+
+    /** Change a node's type (resets children/agent fields). */
+    changeNodeType(path, newType) {
+        const node = this._getNodeByPath(path);
+        if (!node) return;
+        node.type = newType;
+        if (newType === 'agent') {
+            delete node.children;
+            delete node.max_iterations;
+            node.agent_id = '';
+            node.output_key = '';
+        } else {
+            delete node.agent_id;
+            delete node.output_key;
+            if (!node.children || node.children.length === 0) {
+                node.children = [this.createNode('agent')];
+            }
+            if (newType === 'loop' && !node.max_iterations) {
+                node.max_iterations = 3;
+            }
+            if (newType !== 'loop') {
+                delete node.max_iterations;
+            }
+        }
+    },
+
+    /** Resolve a node by dot-separated path (e.g., "graph", "graph.0", "graph.0.2"). */
+    _getNodeByPath(path) {
+        const parts = path.split('.');
+        if (parts[0] !== 'graph') return null;
+        let node = this.workflowForm.graph;
+        for (let i = 1; i < parts.length; i++) {
+            const idx = parseInt(parts[i], 10);
+            if (!node.children || idx >= node.children.length) return null;
+            node = node.children[idx];
+        }
+        return node;
+    },
+
+    /** Get the type label for display. */
+    nodeTypeLabel(type) {
+        const labels = { sequential: 'Sequential', parallel: 'Parallel', loop: 'Loop', agent: 'Agent' };
+        return labels[type] || type;
+    },
+
+    /** Get CSS classes for node type badge. */
+    nodeTypeBadgeClass(type) {
+        const classes = {
+            sequential: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+            parallel: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+            loop: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
+            agent: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+        };
+        return classes[type] || '';
+    },
+
+    /** Collect all agent IDs from a node tree (for summary). */
+    collectAgentIds(node) {
+        const ids = [];
+        const walk = (n) => {
+            if (n.type === 'agent' && n.agent_id) ids.push(n.agent_id);
+            if (n.children) n.children.forEach(walk);
+        };
+        walk(node);
+        return ids;
+    },
+
+    showCreateWorkflowForm() {
+        this.editingWorkflow = null;
+        this._nodeCounter = 1;
+        this.workflowForm = {
+            name: '',
+            description: '',
+            graph: {
+                id: 'node-1',
+                type: 'sequential',
+                label: '',
+                children: [this.createNode('agent')],
+            },
+        };
+        this.view = 'workflow-form';
+    },
+
+    showEditWorkflowForm(wf) {
+        this.editingWorkflow = wf;
+        // Find the max node counter to avoid ID collisions.
+        let maxId = 0;
+        const walk = (n) => {
+            if (n.id) {
+                const num = parseInt(n.id.replace('node-', ''), 10);
+                if (num > maxId) maxId = num;
+            }
+            if (n.children) n.children.forEach(walk);
+        };
+        if (wf.graph) walk(wf.graph);
+        this._nodeCounter = maxId;
+
+        this.workflowForm = {
+            name: wf.name || '',
+            description: wf.description || '',
+            graph: wf.graph ? JSON.parse(JSON.stringify(wf.graph)) : {
+                id: this._nextNodeId(),
+                type: 'sequential',
+                label: '',
+                children: [this.createNode('agent')],
+            },
+        };
+        this.view = 'workflow-form';
+    },
+
+    async saveWorkflow() {
+        if (!this.workflowForm.name.trim()) return;
+
+        this.saving = true;
+        try {
+            const payload = {
+                name: this.workflowForm.name.trim(),
+                description: this.workflowForm.description.trim(),
+                graph: this.workflowForm.graph,
+            };
+
+            let response;
+            if (this.editingWorkflow) {
+                response = await fetch(`/v1/workflows/${this.editingWorkflow.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+            } else {
+                response = await fetch('/v1/workflows', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+            }
+
+            if (response.ok) {
+                await this.fetchWorkflows();
+                this.view = 'list';
+                this.activeTab = 'workflows';
+            } else {
+                const err = await response.json().catch(() => ({}));
+                console.error('Failed to save workflow:', err);
+                alert(err.error || 'Failed to save workflow');
+            }
+        } catch (err) {
+            console.error('Failed to save workflow:', err);
+            alert('Failed to save workflow');
+        } finally {
+            this.saving = false;
+        }
+    },
+
+    confirmDeleteWorkflow(wf) {
+        this.deletingWorkflow = wf;
+        this.view = 'workflow-delete';
+    },
+
+    async deleteWorkflow() {
+        if (!this.deletingWorkflow) return;
+        this.saving = true;
+        try {
+            const response = await fetch(`/v1/workflows/${this.deletingWorkflow.id}`, {
+                method: 'DELETE',
+            });
+            if (response.ok || response.status === 204) {
+                await this.fetchWorkflows();
+                this.view = 'list';
+                this.activeTab = 'workflows';
+            } else {
+                const err = await response.json().catch(() => ({}));
+                console.error('Failed to delete workflow:', err);
+                alert(err.error || 'Failed to delete workflow');
+            }
+        } catch (err) {
+            console.error('Failed to delete workflow:', err);
+            alert('Failed to delete workflow');
+        } finally {
+            this.saving = false;
+        }
     },
 
     // ============================================

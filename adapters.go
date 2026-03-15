@@ -11,6 +11,7 @@ import (
 	"school-with-ai/modules/chat/chatcontracts"
 	"school-with-ai/modules/filesystem"
 	"school-with-ai/modules/knowledge/edgequake"
+	"school-with-ai/modules/multiagent"
 	"school-with-ai/modules/permissions"
 	permworkspace "school-with-ai/modules/permissions/workspace"
 	"school-with-ai/modules/userprofile/identity"
@@ -260,15 +261,18 @@ func mapFileStat(s *filesystem.FileStat) *fsplugin.FileStat {
 
 type userAwareAgentProvider struct {
 	repo                agentstore.AgentDefinitionRepository
+	workflowRepo        multiagent.WorkflowDefinitionRepository
 	functionMiddlewares []agent.Middleware
 }
 
 func newUserAwareAgentProvider(
 	repo agentstore.AgentDefinitionRepository,
+	workflowRepo multiagent.WorkflowDefinitionRepository,
 	funcMw []agent.Middleware,
 ) *userAwareAgentProvider {
 	return &userAwareAgentProvider{
 		repo:                repo,
+		workflowRepo:        workflowRepo,
 		functionMiddlewares: funcMw,
 	}
 }
@@ -284,11 +288,22 @@ func (p *userAwareAgentProvider) GetForUser(ctx context.Context, name, userID st
 	if name == "" {
 		return nil, fmt.Errorf("an agent ID must be provided")
 	}
+
+	// Try regular agent first.
 	agentDef, err := p.repo.GetByID(ctx, name, userID)
-	if err != nil {
-		return nil, fmt.Errorf("agent %q not found for user %s: %w", name, userID, err)
+	if err == nil {
+		return p.agentFromDefinition(agentDef), nil
 	}
-	return p.agentFromDefinition(agentDef), nil
+
+	// Fall back to workflow definitions.
+	if p.workflowRepo != nil {
+		wf, wfErr := p.workflowRepo.GetByID(ctx, name, userID)
+		if wfErr == nil {
+			return workflowAgentFromDefinition(wf), nil
+		}
+	}
+
+	return nil, fmt.Errorf("agent %q not found for user %s: %w", name, userID, err)
 }
 
 func (p *userAwareAgentProvider) List() []agent.Agent {
@@ -299,6 +314,8 @@ func (p *userAwareAgentProvider) ListForUser(ctx context.Context, userID string)
 	if userID == "" {
 		return nil, nil
 	}
+
+	// Load regular agents.
 	definitions, err := p.repo.ListByUser(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("listing agents: %w", err)
@@ -307,6 +324,17 @@ func (p *userAwareAgentProvider) ListForUser(ctx context.Context, userID string)
 	for i := range definitions {
 		agents = append(agents, p.agentFromDefinition(&definitions[i]))
 	}
+
+	// Load workflow agents.
+	if p.workflowRepo != nil {
+		workflows, wfErr := p.workflowRepo.ListByUser(ctx, userID)
+		if wfErr == nil {
+			for i := range workflows {
+				agents = append(agents, workflowAgentFromDefinition(&workflows[i]))
+			}
+		}
+	}
+
 	return agents, nil
 }
 
@@ -368,3 +396,62 @@ func (a *configAgent) SubAgents() []agent.Agent { return a.config.SubAgents }
 func (a *configAgent) Config() agent.Config     { return a.config }
 
 var _ agent.Configurable = (*configAgent)(nil)
+
+// ──────────────────────────────────────────────────────────────────────────────
+// workflowAgent adapts a multiagent.WorkflowDefinition to the foundation
+// agent.WorkflowAgent interface so the ADK-Go adapter can detect it and
+// recursively build the appropriate nested agent tree at runtime.
+//
+// The composition tree supports arbitrary nesting:
+//   sequential → [agent, parallel → [agent, loop → [agent, agent]]]
+//
+// See arch/adr/019-multi-agent-workflow-composition.md.
+// ──────────────────────────────────────────────────────────────────────────────
+
+type workflowAgentAdapter struct {
+	id          string
+	name        string
+	description string
+	icon        string
+	graph       agent.WorkflowNodeInfo
+}
+
+func workflowAgentFromDefinition(wf *multiagent.WorkflowDefinition) agent.Agent {
+	return &workflowAgentAdapter{
+		id:          wf.ID,
+		name:        wf.Name,
+		description: wf.Description,
+		icon:        wf.Icon,
+		graph:       convertNode(wf.Graph),
+	}
+}
+
+// convertNode recursively maps a multiagent.WorkflowNode to agent.WorkflowNodeInfo.
+func convertNode(n multiagent.WorkflowNode) agent.WorkflowNodeInfo {
+	info := agent.WorkflowNodeInfo{
+		ID:            n.ID,
+		Type:          string(n.Type),
+		Label:         n.Label,
+		AgentID:       n.AgentID,
+		OutputKey:     n.OutputKey,
+		MaxIterations: n.MaxIterations,
+	}
+	if len(n.Children) > 0 {
+		info.Children = make([]agent.WorkflowNodeInfo, len(n.Children))
+		for i, child := range n.Children {
+			info.Children[i] = convertNode(child)
+		}
+	}
+	return info
+}
+
+func (a *workflowAgentAdapter) ID() agent.ID             { return a.id }
+func (a *workflowAgentAdapter) Name() string             { return a.name }
+func (a *workflowAgentAdapter) Description() string      { return a.description }
+func (a *workflowAgentAdapter) SubAgents() []agent.Agent { return nil }
+func (a *workflowAgentAdapter) Icon() string             { return a.icon }
+
+// WorkflowAgent interface implementation.
+func (a *workflowAgentAdapter) WorkflowGraph() agent.WorkflowNodeInfo { return a.graph }
+
+var _ agent.WorkflowAgent = (*workflowAgentAdapter)(nil)
