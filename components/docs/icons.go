@@ -39,4 +39,12 @@ var (
 	iconSlidersHorizontal = iconSized(icon.SlidersHorizontal)
 	iconZap               = iconSized(icon.Zap)
 	iconSparkles          = iconSized(icon.Sparkles)
+
+	// ── Workflow examples section icons ──
+	iconBlocks           = iconSized(icon.Blocks)
+	iconPipelineDoc      = iconSized(icon.GitBranch)
+	iconNetworkDoc       = iconSized(icon.Network)
+	iconBookOpenCheckDoc = iconSized(icon.BookOpenCheck)
+	iconRepeatDoc        = iconSized(icon.Repeat)
+	iconWandDoc          = iconSized(icon.WandSparkles)
 )

@@ -83,6 +83,8 @@ services:
       # This pod runs migrations (no APP_SKIP_MIGRATIONS)
       - APP_DB_MAX_IDLE_CONNS=10
       - APP_DB_MAX_OPEN_CONNS=20
+      # A2A: Allow connecting to private/Docker-internal agent addresses
+      - A2A_ALLOW_PRIVATE_NETWORKS=true
       # NATS JetStream — event fan-out and replay
       - APP_NATS_URL=nats://nats-1:4222,nats://nats-2:4222,nats://nats-3:4222
       - APP_NATS_PASSWORD=${NATS_PASSWORD}
@@ -170,10 +172,14 @@ services:
       # Tuning for cluster mode — lower per-pod DB connections since 10 pods share the pool
       - APP_DB_MAX_IDLE_CONNS=10
       - APP_DB_MAX_OPEN_CONNS=20
+      # A2A: Allow connecting to private/Docker-internal agent addresses
+      - A2A_ALLOW_PRIVATE_NETWORKS=true
       # NATS JetStream — event fan-out and replay
       - APP_NATS_URL=nats://nats-1:4222,nats://nats-2:4222,nats://nats-3:4222
       - APP_NATS_PASSWORD=${NATS_PASSWORD}
       - APP_NATS_REPLICAS=3
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./tls:/app/tls:ro
     networks:
