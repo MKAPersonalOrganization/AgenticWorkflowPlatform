@@ -874,3 +874,22 @@ ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS include_contents            VAR
 ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS global_instruction          TEXT NOT NULL DEFAULT '';
 ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS input_schema                JSONB;
 ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS output_schema               JSONB;
+
+-- Version: 1.61
+-- Description: Add workflow template columns to agent_store_catalog so catalog
+-- entries can represent multi-agent workflows, not just single agents. Also add
+-- source_catalog_id to workflow_definitions for fork de-duplication.
+ALTER TABLE agent_store_catalog ADD COLUMN IF NOT EXISTS workflow_graph JSONB;
+ALTER TABLE agent_store_catalog ADD COLUMN IF NOT EXISTS sub_agents    JSONB;
+ALTER TABLE workflow_definitions ADD COLUMN IF NOT EXISTS source_catalog_id VARCHAR(255) NOT NULL DEFAULT '';
+
+-- Version: 1.62
+-- Description: Add unique constraint on agent_store_catalog name to prevent
+-- duplicate seeding across multiple pod restarts in clustered deployments.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_store_catalog_name ON agent_store_catalog(name);
+
+-- Version: 1.63
+-- Description: Add workflow_id to user_agents so sub-agents created when
+-- forking a workflow are hidden from the main agent list. Only agents with
+-- an empty workflow_id are top-level user agents.
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS workflow_id VARCHAR(255) NOT NULL DEFAULT '';

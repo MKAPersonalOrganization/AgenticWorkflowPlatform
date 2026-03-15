@@ -38,10 +38,10 @@ func (r *postgresAgentDefinitionRepository) Create(ctx context.Context, agent *A
 	agent.UpdatedAt = now
 
 	query := `
-INSERT INTO user_agents (id, user_id, name, description, system_prompt, icon, source_catalog_id,
+INSERT INTO user_agents (id, user_id, name, description, system_prompt, icon, source_catalog_id, workflow_id,
     disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
     global_instruction, input_schema, output_schema, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`
 
 	_, err := r.db.ExecContext(ctx, query,
 		agent.ID,
@@ -51,6 +51,7 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`
 		agent.SystemPrompt,
 		agent.Icon,
 		agent.SourceCatalogID,
+		agent.WorkflowID,
 		agent.DisallowTransferToParent,
 		agent.DisallowTransferToPeers,
 		agent.OutputKey,
@@ -131,7 +132,7 @@ func (r *postgresAgentDefinitionRepository) Delete(ctx context.Context, id, user
 }
 
 func (r *postgresAgentDefinitionRepository) GetByID(ctx context.Context, id, userID string) (*AgentDefinition, error) {
-	query := `SELECT id, user_id, name, description, system_prompt, icon, source_catalog_id,
+	query := `SELECT id, user_id, name, description, system_prompt, icon, source_catalog_id, workflow_id,
     disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
     global_instruction, COALESCE(input_schema::text, '') as input_schema, COALESCE(output_schema::text, '') as output_schema,
     created_at, updated_at
@@ -146,11 +147,11 @@ FROM user_agents WHERE id = $1 AND user_id = $2`
 }
 
 func (r *postgresAgentDefinitionRepository) ListByUser(ctx context.Context, userID string) ([]AgentDefinition, error) {
-	query := `SELECT id, user_id, name, description, system_prompt, icon, source_catalog_id,
+	query := `SELECT id, user_id, name, description, system_prompt, icon, source_catalog_id, workflow_id,
     disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
     global_instruction, COALESCE(input_schema::text, '') as input_schema, COALESCE(output_schema::text, '') as output_schema,
     created_at, updated_at
-FROM user_agents WHERE user_id = $1 ORDER BY created_at ASC`
+FROM user_agents WHERE user_id = $1 AND workflow_id = '' ORDER BY created_at ASC`
 
 	var agents []AgentDefinition
 	if err := r.db.SelectContext(ctx, &agents, query, userID); err != nil {
@@ -161,12 +162,12 @@ FROM user_agents WHERE user_id = $1 ORDER BY created_at ASC`
 }
 
 func (r *postgresAgentDefinitionRepository) Search(ctx context.Context, userID, query string) ([]AgentDefinition, error) {
-	sqlQuery := `SELECT id, user_id, name, description, system_prompt, icon, source_catalog_id,
+	sqlQuery := `SELECT id, user_id, name, description, system_prompt, icon, source_catalog_id, workflow_id,
     disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
     global_instruction, COALESCE(input_schema::text, '') as input_schema, COALESCE(output_schema::text, '') as output_schema,
     created_at, updated_at
 FROM user_agents
-WHERE user_id = $1 AND (name ILIKE $2 OR description ILIKE $2)
+WHERE user_id = $1 AND workflow_id = '' AND (name ILIKE $2 OR description ILIKE $2)
 ORDER BY created_at ASC`
 
 	pattern := "%" + query + "%"

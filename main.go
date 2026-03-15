@@ -290,6 +290,12 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Initialize Multi-Agent Workflow module (ADR 019)
 	multiAgentModule := multiagentmod.New(log, db, agentStoreModule.AgentDefinitionRepo())
 
+	// Wire workflow forker into catalog handler so forking a workflow catalog
+	// entry creates sub-agents + workflow_definition for the user.
+	agentStoreModule.SetWorkflowForker(
+		multiagentmod.NewCatalogWorkflowForker(log, agentStoreModule.AgentDefinitionRepo(), multiAgentModule.WorkflowRepo()),
+	)
+
 	// Run migrations (skipped when APP_SKIP_MIGRATIONS=true, e.g. in a
 	// cluster where an init container handles migrations before pods start).
 	if os.Getenv("APP_SKIP_MIGRATIONS") != "true" {

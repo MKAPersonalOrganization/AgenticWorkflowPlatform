@@ -39,7 +39,10 @@ func (r *postgresAgentCatalogRepository) List(ctx context.Context, category stri
 		}
 
 		query := `
-SELECT id, name, description, system_prompt, category, tags, author_name, icon, featured, add_count, created_at, updated_at
+SELECT id, name, description, system_prompt, category, tags, author_name, icon, featured, add_count,
+       COALESCE(workflow_graph::text, '') as workflow_graph,
+       COALESCE(sub_agents::text, '') as sub_agents,
+       created_at, updated_at
 FROM agent_store_catalog
 WHERE category = $1
 ORDER BY featured DESC, add_count DESC, name ASC
@@ -61,7 +64,10 @@ LIMIT $2 OFFSET $3
 		}
 
 		query := `
-SELECT id, name, description, system_prompt, category, tags, author_name, icon, featured, add_count, created_at, updated_at
+SELECT id, name, description, system_prompt, category, tags, author_name, icon, featured, add_count,
+       COALESCE(workflow_graph::text, '') as workflow_graph,
+       COALESCE(sub_agents::text, '') as sub_agents,
+       created_at, updated_at
 FROM agent_store_catalog
 ORDER BY featured DESC, add_count DESC, name ASC
 LIMIT $1 OFFSET $2
@@ -97,7 +103,10 @@ func (r *postgresAgentCatalogRepository) Search(ctx context.Context, query strin
 	}
 
 	searchQuery := `
-SELECT id, name, description, system_prompt, category, tags, author_name, icon, featured, add_count, created_at, updated_at
+SELECT id, name, description, system_prompt, category, tags, author_name, icon, featured, add_count,
+       COALESCE(workflow_graph::text, '') as workflow_graph,
+       COALESCE(sub_agents::text, '') as sub_agents,
+       created_at, updated_at
 FROM agent_store_catalog
 WHERE name ILIKE $1 OR description ILIKE $1 OR category ILIKE $1
 ORDER BY featured DESC, add_count DESC, name ASC
@@ -119,7 +128,10 @@ LIMIT $2 OFFSET $3
 
 func (r *postgresAgentCatalogRepository) GetByID(ctx context.Context, id string) (*AgentCatalogEntry, error) {
 	query := `
-SELECT id, name, description, system_prompt, category, tags, author_name, icon, featured, add_count, created_at, updated_at
+SELECT id, name, description, system_prompt, category, tags, author_name, icon, featured, add_count,
+       COALESCE(workflow_graph::text, '') as workflow_graph,
+       COALESCE(sub_agents::text, '') as sub_agents,
+       created_at, updated_at
 FROM agent_store_catalog
 WHERE id = $1
 `
@@ -128,7 +140,9 @@ WHERE id = $1
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&entry.ID, &entry.Name, &entry.Description, &entry.SystemPrompt,
 		&entry.Category, pq.Array(&tags), &entry.AuthorName, &entry.Icon,
-		&entry.Featured, &entry.AddCount, &entry.CreatedAt, &entry.UpdatedAt,
+		&entry.Featured, &entry.AddCount,
+		&entry.WorkflowGraphJSON, &entry.SubAgentsJSON,
+		&entry.CreatedAt, &entry.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -168,17 +182,15 @@ func (r *postgresAgentCatalogRepository) IncrementAddCount(ctx context.Context, 
 }
 
 func (r *postgresAgentCatalogRepository) Seed(ctx context.Context, entries []AgentCatalogEntry) error {
-	var count int
-	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM agent_store_catalog`).Scan(&count); err != nil {
-		return fmt.Errorf("checking catalog count: %w", err)
-	}
-	if count > 0 {
-		return nil
-	}
-
+	// Use ON CONFLICT to be idempotent: inserts new entries, skips existing.
+	// This allows adding new catalog entries (e.g., workflow templates) to
+	// a database that already has the original single-agent entries.
+	// Uses ON CONFLICT (name) because the unique index on name is always present,
+	// while older entries may have had random UUIDs (not matching our deterministic IDs).
 	query := `
-INSERT INTO agent_store_catalog (id, name, description, system_prompt, category, tags, author_name, icon, featured, add_count, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, $10, $10)
+INSERT INTO agent_store_catalog (id, name, description, system_prompt, category, tags, author_name, icon, featured, add_count, workflow_graph, sub_agents, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, $10, $11, $12, $12)
+ON CONFLICT (name) DO NOTHING
 `
 	now := time.Now()
 	for _, e := range entries {
@@ -186,9 +198,17 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, $10, $10)
 		if id == "" {
 			id = uuid.New().String()
 		}
+		var wfGraph, subAgents interface{}
+		if e.WorkflowGraphJSON != "" {
+			wfGraph = e.WorkflowGraphJSON
+		}
+		if e.SubAgentsJSON != "" {
+			subAgents = e.SubAgentsJSON
+		}
 		_, err := r.db.ExecContext(ctx, query,
 			id, e.Name, e.Description, e.SystemPrompt, e.Category,
-			pq.Array(e.Tags), e.AuthorName, e.Icon, e.Featured, now,
+			pq.Array(e.Tags), e.AuthorName, e.Icon, e.Featured,
+			wfGraph, subAgents, now,
 		)
 		if err != nil {
 			return fmt.Errorf("seeding catalog entry %q: %w", e.Name, err)
@@ -205,7 +225,9 @@ func scanCatalogRows(rows *sql.Rows) ([]AgentCatalogEntry, error) {
 		if err := rows.Scan(
 			&e.ID, &e.Name, &e.Description, &e.SystemPrompt,
 			&e.Category, pq.Array(&tags), &e.AuthorName, &e.Icon,
-			&e.Featured, &e.AddCount, &e.CreatedAt, &e.UpdatedAt,
+			&e.Featured, &e.AddCount,
+			&e.WorkflowGraphJSON, &e.SubAgentsJSON,
+			&e.CreatedAt, &e.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scanning catalog entry: %w", err)
 		}
