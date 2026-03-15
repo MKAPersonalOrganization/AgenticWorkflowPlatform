@@ -22,7 +22,17 @@ export const agentsManager = () => ({
         name: '',
         description: '',
         systemPrompt: '',
+        // Multi-agent orchestration fields
+        disallowTransferToParent: false,
+        disallowTransferToPeers: false,
+        outputKey: '',
+        includeContents: '',
+        globalInstruction: '',
+        outputSchema: '',
     },
+
+    // Orchestration section
+    showOrchestration: false,
 
     // Tools & KB state (for edit mode)
     showTools: false,
@@ -150,10 +160,17 @@ export const agentsManager = () => ({
             name: '',
             description: '',
             systemPrompt: '',
+            disallowTransferToParent: false,
+            disallowTransferToPeers: false,
+            outputKey: '',
+            includeContents: '',
+            globalInstruction: '',
+            outputSchema: '',
         };
         this.showTools = false;
         this.showKnowledgeBases = false;
         this.showFilesystems = false;
+        this.showOrchestration = false;
         this.agentPlugins = [];
         this.agentWorkspaces = [];
         this.agentFilesystems = [];
@@ -166,10 +183,17 @@ export const agentsManager = () => ({
             name: agent.name || '',
             description: agent.description || '',
             systemPrompt: agent.systemPrompt || '',
+            disallowTransferToParent: agent.disallowTransferToParent || false,
+            disallowTransferToPeers: agent.disallowTransferToPeers || false,
+            outputKey: agent.outputKey || '',
+            includeContents: agent.includeContents || '',
+            globalInstruction: agent.globalInstruction || '',
+            outputSchema: agent.outputSchema || '',
         };
         this.showTools = false;
         this.showKnowledgeBases = false;
         this.showFilesystems = false;
+        this.showOrchestration = false;
         this.agentPlugins = [];
         this.agentWorkspaces = [];
         this.view = 'form';
@@ -188,6 +212,12 @@ export const agentsManager = () => ({
                 name: this.form.name.trim(),
                 description: this.form.description.trim(),
                 systemPrompt: this.form.systemPrompt.trim(),
+                disallowTransferToParent: this.form.disallowTransferToParent || false,
+                disallowTransferToPeers: this.form.disallowTransferToPeers || false,
+                outputKey: this.form.outputKey.trim(),
+                includeContents: this.form.includeContents || '',
+                globalInstruction: this.form.globalInstruction.trim(),
+                outputSchema: this.form.outputSchema.trim(),
             };
 
             // Preserve the existing icon when editing (the backend handles fallback)
@@ -295,6 +325,17 @@ export const agentsManager = () => ({
         if (this.loadingFilesystems) return '';
         const enabled = this.agentFilesystems.filter(fs => fs.enabled).length;
         return `${enabled}/${this.agentFilesystems.length}`;
+    },
+
+    get orchestrationSummary() {
+        const flags = [];
+        if (this.form.disallowTransferToParent) flags.push('no↑parent');
+        if (this.form.disallowTransferToPeers) flags.push('no↔peers');
+        if (this.form.outputKey) flags.push('key:' + this.form.outputKey);
+        if (this.form.includeContents === 'none') flags.push('fresh ctx');
+        if (this.form.globalInstruction) flags.push('global');
+        if (this.form.outputSchema) flags.push('schema');
+        return flags.length ? flags.join(' · ') : '';
     },
 
     async fetchAgentPlugins(agentId) {
@@ -580,7 +621,12 @@ export const agentsManager = () => ({
     createNode(type) {
         const id = this._nextNodeId();
         if (type === 'agent') {
-            return { id, type: 'agent', label: '', agent_id: '', output_key: '' };
+            return {
+                id, type: 'agent', label: '', agent_id: '', output_key: '',
+                disallow_transfer_to_parent: null,
+                disallow_transfer_to_peers: null,
+                include_contents: '',
+            };
         }
         const node = { id, type, label: '', children: [] };
         if (type === 'loop') {
@@ -643,9 +689,15 @@ export const agentsManager = () => ({
             delete node.max_iterations;
             node.agent_id = '';
             node.output_key = '';
+            node.disallow_transfer_to_parent = null;
+            node.disallow_transfer_to_peers = null;
+            node.include_contents = '';
         } else {
             delete node.agent_id;
             delete node.output_key;
+            delete node.disallow_transfer_to_parent;
+            delete node.disallow_transfer_to_peers;
+            delete node.include_contents;
             if (!node.children || node.children.length === 0) {
                 node.children = [this.createNode('agent')];
             }

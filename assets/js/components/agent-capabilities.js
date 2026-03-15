@@ -25,6 +25,7 @@ export const agentCapabilities = () => ({
     showToolsSection: true,
     showKBSection: true,
     showFSSection: true,
+    showOrchestrationSection: true,
 
     // Cache key — skip re-fetch if the agent hasn't changed
     _cachedAgentId: null,
@@ -71,6 +72,42 @@ export const agentCapabilities = () => ({
 
     get totalEnabled() {
         return this.enabledTools + this.enabledKBs + this.enabledFS;
+    },
+
+    // ── Orchestration computed properties ──
+    // These are read directly from currentAgentData (parent scope).
+
+    get orchTransferToParentBlocked() {
+        return !!this.currentAgentData?.disallowTransferToParent;
+    },
+
+    get orchTransferToPeersBlocked() {
+        return !!this.currentAgentData?.disallowTransferToPeers;
+    },
+
+    get orchOutputKey() {
+        return this.currentAgentData?.outputKey || '';
+    },
+
+    get orchIncludeContents() {
+        return this.currentAgentData?.includeContents || '';
+    },
+
+    get orchGlobalInstruction() {
+        return this.currentAgentData?.globalInstruction || '';
+    },
+
+    get orchOutputSchema() {
+        return this.currentAgentData?.outputSchema || '';
+    },
+
+    get hasOrchestrationConfig() {
+        return this.orchTransferToParentBlocked
+            || this.orchTransferToPeersBlocked
+            || !!this.orchOutputKey
+            || this.orchIncludeContents === 'none'
+            || !!this.orchGlobalInstruction
+            || !!this.orchOutputSchema;
     },
 
     // ── Methods ──

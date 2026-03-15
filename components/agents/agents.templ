@@ -667,6 +667,165 @@ templ AgentsDialog() {
 									{ i18n.T(ctx, "This is the instruction that defines the agent's personality, expertise, and behavior.") }
 								</p>
 							</div>
+							<!-- ═══════ Multi-Agent Orchestration Section ═══════ -->
+							<div class="border border-border rounded-lg">
+								<button
+									type="button"
+									@click="showOrchestration = !showOrchestration"
+									class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
+								>
+									<span class="flex items-center gap-2">
+										@icon.GitBranch(icon.Props{Class: "size-4 text-muted-foreground"})
+										{ i18n.T(ctx, "Multi-Agent Orchestration") }
+										<span class="text-[10px] text-muted-foreground" x-text="orchestrationSummary"></span>
+									</span>
+									<span
+										class="transition-transform duration-200"
+										:class="showOrchestration ? 'rotate-180' : ''"
+									>
+										@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+									</span>
+								</button>
+								<div x-show="showOrchestration" x-collapse class="px-3 pb-3 border-t border-border pt-3 space-y-4">
+									<p class="text-[11px] text-muted-foreground">
+										{ i18n.T(ctx, "Configure how this agent participates in multi-agent workflows. These settings control delegation, state sharing, and I/O behaviour when combined with other agents.") }
+									</p>
+									<!-- Transfer Policy -->
+									<div class="space-y-2">
+										<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
+											@icon.ArrowRightLeft(icon.Props{Class: "size-3.5 text-muted-foreground"})
+											{ i18n.T(ctx, "Transfer Policy") }
+										</span>
+										<p class="text-[11px] text-muted-foreground">
+											{ i18n.T(ctx, "Controls whether the LLM can delegate tasks to other agents via the transfer_to_agent tool.") }
+										</p>
+										<div class="space-y-2 ps-1">
+											<!-- Disallow Transfer to Parent -->
+											<label class="flex items-center justify-between gap-2 py-1.5 cursor-pointer">
+												<div class="flex-1 min-w-0">
+													<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Block transfer to parent") }</span>
+													<p class="text-[10px] text-muted-foreground mt-0.5">{ i18n.T(ctx, "Prevents this agent from escalating back to its parent agent.") }</p>
+												</div>
+												<button
+													type="button"
+													@click="form.disallowTransferToParent = !form.disallowTransferToParent"
+													class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
+													:class="form.disallowTransferToParent ? 'bg-primary' : 'bg-input'"
+													role="switch"
+													:aria-checked="form.disallowTransferToParent"
+												>
+													<span
+														class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
+														:class="form.disallowTransferToParent ? 'translate-x-4' : 'translate-x-0'"
+													></span>
+												</button>
+											</label>
+											<!-- Disallow Transfer to Peers -->
+											<label class="flex items-center justify-between gap-2 py-1.5 cursor-pointer">
+												<div class="flex-1 min-w-0">
+													<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Block transfer to peers") }</span>
+													<p class="text-[10px] text-muted-foreground mt-0.5">{ i18n.T(ctx, "Prevents this agent from delegating to sibling agents.") }</p>
+												</div>
+												<button
+													type="button"
+													@click="form.disallowTransferToPeers = !form.disallowTransferToPeers"
+													class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
+													:class="form.disallowTransferToPeers ? 'bg-primary' : 'bg-input'"
+													role="switch"
+													:aria-checked="form.disallowTransferToPeers"
+												>
+													<span
+														class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
+														:class="form.disallowTransferToPeers ? 'translate-x-4' : 'translate-x-0'"
+													></span>
+												</button>
+											</label>
+										</div>
+									</div>
+									<!-- Output Key -->
+									<div class="space-y-2">
+										<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
+											@icon.Key(icon.Props{Class: "size-3.5 text-muted-foreground"})
+											{ i18n.T(ctx, "Output Key") }
+										</span>
+										@input.Input(input.Props{
+											Placeholder: i18n.T(ctx, "e.g., research_results, draft_content..."),
+											Class:       "h-8 text-xs",
+											Attributes: templ.Attributes{
+												"x-model":   "form.outputKey",
+												"maxlength": "100",
+											},
+										})
+										<p class="text-[10px] text-muted-foreground">
+											{ i18n.T(ctx, "Stores this agent's final output in session state. Downstream agents can reference it via {key_name} in their instructions.") }
+										</p>
+									</div>
+									<!-- Include Contents -->
+									<div class="space-y-2">
+										<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
+											@icon.MessageSquare(icon.Props{Class: "size-3.5 text-muted-foreground"})
+											{ i18n.T(ctx, "History Forwarding") }
+										</span>
+										<div class="flex gap-2">
+											<button
+												type="button"
+												@click="form.includeContents = ''"
+												class="flex-1 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors"
+												:class="!form.includeContents || form.includeContents === 'default' ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted/50 text-muted-foreground border-border hover:bg-accent'"
+											>
+												{ i18n.T(ctx, "Include History") }
+											</button>
+											<button
+												type="button"
+												@click="form.includeContents = 'none'"
+												class="flex-1 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors"
+												:class="form.includeContents === 'none' ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted/50 text-muted-foreground border-border hover:bg-accent'"
+											>
+												{ i18n.T(ctx, "Fresh Context") }
+											</button>
+										</div>
+										<p class="text-[10px] text-muted-foreground">
+											{ i18n.T(ctx, "Controls whether conversation history is forwarded when this agent runs as a sub-agent. 'Fresh Context' starts with a clean slate.") }
+										</p>
+									</div>
+									<!-- Global Instruction -->
+									<div class="space-y-2">
+										<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
+											@icon.Globe(icon.Props{Class: "size-3.5 text-muted-foreground"})
+											{ i18n.T(ctx, "Global Instruction") }
+										</span>
+										@textarea.Textarea(textarea.Props{
+											Placeholder: i18n.T(ctx, "Shared instruction applied to all agents in the workflow tree..."),
+											Class:       "min-h-[60px] resize-y text-xs",
+											Rows:        2,
+											Attributes: templ.Attributes{
+												"x-model": "form.globalInstruction",
+											},
+										})
+										<p class="text-[10px] text-muted-foreground">
+											{ i18n.T(ctx, "Only effective when this agent is the root of a workflow. Applies to all agents in the tree (e.g., organization policies, safety rules).") }
+										</p>
+									</div>
+									<!-- Output Schema -->
+									<div class="space-y-2">
+										<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
+											@icon.Braces(icon.Props{Class: "size-3.5 text-muted-foreground"})
+											{ i18n.T(ctx, "Output Schema (JSON)") }
+										</span>
+										@textarea.Textarea(textarea.Props{
+											Placeholder: i18n.T(ctx, `{"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]}`),
+											Class:       "min-h-[60px] resize-y font-mono text-[11px]",
+											Rows:        2,
+											Attributes: templ.Attributes{
+												"x-model": "form.outputSchema",
+											},
+										})
+										<p class="text-[10px] text-muted-foreground">
+											{ i18n.T(ctx, "Forces the agent to produce structured JSON matching this schema. When set, tool use is disabled. Leave empty for free-form responses.") }
+										</p>
+									</div>
+								</div>
+							</div>
 							<!-- Tools & Knowledge Bases (only when editing an existing agent) -->
 							<template x-if="editingAgent">
 								<div class="space-y-4">

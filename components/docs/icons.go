@@ -18,6 +18,7 @@ var (
 	iconRocket            = iconSized(icon.Rocket)
 	iconStore             = iconSized(icon.Store)
 	iconWand              = iconSized(icon.Wand)
+	iconGitBranch         = iconSized(icon.GitBranch)
 	iconNetwork           = iconSized(icon.Network)
 	iconPuzzle            = iconSized(icon.Puzzle)
 	iconDatabase          = iconSized(icon.Database)

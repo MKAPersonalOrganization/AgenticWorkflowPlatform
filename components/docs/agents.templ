@@ -199,6 +199,133 @@ templ docsCustomAgents() {
 	}
 }
 
+// ─── Multi-Agent Orchestration ───────────────────────────────────────────────
+templ docsMultiAgentOrchestration() {
+	@docsSection("multi-agent", "Multi-Agent Orchestration", iconGitBranch, "text-indigo-500") {
+		<p>
+			Compass.AI supports <strong>composing multiple agents into coordinated teams</strong> that solve
+			complex, multi-step problems no single agent can handle. Built on Google's
+			<strong>Agent Development Kit (ADK)</strong>, the orchestration engine supports four composition
+			patterns — sequential, parallel, loop, and free-form delegation — all configurable from a
+			visual tree builder in the UI.
+		</p>
+		<h3>Why Multi-Agent?</h3>
+		<p>
+			Single agents work well for focused tasks. But real-world workflows require 
+			<strong>
+				specialization
+				and coordination
+			</strong>: a research agent gathers data, an analyst extracts insights, and a
+			writer produces the final report. Multi-agent orchestration lets you build these pipelines
+			visually, with each agent owning a specific domain and passing structured results downstream.
+		</p>
+		<h3>Composition Patterns</h3>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Pattern</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Behavior</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Use Case</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("Sequential", "Agents execute one after another. Each receives the prior agent's output.", "Research → Analysis → Report pipelines")
+				@docsTableRow("Parallel", "All child agents execute simultaneously. Results are collected and merged.", "Running multiple analysts on the same dataset at once")
+				@docsTableRow("Loop", "Re-executes child agents until an exit condition is met or max iterations reached.", "Iterative refinement: draft → review → revise cycles")
+				@docsTableRow("LLM (Delegation)", "A parent LLM agent dynamically decides which sub-agents to call using transfer_to_agent.", "Open-ended triage: user query routed to the best specialist")
+			</tbody>
+		}
+		<h3>Transfer Policies</h3>
+		<p>
+			Transfer policies control how agents can delegate work to each other in an LLM-routed
+			composition. These prevent undesirable delegation chains and enforce architectural boundaries.
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>• <strong>Block transfer to parent</strong> — Prevents a sub-agent from handing control back to the parent. Useful when a specialist should fully resolve its task before returning.</li>
+			<li>• <strong>Block transfer to peers</strong> — Prevents a sub-agent from delegating to sibling agents. Enforces strict separation of concerns between specialists.</li>
+		</ul>
+		@docsInfoBox("Default Behavior") {
+			<p>By default, all transfers are allowed. Transfer policies are optional constraints you apply per-agent to tighten delegation when your workflow requires it. You can set defaults on the agent definition and override them per-node in a workflow.</p>
+		}
+		<h3>Context Control (Include Contents)</h3>
+		<p>
+			When a sub-agent is invoked, you can control whether it receives the parent's full conversation
+			history or starts with a <strong>fresh context</strong>.
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>• <strong>Default (Include History)</strong> — The sub-agent sees all prior messages. Best for agents that need to reference earlier conversation context.</li>
+			<li>• <strong>None (Fresh Context)</strong> — The sub-agent starts with a clean slate. Best for independent specialists that should not be influenced by upstream dialogue.</li>
+		</ul>
+		<h3>Output Keys</h3>
+		<p>
+			Each agent can store its final output in <strong>session state</strong> under a named key.
+			Downstream agents can then reference this output using template syntax
+			in their system prompts. This enables structured data flow through multi-step pipelines.
+		</p>
+		@docsInfoBox("Example Pipeline") {
+			<p>
+				<strong>Step 1:</strong> Data Analyst agent with <code>output_key: research_data</code>
+				<br/>
+				<strong>Step 2:</strong> Report Writer agent whose system prompt references the output key.
+				The Report Writer receives the structured data produced by the Data Analyst without
+				needing the full conversation history.
+			</p>
+		}
+		<h3>Global Instructions</h3>
+		<p>
+			A <strong>global instruction</strong> is a shared directive applied to <strong>every agent in the tree</strong>.
+			Set it on the root agent, and all sub-agents inherit it automatically. Use this for
+			cross-cutting concerns like tone, compliance rules, or output format requirements.
+		</p>
+		<h3>Output Schemas</h3>
+		<p>
+			Constrain an agent's output to a <strong>JSON schema</strong>. When an output schema is set,
+			the agent's response is guaranteed to conform to the specified structure — essential when downstream agents or systems expect structured input.
+		</p>
+		<p>
+			<strong>Note:</strong> When an output schema is active, tool use is automatically disabled as the model focuses exclusively on producing the structured response.
+		</p>
+		<h3>Visual Workflow Builder</h3>
+		<p>
+			The workflow tree builder provides a <strong>visual, interactive editor</strong> to compose multi-agent workflows.
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>• <strong>Add nodes</strong> — Insert sequential, parallel, loop, or agent nodes at any level of the tree</li>
+			<li>• <strong>Nest compositions</strong> — Place a parallel group inside a sequential pipeline, or a loop inside a parallel group — any combination works</li>
+			<li>• <strong>Per-node overrides</strong> — Override transfer policies and context control on individual nodes without changing the agent definition</li>
+			<li>• <strong>Live preview</strong> — See an animated pipeline visualization with flow particles showing execution direction</li>
+			<li>• <strong>Drag to reorder</strong> — Rearrange agents within compositions by dragging</li>
+		</ul>
+		<h3>Architecture (For Developers)</h3>
+		<p>
+			The orchestration system uses a <strong>framework-agnostic design</strong> with a clean
+			separation between the domain model and the execution engine:
+		</p>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Layer</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Responsibility</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow2("foundation/agent", "Framework-agnostic Config struct: name, system prompt, tools, transfer policy, output key, include contents, global instruction, I/O schemas")
+				@docsTableRow2("modules/multiagent", "WorkflowNode recursive tree type stored as JSONB. Supports per-node overrides of transfer policy and context control.")
+				@docsTableRow2("adapters/adkgo", "Bridges foundation types to Google ADK-Go agents. Resolves precedence: node override > agent definition > default.")
+				@docsTableRow2("adapters.go", "Composition root. Converts DB models to foundation types and wires everything together.")
+			</tbody>
+		}
+		<p>
+			The adapter layer supports <strong>precedence resolution</strong>: per-node overrides in a workflow
+			take priority over agent-level defaults, which take priority over system defaults. This means
+			the same agent can behave differently depending on where it appears in a workflow.
+		</p>
+		@docsInfoBox("ADK-Go Powered") {
+			<p>The orchestration engine is built on <strong>Google's Agent Development Kit for Go (ADK-Go)</strong>, providing battle-tested agent lifecycle management, tool routing, session state, and streaming event delivery via the AG-UI protocol.</p>
+		}
+	}
+}
+
 // ─── Personalized Profile ─────────────────────────────────────────────────────────
 templ docsUserProfile() {
 	@docsSection("personalized-profile", "Personalized Profile", iconUser, "text-amber-500") {

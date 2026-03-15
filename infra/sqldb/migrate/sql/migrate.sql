@@ -862,3 +862,15 @@ WHERE graph = '{}'::jsonb OR graph IS NULL;
 ALTER TABLE workflow_definitions DROP COLUMN IF EXISTS workflow_type;
 ALTER TABLE workflow_definitions DROP COLUMN IF EXISTS steps;
 ALTER TABLE workflow_definitions DROP COLUMN IF EXISTS max_iterations;
+
+-- Version: 1.60
+-- Description: Add multi-agent orchestration columns to user_agents.
+-- Maps to ADK-Go's llmagent.Config fields for transfer control, content
+-- forwarding, session state output, global instructions, and I/O schemas.
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS disallow_transfer_to_parent BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS disallow_transfer_to_peers  BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS output_key                  VARCHAR(255) NOT NULL DEFAULT '';
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS include_contents            VARCHAR(50)  NOT NULL DEFAULT '';
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS global_instruction          TEXT NOT NULL DEFAULT '';
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS input_schema                JSONB;
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS output_schema               JSONB;

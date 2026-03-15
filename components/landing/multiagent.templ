@@ -1,0 +1,114 @@
+package landing
+
+import "school-with-ai/components/icon"
+
+// ─── Multi-Agent Orchestration ───────────────────────────────────────────────
+templ multiAgentSection() {
+	<section id="multi-agent" class="py-24 border-t border-border">
+		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+			<div class="grid gap-12 lg:grid-cols-2 lg:items-center">
+				<!-- Text content -->
+				<div class="order-1">
+					<div class="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-1.5 text-sm text-muted-foreground">
+						@icon.GitBranch(icon.Props{Class: "size-4 text-indigo-500"})
+						<span>Multi-Agent Orchestration</span>
+					</div>
+					<h2 class="text-3xl font-bold tracking-tight sm:text-4xl">
+						Compose agents into
+						<span class="text-primary">intelligent teams</span>
+					</h2>
+					<p class="mt-4 text-lg text-muted-foreground">
+						Build complex AI workflows by combining specialized agents into teams. Sequential pipelines, parallel execution, loops with exit conditions, and free-form delegation — all from a visual tree builder.
+					</p>
+					<ul class="mt-8 space-y-4">
+						@checkListItem("Visual workflow tree builder — drag agents into sequential, parallel, or loop compositions")
+						@checkListItem("Transfer policies — control which agents can delegate to parents or peers")
+						@checkListItem("Per-agent context control — choose between full history forwarding or fresh context per sub-agent")
+						@checkListItem("Output keys — store each agent's result in session state for downstream agents to reference")
+						@checkListItem("Global instructions — set a shared directive that applies across the entire agent tree")
+						@checkListItem("Output schemas — constrain agent responses to structured JSON for reliable pipelines")
+					</ul>
+				</div>
+				<!-- Visual: orchestration tree diagram -->
+				<div class="order-2">
+					<div class="rounded-xl border border-border bg-card p-6">
+						<div class="mb-4 flex items-center justify-between">
+							<h4 class="text-sm font-semibold flex items-center gap-2">
+								@icon.GitBranch(icon.Props{Class: "size-4 text-primary"})
+								Workflow Composition
+							</h4>
+							<span class="text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-muted">Live Preview</span>
+						</div>
+						<!-- Root: Sequential Pipeline -->
+						<div class="space-y-3">
+							@orchNodeCard("sequential", "Research Pipeline", "", "border-blue-500/30", true) {
+								<div class="ml-6 mt-3 space-y-2 border-l-2 border-border/50 pl-4">
+									<!-- Agent 1 -->
+									@orchNodeCard("agent", "📊 Data Analyst", "output: research_data", "border-green-500/30", false) {
+										<div class="flex gap-1.5 mt-1.5">
+											@orchBadge("bg-green-500/10 text-green-700 dark:text-green-400", "↑ parent blocked")
+											@orchBadge("bg-blue-500/10 text-blue-700 dark:text-blue-400", "key: research_data")
+										</div>
+									}
+									<!-- Parallel sub-group -->
+									@orchNodeCard("parallel", "Analysis Group", "", "border-amber-500/30", true) {
+										<div class="ml-6 mt-3 space-y-2 border-l-2 border-border/50 pl-4">
+											@orchNodeCard("agent", "✍️ Writing Coach", "fresh context", "border-purple-500/30", false) {
+												<div class="flex gap-1.5 mt-1.5">
+													@orchBadge("bg-purple-500/10 text-purple-700 dark:text-purple-400", "🧹 fresh context")
+												</div>
+											}
+											@orchNodeCard("agent", "🔬 Research Guide", "", "border-pink-500/30", false) {
+												<div class="flex gap-1.5 mt-1.5">
+													@orchBadge("bg-pink-500/10 text-pink-700 dark:text-pink-400", "↔ peers blocked")
+												</div>
+											}
+										</div>
+									}
+									<!-- Agent 3 -->
+									@orchNodeCard("agent", "📝 Report Writer", "output: final_report", "border-indigo-500/30", false) {
+										<div class="flex gap-1.5 mt-1.5">
+											@orchBadge("bg-indigo-500/10 text-indigo-700 dark:text-indigo-400", "key: final_report")
+											@orchBadge("bg-amber-500/10 text-amber-700 dark:text-amber-400", "schema: JSON")
+										</div>
+									}
+								</div>
+							}
+						</div>
+						<!-- Global instruction indicator -->
+						<div class="mt-4 rounded-lg border border-dashed border-primary/30 bg-primary/5 p-3 flex items-center gap-2">
+							@icon.Globe(icon.Props{Class: "size-3.5 text-primary"})
+							<span class="text-xs text-muted-foreground">Global instruction: <span class="text-foreground font-medium">"Always cite sources and use formal academic tone."</span></span>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+templ orchNodeCard(nodeType, name, subtitle, borderClass string, isContainer bool) {
+	<div class={ "rounded-lg border bg-background px-3 py-2.5", borderClass }>
+		<div class="flex items-center gap-2">
+			switch nodeType {
+				case "sequential":
+					@icon.ArrowDown(icon.Props{Class: "size-3.5 text-blue-500"})
+				case "parallel":
+					@icon.Columns2(icon.Props{Class: "size-3.5 text-amber-500"})
+				case "loop":
+					@icon.RefreshCw(icon.Props{Class: "size-3.5 text-teal-500"})
+				default:
+					@icon.Bot(icon.Props{Class: "size-3.5 text-muted-foreground"})
+			}
+			<span class="text-xs font-medium">{ name }</span>
+			if subtitle != "" {
+				<span class="text-[10px] text-muted-foreground ml-auto">{ subtitle }</span>
+			}
+		</div>
+		{ children... }
+	</div>
+}
+
+templ orchBadge(classes, text string) {
+	<span class={ "text-[9px] px-1.5 py-0.5 rounded-full font-medium", classes }>{ text }</span>
+}

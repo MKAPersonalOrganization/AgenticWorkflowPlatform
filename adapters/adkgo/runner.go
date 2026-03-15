@@ -234,15 +234,20 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 
 			var aErr error
 			adkAgent, aErr = llmagent.New(llmagent.Config{
-				Name:                  agentName,
-				Description:           foundAgent.Description(),
-				Model:                 llm,
-				Instruction:           systemPrompt,
-				Tools:                 adkTools,
-				GenerateContentConfig: genCfg,
-				BeforeAgentCallbacks:  beforeAgentCBs,
-				BeforeToolCallbacks:   beforeToolCBs,
-				AfterToolCallbacks:    afterToolCBs,
+				Name:                     agentName,
+				Description:              foundAgent.Description(),
+				Model:                    llm,
+				Instruction:              systemPrompt,
+				Tools:                    adkTools,
+				GenerateContentConfig:    genCfg,
+				BeforeAgentCallbacks:     beforeAgentCBs,
+				BeforeToolCallbacks:      beforeToolCBs,
+				AfterToolCallbacks:       afterToolCBs,
+				DisallowTransferToParent: transferPolicy(agentCfg).DisallowTransferToParent,
+				DisallowTransferToPeers:  transferPolicy(agentCfg).DisallowTransferToPeers,
+				IncludeContents:          resolveIncludeContents(agentCfg),
+				OutputKey:                outputKey(agentCfg),
+				GlobalInstruction:        globalInstruction(agentCfg),
 			})
 			if aErr != nil {
 				yield(nil, fmt.Errorf("creating adk-go agent: %w", aErr))
@@ -706,6 +711,42 @@ func extractAgentConfig(a fagent.Agent) *fagent.Config {
 		return &cfg
 	}
 	return nil
+}
+
+// transferPolicy extracts the TransferPolicy from an agent config, or returns
+// a zero-value policy (allow all transfers) if config is nil.
+func transferPolicy(cfg *fagent.Config) fagent.TransferPolicy {
+	if cfg == nil {
+		return fagent.TransferPolicy{}
+	}
+	return cfg.TransferPolicy
+}
+
+// resolveIncludeContents maps foundation IncludeContents to ADK-Go's type.
+func resolveIncludeContents(cfg *fagent.Config) llmagent.IncludeContents {
+	if cfg == nil || cfg.IncludeContents == "" || cfg.IncludeContents == fagent.IncludeContentsDefault {
+		return "" // ADK-Go default
+	}
+	if cfg.IncludeContents == fagent.IncludeContentsNone {
+		return llmagent.IncludeContentsNone
+	}
+	return ""
+}
+
+// outputKey returns the OutputKey from an agent config, or empty string.
+func outputKey(cfg *fagent.Config) string {
+	if cfg == nil {
+		return ""
+	}
+	return cfg.OutputKey
+}
+
+// globalInstruction returns the GlobalInstruction from an agent config, or empty string.
+func globalInstruction(cfg *fagent.Config) string {
+	if cfg == nil {
+		return ""
+	}
+	return cfg.GlobalInstruction
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

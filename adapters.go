@@ -346,6 +346,14 @@ func (p *userAwareAgentProvider) agentFromDefinition(def *agentstore.AgentDefini
 		Tools:               []agent.Tool{},
 		Requirements:        []agent.Requirement{},
 		FunctionMiddlewares: p.functionMiddlewares,
+		// Multi-agent orchestration fields
+		TransferPolicy: agent.TransferPolicy{
+			DisallowTransferToParent: def.DisallowTransferToParent,
+			DisallowTransferToPeers:  def.DisallowTransferToPeers,
+		},
+		OutputKey:         def.OutputKey,
+		IncludeContents:   agent.IncludeContents(def.IncludeContents),
+		GlobalInstruction: def.GlobalInstruction,
 	}
 	a := newConfigAgent(cfg)
 	return &dbAgent{
@@ -429,12 +437,15 @@ func workflowAgentFromDefinition(wf *multiagent.WorkflowDefinition) agent.Agent 
 // convertNode recursively maps a multiagent.WorkflowNode to agent.WorkflowNodeInfo.
 func convertNode(n multiagent.WorkflowNode) agent.WorkflowNodeInfo {
 	info := agent.WorkflowNodeInfo{
-		ID:            n.ID,
-		Type:          string(n.Type),
-		Label:         n.Label,
-		AgentID:       n.AgentID,
-		OutputKey:     n.OutputKey,
-		MaxIterations: n.MaxIterations,
+		ID:                       n.ID,
+		Type:                     string(n.Type),
+		Label:                    n.Label,
+		AgentID:                  n.AgentID,
+		OutputKey:                n.OutputKey,
+		MaxIterations:            n.MaxIterations,
+		DisallowTransferToParent: n.DisallowTransferToParent,
+		DisallowTransferToPeers:  n.DisallowTransferToPeers,
+		IncludeContents:          n.IncludeContents,
 	}
 	if len(n.Children) > 0 {
 		info.Children = make([]agent.WorkflowNodeInfo, len(n.Children))

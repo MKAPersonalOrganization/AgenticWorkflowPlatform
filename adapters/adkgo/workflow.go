@@ -191,6 +191,11 @@ func buildLoopNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo) (ag
 
 // buildLeafAgent resolves a single agent node into an ADK-Go LLM agent.
 // It uses the same tool resolution and prompt building pipeline as regular agents.
+//
+// Transfer policies are resolved with this precedence:
+//  1. Workflow node override (DisallowTransferToParent/Peers in WorkflowNodeInfo)
+//  2. AgentDefinition default (stored in DB)
+//  3. ADK-Go default (allow all transfers)
 func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, isLastInLoop bool) (agent.Agent, error) {
 	if node.AgentID == "" {
 		return nil, fmt.Errorf("node %q: agent node requires agent_id", node.ID)
@@ -260,8 +265,41 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 		GenerateContentConfig: genCfg,
 	}
 
+	// ── Transfer Policy ──
+	// Workflow node overrides take precedence over agent definition defaults.
+	if agentCfg != nil {
+		cfg.DisallowTransferToParent = agentCfg.TransferPolicy.DisallowTransferToParent
+		cfg.DisallowTransferToPeers = agentCfg.TransferPolicy.DisallowTransferToPeers
+	}
+	if node.DisallowTransferToParent != nil {
+		cfg.DisallowTransferToParent = *node.DisallowTransferToParent
+	}
+	if node.DisallowTransferToPeers != nil {
+		cfg.DisallowTransferToPeers = *node.DisallowTransferToPeers
+	}
+
+	// ── Include Contents ──
+	includeContents := ""
+	if agentCfg != nil && agentCfg.IncludeContents != "" {
+		includeContents = string(agentCfg.IncludeContents)
+	}
+	if node.IncludeContents != "" {
+		includeContents = node.IncludeContents
+	}
+	if includeContents == "none" {
+		cfg.IncludeContents = llmagent.IncludeContentsNone
+	}
+
+	// ── Output Key ──
 	if node.OutputKey != "" {
 		cfg.OutputKey = node.OutputKey
+	} else if agentCfg != nil && agentCfg.OutputKey != "" {
+		cfg.OutputKey = agentCfg.OutputKey
+	}
+
+	// ── Global Instruction (only meaningful on root, but set if provided) ──
+	if agentCfg != nil && agentCfg.GlobalInstruction != "" {
+		cfg.GlobalInstruction = agentCfg.GlobalInstruction
 	}
 
 	return llmagent.New(cfg)
