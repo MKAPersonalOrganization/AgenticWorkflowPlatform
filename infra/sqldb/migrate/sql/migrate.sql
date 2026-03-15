@@ -949,3 +949,47 @@ DELETE FROM agent_store_catalog;
 -- Drop and recreate as unique so ON CONFLICT (name) works correctly.
 DROP INDEX IF EXISTS idx_agent_store_catalog_name;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_store_catalog_name ON agent_store_catalog(name);
+
+-- Version: 1.67
+-- Description: Create A2A (Agent-to-Agent) connector and skill tables.
+CREATE TABLE IF NOT EXISTS a2a_connectors (
+    id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id              TEXT        NOT NULL,
+    title                TEXT        NOT NULL DEFAULT '',
+    agent_url            TEXT        NOT NULL,
+    status               TEXT        NOT NULL DEFAULT 'created',
+    error_msg            TEXT        NOT NULL DEFAULT '',
+    disconnect_reason    TEXT        NOT NULL DEFAULT '',
+    disconnect_permanent BOOLEAN     NOT NULL DEFAULT FALSE,
+    agent_name           TEXT        NOT NULL DEFAULT '',
+    agent_description    TEXT        NOT NULL DEFAULT '',
+    agent_version        TEXT        NOT NULL DEFAULT '',
+    agent_provider       TEXT        NOT NULL DEFAULT '',
+    agent_card_json      JSONB       NOT NULL DEFAULT '{}',
+    capabilities         TEXT        NOT NULL DEFAULT '',
+    icon_url             TEXT        NOT NULL DEFAULT '',
+    auth_type            TEXT        NOT NULL DEFAULT 'none',
+    auth_token           TEXT        NOT NULL DEFAULT '',
+    auth_header          TEXT        NOT NULL DEFAULT '',
+    created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_a2a_connectors_user_id ON a2a_connectors(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_a2a_connectors_user_url ON a2a_connectors(user_id, agent_url);
+
+CREATE TABLE IF NOT EXISTS a2a_discovered_skills (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    connector_id  UUID        NOT NULL REFERENCES a2a_connectors(id) ON DELETE CASCADE,
+    skill_id      TEXT        NOT NULL DEFAULT '',
+    name          TEXT        NOT NULL,
+    description   TEXT        NOT NULL DEFAULT '',
+    tags          TEXT        NOT NULL DEFAULT '',
+    examples      TEXT        NOT NULL DEFAULT '',
+    input_modes   TEXT        NOT NULL DEFAULT '',
+    output_modes  TEXT        NOT NULL DEFAULT '',
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_a2a_skills_connector ON a2a_discovered_skills(connector_id);

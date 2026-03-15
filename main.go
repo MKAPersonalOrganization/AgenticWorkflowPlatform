@@ -67,6 +67,7 @@ import (
 	memoryplugin "school-with-ai/plugins/memory"
 
 	healthhandlers "school-with-ai/foundation/health"
+	a2amod "school-with-ai/modules/a2a"
 	agentstoremod "school-with-ai/modules/agentstore"
 	aisettingsmod "school-with-ai/modules/aisettings"
 	analyticsmod "school-with-ai/modules/analytics"
@@ -444,6 +445,11 @@ func run(ctx context.Context, log *logger.Logger) error {
 	mcpModule := mcpmod.New(log, db, cfg.Auth.AppURL+"/v1/mcp/oauth/callback", toolRegistry)
 	log.Info(ctx, "startup", "status", "mcp module initialized")
 
+	// Create A2A module
+	a2aModule := a2amod.New(log, db, toolRegistry)
+	defer a2aModule.Shutdown()
+	log.Info(ctx, "startup", "status", "a2a module initialized")
+
 	// Initialize Redis client for distributed permission caching (shared across pods)
 	permCacheRedis := goredis.NewClient(&goredis.Options{Addr: cfg.Redis.Addr, Password: cfg.Redis.Password})
 	defer func() {
@@ -595,6 +601,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		ProfileProvider:        &adkgoProfileAdapter{repo: userProfileRepo},
 		PermChecker:            permissionsService,
 		MCPResolver:            mcpModule.Service(),
+		A2AResolver:            a2aModule.Service(),
 		NewToolSetFactory:      newToolSetFactory,
 		PromptInjectors:        []adkgo.PromptInjector{kbPromptInjector},
 		ExtraConfigFn:          extraConfigFn,
@@ -663,6 +670,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		agentStore:     agentStoreModule,
 		knowledge:      knowledgeModule,
 		mcp:            mcpModule,
+		a2a:            a2aModule,
 		resources:      resourcesModule,
 		filesystem:     filesystemModule,
 		billing:        billingModule,
@@ -785,6 +793,9 @@ type routeModules struct {
 	mcp interface {
 		RegisterRoutes(chi.Router, *auth.Middleware)
 	}
+	a2a interface {
+		RegisterRoutes(chi.Router, *auth.Middleware)
+	}
 	resources interface {
 		RegisterRoutes(chi.Router, *auth.Middleware)
 	}
@@ -825,6 +836,7 @@ func registerRoutes(
 	mods.billing.RegisterRoutes(r, authMW)
 	mods.chat.RegisterRoutes(r, authMW)
 	mods.mcp.RegisterRoutes(r, authMW)
+	mods.a2a.RegisterRoutes(r, authMW)
 	mods.knowledge.RegisterRoutes(r, authMW)
 	mods.analytics.RegisterRoutes(r)
 

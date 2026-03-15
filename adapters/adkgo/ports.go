@@ -85,6 +85,16 @@ type MCPToolResolver interface {
 	) []agent.ExecutableTool
 }
 
+// A2AToolResolver resolves A2A-based tools for a user.
+type A2AToolResolver interface {
+	ResolveEnabledTools(
+		ctx context.Context,
+		userID string,
+		hasToolSetPerm func(toolSetID string) bool,
+		hasToolPerm func(toolSetID, toolID string) bool,
+	) []agent.ExecutableTool
+}
+
 // PluginSettingsResolver provides per-user plugin settings.
 type PluginSettingsResolver interface {
 	GetAllPluginSettingsForUser(ctx context.Context, userID string) (map[string]map[string]string, error)

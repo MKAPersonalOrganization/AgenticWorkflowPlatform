@@ -1,6 +1,7 @@
 package nav
 
 import (
+	a2acomp "school-with-ai/components/a2a"
 	"school-with-ai/components/agenteditor"
 	"school-with-ai/components/agents"
 	"school-with-ai/components/button"
@@ -55,6 +56,10 @@ templ Navbar(props ...NavbarProps) {
 			<!-- Filesystems Button -->
 			<div class="hidden md:block">
 				@filesystem.FilesystemButtonTrigger()
+			</div>
+			<!-- A2A Agents Button -->
+			<div class="hidden md:block">
+				@a2acomp.A2AButtonTrigger()
 			</div>
 		}
 		<!-- Admin Indicator -->

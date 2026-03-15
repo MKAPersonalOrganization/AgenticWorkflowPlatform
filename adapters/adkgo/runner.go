@@ -43,6 +43,7 @@ type RunnerAdapter struct {
 	profileProvider        UserContextProvider
 	permChecker            ToolPermissionChecker
 	mcpResolver            MCPToolResolver
+	a2aResolver            A2AToolResolver
 	newToolSetFactory      NewToolSetFactoryFunc
 	promptInjectors        []PromptInjector
 	extraConfigFn          ExtraConfigFunc
@@ -58,6 +59,7 @@ type RunnerAdapterConfig struct {
 	ProfileProvider        UserContextProvider
 	PermChecker            ToolPermissionChecker
 	MCPResolver            MCPToolResolver
+	A2AResolver            A2AToolResolver
 	NewToolSetFactory      NewToolSetFactoryFunc
 	PromptInjectors        []PromptInjector
 	ExtraConfigFn          ExtraConfigFunc
@@ -77,6 +79,7 @@ func NewRunnerAdapter(cfg RunnerAdapterConfig) (*RunnerAdapter, error) {
 		profileProvider:        cfg.ProfileProvider,
 		permChecker:            cfg.PermChecker,
 		mcpResolver:            cfg.MCPResolver,
+		a2aResolver:            cfg.A2AResolver,
 		newToolSetFactory:      cfg.NewToolSetFactory,
 		promptInjectors:        cfg.PromptInjectors,
 		extraConfigFn:          cfg.ExtraConfigFn,
@@ -604,6 +607,9 @@ func (r *RunnerAdapter) resolveTools(
 			if strings.HasPrefix(toolSetID, "mcp-") {
 				continue // MCP handled below.
 			}
+			if strings.HasPrefix(toolSetID, "a2a-") {
+				continue // A2A handled below.
+			}
 			tools, tErr := toolFactory.CreateExecutableToolsFromSet(ctx, toolSetID)
 			if tErr != nil {
 				continue
@@ -622,6 +628,19 @@ func (r *RunnerAdapter) resolveTools(
 				},
 			)
 			execTools = append(execTools, mcpTools...)
+		}
+
+		// Resolve A2A tools.
+		if r.a2aResolver != nil && userID != "" {
+			a2aTools := r.a2aResolver.ResolveEnabledTools(ctx, userID,
+				func(toolSetID string) bool {
+					return r.permChecker.HasToolSetPermission(ctx, userID, agentName, toolSetID)
+				},
+				func(toolSetID, toolID string) bool {
+					return r.permChecker.HasPermission(ctx, userID, agentName, toolSetID, toolID)
+				},
+			)
+			execTools = append(execTools, a2aTools...)
 		}
 	}
 

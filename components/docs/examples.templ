@@ -1,0 +1,524 @@
+package docs
+
+// ─── Workflow Examples ───────────────────────────────────────────────────────
+templ docsWorkflowExamples() {
+	@docsSection("workflow-examples", "Workflow Examples", iconBlocks, "text-violet-500") {
+		<p>
+			Compass.AI ships with a library of <strong>pre-built workflow templates</strong> in the Agent Store that
+			demonstrate different multi-agent composition patterns. Each template can be <strong>forked and customized</strong>.
+			This section walks through every pattern with architecture diagrams to help you design your own workflows.
+		</p>
+		<h3>Pattern Quick Reference</h3>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Pattern</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">When to Use</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Examples</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("Sequential", "Each step depends on the previous step's output", "Code Pipeline, Trip Planner, Job Posting")
+				@docsTableRow("Parallel → Fan-in", "Independent work streams that merge for a final step", "Stock Analysis, Meeting Prep, Surprise Trip")
+				@docsTableRow("Map-Reduce", "Sequential → parallel fan-out → join", "Write a Book")
+				@docsTableRow("Loop (Self-Evaluation)", "Generate → evaluate → refine until quality target met", "Self-Evaluation Loop")
+			</tbody>
+		}
+		@docsInfoBox("State Passing") {
+			<p>
+				All workflows use <strong>OutputKey → &#123;variable&#125; templates</strong> to pass data between agents.
+				Each agent saves its output under a named key; downstream agents reference it with
+				<code>&#123;key_name&#125;</code> in their system prompts. Keys prefixed with <code>temp:</code> are
+				discarded after the pipeline finishes.
+			</p>
+		}
+	}
+}
+
+// ─── Sequential Pipelines ────────────────────────────────────────────────────
+templ docsSequentialExamples() {
+	@docsSection("sequential-examples", "Sequential Pipelines", iconPipelineDoc, "text-blue-500") {
+		<p>
+			In a <strong>sequential pipeline</strong>, agents execute one after another. Each agent receives the
+			previous agent's output via state keys. This is the simplest and most common composition pattern.
+		</p>
+		<!-- Code Generation Pipeline -->
+		<h3>Code Generation Pipeline</h3>
+		<p>
+			Three-agent pipeline that writes, reviews, and refactors code using explicit state passing.
+			This is the ADK-Go reference for the <code>OutputKey → &#123;variable&#125;</code> pattern.
+		</p>
+		@workflowDiagram("sequential", []string{
+			"CodeWriter → generated_code",
+			"CodeReviewer → temp:review_comments",
+			"CodeRefactorer → refactored_code",
+		})
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Agent</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Reads</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Writes</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("CodeWriter", "User request", "generated_code")
+				@docsTableRow("CodeReviewer", "{generated_code}", "temp:review_comments")
+				@docsTableRow("CodeRefactorer", "{generated_code} + {temp:review_comments}", "refactored_code")
+			</tbody>
+		}
+		@conceptBadges([]string{"OutputKey", "{variable} templates", "temp: prefix"})
+		<!-- Course Generation Pipeline -->
+		<h3>Course Generation Pipeline</h3>
+		<p>
+			Four-agent educational content pipeline: design a curriculum, write the lesson, create assessments,
+			and review all code. Translated from the CrewAI <em>course-generator</em> example.
+		</p>
+		@workflowDiagram("sequential", []string{
+			"CurriculumArchitect → curriculum_plan",
+			"ContentWriter → lesson_content",
+			"QuizMaster → temp:quiz_material",
+			"CodeReviewer → review_report",
+		})
+		@conceptBadges([]string{"4-agent chain", "state cascading", "education domain"})
+		<!-- Game Builder -->
+		<h3>Game Builder Crew</h3>
+		<p>
+			Write a Python game, review it for bugs, then validate the final code against the
+			original specification. From crewAI <em>game-builder-crew</em>.
+		</p>
+		@workflowDiagram("sequential", []string{
+			"SeniorEngineer → game_code",
+			"QAEngineer → temp:qa_review",
+			"ChiefQA → final_game",
+		})
+		@conceptBadges([]string{"code generation", "quality gate", "fix-and-validate"})
+		<!-- Trip Planner -->
+		<h3>Trip Planner</h3>
+		<p>
+			Select the best destination city, gather local insider knowledge, then compile
+			a detailed 7-day itinerary with budget. From crewAI <em>trip_planner</em>.
+		</p>
+		@workflowDiagram("sequential", []string{
+			"CitySelector → selected_city",
+			"LocalExpert → city_guide",
+			"TravelConcierge → travel_plan",
+		})
+		@conceptBadges([]string{"progressive enrichment", "domain hand-off"})
+		<!-- Job Posting Creator -->
+		<h3>Job Posting Creator</h3>
+		<p>
+			Research a company, write a compelling job posting, then review for clarity and inclusivity.
+			From crewAI <em>job-posting</em>.
+		</p>
+		@workflowDiagram("sequential", []string{
+			"CompanyResearcher → company_research",
+			"JobWriter → job_posting_draft",
+			"PostingReviewer → job_posting",
+		})
+		@conceptBadges([]string{"research → draft → review", "HR domain"})
+		<!-- Instagram Post Creator -->
+		<h3>Instagram Post Creator</h3>
+		<p>
+			Five agents create a complete Instagram ad campaign: analyse the product, develop strategy,
+			write copy, describe photographs, and review the creative package. From crewAI <em>instagram_post</em>.
+		</p>
+		@workflowDiagram("sequential", []string{
+			"MarketAnalyst → market_analysis",
+			"Strategist → campaign_strategy",
+			"AdCopywriter → ad_copy",
+			"Photographer → temp:photo_descriptions",
+			"CreativeDirector → creative_review",
+		})
+		@conceptBadges([]string{"5-agent chain", "long pipeline", "creative domain"})
+		<!-- Marketing Strategy -->
+		<h3>Marketing Strategy</h3>
+		<p>
+			Research the market, develop campaign strategy, then produce ready-to-publish content.
+			The final agent reads outputs from both prior agents. From crewAI <em>marketing_strategy</em>.
+		</p>
+		@workflowDiagram("sequential", []string{
+			"MarketResearcher → market_research",
+			"Strategist → campaign_strategy",
+			"ContentCreator → marketing_content",
+		})
+		@conceptBadges([]string{"context fan-in", "marketing domain"})
+		<!-- Recruitment Pipeline -->
+		<h3>Recruitment Pipeline</h3>
+		<p>
+			Four-agent HR pipeline: find candidates, score/match them, plan personalised outreach,
+			then compile a hiring manager report. From crewAI <em>recruitment</em>.
+		</p>
+		@workflowDiagram("sequential", []string{
+			"CandidateResearcher → candidate_research",
+			"CandidateMatcher → match_scores",
+			"OutreachStrategist → temp:outreach_plans",
+			"RecruitmentReporter → recruitment_report",
+		})
+		@conceptBadges([]string{"4-agent chain", "aggregation report", "HR domain"})
+		<!-- Screenplay Writer -->
+		<h3>Screenplay Writer</h3>
+		<p>
+			Analyse a discussion into characters and conflict, write screenplay dialogue, then format to
+			industry standards. From crewAI <em>screenplay_writer</em>.
+		</p>
+		@workflowDiagram("sequential", []string{
+			"DiscussionAnalyst → discussion_analysis",
+			"Scriptwriter → screenplay_draft",
+			"ScriptFormatter → formatted_screenplay",
+		})
+		@conceptBadges([]string{"creative domain", "analysis → generation → formatting"})
+	}
+}
+
+// ─── Parallel Fan-In Examples ────────────────────────────────────────────────
+templ docsParallelExamples() {
+	@docsSection("parallel-examples", "Parallel Fan-In Workflows", iconNetworkDoc, "text-emerald-500") {
+		<p>
+			In a <strong>parallel fan-in</strong> workflow, multiple agents work <strong>simultaneously on independent tasks</strong>,
+			then a downstream agent merges all results. This pattern reduces latency when work streams
+			don't depend on each other.
+		</p>
+		<!-- Stock Analysis -->
+		<h3>Stock Analysis</h3>
+		<p>
+			A Financial Analyst and Research Analyst run <strong>in parallel</strong>, then an Investment Advisor
+			synthesises both into a Buy/Hold/Sell recommendation. From crewAI <em>stock_analysis</em>.
+		</p>
+		@workflowDiagramParallel(
+			[]string{"FinancialAnalyst → financial_analysis", "ResearchAnalyst → research_brief"},
+			[]string{"InvestmentAdvisor → investment_recommendation"},
+		)
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Agent</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Reads</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Writes</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("FinancialAnalyst", "Stock ticker (user input)", "financial_analysis")
+				@docsTableRow("ResearchAnalyst", "Stock ticker (user input)", "research_brief")
+				@docsTableRow("InvestmentAdvisor", "{financial_analysis} + {research_brief}", "investment_recommendation")
+			</tbody>
+		}
+		@conceptBadges([]string{"parallel node", "fan-in merge", "finance domain"})
+		<!-- Meeting Prep -->
+		<h3>Meeting Prep</h3>
+		<p>
+			Two research agents run in parallel (people + industry), then a Strategist merges both,
+			and a Coordinator compiles a one-page executive briefing. From crewAI <em>prep-for-a-meeting</em>.
+		</p>
+		@workflowDiagramParallel(
+			[]string{"ParticipantResearcher → participant_research", "IndustryAnalyst → industry_analysis"},
+			[]string{"MeetingStrategist → temp:meeting_strategy", "BriefingCoordinator → meeting_briefing"},
+		)
+		@conceptBadges([]string{"parallel research", "sequential post-merge", "business domain"})
+		<!-- Surprise Trip -->
+		<h3>Surprise Trip Planner</h3>
+		<p>
+			Two scouts work in parallel — one finds activities, the other finds restaurants — then a
+			compiler weaves them into a day-by-day itinerary. From crewAI <em>surprise_trip</em>.
+		</p>
+		@workflowDiagramParallel(
+			[]string{"ActivityPlanner → planned_activities", "RestaurantScout → restaurant_picks"},
+			[]string{"ItineraryCompiler → trip_itinerary"},
+		)
+		@conceptBadges([]string{"parallel scouting", "merge into itinerary", "travel domain"})
+	}
+}
+
+// ─── Map-Reduce Examples ─────────────────────────────────────────────────────
+templ docsMapReduceExamples() {
+	@docsSection("map-reduce-examples", "Map-Reduce Workflows", iconBookOpenCheckDoc, "text-amber-500") {
+		<p>
+			The <strong>map-reduce</strong> pattern combines sequential and parallel: a planner creates a list of items,
+			then multiple workers process items <strong>in parallel</strong>, and a finaliser joins all results.
+			This is the most powerful pattern for content generation at scale.
+		</p>
+		<!-- Write a Book -->
+		<h3>Write a Book</h3>
+		<p>
+			An outliner generates a 3-chapter plan, three chapter writers work <strong>simultaneously in parallel</strong>,
+			then an editor joins everything into a polished book.
+			From crewAI <em>write_a_book_with_flows</em>.
+		</p>
+		@workflowDiagramMapReduce()
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Phase</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Agent(s)</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Output Key</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("Plan", "BookOutliner", "book_outline")
+				@docsTableRow("Map (parallel)", "ChapterWriter1 ∥ ChapterWriter2 ∥ ChapterWriter3", "chapter_1, chapter_2, chapter_3")
+				@docsTableRow("Reduce", "BookEditor", "final_book")
+			</tbody>
+		}
+		@conceptBadges([]string{"sequential → parallel → sequential", "scatter-gather", "dynamic fan-out"})
+		@docsInfoBox("Scaling Map-Reduce") {
+			<p>
+				The book example uses 3 fixed chapter writers. In your own workflows, you can adjust the
+				number of parallel workers by adding more agent nodes inside the parallel composition node.
+				Each worker reads the same plan but writes a different piece.
+			</p>
+		}
+	}
+}
+
+// ─── Loop / Self-Evaluation Examples ─────────────────────────────────────────
+templ docsLoopExamples() {
+	@docsSection("loop-examples", "Loop & Self-Evaluation Workflows", iconRepeatDoc, "text-rose-500") {
+		<p>
+			<strong>Loop workflows</strong> repeat a set of agents until a quality condition is met or a maximum
+			iteration count is reached. The most common pattern is <strong>generate → evaluate → refine</strong>:
+			a generator produces content, an evaluator checks quality, and if unsatisfied it provides
+			feedback for the next pass.
+		</p>
+		<!-- Self-Evaluation Loop -->
+		<h3>Self-Evaluation Loop</h3>
+		<p>
+			A Content Generator and Content Evaluator run inside a loop (max 3 iterations). The evaluator
+			either calls <code>exit_loop</code> when quality scores are all ≥ 8/10, or provides
+			specific feedback for the next pass.
+			From crewAI <em>self_evaluation_loop_flow</em>.
+		</p>
+		@workflowDiagramLoop()
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Agent</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Role</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Exit Condition</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("ContentGenerator", "Generates or refines content", "N/A — always produces output")
+				@docsTableRow("ContentEvaluator", "Scores quality (1-10 on 4 criteria)", "All scores ≥ 8 → calls exit_loop")
+			</tbody>
+		}
+		@conceptBadges([]string{"loop node", "max_iterations: 3", "exit_loop tool", "self-evaluation"})
+		@docsInfoBox("Loop vs. Sequential Retry") {
+			<p>
+				Loops are different from re-running a sequential pipeline. Inside a loop, <strong>conversation history persists</strong>
+				across iterations — each pass sees what came before. The evaluator's feedback becomes part of the
+				generator's context on the next iteration, enabling genuine iterative improvement.
+			</p>
+		}
+		<!-- ADK-Go Loop Agent -->
+		<h3>Loop Agent (ADK-Go Example)</h3>
+		<p>
+			The simplest loop example: a single agent runs up to 3 iterations, improving its answer each
+			pass. Calls <code>exit_loop</code> when satisfied. This is the ADK-Go loop primitive.
+		</p>
+		<div class="my-4 flex items-center gap-2 flex-wrap">
+			@statusBadge("loop", "bg-rose-500")
+			@statusBadge("max_iterations: 3", "bg-slate-600")
+			@statusBadge("single agent", "bg-slate-600")
+		</div>
+	}
+}
+
+// ─── Design Your Own ─────────────────────────────────────────────────────────
+templ docsDesignYourOwn() {
+	@docsSection("design-your-own", "Design Your Own Workflow", iconWandDoc, "text-pink-500") {
+		<p>
+			Every example above is a template you can <strong>fork from the Agent Store</strong> and adapt.
+			Here's a step-by-step guide to designing your own multi-agent workflow from scratch.
+		</p>
+		<h3>Step 1 — Identify the Stages</h3>
+		<p>
+			Break your task into <strong>distinct stages</strong>. Each stage should have a clear input, a clear output,
+			and a well-defined responsibility. If a stage can be described in one sentence, it's probably the right granularity.
+		</p>
+		<h3>Step 2 — Choose the Composition Pattern</h3>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">If your stages…</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Use this pattern</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow2("Must run in order, each reading the prior output", "Sequential")
+				@docsTableRow2("Can run independently at the same time", "Parallel")
+				@docsTableRow2("Have independent work then a merge step", "Parallel → Sequential (fan-in)")
+				@docsTableRow2("Need a plan step, then N workers, then a join step", "Map-Reduce (seq → par → seq)")
+				@docsTableRow2("Need iterative refinement with feedback", "Loop with exit_loop")
+			</tbody>
+		}
+		<h3>Step 3 — Define State Keys</h3>
+		<p>
+			For each agent, decide:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>• <strong>What it reads</strong> — which <code>&#123;variable&#125;</code> references appear in its system prompt?</li>
+			<li>• <strong>What it writes</strong> — what <code>output_key</code> should it save its output under?</li>
+			<li>• <strong>Is it temporary?</strong> — use the <code>temp:</code> prefix for intermediate results that don't need to persist.</li>
+		</ul>
+		<h3>Step 4 — Write System Prompts</h3>
+		<p>
+			Each agent's system prompt should:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>• Define its <strong>role</strong> and <strong>expertise</strong> in the first sentence.</li>
+			<li>• Reference upstream state keys with <code>&#123;key_name&#125;</code> syntax to receive prior outputs.</li>
+			<li>• Clearly specify the <strong>expected output format</strong> (Markdown, JSON, code block, etc.).</li>
+			<li>• For evaluator agents in a loop, include <strong>evaluation criteria</strong> and exit conditions.</li>
+		</ul>
+		<h3>Step 5 — Build and Test</h3>
+		<ol class="list-decimal list-inside space-y-2 my-4">
+			<li>Open the <strong>Agent Store</strong> and create a new agent.</li>
+			<li>In the workflow editor, add your composition nodes (sequential, parallel, loop).</li>
+			<li>Add agent nodes inside each composition node and assign your agents.</li>
+			<li>Set <code>output_key</code> on each agent node.</li>
+			<li>Test with a simple prompt first, then iterate on the system prompts.</li>
+		</ol>
+		@docsInfoBox("Nesting Compositions") {
+			<p>
+				Composition nodes can be nested up to <strong>5 levels deep</strong>. You can place a parallel group inside a
+				sequential pipeline, or a loop inside a parallel group — any combination works. The visual tree
+				builder shows the full hierarchy in real time.
+			</p>
+		}
+	}
+}
+
+// ─── Visual helpers ──────────────────────────────────────────────────────────
+
+// workflowDiagram renders an ASCII-style sequential pipeline as styled boxes.
+templ workflowDiagram(pattern string, steps []string) {
+	<div class="my-6 overflow-x-auto rounded-lg border border-border bg-muted/30 p-4">
+		<div class="flex items-center gap-1 mb-3">
+			@statusBadge(pattern, patternColor(pattern))
+		</div>
+		<div class="flex flex-wrap items-center gap-2 font-mono text-xs">
+			for i, step := range steps {
+				<div class="rounded-md border border-border bg-background px-3 py-2 text-foreground shadow-sm">
+					{ step }
+				</div>
+				if i < len(steps)-1 {
+					<span class="text-muted-foreground select-none">→</span>
+				}
+			}
+		</div>
+	</div>
+}
+
+// workflowDiagramParallel renders a parallel fan-in pattern.
+templ workflowDiagramParallel(parallelSteps []string, sequentialSteps []string) {
+	<div class="my-6 overflow-x-auto rounded-lg border border-border bg-muted/30 p-4">
+		<div class="flex items-center gap-1 mb-3">
+			@statusBadge("parallel", "bg-emerald-600")
+			@statusBadge("→ sequential", "bg-blue-600")
+		</div>
+		<!-- Parallel branches -->
+		<div class="flex items-start gap-4 mb-3">
+			<div class="space-y-2">
+				for _, step := range parallelSteps {
+					<div class="rounded-md border border-emerald-500/40 bg-emerald-500/5 px-3 py-2 font-mono text-xs text-foreground shadow-sm">
+						{ step }
+					</div>
+				}
+			</div>
+			<div class="flex flex-col items-center justify-center self-stretch">
+				<div class="h-full w-px bg-border"></div>
+				<span class="text-muted-foreground select-none my-1 text-xs">fan-in →</span>
+				<div class="h-full w-px bg-border"></div>
+			</div>
+			<!-- Sequential after merge -->
+			<div class="flex flex-wrap items-center gap-2 self-center">
+				for i, step := range sequentialSteps {
+					<div class="rounded-md border border-border bg-background px-3 py-2 font-mono text-xs text-foreground shadow-sm">
+						{ step }
+					</div>
+					if i < len(sequentialSteps)-1 {
+						<span class="text-muted-foreground select-none">→</span>
+					}
+				}
+			</div>
+		</div>
+	</div>
+}
+
+// workflowDiagramMapReduce renders the book-writing map-reduce pattern.
+templ workflowDiagramMapReduce() {
+	<div class="my-6 overflow-x-auto rounded-lg border border-border bg-muted/30 p-4">
+		<div class="flex items-center gap-1 mb-3">
+			@statusBadge("sequential", "bg-blue-600")
+			@statusBadge("→ parallel", "bg-emerald-600")
+			@statusBadge("→ sequential", "bg-blue-600")
+		</div>
+		<div class="flex flex-wrap items-center gap-3 font-mono text-xs">
+			<!-- Plan -->
+			<div class="rounded-md border border-border bg-background px-3 py-2 text-foreground shadow-sm">
+				BookOutliner → book_outline
+			</div>
+			<span class="text-muted-foreground select-none">→</span>
+			<!-- Parallel map -->
+			<div class="space-y-2 rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-2">
+				<div class="rounded-md border border-emerald-500/30 bg-background px-3 py-1.5 shadow-sm">ChapterWriter1 → chapter_1</div>
+				<div class="rounded-md border border-emerald-500/30 bg-background px-3 py-1.5 shadow-sm">ChapterWriter2 → chapter_2</div>
+				<div class="rounded-md border border-emerald-500/30 bg-background px-3 py-1.5 shadow-sm">ChapterWriter3 → chapter_3</div>
+			</div>
+			<span class="text-muted-foreground select-none">→</span>
+			<!-- Reduce -->
+			<div class="rounded-md border border-border bg-background px-3 py-2 text-foreground shadow-sm">
+				BookEditor → final_book
+			</div>
+		</div>
+	</div>
+}
+
+// workflowDiagramLoop renders the self-evaluation loop pattern.
+templ workflowDiagramLoop() {
+	<div class="my-6 overflow-x-auto rounded-lg border border-border bg-muted/30 p-4">
+		<div class="flex items-center gap-1 mb-3">
+			@statusBadge("loop", "bg-rose-500")
+			@statusBadge("max_iterations: 3", "bg-slate-600")
+		</div>
+		<div class="flex flex-wrap items-center gap-3 font-mono text-xs">
+			<div class="rounded-lg border border-rose-500/40 bg-rose-500/5 p-3 space-y-2">
+				<div class="rounded-md border border-border bg-background px-3 py-2 shadow-sm">
+					ContentGenerator — produce or refine
+				</div>
+				<div class="text-center text-muted-foreground select-none">↓</div>
+				<div class="rounded-md border border-border bg-background px-3 py-2 shadow-sm">
+					ContentEvaluator — score & decide
+				</div>
+				<div class="text-center text-muted-foreground select-none text-[10px] mt-1">
+					↩ loop back (if scores &lt; 8) · exit_loop (if all ≥ 8)
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// conceptBadges renders a row of concept tags.
+templ conceptBadges(concepts []string) {
+	<div class="my-3 flex items-center gap-1.5 flex-wrap">
+		for _, c := range concepts {
+			<span class="inline-flex items-center rounded-full border border-border bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+				{ c }
+			</span>
+		}
+	</div>
+}
+
+// patternColor returns a badge background color for a composition pattern name.
+func patternColor(pattern string) string {
+	switch pattern {
+	case "sequential":
+		return "bg-blue-600"
+	case "parallel":
+		return "bg-emerald-600"
+	case "loop":
+		return "bg-rose-500"
+	default:
+		return "bg-slate-600"
+	}
+}
