@@ -339,6 +339,19 @@ export function workflowTreeVisualizer() {
             ? `<span class="wf-agent-desc">→ <code style="font-size:10px;padding:0 3px;border-radius:3px;background:var(--muted);font-family:var(--font-mono);">${esc(node.output_key)}</code></span>`
             : '';
 
+        // Build orchestration badges
+        let badges = '';
+        if (node.disallow_transfer_to_parent) {
+            badges += `<span style="font-size:9px;padding:0 4px;border-radius:4px;background:oklch(0.65 0.15 25/12%);color:oklch(0.55 0.18 25);font-weight:600;white-space:nowrap;" title="Transfer to parent blocked">⛔ ↑parent</span>`;
+        }
+        if (node.disallow_transfer_to_peers) {
+            badges += `<span style="font-size:9px;padding:0 4px;border-radius:4px;background:oklch(0.65 0.15 25/12%);color:oklch(0.55 0.18 25);font-weight:600;white-space:nowrap;" title="Transfer to peers blocked">⛔ ↔peers</span>`;
+        }
+        if (node.include_contents === 'none') {
+            badges += `<span style="font-size:9px;padding:0 4px;border-radius:4px;background:oklch(0.7 0.14 250/12%);color:oklch(0.55 0.16 250);font-weight:600;white-space:nowrap;" title="Fresh context (no history)">🧹 fresh</span>`;
+        }
+        const badgesHtml = badges ? `<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:2px;">${badges}</div>` : '';
+
         return `
             <div class="wf-node" style="--node-accent:${m.accent};--node-border:${m.accentMuted};--node-bg:${m.accentMuted};">
                 <div style="display:flex;align-items:center;gap:8px;">
@@ -348,6 +361,7 @@ export function workflowTreeVisualizer() {
                     <div style="flex:1;min-width:0;">
                         <div class="wf-agent-name">${esc(name)}</div>
                         ${outputKey}
+                        ${badgesHtml}
                     </div>
                 </div>
             </div>`;

@@ -22,30 +22,51 @@ func newStoreHandler(log *logger.Logger, svc *service) *storeHandler {
 
 // createRequest represents the request body for creating an agent.
 type createRequest struct {
-	Name         string `json:"name"`
-	Description  string `json:"description"`
-	SystemPrompt string `json:"systemPrompt"`
-	Icon         string `json:"icon"`
+	Name                     string `json:"name"`
+	Description              string `json:"description"`
+	SystemPrompt             string `json:"systemPrompt"`
+	Icon                     string `json:"icon"`
+	DisallowTransferToParent bool   `json:"disallowTransferToParent"`
+	DisallowTransferToPeers  bool   `json:"disallowTransferToPeers"`
+	OutputKey                string `json:"outputKey"`
+	IncludeContents          string `json:"includeContents"`
+	GlobalInstruction        string `json:"globalInstruction"`
+	InputSchema              string `json:"inputSchema"`
+	OutputSchema             string `json:"outputSchema"`
 }
 
 // updateRequest represents the request body for updating an agent.
 type updateRequest struct {
-	Name         string `json:"name"`
-	Description  string `json:"description"`
-	SystemPrompt string `json:"systemPrompt"`
-	Icon         string `json:"icon"`
+	Name                     string `json:"name"`
+	Description              string `json:"description"`
+	SystemPrompt             string `json:"systemPrompt"`
+	Icon                     string `json:"icon"`
+	DisallowTransferToParent bool   `json:"disallowTransferToParent"`
+	DisallowTransferToPeers  bool   `json:"disallowTransferToPeers"`
+	OutputKey                string `json:"outputKey"`
+	IncludeContents          string `json:"includeContents"`
+	GlobalInstruction        string `json:"globalInstruction"`
+	InputSchema              string `json:"inputSchema"`
+	OutputSchema             string `json:"outputSchema"`
 }
 
 // agentResponse represents a single agent in API responses.
 type agentResponse struct {
-	ID              string `json:"id"`
-	Name            string `json:"name"`
-	Description     string `json:"description"`
-	SystemPrompt    string `json:"systemPrompt"`
-	Icon            string `json:"icon"`
-	SourceCatalogID string `json:"sourceCatalogId,omitempty"`
-	CreatedAt       string `json:"createdAt"`
-	UpdatedAt       string `json:"updatedAt"`
+	ID                       string `json:"id"`
+	Name                     string `json:"name"`
+	Description              string `json:"description"`
+	SystemPrompt             string `json:"systemPrompt"`
+	Icon                     string `json:"icon"`
+	SourceCatalogID          string `json:"sourceCatalogId,omitempty"`
+	DisallowTransferToParent bool   `json:"disallowTransferToParent"`
+	DisallowTransferToPeers  bool   `json:"disallowTransferToPeers"`
+	OutputKey                string `json:"outputKey,omitempty"`
+	IncludeContents          string `json:"includeContents,omitempty"`
+	GlobalInstruction        string `json:"globalInstruction,omitempty"`
+	InputSchema              string `json:"inputSchema,omitempty"`
+	OutputSchema             string `json:"outputSchema,omitempty"`
+	CreatedAt                string `json:"createdAt"`
+	UpdatedAt                string `json:"updatedAt"`
 }
 
 // listResponse represents the response for listing agents.
@@ -66,14 +87,21 @@ func agentIconOrDefault(icon string) string {
 
 func toAgentResponse(a *AgentDefinition) agentResponse {
 	return agentResponse{
-		ID:              a.ID,
-		Name:            a.Name,
-		Description:     a.Description,
-		SystemPrompt:    a.SystemPrompt,
-		Icon:            agentIconOrDefault(a.Icon),
-		SourceCatalogID: a.SourceCatalogID,
-		CreatedAt:       a.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:       a.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		ID:                       a.ID,
+		Name:                     a.Name,
+		Description:              a.Description,
+		SystemPrompt:             a.SystemPrompt,
+		Icon:                     agentIconOrDefault(a.Icon),
+		SourceCatalogID:          a.SourceCatalogID,
+		DisallowTransferToParent: a.DisallowTransferToParent,
+		DisallowTransferToPeers:  a.DisallowTransferToPeers,
+		OutputKey:                a.OutputKey,
+		IncludeContents:          a.IncludeContents,
+		GlobalInstruction:        a.GlobalInstruction,
+		InputSchema:              a.InputSchemaJSON,
+		OutputSchema:             a.OutputSchemaJSON,
+		CreatedAt:                a.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:                a.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 }
 
@@ -97,11 +125,18 @@ func (h *storeHandler) create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	agent := &AgentDefinition{
-		UserID:       user.ID,
-		Name:         req.Name,
-		Description:  req.Description,
-		SystemPrompt: req.SystemPrompt,
-		Icon:         agentIconOrDefault(req.Icon),
+		UserID:                   user.ID,
+		Name:                     req.Name,
+		Description:              req.Description,
+		SystemPrompt:             req.SystemPrompt,
+		Icon:                     agentIconOrDefault(req.Icon),
+		DisallowTransferToParent: req.DisallowTransferToParent,
+		DisallowTransferToPeers:  req.DisallowTransferToPeers,
+		OutputKey:                req.OutputKey,
+		IncludeContents:          req.IncludeContents,
+		GlobalInstruction:        req.GlobalInstruction,
+		InputSchemaJSON:          req.InputSchema,
+		OutputSchemaJSON:         req.OutputSchema,
 	}
 
 	if err := h.svc.create(r.Context(), agent); err != nil {
@@ -155,12 +190,19 @@ func (h *storeHandler) update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	agent := &AgentDefinition{
-		ID:           agentID,
-		UserID:       user.ID,
-		Name:         req.Name,
-		Description:  req.Description,
-		SystemPrompt: req.SystemPrompt,
-		Icon:         iconValue,
+		ID:                       agentID,
+		UserID:                   user.ID,
+		Name:                     req.Name,
+		Description:              req.Description,
+		SystemPrompt:             req.SystemPrompt,
+		Icon:                     iconValue,
+		DisallowTransferToParent: req.DisallowTransferToParent,
+		DisallowTransferToPeers:  req.DisallowTransferToPeers,
+		OutputKey:                req.OutputKey,
+		IncludeContents:          req.IncludeContents,
+		GlobalInstruction:        req.GlobalInstruction,
+		InputSchemaJSON:          req.InputSchema,
+		OutputSchemaJSON:         req.OutputSchema,
 	}
 
 	if err := h.svc.update(r.Context(), agent); err != nil {

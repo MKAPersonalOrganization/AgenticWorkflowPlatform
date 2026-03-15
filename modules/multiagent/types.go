@@ -66,6 +66,9 @@ func (nt NodeType) IsComposite() bool {
 
 // WorkflowNode is the recursive building block for arbitrary agent composition.
 // It forms a tree: composite nodes hold children, leaf nodes reference agents.
+//
+// Agent nodes can optionally override the referenced agent's transfer policy
+// and content forwarding behaviour within this specific workflow context.
 type WorkflowNode struct {
 	// ID is a unique identifier within this tree (e.g., "node-1", "node-2").
 	// Used by the frontend to track nodes for editing.
@@ -88,6 +91,20 @@ type WorkflowNode struct {
 	// making it available to subsequent nodes via {output_key} template syntax.
 	// Only meaningful for agent nodes inside sequential or loop parents.
 	OutputKey string `json:"output_key,omitempty"`
+
+	// DisallowTransferToParent overrides the agent's transfer policy for
+	// this workflow context. When true, the agent cannot delegate back to
+	// its parent in the workflow tree.
+	DisallowTransferToParent *bool `json:"disallow_transfer_to_parent,omitempty"`
+
+	// DisallowTransferToPeers overrides the agent's transfer policy for
+	// this workflow context. When true, the agent cannot delegate to
+	// sibling agents.
+	DisallowTransferToPeers *bool `json:"disallow_transfer_to_peers,omitempty"`
+
+	// IncludeContents overrides the agent's content forwarding for this
+	// workflow context. "default" includes full history, "none" starts fresh.
+	IncludeContents string `json:"include_contents,omitempty"`
 
 	// ── Composite-node fields (Type = sequential/parallel/loop) ──
 

@@ -2,12 +2,22 @@ package agentstore
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
+
+// nullIfEmpty returns a sql.NullString that is NULL when the input is empty.
+// Used for JSONB columns that should be NULL rather than empty string.
+func nullIfEmpty(s string) sql.NullString {
+	if s == "" {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: s, Valid: true}
+}
 
 // postgresAgentDefinitionRepository implements AgentDefinitionRepository using PostgreSQL.
 type postgresAgentDefinitionRepository struct {
@@ -28,8 +38,10 @@ func (r *postgresAgentDefinitionRepository) Create(ctx context.Context, agent *A
 	agent.UpdatedAt = now
 
 	query := `
-INSERT INTO user_agents (id, user_id, name, description, system_prompt, icon, source_catalog_id, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+INSERT INTO user_agents (id, user_id, name, description, system_prompt, icon, source_catalog_id,
+    disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
+    global_instruction, input_schema, output_schema, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`
 
 	_, err := r.db.ExecContext(ctx, query,
 		agent.ID,
@@ -39,6 +51,13 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 		agent.SystemPrompt,
 		agent.Icon,
 		agent.SourceCatalogID,
+		agent.DisallowTransferToParent,
+		agent.DisallowTransferToPeers,
+		agent.OutputKey,
+		agent.IncludeContents,
+		agent.GlobalInstruction,
+		nullIfEmpty(agent.InputSchemaJSON),
+		nullIfEmpty(agent.OutputSchemaJSON),
 		agent.CreatedAt,
 		agent.UpdatedAt,
 	)
@@ -55,8 +74,11 @@ func (r *postgresAgentDefinitionRepository) Update(ctx context.Context, agent *A
 	query := `
 UPDATE user_agents
 SET name = $1, description = $2, system_prompt = $3,
-    icon = $4, updated_at = $5
-WHERE id = $6 AND user_id = $7`
+    icon = $4, updated_at = $5,
+    disallow_transfer_to_parent = $6, disallow_transfer_to_peers = $7,
+    output_key = $8, include_contents = $9, global_instruction = $10,
+    input_schema = $11, output_schema = $12
+WHERE id = $13 AND user_id = $14`
 
 	result, err := r.db.ExecContext(ctx, query,
 		agent.Name,
@@ -64,6 +86,13 @@ WHERE id = $6 AND user_id = $7`
 		agent.SystemPrompt,
 		agent.Icon,
 		agent.UpdatedAt,
+		agent.DisallowTransferToParent,
+		agent.DisallowTransferToPeers,
+		agent.OutputKey,
+		agent.IncludeContents,
+		agent.GlobalInstruction,
+		nullIfEmpty(agent.InputSchemaJSON),
+		nullIfEmpty(agent.OutputSchemaJSON),
 		agent.ID,
 		agent.UserID,
 	)
@@ -102,7 +131,10 @@ func (r *postgresAgentDefinitionRepository) Delete(ctx context.Context, id, user
 }
 
 func (r *postgresAgentDefinitionRepository) GetByID(ctx context.Context, id, userID string) (*AgentDefinition, error) {
-	query := `SELECT id, user_id, name, description, system_prompt, icon, source_catalog_id, created_at, updated_at
+	query := `SELECT id, user_id, name, description, system_prompt, icon, source_catalog_id,
+    disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
+    global_instruction, COALESCE(input_schema::text, '') as input_schema, COALESCE(output_schema::text, '') as output_schema,
+    created_at, updated_at
 FROM user_agents WHERE id = $1 AND user_id = $2`
 
 	var agent AgentDefinition
@@ -114,7 +146,10 @@ FROM user_agents WHERE id = $1 AND user_id = $2`
 }
 
 func (r *postgresAgentDefinitionRepository) ListByUser(ctx context.Context, userID string) ([]AgentDefinition, error) {
-	query := `SELECT id, user_id, name, description, system_prompt, icon, source_catalog_id, created_at, updated_at
+	query := `SELECT id, user_id, name, description, system_prompt, icon, source_catalog_id,
+    disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
+    global_instruction, COALESCE(input_schema::text, '') as input_schema, COALESCE(output_schema::text, '') as output_schema,
+    created_at, updated_at
 FROM user_agents WHERE user_id = $1 ORDER BY created_at ASC`
 
 	var agents []AgentDefinition
@@ -126,7 +161,10 @@ FROM user_agents WHERE user_id = $1 ORDER BY created_at ASC`
 }
 
 func (r *postgresAgentDefinitionRepository) Search(ctx context.Context, userID, query string) ([]AgentDefinition, error) {
-	sqlQuery := `SELECT id, user_id, name, description, system_prompt, icon, source_catalog_id, created_at, updated_at
+	sqlQuery := `SELECT id, user_id, name, description, system_prompt, icon, source_catalog_id,
+    disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
+    global_instruction, COALESCE(input_schema::text, '') as input_schema, COALESCE(output_schema::text, '') as output_schema,
+    created_at, updated_at
 FROM user_agents
 WHERE user_id = $1 AND (name ILIKE $2 OR description ILIKE $2)
 ORDER BY created_at ASC`
@@ -140,9 +178,6 @@ ORDER BY created_at ASC`
 
 	return agents, nil
 }
-
-
-
 
 func (r *postgresAgentDefinitionRepository) ListAddedCatalogIDs(ctx context.Context, userID string) ([]string, error) {
 	query := `SELECT DISTINCT source_catalog_id FROM user_agents WHERE user_id = $1 AND source_catalog_id != ''`

@@ -17,6 +17,7 @@ var (
 	iconCompass     = icon.CompassLogo("size-5")
 	iconRocket      = iconSized(icon.Rocket)
 	iconStore       = iconSized(icon.Store)
+	iconGitBranch   = iconSized(icon.GitBranch)
 	iconPuzzle      = iconSized(icon.Puzzle)
 	iconDatabase    = iconSized(icon.Database)
 	iconBrain       = iconSized(icon.Brain)

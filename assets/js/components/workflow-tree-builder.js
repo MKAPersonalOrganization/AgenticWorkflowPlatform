@@ -91,7 +91,7 @@ export function workflowTreeBuilder() {
 
             html += `</div>`;
 
-            // ── Agent-specific: agent selector + output key ──
+            // ── Agent-specific: agent selector + output key + orchestration overrides ──
             if (node.type === 'agent') {
                 html += `<div class="space-y-2">`;
                 // Agent dropdown — we read agents from the parent scope
@@ -112,12 +112,58 @@ export function workflowTreeBuilder() {
                 html += `</select>`;
 
                 // Output key
-                html += `<input type="text" placeholder="Output key (optional)" maxlength="50" class="w-full h-7 rounded-md border border-border bg-background px-3 text-[11px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" `;
+                html += `<input type="text" placeholder="Output key (optional, for state sharing)" maxlength="50" class="w-full h-7 rounded-md border border-border bg-background px-3 text-[11px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" `;
                 html += `value="${this._escapeAttr(node.output_key || '')}" `;
                 html += `oninput="`;
                 html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
                 html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.output_key = this.value; }`;
                 html += `">`;
+
+                // ── Orchestration overrides (collapsible) ──
+                const hasOverrides = node.disallow_transfer_to_parent || node.disallow_transfer_to_peers || node.include_contents;
+                html += `<details class="group" ${hasOverrides ? 'open' : ''}>`;
+                html += `<summary class="cursor-pointer text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors select-none flex items-center gap-1">`;
+                html += `<svg xmlns="http://www.w3.org/2000/svg" class="size-3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>`;
+                html += `Transfer &amp; Context Overrides`;
+                html += `</summary>`;
+                html += `<div class="mt-1.5 space-y-1.5 pl-4 border-l border-border/50">`;
+
+                // Transfer to parent toggle
+                const parentChecked = node.disallow_transfer_to_parent ? ' checked' : '';
+                html += `<label class="flex items-center gap-2 cursor-pointer">`;
+                html += `<input type="checkbox" class="size-3.5 rounded border-border accent-primary" ${parentChecked} `;
+                html += `onchange="`;
+                html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
+                html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.disallow_transfer_to_parent = this.checked || null; }`;
+                html += `">`;
+                html += `<span class="text-[10px] text-muted-foreground">Block transfer to parent</span>`;
+                html += `</label>`;
+
+                // Transfer to peers toggle
+                const peersChecked = node.disallow_transfer_to_peers ? ' checked' : '';
+                html += `<label class="flex items-center gap-2 cursor-pointer">`;
+                html += `<input type="checkbox" class="size-3.5 rounded border-border accent-primary" ${peersChecked} `;
+                html += `onchange="`;
+                html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
+                html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.disallow_transfer_to_peers = this.checked || null; }`;
+                html += `">`;
+                html += `<span class="text-[10px] text-muted-foreground">Block transfer to peers</span>`;
+                html += `</label>`;
+
+                // Include contents selector
+                html += `<div class="flex items-center gap-2">`;
+                html += `<span class="text-[10px] text-muted-foreground whitespace-nowrap">History:</span>`;
+                html += `<select class="h-6 rounded border border-border bg-background px-1.5 text-[10px] text-foreground focus:outline-none" `;
+                html += `onchange="`;
+                html += `  const mgr = Alpine.closestDataStack(this).find(d => d._getNodeByPath);`;
+                html += `  if (mgr) { const n = mgr._getNodeByPath('${path}'); if (n) n.include_contents = this.value; }`;
+                html += `">`;
+                html += `<option value=""${!node.include_contents ? ' selected' : ''}>Default (include)</option>`;
+                html += `<option value="none"${node.include_contents === 'none' ? ' selected' : ''}>Fresh context</option>`;
+                html += `</select>`;
+                html += `</div>`;
+
+                html += `</div></details>`;
                 html += `</div>`;
             }
 

@@ -69,6 +69,18 @@ type WorkflowNodeInfo struct {
 	// MaxIterations limits loop repetitions (only for Type="loop").
 	MaxIterations int
 
+	// DisallowTransferToParent overrides the agent's transfer policy
+	// within this workflow context.
+	DisallowTransferToParent *bool
+
+	// DisallowTransferToPeers overrides the agent's transfer policy
+	// within this workflow context.
+	DisallowTransferToPeers *bool
+
+	// IncludeContents overrides content forwarding for this node.
+	// "default" or "none".
+	IncludeContents string
+
 	// Children are the sub-nodes (only for composite types).
 	Children []WorkflowNodeInfo
 }
