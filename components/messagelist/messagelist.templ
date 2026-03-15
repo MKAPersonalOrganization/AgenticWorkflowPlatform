@@ -40,7 +40,7 @@ templ ScrollToBottom() {
 // DateSeparator - LibreChat style date separator
 templ DateSeparator() {
 	<div
-		x-show="index > 0 && getMessageDate(message) !== getMessageDate(messages[index - 1])"
+		x-show="message.type !== 'parallel_group' && index > 0 && getMessageDate(message) !== getMessageDate(displayMessages[index - 1])"
 		x-cloak
 		class="flex items-center justify-center my-4"
 	>
@@ -191,21 +191,141 @@ templ MessageContextMenu() {
 	</div>
 }
 
+// WorkflowMarker renders visual section dividers for loop transitions.
+// Parallel markers are consumed by displayMessages grouping and rendered
+// as side-by-side columns via ParallelGroup instead.
+templ WorkflowMarker() {
+	<div
+		x-show="message.type === 'workflow_marker'"
+		x-cloak
+		class="flex items-center gap-3 my-3 px-2"
+	>
+		<div class="flex-1 h-px bg-border"></div>
+		<!-- Loop section start -->
+		<template x-if="message.markerType === 'loop'">
+			<span class="inline-flex items-center gap-1.5 text-[11px] font-medium text-violet-600 dark:text-violet-400 whitespace-nowrap">
+				<svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+				<span x-text="`${message.parentAgent || 'Loop'} (max ${message.maxIterations} iterations)`"></span>
+			</span>
+		</template>
+		<!-- Loop iteration boundary -->
+		<template x-if="message.markerType === 'loop_iteration'">
+			<span class="inline-flex items-center gap-1.5 text-[11px] font-medium text-violet-600 dark:text-violet-400 whitespace-nowrap">
+				<svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+				<span x-text="`Iteration ${message.iteration}/${message.maxIterations}`"></span>
+			</span>
+		</template>
+		<div class="flex-1 h-px bg-border"></div>
+	</div>
+}
+
+// ParallelGroup renders a side-by-side column layout for parallel workflow
+// branches. Each branch gets its own column with a colored accent, header,
+// and the branch's messages rendered inline.
+templ ParallelGroup() {
+	<div
+		x-show="message.type === 'parallel_group'"
+		x-cloak
+		class="w-full my-2"
+	>
+		<!-- Section header divider -->
+		<div class="flex items-center gap-3 mb-3 px-2">
+			<div class="flex-1 h-px bg-amber-400/30 dark:bg-amber-400/20"></div>
+			<span class="inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-600 dark:text-amber-400 whitespace-nowrap">
+				<svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v12"></path><path d="M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path><path d="M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path><path d="M18 9a9 9 0 0 1-9 9"></path></svg>
+				<span x-text="`${message.parentAgent || 'Parallel'} · ${message.stepCount} branches`"></span>
+			</span>
+			<div class="flex-1 h-px bg-amber-400/30 dark:bg-amber-400/20"></div>
+		</div>
+		<!-- Branch columns — responsive grid: 1 col on mobile, up to 4 on xl -->
+		<div
+			class="grid gap-3 grid-cols-1 md:grid-cols-2"
+			:class="{ 'lg:grid-cols-3': (message.stepCount || 2) >= 3, 'xl:grid-cols-4': (message.stepCount || 2) >= 4 }"
+		>
+			<template x-for="branchIdx in Array.from({length: message.stepCount || 0}, (_, i) => i)" :key="'branch-' + branchIdx">
+				<div
+					class="min-w-0 rounded-lg border p-3 space-y-3 transition-colors"
+					:class="['border-amber-400/40 bg-amber-50/5 dark:bg-amber-950/10',
+					          'border-cyan-400/40 bg-cyan-50/5 dark:bg-cyan-950/10',
+					          'border-violet-400/40 bg-violet-50/5 dark:bg-violet-950/10',
+					          'border-emerald-400/40 bg-emerald-50/5 dark:bg-emerald-950/10'][branchIdx % 4]"
+				>
+					<!-- Branch header -->
+					<div
+						class="flex items-center gap-2 pb-2 border-b"
+						:class="['border-amber-400/20','border-cyan-400/20','border-violet-400/20','border-emerald-400/20'][branchIdx % 4]"
+					>
+						<span
+							class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+							:class="['bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+							          'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20',
+							          'bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20',
+							          'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'][branchIdx % 4]"
+						>
+							<svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v12"></path><path d="M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path><path d="M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path><path d="M18 9a9 9 0 0 1-9 9"></path></svg>
+							<span x-text="`Branch ${branchIdx + 1}`"></span>
+						</span>
+						<!-- Agent name from first message in this branch -->
+						<template x-if="(message.branches[branchIdx] || [])[0]?.agentName">
+							<span class="text-[10px] text-muted-foreground font-medium truncate" x-text="(message.branches[branchIdx] || [])[0].agentName"></span>
+						</template>
+					</div>
+					<!-- Branch messages -->
+					<template x-for="branchMsg in (message.branches[branchIdx] || [])" :key="branchMsg.id">
+						<div class="space-y-1.5">
+							<!-- Assistant message in branch -->
+							<template x-if="branchMsg.role === 'assistant'">
+								<div
+									class="prose prose-sm max-w-none text-sm leading-relaxed text-foreground dark:**:text-white"
+									x-html="renderMarkdown(branchMsg.content)"
+									dir="auto"
+								></div>
+							</template>
+							<!-- Tool call in branch (compact) -->
+							<template x-if="branchMsg.type === 'tool_call'">
+								<div class="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded-md px-2.5 py-1.5">
+									<svg class="size-3 shrink-0 text-primary/70" fill="currentColor" viewBox="0 0 20 20">
+										<path d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H6a1 1 0 01-1-1v-3a1 1 0 00-1-1h-.5a1.5 1.5 0 010-3H4a1 1 0 001-1V6a1 1 0 011-1h3a1 1 0 001-1v-.5z"></path>
+									</svg>
+									<span class="font-mono truncate" x-text="branchMsg.name"></span>
+									<span x-show="branchMsg.status === 'completed'" class="text-primary ml-auto shrink-0">✓</span>
+									<span x-show="branchMsg.status !== 'completed'" class="ml-auto shrink-0 animate-pulse">…</span>
+								</div>
+							</template>
+						</div>
+					</template>
+					<!-- Empty branch (waiting for first message) -->
+					<template x-if="!message.branches[branchIdx] || message.branches[branchIdx].length === 0">
+						<div class="flex items-center gap-2 text-xs text-muted-foreground/50 italic py-2">
+							<div class="size-1.5 rounded-full bg-primary/30 animate-pulse"></div>
+							<span>{ i18n.T(ctx, "Waiting...") }</span>
+						</div>
+					</template>
+				</div>
+			</template>
+		</div>
+	</div>
+}
+
 templ MessageList() {
 	<div class="space-y-4 relative">
-		<template x-for="(message, index) in messages" :key="message.id">
+		<template x-for="(message, index) in displayMessages" :key="message.id">
 			<div
 				class="group"
 				role="article"
-				:aria-label="`Message from ${message.role || 'system'}`"
-				x-show="!showSearch || !searchQuery || (message.content && message.content.toLowerCase().includes(searchQuery.toLowerCase())) || (message.parsedArgs && JSON.stringify(message.parsedArgs).toLowerCase().includes(searchQuery.toLowerCase()))"
+				:aria-label="`Message from ${message.role || message.type || 'system'}`"
+				x-show="message.type === 'parallel_group' || !showSearch || !searchQuery || (message.content && message.content.toLowerCase().includes(searchQuery.toLowerCase())) || (message.parsedArgs && JSON.stringify(message.parsedArgs).toLowerCase().includes(searchQuery.toLowerCase()))"
 				x-transition:enter="transition ease-out duration-200"
 				x-transition:enter-start="opacity-0 translate-y-2"
 				x-transition:enter-end="opacity-100 translate-y-0"
-				@contextmenu.prevent="openMessageContextMenu($event, message)"
+				@contextmenu.prevent="message.type !== 'parallel_group' && openMessageContextMenu($event, message)"
 			>
 				<!-- Date Separator -->
 				@DateSeparator()
+				<!-- Workflow Section Marker (loop only — parallel is handled by ParallelGroup) -->
+				@WorkflowMarker()
+				<!-- Parallel Branch Columns -->
+				@ParallelGroup()
 				<!-- User Message -->
 				@message.UserMessage()
 				<!-- Special Tool Components -->

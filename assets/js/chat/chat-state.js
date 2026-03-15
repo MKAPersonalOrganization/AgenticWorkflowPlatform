@@ -43,7 +43,15 @@ export function createEmptyThreadState() {
         currentJobId: null,
         humanInputToastId: null,
         // Token usage tracking
-        tokenUsage: null
+        tokenUsage: null,
+        // Parallel message coalescing — maps multiple SSE message IDs
+        // from the same parallel branch agent into a single UI message.
+        // parallelAgentMessages: { [agentName]: messageId } — canonical msg per agent
+        // parallelCoalesceMap: { [newMessageId]: canonicalMessageId } — redirect
+        // parallelParent: string|null — current parallel section's parentAgent
+        parallelAgentMessages: {},
+        parallelCoalesceMap: {},
+        parallelParent: null
     };
 }
 

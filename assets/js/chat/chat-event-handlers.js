@@ -80,6 +80,69 @@ export function createEventHandlerMethods() {
             console.log(`Agent collaboration: ${callerAgent} → ${calledAgent} (${reason})`);
         },
 
+        /**
+         * Handle AGENT_TRANSFER_STARTED — workflow agent transferred control.
+         * Tracks the current active agent and full workflow context so new
+         * messages get tagged with step/branch/iteration info.
+         * Injects visual section markers for parallel and loop boundaries.
+         */
+        __handleAgentTransferStarted(value, state, threadId) {
+            const { fromAgent, toAgent, workflowType, parentAgent, stepIndex, stepCount, iteration, maxIterations } = value;
+            console.log(`[Workflow] Agent transfer: ${fromAgent} → ${toAgent} (${workflowType || 'direct'}, step ${(stepIndex || 0) + 1}/${stepCount || '?'})`);
+
+            state.activeAgentName = toAgent;
+            state.activeWorkflowContext = workflowType
+                ? { workflowType, parentAgent, stepIndex, stepCount, iteration, maxIterations }
+                : null;
+
+            // Reset parallel coalesce maps when leaving a parallel section
+            // or entering a different parallel section.
+            if (workflowType === 'parallel') {
+                if (state.parallelParent !== parentAgent) {
+                    state.parallelAgentMessages = {};
+                    state.parallelCoalesceMap = {};
+                    state.parallelParent = parentAgent;
+                }
+            } else {
+                state.parallelAgentMessages = {};
+                state.parallelCoalesceMap = {};
+                state.parallelParent = null;
+            }
+
+            // Inject workflow section markers when entering a new workflow
+            // section or starting a new loop iteration.
+            if (workflowType) {
+                const prev = state.lastWorkflowContext;
+                const isNewSection = !prev || prev.parentAgent !== parentAgent || prev.workflowType !== workflowType;
+                const isNewIteration = workflowType === 'loop' && prev?.parentAgent === parentAgent && iteration > (prev.iteration || 0);
+
+                if (isNewSection && (workflowType === 'parallel' || workflowType === 'loop')) {
+                    state.messages.push({
+                        id: `wf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                        type: 'workflow_marker',
+                        markerType: workflowType,
+                        parentAgent,
+                        stepCount,
+                        maxIterations,
+                        iteration: iteration || 1,
+                        timestamp: new Date().toISOString(),
+                    });
+                } else if (isNewIteration) {
+                    state.messages.push({
+                        id: `wf_iter_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                        type: 'workflow_marker',
+                        markerType: 'loop_iteration',
+                        parentAgent,
+                        iteration,
+                        maxIterations,
+                        timestamp: new Date().toISOString(),
+                    });
+                }
+
+                state.lastWorkflowContext = { workflowType, parentAgent, stepIndex, stepCount, iteration, maxIterations };
+            }
+        },
+
         __handleTokenUsageReported(value, state) {
             console.log('Token usage reported:', value);
             state.tokenUsage = mapTokenUsage(value);
@@ -311,14 +374,42 @@ export function createEventHandlerMethods() {
             // Check if we already have this message (e.g. from history or snapshot)
             const existingMsg = state.messages.find(m => m.id === event.messageId);
             if (!existingMsg) {
-                console.log(`[STREAM] Adding new assistant message for ID: ${event.messageId}`);
-                state.messages.push({
-                    id: event.messageId,
-                    role: 'assistant',
-                    content: '',
-                    timestamp: new Date(event.timestamp || Date.now()).toISOString(),
-                    streaming: true
-                });
+                const wfType = state.activeWorkflowContext?.workflowType;
+                const agentName = state.activeAgentName;
+
+                // Parallel coalescing: if this agent already has a message
+                // in the current parallel section, redirect to it instead
+                // of creating a new one-word message bubble.
+                if (wfType === 'parallel' && agentName && state.parallelAgentMessages[agentName]) {
+                    const canonicalId = state.parallelAgentMessages[agentName];
+                    state.parallelCoalesceMap[event.messageId] = canonicalId;
+                    const canonical = state.messages.find(m => m.id === canonicalId);
+                    if (canonical) {
+                        canonical.streaming = true;
+                        console.log(`[STREAM] Coalescing parallel msg ${event.messageId} → ${canonicalId} (${agentName})`);
+                    }
+                } else {
+                    console.log(`[STREAM] Adding new assistant message for ID: ${event.messageId}`);
+                    state.messages.push({
+                        id: event.messageId,
+                        role: 'assistant',
+                        content: '',
+                        timestamp: new Date(event.timestamp || Date.now()).toISOString(),
+                        streaming: true,
+                        agentName: agentName || null,
+                        workflowType: state.activeWorkflowContext?.workflowType || null,
+                        parentAgent: state.activeWorkflowContext?.parentAgent || null,
+                        stepIndex: state.activeWorkflowContext?.stepIndex ?? null,
+                        stepCount: state.activeWorkflowContext?.stepCount ?? null,
+                        iteration: state.activeWorkflowContext?.iteration ?? null,
+                        maxIterations: state.activeWorkflowContext?.maxIterations ?? null,
+                    });
+
+                    // Track as the canonical message for this parallel agent
+                    if (wfType === 'parallel' && agentName) {
+                        state.parallelAgentMessages[agentName] = event.messageId;
+                    }
+                }
             } else {
                 console.log(`[STREAM] Message already exists for ID: ${event.messageId}, marking as streaming`);
                 existingMsg.streaming = true;
@@ -335,7 +426,9 @@ export function createEventHandlerMethods() {
          * Handle TEXT_MESSAGE_CONTENT event
          */
         __handleTextMessageContent(event, state, threadId) {
-            let msgIndex = state.messages.findIndex(m => m.id === event.messageId);
+            // Resolve coalesced parallel message ID
+            const resolvedId = state.parallelCoalesceMap[event.messageId] || event.messageId;
+            let msgIndex = state.messages.findIndex(m => m.id === resolvedId);
             if (msgIndex === -1) {
                 console.warn(`[STREAM] TEXT_MESSAGE_CONTENT for unknown ID: ${event.messageId}, lazily creating segment.`);
                 state.messages.push({
@@ -365,9 +458,12 @@ export function createEventHandlerMethods() {
          * Handle TEXT_MESSAGE_END event
          */
         __handleTextMessageEnd(event, state, threadId) {
-            console.log(`[STREAM] TEXT_MESSAGE_END for messageId: ${event.messageId}`);
-            const endMsgIndex = state.messages.findIndex(m => m.id === event.messageId);
+            // Resolve coalesced parallel message ID
+            const resolvedId = state.parallelCoalesceMap[event.messageId] || event.messageId;
+            console.log(`[STREAM] TEXT_MESSAGE_END for messageId: ${event.messageId}${resolvedId !== event.messageId ? ` (coalesced → ${resolvedId})` : ''}`);
+            const endMsgIndex = state.messages.findIndex(m => m.id === resolvedId);
             if (endMsgIndex !== -1) {
+                // Only mark as not-streaming if no other coalesced ID is still active
                 state.messages[endMsgIndex].streaming = false;
             }
 
@@ -396,6 +492,12 @@ export function createEventHandlerMethods() {
             state.showTypingIndicator = false;
             state.eventSource = null;
             state.retryCount = 0;
+            state.activeAgentName = null;
+            state.activeWorkflowContext = null;
+            state.lastWorkflowContext = null;
+            state.parallelAgentMessages = {};
+            state.parallelCoalesceMap = {};
+            state.parallelParent = null;
             eventSource.close();
         },
 
@@ -410,6 +512,12 @@ export function createEventHandlerMethods() {
             state.isStreaming = false;
             state.showTypingIndicator = false;
             state.eventSource = null;
+            state.activeAgentName = null;
+            state.activeWorkflowContext = null;
+            state.lastWorkflowContext = null;
+            state.parallelAgentMessages = {};
+            state.parallelCoalesceMap = {};
+            state.parallelParent = null;
 
             if (threadId === this.__currentThreadId) {
                 this.__showError(event.message || window.i18n.t('An error occurred'), threadId);
@@ -489,7 +597,11 @@ export function createEventHandlerMethods() {
                 parsedResult: null,
                 status: 'executing',
                 timestamp: new Date().toISOString(),
-                agentName: agentName
+                agentName: agentName,
+                workflowType: state.activeWorkflowContext?.workflowType || null,
+                parentAgent: state.activeWorkflowContext?.parentAgent || null,
+                stepIndex: state.activeWorkflowContext?.stepIndex ?? null,
+                stepCount: state.activeWorkflowContext?.stepCount ?? null,
             });
         }
     };

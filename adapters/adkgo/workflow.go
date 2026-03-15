@@ -38,6 +38,26 @@ import (
 // See arch/adr/019-multi-agent-workflow-composition.md.
 // ──────────────────────────────────────────────────────────────────────────────
 
+// AgentPosition describes a leaf agent's location within a workflow tree.
+// This is built during workflow construction and used at runtime to enrich
+// AgentTransferStarted events with structural context (step/branch/iteration).
+type AgentPosition struct {
+	WorkflowType  string // "sequential", "parallel", "loop"
+	ParentName    string // ADK-Go name of the parent composite agent
+	StepIndex     int    // 0-based index among siblings
+	StepCount     int    // Total number of siblings
+	MaxIterations int    // Only for loop contexts
+}
+
+// agentPositionCtx carries parent composite node info during recursive build.
+type agentPositionCtx struct {
+	workflowType  string
+	parentName    string
+	stepIndex     int
+	stepCount     int
+	maxIterations int
+}
+
 // workflowBuildContext carries the dependencies needed to build a workflow agent.
 type workflowBuildContext struct {
 	ctx      context.Context
@@ -51,6 +71,10 @@ type workflowBuildContext struct {
 	// usedNames tracks agent names already assigned in this tree.
 	// ADK-Go requires every agent name in the tree to be unique.
 	usedNames map[string]int
+
+	// positions maps leaf agent names → their position in the workflow tree.
+	// Populated during build, consumed by the runner event loop.
+	positions map[string]AgentPosition
 }
 
 // uniqueName returns a name guaranteed to be unique within this build.
@@ -68,18 +92,23 @@ func (wbc *workflowBuildContext) uniqueName(name string) string {
 
 // buildWorkflowAgent converts a foundation WorkflowAgent into an ADK-Go
 // agent tree by recursively walking the WorkflowNodeInfo graph.
-func buildWorkflowAgent(wbc *workflowBuildContext, wa fagent.WorkflowAgent) (agent.Agent, error) {
+// It also returns a position map for leaf agents so the runner can enrich
+// agent transfer events with workflow structure context.
+func buildWorkflowAgent(wbc *workflowBuildContext, wa fagent.WorkflowAgent) (agent.Agent, map[string]AgentPosition, error) {
+	wbc.positions = make(map[string]AgentPosition)
 	graph := wa.WorkflowGraph()
-	return buildNode(wbc, &graph, false)
+	agnt, err := buildNode(wbc, &graph, false, nil)
+	return agnt, wbc.positions, err
 }
 
 // buildNode recursively converts a WorkflowNodeInfo into the corresponding
 // ADK-Go agent. Leaf nodes become LLM agents; composite nodes become
 // sequential/parallel/loop agents wrapping their children.
-func buildNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, isLastInLoop bool) (agent.Agent, error) {
+// parentCtx carries the parent composite node's info for position tracking.
+func buildNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, isLastInLoop bool, parentCtx *agentPositionCtx) (agent.Agent, error) {
 	switch node.Type {
 	case "agent":
-		return buildLeafAgent(wbc, node, isLastInLoop)
+		return buildLeafAgent(wbc, node, isLastInLoop, parentCtx)
 
 	case "sequential":
 		return buildSequentialNode(wbc, node)
@@ -101,23 +130,31 @@ func buildSequentialNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInf
 		return nil, fmt.Errorf("node %q: sequential node has no children", node.ID)
 	}
 
+	// Reserve the parent name first so children can reference it.
+	name := node.Label
+	if name == "" {
+		name = fmt.Sprintf("seq-%s", node.ID)
+	}
+	parentName := wbc.uniqueName(name)
+
 	subAgents := make([]agent.Agent, 0, len(node.Children))
 	for i := range node.Children {
-		child, err := buildNode(wbc, &node.Children[i], false)
+		childCtx := &agentPositionCtx{
+			workflowType: "sequential",
+			parentName:   parentName,
+			stepIndex:    i,
+			stepCount:    len(node.Children),
+		}
+		child, err := buildNode(wbc, &node.Children[i], false, childCtx)
 		if err != nil {
 			return nil, fmt.Errorf("node %q child %d: %w", node.ID, i, err)
 		}
 		subAgents = append(subAgents, child)
 	}
 
-	name := node.Label
-	if name == "" {
-		name = fmt.Sprintf("seq-%s", node.ID)
-	}
-
 	return sequentialagent.New(sequentialagent.Config{
 		AgentConfig: agent.Config{
-			Name:      wbc.uniqueName(name),
+			Name:      parentName,
 			SubAgents: subAgents,
 		},
 	})
@@ -129,23 +166,31 @@ func buildParallelNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo)
 		return nil, fmt.Errorf("node %q: parallel node has no children", node.ID)
 	}
 
+	// Reserve the parent name first so children can reference it.
+	name := node.Label
+	if name == "" {
+		name = fmt.Sprintf("par-%s", node.ID)
+	}
+	parentName := wbc.uniqueName(name)
+
 	subAgents := make([]agent.Agent, 0, len(node.Children))
 	for i := range node.Children {
-		child, err := buildNode(wbc, &node.Children[i], false)
+		childCtx := &agentPositionCtx{
+			workflowType: "parallel",
+			parentName:   parentName,
+			stepIndex:    i,
+			stepCount:    len(node.Children),
+		}
+		child, err := buildNode(wbc, &node.Children[i], false, childCtx)
 		if err != nil {
 			return nil, fmt.Errorf("node %q child %d: %w", node.ID, i, err)
 		}
 		subAgents = append(subAgents, child)
 	}
 
-	name := node.Label
-	if name == "" {
-		name = fmt.Sprintf("par-%s", node.ID)
-	}
-
 	return parallelagent.New(parallelagent.Config{
 		AgentConfig: agent.Config{
-			Name:      wbc.uniqueName(name),
+			Name:      parentName,
 			SubAgents: subAgents,
 		},
 	})
@@ -159,31 +204,40 @@ func buildLoopNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo) (ag
 		return nil, fmt.Errorf("node %q: loop node has no children", node.ID)
 	}
 
+	maxIter := node.MaxIterations
+	if maxIter < 1 {
+		maxIter = 3
+	}
+
+	// Reserve the parent name first so children can reference it.
+	name := node.Label
+	if name == "" {
+		name = fmt.Sprintf("loop-%s", node.ID)
+	}
+	parentName := wbc.uniqueName(name)
+
 	subAgents := make([]agent.Agent, 0, len(node.Children))
 	lastIdx := len(node.Children) - 1
 	for i := range node.Children {
+		childCtx := &agentPositionCtx{
+			workflowType:  "loop",
+			parentName:    parentName,
+			stepIndex:     i,
+			stepCount:     len(node.Children),
+			maxIterations: maxIter,
+		}
 		// Mark the last child so buildLeafAgent adds the exit_loop tool.
-		child, err := buildNode(wbc, &node.Children[i], i == lastIdx)
+		child, err := buildNode(wbc, &node.Children[i], i == lastIdx, childCtx)
 		if err != nil {
 			return nil, fmt.Errorf("node %q child %d: %w", node.ID, i, err)
 		}
 		subAgents = append(subAgents, child)
 	}
 
-	maxIter := node.MaxIterations
-	if maxIter < 1 {
-		maxIter = 3
-	}
-
-	name := node.Label
-	if name == "" {
-		name = fmt.Sprintf("loop-%s", node.ID)
-	}
-
 	return loopagent.New(loopagent.Config{
 		MaxIterations: uint(maxIter),
 		AgentConfig: agent.Config{
-			Name:      wbc.uniqueName(name),
+			Name:      parentName,
 			SubAgents: subAgents,
 		},
 	})
@@ -196,7 +250,7 @@ func buildLoopNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo) (ag
 //  1. Workflow node override (DisallowTransferToParent/Peers in WorkflowNodeInfo)
 //  2. AgentDefinition default (stored in DB)
 //  3. ADK-Go default (allow all transfers)
-func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, isLastInLoop bool) (agent.Agent, error) {
+func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, isLastInLoop bool, parentCtx *agentPositionCtx) (agent.Agent, error) {
 	if node.AgentID == "" {
 		return nil, fmt.Errorf("node %q: agent node requires agent_id", node.ID)
 	}
@@ -256,8 +310,22 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 	// Build generate content config.
 	genCfg := buildGenerateContentConfig(wbc.modelCfg)
 
+	agentName := wbc.uniqueName(foundAgent.Name())
+
+	// Record this leaf's position in the workflow tree so the runner can
+	// enrich AgentTransferStarted events with structural context.
+	if parentCtx != nil {
+		wbc.positions[agentName] = AgentPosition{
+			WorkflowType:  parentCtx.workflowType,
+			ParentName:    parentCtx.parentName,
+			StepIndex:     parentCtx.stepIndex,
+			StepCount:     parentCtx.stepCount,
+			MaxIterations: parentCtx.maxIterations,
+		}
+	}
+
 	cfg := llmagent.Config{
-		Name:                  wbc.uniqueName(foundAgent.Name()),
+		Name:                  agentName,
 		Description:           foundAgent.Description(),
 		Model:                 wbc.llm,
 		Instruction:           systemPrompt,

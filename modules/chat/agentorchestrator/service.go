@@ -203,7 +203,8 @@ func (s *Service) isDurable(event thread.Event) bool {
 		*thread.AssistantContentStreamed,
 		*thread.AssistantMessageCompleted,
 		*thread.ToolStart,
-		*thread.ToolContentStreamed:
+		*thread.ToolContentStreamed,
+		*thread.AgentTransferStarted:
 		return false
 
 	default:

@@ -187,6 +187,68 @@ document.addEventListener('alpine:init', () => {
                 return this.__currentState.messages;
             },
 
+            /**
+             * Grouped message view for rendering.
+             * Consecutive parallel messages (same parentAgent) are collapsed
+             * into a single parallel_group entry with per-branch arrays
+             * so the template can render them as side-by-side columns.
+             * Non-parallel messages pass through unchanged.
+             */
+            get displayMessages() {
+                const msgs = this.__currentState.messages;
+                if (!msgs || msgs.length === 0) return [];
+
+                const result = [];
+                let i = 0;
+
+                while (i < msgs.length) {
+                    const msg = msgs[i];
+
+                    // When we hit a parallel workflow_marker, group everything
+                    // that belongs to this parallel section into branches.
+                    if (msg.type === 'workflow_marker' && msg.markerType === 'parallel') {
+                        const parentAgent = msg.parentAgent;
+                        const stepCount = msg.stepCount || 2;
+                        const branches = {};
+                        const agentToBranch = {}; // agentName → stepIndex lookup for tool calls
+                        i++; // skip the marker itself
+
+                        while (i < msgs.length) {
+                            const m = msgs[i];
+                            if (m.workflowType === 'parallel' && m.parentAgent === parentAgent) {
+                                // Assistant message (or tagged tool call) — direct branch match
+                                const branch = m.stepIndex || 0;
+                                if (!branches[branch]) branches[branch] = [];
+                                branches[branch].push(m);
+                                if (m.agentName) agentToBranch[m.agentName] = branch;
+                                i++;
+                            } else if (m.type === 'tool_call' && m.agentName && m.agentName in agentToBranch) {
+                                // Untagged tool call — match by agent name
+                                const branch = agentToBranch[m.agentName];
+                                if (!branches[branch]) branches[branch] = [];
+                                branches[branch].push(m);
+                                i++;
+                            } else {
+                                break; // end of parallel section
+                            }
+                        }
+
+                        result.push({
+                            id: msg.id,
+                            type: 'parallel_group',
+                            parentAgent,
+                            stepCount,
+                            branches,
+                            timestamp: msg.timestamp,
+                        });
+                    } else {
+                        result.push(msg);
+                        i++;
+                    }
+                }
+                return result;
+            },
+
             get isStreaming() {
                 return this.__currentState.isStreaming;
             },

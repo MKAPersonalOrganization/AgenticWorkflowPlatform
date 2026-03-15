@@ -22,6 +22,7 @@ func RegisterThreadEvents(r *es.DeserializerRegistry) {
 	r.Register("TokenUsageReported", func() es.Event { return &TokenUsageReported{} })
 	r.Register("ToolStart", func() es.Event { return &ToolStart{} })
 	r.Register("ToolContentStreamed", func() es.Event { return &ToolContentStreamed{} })
+	r.Register("AgentTransferStarted", func() es.Event { return &AgentTransferStarted{} })
 	r.Register("ToolResultAdded", func() es.Event { return &ToolResultAdded{} })
 	r.Register("ToolNeedsInput", func() es.Event { return &ToolNeedsInput{} })
 	r.Register("ToolNeedsAuth", func() es.Event { return &ToolNeedsAuth{} })

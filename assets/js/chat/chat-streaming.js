@@ -389,6 +389,9 @@ export function createStreamingMethods() {
                 case 'TOOL_CANCELLED':
                     this.__handleToolCancelled(event.value, state);
                     break;
+                case 'AGENT_TRANSFER_STARTED':
+                    this.__handleAgentTransferStarted(event.value, state, threadId);
+                    break;
                 default:
                     console.warn('[Streaming] Unknown custom event:', event.name);
             }
