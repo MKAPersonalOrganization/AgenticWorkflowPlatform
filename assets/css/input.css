@@ -681,4 +681,28 @@
   [x-cloak] {
     display: none !important;
   }
+
+  /* ========================================
+   * Streaming cursor (LibreChat pattern)
+   * GPU-accelerated CSS ::after — zero JS cost.
+   * Appears on the last block-level child while
+   * the message has the .result-streaming class.
+   * ======================================== */
+  @keyframes stream-cursor-blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+  }
+
+  .result-streaming > :not(ol):not(ul):not(pre):last-child::after,
+  .result-streaming > pre:last-child code::after {
+    content: '▋';
+    display: inline-block;
+    margin-inline-start: 1px;
+    vertical-align: -0.1em;
+    font-size: 0.85em;
+    color: var(--primary);
+    animation: stream-cursor-blink 0.85s ease-in-out infinite;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
 }

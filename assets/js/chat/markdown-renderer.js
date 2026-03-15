@@ -211,16 +211,25 @@ function preprocessLaTeX(content) {
 // (replaces remark-math + rehype-katex from LibreChat's React pipeline)
 // ============================================================================
 
+// KaTeX render cache — keyed by "tex|display". Each unique math expression is
+// rendered once and reused for the lifetime of the page (LibreChat lesson:
+// memoize expensive plugin output, not the pipeline itself).
+const _katexCache = new Map();
+
 /**
  * Render a TeX string to HTML using KaTeX.
+ * Results are memoized — identical expressions are rendered only once.
  * @param {string} tex - The TeX source
  * @param {boolean} displayMode - true for block/display math, false for inline
  * @returns {string} Rendered HTML or fallback
  */
 function renderKatex(tex, displayMode) {
   if (typeof window.katex === 'undefined') return tex;
+  const cacheKey = tex + (displayMode ? '|D' : '|I');
+  if (_katexCache.has(cacheKey)) return _katexCache.get(cacheKey);
+  let result;
   try {
-    return window.katex.renderToString(tex.trim(), {
+    result = window.katex.renderToString(tex.trim(), {
       displayMode,
       throwOnError: false,
       strict: false,
@@ -228,10 +237,12 @@ function renderKatex(tex, displayMode) {
     });
   } catch (e) {
     const escaped = tex.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    return displayMode
+    result = displayMode
       ? `<pre class="math-error">${escaped}</pre>`
       : `<code class="math-error">${escaped}</code>`;
   }
+  _katexCache.set(cacheKey, result);
+  return result;
 }
 
 /**
@@ -343,6 +354,12 @@ function enhanceCodeBlocks(html) {
 // Public API
 // ============================================================================
 
+// Full-pipeline output cache — if Alpine evaluates renderMarkdown() with the
+// same content string twice (e.g. unrelated reactive flush), skip all work.
+// Stores the single most-recent {content, html} pair; enough for the common
+// case where content only changes between RAF flushes.
+let _lastRender = { content: null, html: '' };
+
 /**
  * Render markdown content safely with math support.
  * Pipeline: preprocessLaTeX → extractMath → markdown-it → restoreMath → enhanceCodeBlocks
@@ -351,6 +368,7 @@ function enhanceCodeBlocks(html) {
  */
 export function renderMarkdown(content) {
   if (!content) return '';
+  if (content === _lastRender.content) return _lastRender.html;
 
   const langData = window.i18n?.getLanguage(window.i18n.getCurrentLanguage());
   let processedContent = content;
@@ -383,9 +401,12 @@ export function renderMarkdown(content) {
     html = restoreMath(html, mathMap);
 
     // Step 5: Enhance code blocks
-    return enhanceCodeBlocks(html);
+    const finalHtml = enhanceCodeBlocks(html);
+    _lastRender = { content, html: finalHtml };
+    return finalHtml;
   }
 
+  _lastRender = { content, html: processedContent };
   return processedContent;
 }
 

@@ -285,11 +285,7 @@ export function createStreamingMethods() {
                 return;
             }
 
-            // Log all events
-            this.__addEvent(event, threadId);
-
-            // Add lifecycle event as message if not hidden
-            if (!this.hideLifecycleEvents && LIFECYCLE_EVENT_TYPES.includes(event.type)) {
+            if (LIFECYCLE_EVENT_TYPES.includes(event.type)) {
                 this.__addLifecycleMessage(event, threadId);
             }
 
