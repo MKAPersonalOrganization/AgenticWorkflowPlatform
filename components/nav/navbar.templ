@@ -33,10 +33,6 @@ templ Navbar(props ...NavbarProps) {
 		if p.User != nil {
 			<!-- Chat History Button -->
 			@threads.ThreadsButtonTrigger()
-			<!-- Resources Button -->
-			<div class="hidden md:block">
-				@resources.ResourcesButtonTrigger()
-			</div>
 			<!-- Agent Store Button -->
 			<div class="hidden md:block">
 				@agents.AgentStoreNavButtonTrigger()
@@ -48,10 +44,6 @@ templ Navbar(props ...NavbarProps) {
 			<!-- Search Conversations Button -->
 			<div class="hidden md:block">
 				@convsearch.SearchButtonTrigger()
-			</div>
-			<!-- Filesystems Button -->
-			<div class="hidden md:block">
-				@filesystem.FilesystemButtonTrigger()
 			</div>
 			<!-- A2A Agents Button -->
 			<div class="hidden md:block">
@@ -78,8 +70,21 @@ templ Navbar(props ...NavbarProps) {
 				}
 			</div>
 		}
-		<!-- Spacer to push account settings to bottom -->
+		<!-- Spacer to push bottom icons down -->
 		<div class="flex-1"></div>
+		<!-- Bottom-pinned icons (VSCode-style) -->
+		if p.User != nil {
+			<!-- Filesystems Button -->
+			<div class="hidden md:block">
+				@filesystem.FilesystemButtonTrigger()
+			</div>
+			<!-- Resources / Knowledge Workspace Button -->
+			<div class="hidden md:block">
+				@resources.ResourcesButtonTrigger()
+			</div>
+		}
+		<!-- Separator -->
+		<div class="w-6 border-t border-sidebar-border/40 my-0.5"></div>
 		<!-- User Profile / Settings Menu (at bottom) -->
 		@AccountSettings(AccountSettingsProps{
 			User:    p.User,
