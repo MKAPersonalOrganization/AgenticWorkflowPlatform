@@ -805,3 +805,60 @@ FROM (VALUES ('stats'), ('billing'), ('agui'), ('llm-context')) AS t(name)
 CROSS JOIN projection_checkpoints cp
 WHERE cp.projection_name = 'all_projections'
 ON CONFLICT (projection_name) DO NOTHING;
+
+-- Version: 1.58
+-- Description: Create workflow_definitions table for multi-agent workflow composition.
+-- Users compose their existing agents into sequential, parallel, or loop workflows.
+-- See arch/adr/019-multi-agent-workflow-composition.md.
+CREATE TABLE IF NOT EXISTS workflow_definitions (
+    id             VARCHAR(255) PRIMARY KEY,
+    user_id        VARCHAR(255) NOT NULL,
+    name           VARCHAR(255) NOT NULL,
+    description    TEXT         NOT NULL DEFAULT '',
+    icon           TEXT         NOT NULL DEFAULT '',
+    workflow_type  VARCHAR(50)  NOT NULL,
+    steps          JSONB        NOT NULL DEFAULT '[]',
+    max_iterations INTEGER      NOT NULL DEFAULT 0,
+    created_at     TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at     TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_workflow_definitions_user ON workflow_definitions(user_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_definitions_user_created ON workflow_definitions(user_id, created_at ASC);
+
+-- Version: 1.59
+-- Description: Migrate workflow_definitions from flat (workflow_type + steps + max_iterations)
+-- to recursive composition tree (graph JSONB). This enables arbitrary nesting of
+-- sequential, parallel, loop, and agent nodes.
+-- See arch/adr/019-multi-agent-workflow-composition.md.
+
+-- 1. Add the graph column.
+ALTER TABLE workflow_definitions ADD COLUMN IF NOT EXISTS graph JSONB NOT NULL DEFAULT '{}';
+
+-- 2. Migrate existing rows: convert flat workflow_type + steps + max_iterations
+--    into a recursive graph tree with the old type as root and steps as agent children.
+UPDATE workflow_definitions
+SET graph = jsonb_build_object(
+    'id', 'node-root',
+    'type', workflow_type,
+    'label', '',
+    'max_iterations', CASE WHEN workflow_type = 'loop' THEN max_iterations ELSE 0 END,
+    'children', (
+        SELECT COALESCE(jsonb_agg(
+            jsonb_build_object(
+                'id', 'node-' || (row_number),
+                'type', 'agent',
+                'agent_id', step->>'agent_id',
+                'output_key', COALESCE(step->>'output_key', ''),
+                'label', ''
+            )
+        ), '[]'::jsonb)
+        FROM jsonb_array_elements(steps) WITH ORDINALITY AS t(step, row_number)
+    )
+)
+WHERE graph = '{}'::jsonb OR graph IS NULL;
+
+-- 3. Drop old columns.
+ALTER TABLE workflow_definitions DROP COLUMN IF EXISTS workflow_type;
+ALTER TABLE workflow_definitions DROP COLUMN IF EXISTS steps;
+ALTER TABLE workflow_definitions DROP COLUMN IF EXISTS max_iterations;

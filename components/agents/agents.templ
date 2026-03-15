@@ -22,6 +22,9 @@ templ AgentsDialog() {
 		}) {
 			@dialog.Content(dialog.ContentProps{
 				Class: "sm:max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden",
+				Attributes: templ.Attributes{
+					":class": "view === 'workflow-form' ? 'sm:!max-w-6xl' : ''",
+				},
 			}) {
 				<!-- Main View (Agent List + Store Tabs) -->
 				<template x-if="view === 'list'">
@@ -56,6 +59,15 @@ templ AgentsDialog() {
 								>
 									@icon.Store(icon.Props{Class: "size-4 inline-block me-1.5 -mt-0.5"})
 									{ i18n.T(ctx, "Agent Store") }
+								</button>
+								<button
+									type="button"
+									@click="switchTab('workflows')"
+									class="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
+									:class="activeTab === 'workflows' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'"
+								>
+									@icon.GitBranch(icon.Props{Class: "size-4 inline-block me-1.5 -mt-0.5"})
+									{ i18n.T(ctx, "Workflows") }
 								</button>
 							</div>
 						}
@@ -377,6 +389,191 @@ templ AgentsDialog() {
 								</div>
 							</div>
 						</template>
+						<!-- ═══════ Workflows Tab ═══════ -->
+						<template x-if="activeTab === 'workflows'">
+							<div class="flex flex-col flex-1 overflow-hidden">
+								<!-- Search + Create Bar -->
+								<div class="px-4 pt-3 pb-2 flex items-center gap-2">
+									<div class="flex-1">
+										@input.Input(input.Props{
+											Type:        input.TypeSearch,
+											Placeholder: i18n.T(ctx, "Search workflows..."),
+											Class:       "h-9 bg-muted/40 border-transparent focus-within:bg-background",
+											Attributes: templ.Attributes{
+												"x-model.debounce.300ms": "workflowSearchQuery",
+												"@input":                 "filterWorkflows()",
+											},
+										})
+									</div>
+									@button.Button(button.Props{
+										Size:    button.SizeSm,
+										Variant: button.VariantDefault,
+										Class:   "gap-1.5 shrink-0",
+										Attributes: templ.Attributes{
+											"@click": "showCreateWorkflowForm()",
+										},
+									}) {
+										@icon.Plus(icon.Props{Class: "size-4"})
+										{ i18n.T(ctx, "New Workflow") }
+									}
+								</div>
+								<div class="flex-1 overflow-y-auto px-4 pb-4 scrollbar-thin min-h-[300px]">
+									<!-- Loading State -->
+									<template x-if="workflowsLoading">
+										<div class="space-y-3">
+											<template x-for="i in 3" :key="i">
+												<div class="flex items-center gap-3 p-3 animate-pulse rounded-lg border border-border">
+													<div class="size-10 rounded-lg bg-muted"></div>
+													<div class="flex-1 space-y-2">
+														<div class="h-4 bg-muted rounded-md w-1/3"></div>
+														<div class="h-3 bg-muted rounded-md w-2/3"></div>
+													</div>
+												</div>
+											</template>
+										</div>
+									</template>
+									<!-- Loaded content -->
+									<template x-if="!workflowsLoading">
+										<div>
+											<!-- Empty State -->
+											<template x-if="filteredWorkflows.length === 0">
+												<div class="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
+													@icon.GitBranch(icon.Props{Class: "size-12 opacity-20"})
+													<template x-if="workflowSearchQuery">
+														<div class="text-center">
+															<p class="text-sm font-medium">{ i18n.T(ctx, "No workflows found") }</p>
+															<p class="text-xs mt-1">{ i18n.T(ctx, "Try a different search term.") }</p>
+														</div>
+													</template>
+													<template x-if="!workflowSearchQuery">
+														<div class="text-center">
+															<p class="text-sm font-medium">{ i18n.T(ctx, "No workflows yet") }</p>
+															<p class="text-xs mt-1">{ i18n.T(ctx, "Compose your agents into powerful workflows.") }</p>
+															@button.Button(button.Props{
+																Size:    button.SizeSm,
+																Variant: button.VariantOutline,
+																Class:   "mt-3 gap-1.5",
+																Attributes: templ.Attributes{
+																	"@click": "showCreateWorkflowForm()",
+																},
+															}) {
+																@icon.Plus(icon.Props{Class: "size-3.5"})
+																{ i18n.T(ctx, "Create Workflow") }
+															}
+														</div>
+													</template>
+												</div>
+											</template>
+											<!-- Workflow Cards -->
+											<div class="space-y-2">
+												<template x-for="wf in filteredWorkflows" :key="wf.id">
+													<div
+														class="group relative rounded-xl border-2 transition-all duration-200 cursor-pointer overflow-hidden"
+														:class="selectedAgent === wf.id
+															? 'border-primary bg-primary/4 shadow-[0_0_0_1px_hsl(var(--primary)/0.15),0_2px_8px_-2px_hsl(var(--primary)/0.12)]'
+															: 'border-transparent bg-card hover:border-border hover:shadow-sm'"
+														@click="selectedAgent !== wf.id && selectAgentForChat(wf.id)"
+													>
+														<!-- Active indicator bar -->
+														<div
+															class="absolute inset-y-0 start-0 w-1 rounded-s-xl transition-all duration-200"
+															:class="selectedAgent === wf.id ? 'bg-primary' : 'bg-transparent group-hover:bg-border'"
+														></div>
+														<div class="flex items-start gap-3.5 p-3.5 ps-5">
+															<!-- Workflow Icon -->
+															<div
+																class="size-11 rounded-xl flex items-center justify-center shrink-0 transition-colors duration-200"
+																:class="selectedAgent === wf.id
+																	? 'bg-primary text-primary-foreground shadow-sm'
+																	: 'bg-primary/10 text-primary'"
+															>
+																@icon.GitBranch(icon.Props{Class: "size-5"})
+															</div>
+															<!-- Content -->
+															<div class="flex-1 min-w-0">
+																<div class="flex items-center gap-2 mb-0.5">
+																	<h3 class="text-sm font-semibold text-foreground truncate" x-text="wf.name"></h3>
+																	<!-- Root node type badge -->
+																	<span
+																		class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold select-none"
+																		:class="nodeTypeBadgeClass(wf.graph?.type)"
+																		x-text="nodeTypeLabel(wf.graph?.type)"
+																	></span>
+																	<template x-if="selectedAgent === wf.id">
+																		<span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-primary/15 text-primary border border-primary/20 select-none">
+																			<span class="relative flex size-1.5">
+																				<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+																				<span class="relative inline-flex rounded-full size-1.5 bg-primary"></span>
+																			</span>
+																			{ i18n.T(ctx, "Active") }
+																		</span>
+																	</template>
+																</div>
+																<p class="text-xs text-muted-foreground mt-0.5 line-clamp-2" x-text="wf.description || 'No description'"></p>
+																<div class="flex items-center gap-3 mt-2">
+																	<span class="text-[10px] text-muted-foreground" x-text="collectAgentIds(wf.graph).length + ' agent' + (collectAgentIds(wf.graph).length !== 1 ? 's' : '')"></span>
+																	<span class="text-[10px] text-muted-foreground" x-text="'depth ' + nodeDepth(wf.graph)"></span>
+																	<span class="text-[10px] text-muted-foreground" x-text="'Created ' + formatDate(wf.created_at)"></span>
+																</div>
+															</div>
+															<!-- Actions -->
+															<div class="flex items-center gap-1.5 shrink-0" @click.stop>
+																<!-- Use Workflow button -->
+																<template x-if="selectedAgent !== wf.id">
+																	@button.Button(button.Props{
+																		Size:    button.SizeSm,
+																		Variant: button.VariantDefault,
+																		Class:   "text-xs px-3 h-8 gap-1.5 font-medium shadow-sm",
+																		Attributes: templ.Attributes{
+																			"@click.stop": "selectAgentForChat(wf.id)",
+																		},
+																	}) {
+																		@icon.Sparkles(icon.Props{Class: "size-3.5"})
+																		{ i18n.T(ctx, "Use") }
+																	}
+																</template>
+																<!-- Active indicator -->
+																<template x-if="selectedAgent === wf.id">
+																	<span class="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium text-primary rounded-md bg-primary/10 border border-primary/20 select-none">
+																		@icon.CircleCheck(icon.Props{Class: "size-3.5"})
+																		{ i18n.T(ctx, "In Use") }
+																	</span>
+																</template>
+																<!-- Edit & Delete -->
+																<div class="flex items-center gap-0.5 ms-1 ps-1.5 border-s border-border transition-opacity duration-150" :class="selectedAgent === wf.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'">
+																	@button.Button(button.Props{
+																		Size:    button.SizeIcon,
+																		Variant: button.VariantGhost,
+																		Class:   "size-7",
+																		Attributes: templ.Attributes{
+																			"@click.stop": "showEditWorkflowForm(wf)",
+																			"title":       i18n.T(ctx, "Edit"),
+																		},
+																	}) {
+																		@icon.Pencil(icon.Props{Class: "size-3.5"})
+																	}
+																	@button.Button(button.Props{
+																		Size:    button.SizeIcon,
+																		Variant: button.VariantGhost,
+																		Class:   "size-7 text-destructive hover:text-destructive",
+																		Attributes: templ.Attributes{
+																			"@click.stop": "confirmDeleteWorkflow(wf)",
+																			"title":       i18n.T(ctx, "Delete"),
+																		},
+																	}) {
+																		@icon.Trash2(icon.Props{Class: "size-3.5"})
+																	}
+																</div>
+															</div>
+														</div>
+													</div>
+												</template>
+											</div>
+										</div>
+									</template>
+								</div>
+							</div>
+						</template>
 						@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
 							<div class="flex items-center justify-between w-full">
 								<span class="text-xs text-muted-foreground">
@@ -385,6 +582,9 @@ templ AgentsDialog() {
 									</template>
 									<template x-if="activeTab === 'store'">
 										<span x-text="`${storeTotal} agent${storeTotal !== 1 ? 's' : ''} in store`"></span>
+									</template>
+									<template x-if="activeTab === 'workflows'">
+										<span x-text="`${filteredWorkflows.length} workflow${filteredWorkflows.length !== 1 ? 's' : ''}`"></span>
 									</template>
 								</span>
 								@dialog.Close() {
@@ -641,7 +841,6 @@ templ AgentsDialog() {
 											</template>
 										</div>
 									</div>
-
 									<!-- Filesystems Section -->
 									<div class="border border-border rounded-lg">
 										<button
@@ -792,6 +991,177 @@ templ AgentsDialog() {
 									Class:   "h-8 px-4 text-xs gap-1.5",
 									Attributes: templ.Attributes{
 										"@click":    "deleteAgent()",
+										":disabled": "saving",
+									},
+								}) {
+									<span x-show="!saving">{ i18n.T(ctx, "Delete") }</span>
+									<span x-show="saving" class="flex items-center gap-1.5">
+										<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
+										{ i18n.T(ctx, "Deleting...") }
+									</span>
+								}
+							</div>
+						}
+					</div>
+				</template>
+				<!-- Workflow Create/Edit Form View -->
+				<template x-if="view === 'workflow-form'">
+					<div class="flex flex-col h-full max-h-[90vh]">
+						@dialog.Header(dialog.HeaderProps{Class: "p-4 pb-3 border-b border-border"}) {
+							<div class="flex items-center gap-2">
+								@button.Button(button.Props{
+									Size:    button.SizeIcon,
+									Variant: button.VariantGhost,
+									Class:   "size-8",
+									Attributes: templ.Attributes{
+										"@click": "view = 'list'; activeTab = 'workflows'",
+									},
+								}) {
+									@icon.ArrowLeft(icon.Props{Class: "size-4"})
+								}
+								<div>
+									@dialog.Title() {
+										<span x-text="editingWorkflow ? 'Edit Workflow' : 'Create New Workflow'"></span>
+									}
+									@dialog.Description() {
+										<span x-text="editingWorkflow ? 'Modify your workflow composition tree.' : 'Compose agents into an arbitrary multi-agent workflow tree.'"></span>
+									}
+								</div>
+							</div>
+						}
+						<div class="flex-1 overflow-hidden flex">
+							<!-- Left column: Form + Tree Editor -->
+							<div class="flex-1 min-w-0 overflow-y-auto p-4 scrollbar-thin space-y-4">
+								<!-- Workflow Name -->
+								<div class="space-y-2">
+									@label.Label(label.Props{}) {
+										{ i18n.T(ctx, "Workflow Name") }
+										<span class="text-destructive">*</span>
+									}
+									@input.Input(input.Props{
+										Placeholder: i18n.T(ctx, "e.g., Research Pipeline, Content Creator..."),
+										Attributes: templ.Attributes{
+											"x-model":   "workflowForm.name",
+											"maxlength": "100",
+										},
+									})
+								</div>
+								<!-- Description -->
+								<div class="space-y-2">
+									@label.Label(label.Props{}) {
+										{ i18n.T(ctx, "Description") }
+									}
+									@input.Input(input.Props{
+										Placeholder: i18n.T(ctx, "Brief description of what this workflow does..."),
+										Attributes: templ.Attributes{
+											"x-model":   "workflowForm.description",
+											"maxlength": "500",
+										},
+									})
+								</div>
+								<!-- Composition Tree -->
+								<div class="space-y-2">
+									@label.Label(label.Props{}) {
+										{ i18n.T(ctx, "Composition Tree") }
+										<span class="text-destructive">*</span>
+									}
+									<p class="text-[11px] text-muted-foreground mb-2">
+										{ i18n.T(ctx, "Build your workflow by nesting agents inside sequential, parallel, or loop nodes. Any node can contain any other node type.") }
+									</p>
+									<!-- Recursive tree rendered via Alpine.js -->
+									<div class="space-y-2" x-data="workflowTreeBuilder()" x-init="init()">
+										<template x-if="true">
+											<div x-html="renderNode(workflowForm.graph, 'graph', 0, false)"></div>
+										</template>
+									</div>
+								</div>
+								<!-- Tree stats -->
+								<div class="flex items-center gap-4 p-2 rounded-lg bg-muted/30 border border-border">
+									<span class="text-[11px] text-muted-foreground" x-text="countNodes(workflowForm.graph) + ' nodes'"></span>
+									<span class="text-[11px] text-muted-foreground" x-text="'depth ' + nodeDepth(workflowForm.graph)"></span>
+									<span class="text-[11px] text-muted-foreground" x-text="collectAgentIds(workflowForm.graph).length + ' agents'"></span>
+									<template x-if="countNodes(workflowForm.graph) >= 50">
+										<span class="text-[11px] text-amber-600 dark:text-amber-400 font-medium">{ i18n.T(ctx, "Node limit reached") }</span>
+									</template>
+								</div>
+							</div>
+							<!-- Right column: Pipeline Preview -->
+							<div class="w-[340px] shrink-0 border-l border-border overflow-y-auto scrollbar-thin bg-muted/5">
+								<div class="p-3 border-b border-border">
+									<span class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "Pipeline Preview") }</span>
+								</div>
+								<div
+									x-data="workflowTreeVisualizer()"
+								>
+									<div x-html="renderTree(workflowForm.graph, agents)"></div>
+								</div>
+							</div>
+						</div>
+						@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
+							<div class="flex items-center justify-end gap-2 w-full">
+								@button.Button(button.Props{
+									Variant: button.VariantGhost,
+									Class:   "h-8 px-3 text-xs",
+									Attributes: templ.Attributes{
+										"@click": "view = 'list'; activeTab = 'workflows'",
+									},
+								}) {
+									{ i18n.T(ctx, "Cancel") }
+								}
+								@button.Button(button.Props{
+									Variant: button.VariantDefault,
+									Class:   "h-8 px-4 text-xs gap-1.5",
+									Attributes: templ.Attributes{
+										"@click":    "saveWorkflow()",
+										":disabled": "saving || !workflowForm.name.trim()",
+									},
+								}) {
+									<span x-show="!saving" x-text="editingWorkflow ? 'Save Changes' : 'Create Workflow'"></span>
+									<span x-show="saving" class="flex items-center gap-1.5">
+										<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
+										{ i18n.T(ctx, "Saving...") }
+									</span>
+								}
+							</div>
+						}
+					</div>
+				</template>
+				<!-- Workflow Delete Confirmation View -->
+				<template x-if="view === 'workflow-delete'">
+					<div class="flex flex-col h-full">
+						@dialog.Header(dialog.HeaderProps{Class: "p-4 pb-3 border-b border-border"}) {
+							@dialog.Title() {
+								{ i18n.T(ctx, "Delete Workflow") }
+							}
+							@dialog.Description() {
+								{ i18n.T(ctx, "This action cannot be undone.") }
+							}
+						}
+						<div class="p-6 flex flex-col items-center gap-4">
+							<div class="size-12 rounded-full bg-destructive/10 flex items-center justify-center">
+								@icon.Trash2(icon.Props{Class: "size-6 text-destructive"})
+							</div>
+							<p class="text-sm text-center text-foreground">
+								{ i18n.T(ctx, "Are you sure you want to delete workflow") }
+								<span class="font-semibold" x-text="deletingWorkflow?.name"></span>?
+							</p>
+						</div>
+						@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
+							<div class="flex items-center justify-end gap-2 w-full">
+								@button.Button(button.Props{
+									Variant: button.VariantGhost,
+									Class:   "h-8 px-3 text-xs",
+									Attributes: templ.Attributes{
+										"@click": "view = 'list'; activeTab = 'workflows'",
+									},
+								}) {
+									{ i18n.T(ctx, "Cancel") }
+								}
+								@button.Button(button.Props{
+									Variant: button.VariantDestructive,
+									Class:   "h-8 px-4 text-xs gap-1.5",
+									Attributes: templ.Attributes{
+										"@click":    "deleteWorkflow()",
 										":disabled": "saving",
 									},
 								}) {
