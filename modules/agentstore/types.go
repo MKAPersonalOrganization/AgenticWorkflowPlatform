@@ -2,18 +2,27 @@ package agentstore
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"time"
 )
 
-// AgentDefinition represents a user-created agent definition.
-// Each user can create agents that are scoped only to them.
+// ──────────────────────────────────────────────────────────────────────────────
+// AgentDefinition — the universal building block
 //
-// Multi-agent orchestration fields map directly to ADK-Go's llmagent.Config:
-//   - TransferPolicy controls transfer_to_agent delegation
-//   - OutputKey stores agent output in session state for downstream agents
-//   - IncludeContents controls history forwarding in sub-agent contexts
-//   - GlobalInstruction is shared across the entire agent tree (root only)
-//   - InputSchema/OutputSchema constrain agent I/O
+// Every agent in the system — whether a simple LLM agent or a composed
+// multi-agent workflow — is an AgentDefinition. This mirrors ADK-Go where
+// every agent type (llmagent, sequentialagent, parallelagent, loopagent)
+// implements the same Agent interface.
+//
+// An agent with a non-nil Graph is a "composed agent" that orchestrates
+// sub-agents via sequential, parallel, or loop patterns. An agent without
+// a graph is a simple LLM agent with an instruction (system prompt).
+//
+// Creating an agent programmatically (via ADK-Go constructors) and through
+// the web interface (via this definition) are completely equivalent.
+// ──────────────────────────────────────────────────────────────────────────────
+
 type AgentDefinition struct {
 	ID              string `json:"id" db:"id"`
 	UserID          string `json:"user_id" db:"user_id"`
@@ -23,67 +32,195 @@ type AgentDefinition struct {
 	Icon            string `json:"icon" db:"icon"`
 	SourceCatalogID string `json:"source_catalog_id,omitempty" db:"source_catalog_id"`
 
-	// WorkflowID links this agent to a workflow definition.
-	// Sub-agents created when forking a workflow catalog entry have this set
-	// to the parent workflow's ID, which hides them from the main agent list.
-	WorkflowID string `json:"workflow_id,omitempty" db:"workflow_id"`
+	// WorkflowID is deprecated. Kept for migration compatibility.
+	// In the unified model all agents are first-class and visible.
+	WorkflowID string `json:"-" db:"workflow_id"`
 
-	// ── Multi-Agent Orchestration ──
+	// ── Composition ──
+	// Graph holds the composition tree for composed agents.
+	// When non-nil, this agent orchestrates sub-agents (sequential, parallel,
+	// loop patterns). Leaf nodes reference other AgentDefinitions by ID.
+	// Nil/empty means this is a simple LLM agent.
+	Graph     *CompositionNode `json:"graph,omitempty" db:"-"`
+	GraphJSON string           `json:"-" db:"graph"`
 
-	// DisallowTransferToParent prevents delegation back to the parent agent.
-	DisallowTransferToParent bool `json:"disallow_transfer_to_parent" db:"disallow_transfer_to_parent"`
+	// ── Multi-Agent Orchestration (used when this agent participates as a sub-agent) ──
 
-	// DisallowTransferToPeers prevents delegation to sibling agents.
-	DisallowTransferToPeers bool `json:"disallow_transfer_to_peers" db:"disallow_transfer_to_peers"`
+	DisallowTransferToParent bool   `json:"disallow_transfer_to_parent" db:"disallow_transfer_to_parent"`
+	DisallowTransferToPeers  bool   `json:"disallow_transfer_to_peers" db:"disallow_transfer_to_peers"`
+	OutputKey                string `json:"output_key,omitempty" db:"output_key"`
+	IncludeContents          string `json:"include_contents,omitempty" db:"include_contents"`
+	GlobalInstruction        string `json:"global_instruction,omitempty" db:"global_instruction"`
+	InputSchemaJSON          string `json:"input_schema,omitempty" db:"input_schema"`
+	OutputSchemaJSON         string `json:"output_schema,omitempty" db:"output_schema"`
 
-	// OutputKey stores the agent's final output in session state under this key.
-	// Downstream agents can reference it via {output_key} template syntax.
-	OutputKey string `json:"output_key,omitempty" db:"output_key"`
-
-	// IncludeContents controls whether conversation history is forwarded
-	// when this agent runs as a sub-agent. "default" or "none".
-	IncludeContents string `json:"include_contents,omitempty" db:"include_contents"`
-
-	// GlobalInstruction is shared across the entire agent tree (root agent only).
-	GlobalInstruction string `json:"global_instruction,omitempty" db:"global_instruction"`
-
-	// InputSchemaJSON is the JSON-encoded input schema for when this agent
-	// is used as a tool (AgentTool pattern). Stored as JSONB.
-	InputSchemaJSON string `json:"input_schema,omitempty" db:"input_schema"`
-
-	// OutputSchemaJSON is the JSON-encoded output schema that constrains the
-	// agent's response format. When set, tool use is disabled. Stored as JSONB.
-	OutputSchemaJSON string `json:"output_schema,omitempty" db:"output_schema"`
+	// ── Sharing ──
+	// ShareToken is a unique token that enables sharing this agent with other users.
+	// Empty means the agent is private. Generate via the share endpoint.
+	ShareToken string `json:"share_token,omitempty" db:"share_token"`
+	// Visibility controls who can see this agent: "private" (default) or "shared".
+	Visibility string `json:"visibility,omitempty" db:"visibility"`
 
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
+// IsComposed returns true if this agent has a composition graph
+// (i.e., it orchestrates sub-agents rather than being a simple LLM agent).
+func (a *AgentDefinition) IsComposed() bool {
+	return a.Graph != nil
+}
+
+// MarshalGraph serializes the Graph to GraphJSON for storage.
+func (a *AgentDefinition) MarshalGraph() error {
+	if a.Graph == nil {
+		a.GraphJSON = ""
+		return nil
+	}
+	b, err := json.Marshal(a.Graph)
+	if err != nil {
+		return fmt.Errorf("marshalling composition graph: %w", err)
+	}
+	a.GraphJSON = string(b)
+	return nil
+}
+
+// UnmarshalGraph deserializes GraphJSON into Graph.
+func (a *AgentDefinition) UnmarshalGraph() error {
+	if a.GraphJSON == "" || a.GraphJSON == "null" {
+		a.Graph = nil
+		return nil
+	}
+	var g CompositionNode
+	if err := json.Unmarshal([]byte(a.GraphJSON), &g); err != nil {
+		return fmt.Errorf("unmarshalling composition graph: %w", err)
+	}
+	a.Graph = &g
+	return nil
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// CompositionNode — recursive building block for agent composition
+//
+// Maps 1:1 to ADK-Go's agent types:
+//   - "agent"      → llmagent.New (leaf — references another AgentDefinition)
+//   - "sequential" → sequentialagent.New (runs children in order)
+//   - "parallel"   → parallelagent.New (runs children concurrently)
+//   - "loop"       → loopagent.New (repeats children until exit condition)
+//
+// Example tree:
+//
+//   sequential
+//   ├─ agent(researcher)
+//   ├─ parallel
+//   │  ├─ agent(writer)
+//   │  └─ agent(fact-checker)
+//   └─ loop
+//      ├─ agent(reviewer)
+//      └─ agent(editor)
+// ──────────────────────────────────────────────────────────────────────────────
+
+// NodeType identifies what kind of node this is in the composition tree.
+type NodeType string
+
+const (
+	NodeAgent      NodeType = "agent"
+	NodeSequential NodeType = "sequential"
+	NodeParallel   NodeType = "parallel"
+	NodeLoop       NodeType = "loop"
+)
+
+// ValidNodeTypes is the set of supported node types.
+var ValidNodeTypes = map[NodeType]bool{
+	NodeAgent:      true,
+	NodeSequential: true,
+	NodeParallel:   true,
+	NodeLoop:       true,
+}
+
+// IsComposite returns true if the node type can contain children.
+func (nt NodeType) IsComposite() bool {
+	return nt == NodeSequential || nt == NodeParallel || nt == NodeLoop
+}
+
+// CompositionNode is the recursive building block for agent composition.
+// Composite nodes hold children, leaf nodes reference agent definitions.
+type CompositionNode struct {
+	ID    string   `json:"id"`
+	Type  NodeType `json:"type"`
+	Label string   `json:"label,omitempty"`
+
+	// ── Leaf-node fields (Type = "agent") ──
+	AgentID                  string `json:"agent_id,omitempty"`
+	OutputKey                string `json:"output_key,omitempty"`
+	DisallowTransferToParent *bool  `json:"disallow_transfer_to_parent,omitempty"`
+	DisallowTransferToPeers  *bool  `json:"disallow_transfer_to_peers,omitempty"`
+	IncludeContents          string `json:"include_contents,omitempty"`
+
+	// ── Composite-node fields ──
+	Children      []CompositionNode `json:"children,omitempty"`
+	MaxIterations int               `json:"max_iterations,omitempty"`
+}
+
+// CollectAgentIDs returns all agent IDs referenced in the tree.
+func (n *CompositionNode) CollectAgentIDs() []string {
+	var ids []string
+	n.Walk(func(node *CompositionNode) {
+		if node.Type == NodeAgent && node.AgentID != "" {
+			ids = append(ids, node.AgentID)
+		}
+	})
+	return ids
+}
+
+// CountNodes returns the total number of nodes in the tree.
+func (n *CompositionNode) CountNodes() int {
+	count := 0
+	n.Walk(func(_ *CompositionNode) { count++ })
+	return count
+}
+
+// Depth returns the maximum depth of the tree (1 for a single leaf).
+func (n *CompositionNode) Depth() int {
+	if len(n.Children) == 0 {
+		return 1
+	}
+	maxChildDepth := 0
+	for i := range n.Children {
+		d := n.Children[i].Depth()
+		if d > maxChildDepth {
+			maxChildDepth = d
+		}
+	}
+	return 1 + maxChildDepth
+}
+
+// Walk visits every node in the tree depth-first.
+func (n *CompositionNode) Walk(fn func(*CompositionNode)) {
+	fn(n)
+	for i := range n.Children {
+		n.Children[i].Walk(fn)
+	}
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Repository
+// ──────────────────────────────────────────────────────────────────────────────
+
 // AgentDefinitionRepository defines the storage contract for user-created agents.
 type AgentDefinitionRepository interface {
-	// Create persists a new agent definition.
 	Create(ctx context.Context, agent *AgentDefinition) error
-
-	// Update modifies an existing agent definition (must be owned by user).
 	Update(ctx context.Context, agent *AgentDefinition) error
-
-	// Delete removes an agent definition by ID (must be owned by user).
 	Delete(ctx context.Context, id, userID string) error
-
-	// GetByID retrieves a single agent by ID (must be owned by user).
 	GetByID(ctx context.Context, id, userID string) (*AgentDefinition, error)
-
-	// ListByUser returns all agents created by a specific user.
 	ListByUser(ctx context.Context, userID string) ([]AgentDefinition, error)
-
-	// Search finds agents matching a query string within a user's agents.
 	Search(ctx context.Context, userID, query string) ([]AgentDefinition, error)
-
-	// ListAddedCatalogIDs returns the set of catalog entry IDs that the
-	// user has already forked into their personal agents.
 	ListAddedCatalogIDs(ctx context.Context, userID string) ([]string, error)
-
-	// ExistsByCatalogID checks whether the user already has an agent
-	// forked from the given catalog entry. Used to prevent duplicates.
 	ExistsByCatalogID(ctx context.Context, userID, catalogID string) (bool, error)
+
+	// GetByShareToken retrieves a shared agent by its share token (no user scoping).
+	GetByShareToken(ctx context.Context, token string) (*AgentDefinition, error)
+
+	// UpdateShareToken sets or clears the share token for an agent.
+	UpdateShareToken(ctx context.Context, id, userID, token, visibility string) error
 }

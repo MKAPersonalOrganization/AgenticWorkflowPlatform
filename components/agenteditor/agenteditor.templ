@@ -1,0 +1,1177 @@
+package agenteditor
+
+import (
+	"school-with-ai/components/badge"
+	"school-with-ai/components/button"
+	"school-with-ai/components/dialog"
+	"school-with-ai/components/i18n"
+	"school-with-ai/components/icon"
+	"school-with-ai/components/input"
+	"school-with-ai/components/label"
+	"school-with-ai/components/textarea"
+)
+
+// AgentDesignerDialog is the main dialog for designing agents.
+// Two modes: Node Design (single agent) and Pipeline Compose (workflow).
+templ AgentDesignerDialog() {
+	<div
+		x-data="agentDesigner"
+		@open-agent-designer.window="open($event.detail?.mode)"
+		@open-agent-designer-node.window="open('node'); $nextTick(() => showEditNodeForm($event.detail))"
+		@open-agent-designer-pipeline.window="open('pipeline'); $nextTick(() => showEditPipelineForm($event.detail))"
+		@agents-updated.window="fetchAgents()"
+	>
+		@dialog.Dialog(dialog.Props{
+			ID: "agent-designer-dialog",
+		}) {
+			@dialog.Content(dialog.ContentProps{
+				Class: "sm:max-w-5xl max-h-[90vh] flex flex-col p-0 overflow-hidden transition-all duration-300 ease-in-out",
+				Attributes: templ.Attributes{
+					":class": "expanded ? '!max-w-[calc(100vw-2rem)] !max-h-[calc(100vh-2rem)] !w-[calc(100vw-2rem)] !h-[calc(100vh-2rem)]' : ''",
+				},
+			}) {
+				<!-- Header with mode tabs -->
+				@dialog.Header(dialog.HeaderProps{Class: "p-4 pb-0 border-b border-border"}) {
+					<div class="flex items-center justify-between mb-3">
+						<div>
+							@dialog.Title() {
+								<span class="flex items-center gap-2">
+									@icon.Workflow(icon.Props{Class: "size-5"})
+									{ i18n.T(ctx, "Agent Designer") }
+								</span>
+							}
+							@dialog.Description() {
+								{ i18n.T(ctx, "Design individual agent nodes or compose them into pipelines.") }
+							}
+						</div>
+						<div class="flex items-center gap-1">
+							@button.Button(button.Props{
+								Size:    button.SizeIcon,
+								Variant: button.VariantGhost,
+								Class:   "size-7 text-muted-foreground",
+								Attributes: templ.Attributes{
+									"@click": "toggleExpand()",
+									"title":  i18n.T(ctx, "Toggle fullscreen"),
+								},
+							}) {
+								<span x-show="!expanded">
+									@icon.Maximize2(icon.Props{Class: "size-3.5"})
+								</span>
+								<span x-show="expanded">
+									@icon.Minimize2(icon.Props{Class: "size-3.5"})
+								</span>
+							}
+						</div>
+					</div>
+					<!-- Mode Tab Bar -->
+					<div class="flex gap-0 -mb-px">
+						<button
+							type="button"
+							@click="switchMode('node')"
+							class="px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5"
+							:class="mode === 'node' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'"
+						>
+							@icon.Bot(icon.Props{Class: "size-4"})
+							{ i18n.T(ctx, "Node Design") }
+						</button>
+						<button
+							type="button"
+							@click="switchMode('pipeline')"
+							class="px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5"
+							:class="mode === 'pipeline' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'"
+						>
+							@icon.GitBranch(icon.Props{Class: "size-4"})
+							{ i18n.T(ctx, "Pipeline Compose") }
+						</button>
+					</div>
+				}
+				<!-- ═══════════════════════════════════════════ -->
+				<!-- NODE DESIGN MODE                           -->
+				<!-- ═══════════════════════════════════════════ -->
+				<template x-if="mode === 'node'">
+					<div class="flex flex-col flex-1 overflow-hidden" :class="expanded ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[calc(90vh-8rem)]'">
+						<!-- Node List View -->
+						<template x-if="nodeView === 'list'">
+							<div class="flex flex-col flex-1 overflow-hidden">
+								<div class="px-4 pt-3 pb-2 flex items-center gap-2">
+									<div class="flex-1">
+										@input.Input(input.Props{
+											Type:        input.TypeSearch,
+											Placeholder: i18n.T(ctx, "Search agent nodes..."),
+											Class:       "h-9 bg-muted/40 border-transparent focus-within:bg-background",
+											Attributes: templ.Attributes{
+												"x-model.debounce.300ms": "searchQuery",
+												"@input":                 "searchAgents()",
+											},
+										})
+									</div>
+									@button.Button(button.Props{
+										Size:    button.SizeSm,
+										Variant: button.VariantDefault,
+										Class:   "gap-1.5 shrink-0",
+										Attributes: templ.Attributes{
+											"@click": "showCreateNodeForm()",
+										},
+									}) {
+										@icon.Plus(icon.Props{Class: "size-4"})
+										{ i18n.T(ctx, "New Agent") }
+									}
+								</div>
+								<div class="flex-1 overflow-y-auto px-4 pb-4 scrollbar-thin min-h-[300px]">
+									<template x-if="loading">
+										<div class="space-y-3">
+											<template x-for="i in 3" :key="i">
+												<div class="flex items-center gap-3 p-3 animate-pulse rounded-lg border border-border">
+													<div class="size-10 rounded-lg bg-muted"></div>
+													<div class="flex-1 space-y-2">
+														<div class="h-4 bg-muted rounded-md w-1/3"></div>
+														<div class="h-3 bg-muted rounded-md w-2/3"></div>
+													</div>
+												</div>
+											</template>
+										</div>
+									</template>
+									<template x-if="!loading">
+										<div>
+											<template x-if="filteredAgents.length === 0">
+												<div class="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
+													@icon.Bot(icon.Props{Class: "size-12 opacity-20"})
+													<template x-if="searchQuery">
+														<div class="text-center">
+															<p class="text-sm font-medium">{ i18n.T(ctx, "No agent nodes found") }</p>
+															<p class="text-xs mt-1">{ i18n.T(ctx, "Try a different search term.") }</p>
+														</div>
+													</template>
+													<template x-if="!searchQuery">
+														<div class="text-center">
+															<p class="text-sm font-medium">{ i18n.T(ctx, "No agent nodes yet") }</p>
+															<p class="text-xs mt-1">{ i18n.T(ctx, "Create your first agent node to start building.") }</p>
+															@button.Button(button.Props{
+																Size:    button.SizeSm,
+																Variant: button.VariantOutline,
+																Class:   "mt-3 gap-1.5",
+																Attributes: templ.Attributes{
+																	"@click": "showCreateNodeForm()",
+																},
+															}) {
+																@icon.Plus(icon.Props{Class: "size-3.5"})
+																{ i18n.T(ctx, "Create Agent Node") }
+															}
+														</div>
+													</template>
+												</div>
+											</template>
+											<!-- Agent Node Cards Grid -->
+											<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+												<template x-for="ag in filteredAgents" :key="ag.id">
+													<div
+														class="group relative rounded-xl border border-border hover:border-primary/30 hover:shadow-sm transition-all duration-200 cursor-pointer overflow-hidden bg-card"
+														@click="showEditNodeForm(ag)"
+													>
+														<div class="p-4">
+															<div class="flex items-start gap-3">
+																<!-- Agent Icon -->
+																<div class="size-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0 [&_svg]:size-5">
+																	<span x-html="ag.icon"></span>
+																</div>
+																<div class="flex-1 min-w-0">
+																	<h3 class="text-sm font-semibold text-foreground truncate" x-text="ag.name"></h3>
+																	<p class="text-xs text-muted-foreground mt-0.5 line-clamp-2" x-text="ag.description || 'No description'"></p>
+																</div>
+															</div>
+															<!-- Node metadata -->
+															<div class="flex items-center gap-2 mt-3 pt-2 border-t border-border/50">
+																@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "text-[9px] px-1.5 py-0 h-4"}) {
+																	@icon.Bot(icon.Props{Class: "size-2.5 me-0.5"})
+																	{ i18n.T(ctx, "Node") }
+																}
+																<span class="text-[10px] text-muted-foreground" x-text="formatDate(ag.createdAt || ag.created_at)"></span>
+																<div class="flex-1"></div>
+																<div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" @click.stop>
+																	@button.Button(button.Props{
+																		Size:    button.SizeIcon,
+																		Variant: button.VariantGhost,
+																		Class:   "size-7 text-destructive hover:text-destructive",
+																		Attributes: templ.Attributes{
+																			"@click.stop": "confirmDeleteNode(ag)",
+																			"title":       i18n.T(ctx, "Delete"),
+																		},
+																	}) {
+																		@icon.Trash2(icon.Props{Class: "size-3.5"})
+																	}
+																</div>
+															</div>
+														</div>
+													</div>
+												</template>
+											</div>
+										</div>
+									</template>
+								</div>
+							</div>
+						</template>
+						<!-- Node Create/Edit Form View -->
+						<template x-if="nodeView === 'form'">
+							<div class="flex flex-col flex-1 overflow-hidden">
+								<div class="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/50">
+									@button.Button(button.Props{
+										Size:    button.SizeIcon,
+										Variant: button.VariantGhost,
+										Class:   "size-8",
+										Attributes: templ.Attributes{
+											"@click": "nodeView = 'list'",
+										},
+									}) {
+										@icon.ArrowLeft(icon.Props{Class: "size-4"})
+									}
+									<h3 class="text-sm font-semibold" x-text="editingAgent ? 'Edit Agent Node' : 'Create Agent Node'"></h3>
+									<span class="text-[10px] text-muted-foreground" x-text="editingAgent ? 'Modify agent configuration' : 'Design a new agent node'"></span>
+								</div>
+								<div class="flex-1 overflow-y-auto p-4 scrollbar-thin space-y-4">
+									@agentNodeForm()
+								</div>
+								<!-- Save Footer -->
+								<div class="px-4 py-3 border-t bg-muted/50 flex items-center justify-end gap-2">
+									@button.Button(button.Props{
+										Variant: button.VariantGhost,
+										Class:   "h-8 px-3 text-xs",
+										Attributes: templ.Attributes{
+											"@click": "nodeView = 'list'",
+										},
+									}) {
+										{ i18n.T(ctx, "Cancel") }
+									}
+									@button.Button(button.Props{
+										Variant: button.VariantDefault,
+										Class:   "h-8 px-4 text-xs gap-1.5",
+										Attributes: templ.Attributes{
+											"@click":    "saveNode()",
+											":disabled": "saving || !form.name.trim()",
+										},
+									}) {
+										<span x-show="!saving" x-text="editingAgent ? 'Save Changes' : 'Create Agent'"></span>
+										<span x-show="saving" class="flex items-center gap-1.5">
+											<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
+											{ i18n.T(ctx, "Saving...") }
+										</span>
+									}
+								</div>
+							</div>
+						</template>
+						<!-- Node Delete Confirmation -->
+						<template x-if="nodeView === 'delete'">
+							@deleteConfirmation("nodeView = 'list'", "deleteNode()")
+						</template>
+					</div>
+				</template>
+				<!-- ═══════════════════════════════════════════ -->
+				<!-- PIPELINE COMPOSE MODE                      -->
+				<!-- ═══════════════════════════════════════════ -->
+				<template x-if="mode === 'pipeline'">
+					<div class="flex flex-col flex-1 overflow-hidden" :class="expanded ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[calc(90vh-8rem)]'">
+						<!-- Pipeline Canvas (list) View -->
+						<template x-if="pipelineView === 'canvas'">
+							<div class="flex flex-col flex-1 overflow-hidden">
+								<div class="px-4 pt-3 pb-2 flex items-center gap-2">
+									<div class="flex-1">
+										@input.Input(input.Props{
+											Type:        input.TypeSearch,
+											Placeholder: i18n.T(ctx, "Search pipelines..."),
+											Class:       "h-9 bg-muted/40 border-transparent focus-within:bg-background",
+											Attributes: templ.Attributes{
+												"x-model.debounce.300ms": "pipelineSearchQuery",
+												"@input":                 "filterPipelines()",
+											},
+										})
+									</div>
+									@button.Button(button.Props{
+										Size:    button.SizeSm,
+										Variant: button.VariantDefault,
+										Class:   "gap-1.5 shrink-0",
+										Attributes: templ.Attributes{
+											"@click": "showCreatePipelineForm()",
+										},
+									}) {
+										@icon.Plus(icon.Props{Class: "size-4"})
+										{ i18n.T(ctx, "New Pipeline") }
+									}
+								</div>
+								<div class="flex-1 overflow-y-auto px-4 pb-4 scrollbar-thin min-h-[300px]">
+									<template x-if="loading">
+										<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+											<template x-for="i in 4" :key="i">
+												<div class="p-4 rounded-lg border border-border animate-pulse">
+													<div class="flex items-center gap-3 mb-3">
+														<div class="size-10 rounded-lg bg-muted"></div>
+														<div class="flex-1 space-y-2">
+															<div class="h-4 bg-muted rounded w-2/3"></div>
+															<div class="h-3 bg-muted rounded w-1/3"></div>
+														</div>
+													</div>
+												</div>
+											</template>
+										</div>
+									</template>
+									<template x-if="!loading">
+										<div>
+											<template x-if="filteredPipelines.length === 0">
+												<div class="flex flex-col items-center justify-center py-12 gap-4 text-muted-foreground">
+													@icon.GitBranch(icon.Props{Class: "size-12 opacity-20"})
+													<div class="text-center">
+														<p class="text-sm font-medium">{ i18n.T(ctx, "No pipelines yet") }</p>
+														<p class="text-xs mt-1 max-w-sm">
+															{ i18n.T(ctx, "Compose agent nodes into workflows using sequential, parallel, and loop patterns — mapping directly to ADK execution.") }
+														</p>
+													</div>
+													@button.Button(button.Props{
+														Size:    button.SizeSm,
+														Variant: button.VariantOutline,
+														Class:   "gap-1.5",
+														Attributes: templ.Attributes{
+															"@click": "showCreatePipelineForm()",
+														},
+													}) {
+														@icon.Plus(icon.Props{Class: "size-3.5"})
+														{ i18n.T(ctx, "Create Pipeline") }
+													}
+													<!-- Quick explanation cards -->
+													<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 w-full max-w-2xl">
+														@pipelineTypeCard("sequential", "↓ Sequential", "Run agents one after another in order. Output flows from each agent to the next.", "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20")
+														@pipelineTypeCard("parallel", "∥ Parallel", "Run agents simultaneously. Each gets an isolated branch of the conversation.", "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20")
+														@pipelineTypeCard("loop", "↻ Loop", "Repeat agents until max iterations or the agent uses exit_loop tool.", "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20")
+													</div>
+												</div>
+											</template>
+											<!-- Pipeline Cards -->
+											<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+												<template x-for="pipeline in filteredPipelines" :key="pipeline.id">
+													<div
+														class="group relative rounded-xl border border-border hover:border-indigo-500/30 hover:shadow-md transition-all duration-200 cursor-pointer overflow-hidden bg-card"
+														@click="showEditPipelineForm(pipeline)"
+													>
+														<div class="p-4">
+															<div class="flex items-start gap-3">
+																<div class="size-10 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+																	@icon.GitBranch(icon.Props{Class: "size-5"})
+																</div>
+																<div class="flex-1 min-w-0">
+																	<div class="flex items-center gap-2">
+																		<h3 class="text-sm font-semibold text-foreground truncate" x-text="pipeline.name"></h3>
+																		@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "text-[9px] px-1.5 py-0 h-4 shrink-0 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"}) {
+																			@icon.GitBranch(icon.Props{Class: "size-2.5 me-0.5"})
+																			{ i18n.T(ctx, "Pipeline") }
+																		}
+																	</div>
+																	<p class="text-xs text-muted-foreground mt-0.5 line-clamp-2" x-text="pipeline.description || 'No description'"></p>
+																</div>
+															</div>
+															<!-- Pipeline stats -->
+															<div class="flex items-center gap-3 mt-3 pt-2 border-t border-border/50">
+																<template x-if="pipeline.graph">
+																	<span class="text-[10px] text-muted-foreground">
+																		<span x-text="collectAgentIds(pipeline.graph).length"></span> agents ·
+																		<span x-text="countNodes(pipeline.graph)"></span> nodes
+																	</span>
+																</template>
+																<span class="text-[10px] text-muted-foreground" x-text="formatDate(pipeline.createdAt || pipeline.created_at)"></span>
+																<div class="flex-1"></div>
+																<div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" @click.stop>
+																	@button.Button(button.Props{
+																		Size:    button.SizeIcon,
+																		Variant: button.VariantGhost,
+																		Class:   "size-7 text-destructive hover:text-destructive",
+																		Attributes: templ.Attributes{
+																			"@click.stop": "confirmDeletePipeline(pipeline)",
+																			"title":       i18n.T(ctx, "Delete"),
+																		},
+																	}) {
+																		@icon.Trash2(icon.Props{Class: "size-3.5"})
+																	}
+																</div>
+															</div>
+														</div>
+													</div>
+												</template>
+											</div>
+										</div>
+									</template>
+								</div>
+							</div>
+						</template>
+						<!-- Pipeline Form View (editor with tree builder) -->
+						<template x-if="pipelineView === 'form'">
+							<div class="flex flex-col flex-1 overflow-hidden">
+								<div class="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/50">
+									@button.Button(button.Props{
+										Size:    button.SizeIcon,
+										Variant: button.VariantGhost,
+										Class:   "size-8",
+										Attributes: templ.Attributes{
+											"@click": "pipelineView = 'canvas'",
+										},
+									}) {
+										@icon.ArrowLeft(icon.Props{Class: "size-4"})
+									}
+									<h3 class="text-sm font-semibold" x-text="editingPipeline ? 'Edit Pipeline' : 'Create Pipeline'"></h3>
+									<div class="flex-1"></div>
+									<!-- Validation indicator -->
+									<div class="flex items-center gap-1.5">
+										<template x-if="isPipelineValid">
+											<span class="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
+												@icon.CircleCheck(icon.Props{Class: "size-3.5"})
+												{ i18n.T(ctx, "Valid") }
+											</span>
+										</template>
+										<template x-if="!isPipelineValid">
+											<span class="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400">
+												@icon.TriangleAlert(icon.Props{Class: "size-3.5"})
+												<span x-text="pipelineErrors.length + ' issue' + (pipelineErrors.length !== 1 ? 's' : '')"></span>
+											</span>
+										</template>
+									</div>
+								</div>
+								<!-- Split panel: left = config, right = tree -->
+								<div class="flex-1 overflow-hidden flex" :class="expanded ? '' : ''">
+									<!-- Left: Pipeline Config -->
+									<div class="w-[320px] shrink-0 border-e border-border overflow-y-auto scrollbar-thin p-4 space-y-4">
+										@pipelineConfigForm()
+									</div>
+									<!-- Right: Tree Builder / Visual -->
+									<div class="flex-1 overflow-y-auto scrollbar-thin p-4">
+										<div class="space-y-3">
+											<!-- Pipeline graph tree builder -->
+											<template x-if="pipelineGraph">
+												<div>
+													<div class="space-y-2" x-data="workflowTreeBuilder()" x-init="init()">
+														<div x-html="renderPipelineNode(pipelineGraph, 'graph', 0, false)"></div>
+													</div>
+													<!-- Stats bar -->
+													<div class="flex items-center gap-4 p-2 mt-3 rounded-lg bg-muted/30 border border-border">
+														<span class="text-[11px] text-muted-foreground" x-text="countNodes(pipelineGraph) + ' nodes'"></span>
+														<span class="text-[11px] text-muted-foreground" x-text="'depth ' + nodeDepth(pipelineGraph)"></span>
+														<span class="text-[11px] text-muted-foreground" x-text="collectAgentIds(pipelineGraph).length + ' agents'"></span>
+														<template x-if="countNodes(pipelineGraph) >= 50">
+															<span class="text-[11px] text-amber-600 dark:text-amber-400 font-medium">{ i18n.T(ctx, "Node limit reached") }</span>
+														</template>
+													</div>
+													<!-- Validation errors -->
+													<template x-if="pipelineErrors.length > 0">
+														<div class="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-1">
+															<h4 class="text-xs font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+																@icon.TriangleAlert(icon.Props{Class: "size-3.5"})
+																{ i18n.T(ctx, "Validation Issues") }
+															</h4>
+															<template x-for="err in pipelineErrors" :key="err">
+																<p class="text-[11px] text-amber-600/80 dark:text-amber-400/80" x-text="'• ' + err"></p>
+															</template>
+														</div>
+													</template>
+												</div>
+											</template>
+										</div>
+									</div>
+								</div>
+								<!-- Save Footer -->
+								<div class="px-4 py-3 border-t bg-muted/50 flex items-center justify-between">
+									<span class="text-[10px] text-muted-foreground">
+										{ i18n.T(ctx, "Pipelines map to ADK-Go workflow agents: sequential → parallel → loop composition") }
+									</span>
+									<div class="flex items-center gap-2">
+										@button.Button(button.Props{
+											Variant: button.VariantGhost,
+											Class:   "h-8 px-3 text-xs",
+											Attributes: templ.Attributes{
+												"@click": "pipelineView = 'canvas'",
+											},
+										}) {
+											{ i18n.T(ctx, "Cancel") }
+										}
+										@button.Button(button.Props{
+											Variant: button.VariantDefault,
+											Class:   "h-8 px-4 text-xs gap-1.5",
+											Attributes: templ.Attributes{
+												"@click":    "savePipeline()",
+												":disabled": "pipelineSaving || !pipelineName.trim() || !isPipelineValid",
+											},
+										}) {
+											<span x-show="!pipelineSaving" x-text="editingPipeline ? 'Save Pipeline' : 'Create Pipeline'"></span>
+											<span x-show="pipelineSaving" class="flex items-center gap-1.5">
+												<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
+												{ i18n.T(ctx, "Saving...") }
+											</span>
+										}
+									</div>
+								</div>
+							</div>
+						</template>
+						<!-- Pipeline Delete Confirmation -->
+						<template x-if="pipelineView === 'delete'">
+							@deleteConfirmation("pipelineView = 'canvas'", "deletePipeline()")
+						</template>
+					</div>
+				</template>
+				<!-- Footer (only on list views) -->
+				<template x-if="(mode === 'node' && nodeView === 'list') || (mode === 'pipeline' && pipelineView === 'canvas')">
+					@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
+						<div class="flex items-center justify-between w-full">
+							<span class="text-xs text-muted-foreground">
+								<template x-if="mode === 'node'">
+									<span x-text="`${filteredAgents.length} agent node${filteredAgents.length !== 1 ? 's' : ''}`"></span>
+								</template>
+								<template x-if="mode === 'pipeline'">
+									<span x-text="`${filteredPipelines.length} pipeline${filteredPipelines.length !== 1 ? 's' : ''}`"></span>
+								</template>
+							</span>
+							@dialog.Close() {
+								@button.Button(button.Props{Variant: button.VariantGhost, Class: "h-8 px-3 text-xs"}) {
+									{ i18n.T(ctx, "Close") }
+								}
+							}
+						</div>
+					}
+				</template>
+			}
+		}
+	</div>
+}
+
+// agentNodeForm renders the form fields for designing a single agent node.
+// Maps to ADK-Go llmagent.Config: Name, Description, Instruction, Tools, etc.
+templ agentNodeForm() {
+	<!-- Agent Name -->
+	<div class="space-y-2">
+		@label.Label(label.Props{}) {
+			{ i18n.T(ctx, "Agent Name") }
+			<span class="text-destructive">*</span>
+		}
+		@input.Input(input.Props{
+			Placeholder: i18n.T(ctx, "e.g., Writing Coach, Code Reviewer..."),
+			Attributes: templ.Attributes{
+				"x-model":   "form.name",
+				"maxlength": "100",
+			},
+		})
+	</div>
+	<!-- Description -->
+	<div class="space-y-2">
+		@label.Label(label.Props{}) {
+			{ i18n.T(ctx, "Description") }
+		}
+		@input.Input(input.Props{
+			Placeholder: i18n.T(ctx, "Brief description of what this agent does..."),
+			Attributes: templ.Attributes{
+				"x-model":   "form.description",
+				"maxlength": "500",
+			},
+		})
+	</div>
+	<!-- System Prompt (maps to llmagent Instruction) -->
+	<div class="space-y-2">
+		@label.Label(label.Props{}) {
+			{ i18n.T(ctx, "System Prompt") }
+			<span class="text-destructive">*</span>
+		}
+		@textarea.Textarea(textarea.Props{
+			Placeholder: i18n.T(ctx, "Instructions for how the agent should behave..."),
+			Class:       "min-h-[120px] resize-y",
+			Rows:        5,
+			Attributes: templ.Attributes{
+				"x-model": "form.systemPrompt",
+			},
+		})
+		<p class="text-[11px] text-muted-foreground">
+			{ i18n.T(ctx, "Maps to the ADK-Go agent Instruction field — the system-level prompt defining this agent's behavior.") }
+		</p>
+	</div>
+	<!-- Multi-Agent Orchestration Section -->
+	<div class="border border-border rounded-lg">
+		<button
+			type="button"
+			@click="showOrchestration = !showOrchestration"
+			class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
+		>
+			<span class="flex items-center gap-2">
+				@icon.GitBranch(icon.Props{Class: "size-4 text-muted-foreground"})
+				{ i18n.T(ctx, "Orchestration Settings") }
+				<span class="text-[10px] text-muted-foreground" x-text="orchestrationSummary"></span>
+			</span>
+			<span class="transition-transform duration-200" :class="showOrchestration ? 'rotate-180' : ''">
+				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+			</span>
+		</button>
+		<div x-show="showOrchestration" x-collapse class="px-3 pb-3 border-t border-border pt-3 space-y-4">
+			<p class="text-[11px] text-muted-foreground">
+				{ i18n.T(ctx, "Configure how this agent participates when composed in pipelines. Maps to ADK-Go llmagent.Config fields.") }
+			</p>
+			@orchestrationFields()
+		</div>
+	</div>
+	<!-- Tools, KBs, Filesystems (edit mode only) -->
+	<template x-if="editingAgent">
+		<div class="space-y-4">
+			@toolsSection()
+			@knowledgeBasesSection()
+			@filesystemsSection()
+		</div>
+	</template>
+	<!-- Info notice (create mode) -->
+	<template x-if="!editingAgent">
+		<div class="border border-border rounded-lg p-3 flex items-start gap-2 bg-muted/30">
+			@icon.Info(icon.Props{Class: "size-4 text-muted-foreground shrink-0 mt-0.5"})
+			<p class="text-[11px] text-muted-foreground">
+				{ i18n.T(ctx, "After creating the agent, you can configure its tools and knowledge bases by editing it.") }
+			</p>
+		</div>
+	</template>
+}
+
+// orchestrationFields renders the transfer policy, output key, history, etc.
+templ orchestrationFields() {
+	<!-- Transfer Policy -->
+	<div class="space-y-2">
+		<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
+			@icon.ArrowRightLeft(icon.Props{Class: "size-3.5 text-muted-foreground"})
+			{ i18n.T(ctx, "Transfer Policy") }
+		</span>
+		<p class="text-[11px] text-muted-foreground">
+			{ i18n.T(ctx, "Maps to ADK-Go DisallowTransferToParent / DisallowTransferToPeers flags.") }
+		</p>
+		<div class="space-y-2 ps-1">
+			@toggleSwitch("form.disallowTransferToParent", i18n.T(ctx, "Block transfer to parent"), i18n.T(ctx, "Prevents this agent from escalating back to its parent."))
+			@toggleSwitch("form.disallowTransferToPeers", i18n.T(ctx, "Block transfer to peers"), i18n.T(ctx, "Prevents this agent from delegating to sibling agents."))
+		</div>
+	</div>
+	<!-- Output Key -->
+	<div class="space-y-2">
+		<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
+			@icon.Key(icon.Props{Class: "size-3.5 text-muted-foreground"})
+			{ i18n.T(ctx, "Output Key") }
+		</span>
+		@input.Input(input.Props{
+			Placeholder: i18n.T(ctx, "e.g., research_results, draft_content..."),
+			Class:       "h-8 text-xs",
+			Attributes: templ.Attributes{
+				"x-model":   "form.outputKey",
+				"maxlength": "100",
+			},
+		})
+		<p class="text-[10px] text-muted-foreground">
+			{ i18n.T(ctx, "Maps to ADK-Go OutputKey — stores this agent's output in session state for downstream agents.") }
+		</p>
+	</div>
+	<!-- Include Contents / History Forwarding -->
+	<div class="space-y-2">
+		<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
+			@icon.MessageSquare(icon.Props{Class: "size-3.5 text-muted-foreground"})
+			{ i18n.T(ctx, "History Forwarding") }
+		</span>
+		<div class="flex gap-2">
+			<button
+				type="button"
+				@click="form.includeContents = ''"
+				class="flex-1 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors"
+				:class="!form.includeContents || form.includeContents === 'default' ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted/50 text-muted-foreground border-border hover:bg-accent'"
+			>
+				{ i18n.T(ctx, "Include History") }
+			</button>
+			<button
+				type="button"
+				@click="form.includeContents = 'none'"
+				class="flex-1 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors"
+				:class="form.includeContents === 'none' ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted/50 text-muted-foreground border-border hover:bg-accent'"
+			>
+				{ i18n.T(ctx, "Fresh Context") }
+			</button>
+		</div>
+		<p class="text-[10px] text-muted-foreground">
+			{ i18n.T(ctx, "Maps to ADK-Go IncludeContents. 'Fresh Context' = IncludeContentsNone.") }
+		</p>
+	</div>
+	<!-- Global Instruction -->
+	<div class="space-y-2">
+		<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
+			@icon.Globe(icon.Props{Class: "size-3.5 text-muted-foreground"})
+			{ i18n.T(ctx, "Global Instruction") }
+		</span>
+		@textarea.Textarea(textarea.Props{
+			Placeholder: i18n.T(ctx, "Shared instruction applied to all agents in the workflow tree..."),
+			Class:       "min-h-[60px] resize-y text-xs",
+			Rows:        2,
+			Attributes: templ.Attributes{
+				"x-model": "form.globalInstruction",
+			},
+		})
+		<p class="text-[10px] text-muted-foreground">
+			{ i18n.T(ctx, "Maps to ADK-Go GlobalInstruction. Only effective when this agent is the root of a workflow.") }
+		</p>
+	</div>
+	<!-- Output Schema -->
+	<div class="space-y-2">
+		<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
+			@icon.Braces(icon.Props{Class: "size-3.5 text-muted-foreground"})
+			{ i18n.T(ctx, "Output Schema (JSON)") }
+		</span>
+		@textarea.Textarea(textarea.Props{
+			Placeholder: i18n.T(ctx, `{"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]}`),
+			Class:       "min-h-[60px] resize-y font-mono text-[11px]",
+			Rows:        2,
+			Attributes: templ.Attributes{
+				"x-model": "form.outputSchema",
+			},
+		})
+		<p class="text-[10px] text-muted-foreground">
+			{ i18n.T(ctx, "Maps to ADK-Go GenerateContentConfig.ResponseSchema. Forces structured JSON output.") }
+		</p>
+	</div>
+}
+
+// toggleSwitch renders a labeled toggle switch for boolean form fields.
+templ toggleSwitch(model string, labelText string, helpText string) {
+	<label class="flex items-center justify-between gap-2 py-1.5 cursor-pointer">
+		<div class="flex-1 min-w-0">
+			<span class="text-xs font-medium text-foreground">{ labelText }</span>
+			<p class="text-[10px] text-muted-foreground mt-0.5">{ helpText }</p>
+		</div>
+		<button
+			type="button"
+			x-on:click={ model + " = !" + model }
+			class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
+			x-bind:class={ model + " ? 'bg-primary' : 'bg-input'" }
+			role="switch"
+			x-bind:aria-checked={ model }
+		>
+			<span
+				class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
+				x-bind:class={ model + " ? 'translate-x-4' : 'translate-x-0'" }
+			></span>
+		</button>
+	</label>
+}
+
+// toolsSection renders the collapsible tools section for an agent in edit mode.
+templ toolsSection() {
+	<div class="border border-border rounded-lg">
+		<button
+			type="button"
+			@click="showTools = !showTools"
+			class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
+		>
+			<span class="flex items-center gap-2">
+				@icon.Blocks(icon.Props{Class: "size-4 text-muted-foreground"})
+				{ i18n.T(ctx, "Tools") }
+				<span class="text-[10px] text-muted-foreground tabular-nums" x-text="toolsSummary"></span>
+			</span>
+			<span class="transition-transform duration-200" :class="showTools ? 'rotate-180' : ''">
+				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+			</span>
+		</button>
+		<div x-show="showTools" x-collapse class="px-3 pb-3 border-t border-border pt-3">
+			<template x-if="loadingTools">
+				<div class="space-y-2">
+					<template x-for="i in 3" :key="i">
+						<div class="flex items-center gap-3 p-2 animate-pulse rounded-md">
+							<div class="size-7 rounded bg-muted"></div>
+							<div class="flex-1 space-y-1">
+								<div class="h-3 bg-muted rounded w-1/3"></div>
+								<div class="h-2 bg-muted rounded w-2/3"></div>
+							</div>
+						</div>
+					</template>
+				</div>
+			</template>
+			<template x-if="!loadingTools">
+				<div>
+					<template x-if="agentPlugins.length === 0">
+						<div class="py-4 text-center text-xs text-muted-foreground">
+							{ i18n.T(ctx, "No plugins available. Add plugins from the Tools sidebar.") }
+						</div>
+					</template>
+					<div class="space-y-1.5">
+						<template x-for="plugin in agentPlugins" :key="plugin.id">
+							<div class="rounded-md border border-border">
+								<div class="flex items-center justify-between p-2 hover:bg-accent/20 transition-colors">
+									<div class="flex items-center gap-2 flex-1 min-w-0">
+										<div class="size-7 rounded-md bg-primary/10 flex items-center justify-center text-primary shrink-0">
+											@icon.Blocks(icon.Props{Class: "size-3.5"})
+										</div>
+										<div class="flex-1 min-w-0">
+											<div class="text-xs font-medium text-foreground truncate" x-text="plugin.name"></div>
+											<div class="text-[10px] text-muted-foreground truncate" x-text="plugin.tools.length + ' tools'"></div>
+										</div>
+									</div>
+									<button
+										@click="toggleAgentPlugin(plugin)"
+										class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+										:class="plugin.enabled ? 'bg-primary' : 'bg-input'"
+										role="switch"
+										:aria-checked="plugin.enabled"
+									>
+										<span class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200" :class="plugin.enabled ? 'translate-x-4' : 'translate-x-0'"></span>
+									</button>
+								</div>
+								<template x-if="plugin.enabled && plugin.tools.length > 1">
+									<div class="border-t border-border/50 px-2 py-1.5 space-y-1">
+										<template x-for="tool in plugin.tools" :key="tool.id">
+											<div class="flex items-center justify-between py-1 px-2 rounded hover:bg-accent/20">
+												<span class="text-[11px] text-muted-foreground truncate flex-1" x-text="tool.name"></span>
+												<button
+													@click="toggleAgentTool(plugin, tool)"
+													class="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+													:class="tool.enabled ? 'bg-primary' : 'bg-input'"
+													role="switch"
+													:aria-checked="tool.enabled"
+												>
+													<span class="pointer-events-none inline-block h-3 w-3 rounded-full bg-background shadow ring-0 transition-transform duration-200" :class="tool.enabled ? 'translate-x-3' : 'translate-x-0'"></span>
+												</button>
+											</div>
+										</template>
+									</div>
+								</template>
+							</div>
+						</template>
+					</div>
+				</div>
+			</template>
+		</div>
+	</div>
+}
+
+// knowledgeBasesSection renders the collapsible KB section for an agent in edit mode.
+templ knowledgeBasesSection() {
+	<div class="border border-border rounded-lg">
+		<button
+			type="button"
+			@click="showKnowledgeBases = !showKnowledgeBases"
+			class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
+		>
+			<span class="flex items-center gap-2">
+				@icon.Library(icon.Props{Class: "size-4 text-muted-foreground"})
+				{ i18n.T(ctx, "Knowledge Bases") }
+				<span class="text-[10px] text-muted-foreground tabular-nums" x-text="kbSummary"></span>
+			</span>
+			<span class="transition-transform duration-200" :class="showKnowledgeBases ? 'rotate-180' : ''">
+				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+			</span>
+		</button>
+		<div x-show="showKnowledgeBases" x-collapse class="px-3 pb-3 border-t border-border pt-3">
+			<template x-if="loadingKBs">
+				<div class="space-y-2">
+					<template x-for="i in 3" :key="i">
+						<div class="flex items-center gap-3 p-2 animate-pulse rounded-md">
+							<div class="size-7 rounded bg-muted"></div>
+							<div class="flex-1 space-y-1">
+								<div class="h-3 bg-muted rounded w-1/3"></div>
+								<div class="h-2 bg-muted rounded w-2/3"></div>
+							</div>
+						</div>
+					</template>
+				</div>
+			</template>
+			<template x-if="!loadingKBs">
+				<div>
+					<template x-if="agentWorkspaces.length === 0">
+						<div class="py-4 text-center text-xs text-muted-foreground">
+							{ i18n.T(ctx, "No knowledge bases available. Create one from the Resources sidebar.") }
+						</div>
+					</template>
+					<div class="space-y-1.5">
+						<template x-for="ws in agentWorkspaces" :key="ws.id">
+							<div class="flex items-center justify-between p-2 rounded-md border border-border hover:bg-accent/20 transition-colors">
+								<div class="flex items-center gap-2 flex-1 min-w-0">
+									<div class="size-7 rounded-md bg-primary/10 flex items-center justify-center text-primary shrink-0">
+										@icon.Library(icon.Props{Class: "size-3.5"})
+									</div>
+									<div class="flex-1 min-w-0">
+										<div class="text-xs font-medium text-foreground truncate" x-text="ws.name"></div>
+										<div class="text-[10px] text-muted-foreground truncate" x-text="ws.description || ws.slug"></div>
+									</div>
+								</div>
+								<button
+									@click="toggleAgentWorkspace(ws)"
+									class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+									:class="ws.enabled ? 'bg-primary' : 'bg-input'"
+									role="switch"
+									:aria-checked="ws.enabled"
+								>
+									<span class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200" :class="ws.enabled ? 'translate-x-4' : 'translate-x-0'"></span>
+								</button>
+							</div>
+						</template>
+					</div>
+				</div>
+			</template>
+		</div>
+	</div>
+}
+
+// filesystemsSection renders the collapsible filesystem section for an agent in edit mode.
+templ filesystemsSection() {
+	<div class="border border-border rounded-lg">
+		<button
+			type="button"
+			@click="showFilesystems = !showFilesystems"
+			class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
+		>
+			<span class="flex items-center gap-2">
+				@icon.Folder(icon.Props{Class: "size-4 text-muted-foreground"})
+				{ i18n.T(ctx, "Filesystems") }
+				<span class="text-[10px] text-muted-foreground tabular-nums" x-text="fsSummary"></span>
+			</span>
+			<span class="transition-transform duration-200" :class="showFilesystems ? 'rotate-180' : ''">
+				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+			</span>
+		</button>
+		<div x-show="showFilesystems" x-collapse class="px-3 pb-3 border-t border-border pt-3">
+			<template x-if="loadingFilesystems">
+				<div class="space-y-2">
+					<template x-for="i in 3" :key="i">
+						<div class="flex items-center gap-3 p-2 animate-pulse rounded-md">
+							<div class="size-7 rounded bg-muted"></div>
+							<div class="flex-1 space-y-1">
+								<div class="h-3 bg-muted rounded w-1/3"></div>
+								<div class="h-2 bg-muted rounded w-2/3"></div>
+							</div>
+						</div>
+					</template>
+				</div>
+			</template>
+			<template x-if="!loadingFilesystems">
+				<div>
+					<template x-if="agentFilesystems.length === 0">
+						<div class="py-4 text-center text-xs text-muted-foreground">
+							{ i18n.T(ctx, "No filesystems available. Create one from the Files sidebar.") }
+						</div>
+					</template>
+					<div class="space-y-1.5">
+						<template x-for="fs in agentFilesystems" :key="fs.id">
+							<div class="flex items-center justify-between p-2 rounded-md border border-border hover:bg-accent/20 transition-colors">
+								<div class="flex items-center gap-2 flex-1 min-w-0">
+									<div class="size-7 rounded-md bg-primary/10 flex items-center justify-center text-primary shrink-0">
+										@icon.Folder(icon.Props{Class: "size-3.5"})
+									</div>
+									<div class="flex-1 min-w-0">
+										<div class="text-xs font-medium text-foreground truncate" x-text="fs.name"></div>
+										<div class="text-[10px] text-muted-foreground truncate" x-text="fs.description || fs.type"></div>
+									</div>
+								</div>
+								<button
+									@click="toggleAgentFilesystem(fs)"
+									class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+									:class="fs.enabled ? 'bg-primary' : 'bg-input'"
+									role="switch"
+									:aria-checked="fs.enabled"
+								>
+									<span class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200" :class="fs.enabled ? 'translate-x-4' : 'translate-x-0'"></span>
+								</button>
+							</div>
+						</template>
+					</div>
+				</div>
+			</template>
+		</div>
+	</div>
+}
+
+// pipelineConfigForm renders the left panel of the pipeline editor with name, description, etc.
+templ pipelineConfigForm() {
+	<!-- Pipeline Name -->
+	<div class="space-y-2">
+		@label.Label(label.Props{}) {
+			{ i18n.T(ctx, "Pipeline Name") }
+			<span class="text-destructive">*</span>
+		}
+		@input.Input(input.Props{
+			Placeholder: i18n.T(ctx, "e.g., Research & Write, Code Review Pipeline..."),
+			Attributes: templ.Attributes{
+				"x-model":   "pipelineName",
+				"maxlength": "100",
+			},
+		})
+	</div>
+	<!-- Description -->
+	<div class="space-y-2">
+		@label.Label(label.Props{}) {
+			{ i18n.T(ctx, "Description") }
+		}
+		@input.Input(input.Props{
+			Placeholder: i18n.T(ctx, "What does this pipeline do?"),
+			Attributes: templ.Attributes{
+				"x-model":   "pipelineDescription",
+				"maxlength": "500",
+			},
+		})
+	</div>
+	<!-- System Prompt (for the root orchestrator) -->
+	<div class="space-y-2">
+		@label.Label(label.Props{}) {
+			{ i18n.T(ctx, "Root System Prompt") }
+		}
+		@textarea.Textarea(textarea.Props{
+			Placeholder: i18n.T(ctx, "System prompt for the pipeline orchestrator..."),
+			Class:       "min-h-[80px] resize-y text-xs",
+			Rows:        3,
+			Attributes: templ.Attributes{
+				"x-model": "pipelineSystemPrompt",
+			},
+		})
+	</div>
+	<!-- Orchestration (root-level) -->
+	<div class="border border-border rounded-lg">
+		<details class="group">
+			<summary class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors cursor-pointer select-none">
+				<span class="flex items-center gap-2">
+					@icon.Settings2(icon.Props{Class: "size-4 text-muted-foreground"})
+					{ i18n.T(ctx, "Pipeline Settings") }
+				</span>
+				<span class="transition-transform duration-200 group-open:rotate-180">
+					@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+				</span>
+			</summary>
+			<div class="px-3 pb-3 border-t border-border pt-3 space-y-3">
+				<!-- Global Instruction -->
+				<div class="space-y-1.5">
+					<span class="text-xs font-medium flex items-center gap-1.5">
+						@icon.Globe(icon.Props{Class: "size-3.5 text-muted-foreground"})
+						{ i18n.T(ctx, "Global Instruction") }
+					</span>
+					@textarea.Textarea(textarea.Props{
+						Placeholder: i18n.T(ctx, "Applied to all agents in this pipeline..."),
+						Class:       "min-h-[48px] resize-y text-[11px]",
+						Rows:        2,
+						Attributes: templ.Attributes{
+							"x-model": "pipelineOrchestration.globalInstruction",
+						},
+					})
+				</div>
+				<!-- Output Key -->
+				<div class="space-y-1.5">
+					<span class="text-xs font-medium flex items-center gap-1.5">
+						@icon.Key(icon.Props{Class: "size-3.5 text-muted-foreground"})
+						{ i18n.T(ctx, "Output Key") }
+					</span>
+					@input.Input(input.Props{
+						Placeholder: i18n.T(ctx, "Pipeline output key..."),
+						Class:       "h-7 text-[11px]",
+						Attributes: templ.Attributes{
+							"x-model": "pipelineOrchestration.outputKey",
+						},
+					})
+				</div>
+				<!-- Output Schema -->
+				<div class="space-y-1.5">
+					<span class="text-xs font-medium flex items-center gap-1.5">
+						@icon.Braces(icon.Props{Class: "size-3.5 text-muted-foreground"})
+						{ i18n.T(ctx, "Output Schema") }
+					</span>
+					@textarea.Textarea(textarea.Props{
+						Placeholder: i18n.T(ctx, `{"type": "object", ...}`),
+						Class:       "min-h-[48px] resize-y font-mono text-[10px]",
+						Rows:        2,
+						Attributes: templ.Attributes{
+							"x-model": "pipelineOrchestration.outputSchema",
+						},
+					})
+				</div>
+			</div>
+		</details>
+	</div>
+	<!-- Legend / ADK-Go mapping -->
+	<div class="rounded-lg bg-muted/30 border border-border p-3 space-y-2">
+		<h4 class="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
+			@icon.Info(icon.Props{Class: "size-3.5"})
+			{ i18n.T(ctx, "ADK-Go Node Types") }
+		</h4>
+		<div class="grid grid-cols-2 gap-1.5">
+			<div class="flex items-center gap-1.5">
+				<span class="size-2 rounded-full bg-blue-500"></span>
+				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Sequential — ordered steps") }</span>
+			</div>
+			<div class="flex items-center gap-1.5">
+				<span class="size-2 rounded-full bg-amber-500"></span>
+				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Parallel — concurrent branches") }</span>
+			</div>
+			<div class="flex items-center gap-1.5">
+				<span class="size-2 rounded-full bg-purple-500"></span>
+				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Loop — repeat until exit") }</span>
+			</div>
+			<div class="flex items-center gap-1.5">
+				<span class="size-2 rounded-full bg-emerald-500"></span>
+				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Agent — leaf LLM agent") }</span>
+			</div>
+		</div>
+	</div>
+}
+
+// pipelineTypeCard renders an explanatory card for a pipeline node type (used in the empty state).
+templ pipelineTypeCard(nodeType string, label string, desc string, badgeClass string) {
+	<div class="rounded-lg border border-border p-3 text-start">
+		<span class={ "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold mb-2 border", badgeClass }>
+			{ label }
+		</span>
+		<p class="text-[11px] text-muted-foreground">{ desc }</p>
+	</div>
+}
+
+// deleteConfirmation renders a reusable delete confirmation view.
+templ deleteConfirmation(cancelAction string, deleteAction string) {
+	<div class="flex flex-col h-full">
+		<div class="p-4 pb-3 border-b border-border">
+			<h2 class="text-lg font-semibold">{ i18n.T(ctx, "Delete Agent") }</h2>
+			<p class="text-sm text-muted-foreground">{ i18n.T(ctx, "This action cannot be undone.") }</p>
+		</div>
+		<div class="p-6 flex flex-col items-center gap-4">
+			<div class="size-12 rounded-full bg-destructive/10 flex items-center justify-center">
+				@icon.Trash2(icon.Props{Class: "size-6 text-destructive"})
+			</div>
+			<p class="text-sm text-center text-foreground">
+				{ i18n.T(ctx, "Are you sure you want to delete") }
+				<span class="font-semibold" x-text="deletingAgent?.name"></span>?
+			</p>
+		</div>
+		<div class="px-4 py-3 border-t mt-auto bg-muted/50 flex items-center justify-end gap-2">
+			@button.Button(button.Props{
+				Variant: button.VariantGhost,
+				Class:   "h-8 px-3 text-xs",
+				Attributes: templ.Attributes{
+					"@click": cancelAction,
+				},
+			}) {
+				{ i18n.T(ctx, "Cancel") }
+			}
+			@button.Button(button.Props{
+				Variant: button.VariantDestructive,
+				Class:   "h-8 px-4 text-xs gap-1.5",
+				Attributes: templ.Attributes{
+					"@click":    deleteAction,
+					":disabled": "saving || pipelineSaving",
+				},
+			}) {
+				<span x-show="!saving && !pipelineSaving">{ i18n.T(ctx, "Delete") }</span>
+				<span x-show="saving || pipelineSaving" class="flex items-center gap-1.5">
+					<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
+					{ i18n.T(ctx, "Deleting...") }
+				</span>
+			}
+		</div>
+	</div>
+}
+
+// AgentDesignerNavButtonTrigger renders a workflow icon button for the navbar.
+templ AgentDesignerNavButtonTrigger() {
+	@dialog.Trigger(dialog.TriggerProps{
+		For: "agent-designer-dialog",
+	}) {
+		@button.Button(button.Props{
+			Size:    button.SizeIcon,
+			Variant: button.VariantGhost,
+			Class:   "size-9",
+			Attributes: templ.Attributes{
+				"@click": "$dispatch('open-agent-designer')",
+				"title":  i18n.T(ctx, "Agent Designer"),
+			},
+		}) {
+			@icon.Workflow(icon.Props{Class: "size-5"})
+			<span class="sr-only">{ i18n.T(ctx, "Agent Designer") }</span>
+		}
+	}
+}

@@ -10,27 +10,21 @@ import (
 	"school-with-ai/shared"
 )
 
-// WorkflowForker is a callback interface that allows the catalog handler to
-// create workflow definitions without importing the multiagent module directly.
-// The composition root (main.go / agentstore module) wires this up.
-type WorkflowForker interface {
-	// ForkCatalogWorkflow creates sub-agents and a workflow definition for the user.
-	// graphJSON is the WorkflowNode tree (with placeholder agent IDs).
-	// subAgentsJSON is the []CatalogSubAgent definitions for those placeholders.
-	// Returns the workflow definition ID.
-	ForkCatalogWorkflow(ctx context.Context, userID, catalogID, name, description, icon, graphJSON, subAgentsJSON string) (string, error)
-}
-
 // catalogHandler encapsulates HTTP handlers for the shared agent catalog.
 type catalogHandler struct {
-	log            *logger.Logger
-	catalog        AgentCatalogRepository
-	agentRepo      AgentDefinitionRepository
-	workflowForker WorkflowForker // nil if workflow forking is not available
+	log       *logger.Logger
+	catalog   AgentCatalogRepository
+	agentRepo AgentDefinitionRepository
+	svc       *service
 }
 
-func newCatalogHandler(log *logger.Logger, catalog AgentCatalogRepository, agentRepo AgentDefinitionRepository) *catalogHandler {
-	return &catalogHandler{log: log, catalog: catalog, agentRepo: agentRepo}
+func newCatalogHandler(
+	log *logger.Logger,
+	catalog AgentCatalogRepository,
+	agentRepo AgentDefinitionRepository,
+	svc *service,
+) *catalogHandler {
+	return &catalogHandler{log: log, catalog: catalog, agentRepo: agentRepo, svc: svc}
 }
 
 // catalogEntryResponse represents a single catalog entry in API responses.
@@ -44,7 +38,7 @@ type catalogEntryResponse struct {
 	Icon        string   `json:"icon"`
 	Featured    bool     `json:"featured"`
 	AddCount    int64    `json:"addCount"`
-	IsWorkflow  bool     `json:"isWorkflow"`
+	IsComposed  bool     `json:"isComposed"`
 }
 
 // catalogListResponse is the response for listing/searching catalog entries.
@@ -70,7 +64,7 @@ func toCatalogResponse(e *AgentCatalogEntry) catalogEntryResponse {
 		Icon:        e.Icon,
 		Featured:    e.Featured,
 		AddCount:    e.AddCount,
-		IsWorkflow:  e.IsWorkflow(),
+		IsComposed:  e.IsWorkflow(),
 	}
 }
 
@@ -169,6 +163,9 @@ func (h *catalogHandler) search(w http.ResponseWriter, r *http.Request) {
 }
 
 // addToMyAgents handles POST /v1/agent-catalog/{id}/add
+// In the unified model, both simple agents and composed agents are created as
+// AgentDefinitions. Composed catalog entries create sub-agents as standalone
+// reusable agents plus a composed agent with the graph referencing them.
 func (h *catalogHandler) addToMyAgents(w http.ResponseWriter, r *http.Request) {
 	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
@@ -205,45 +202,28 @@ func (h *catalogHandler) addToMyAgents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ── Workflow catalog entry: fork as a multi-agent workflow ──
-	if entry.IsWorkflow() && h.workflowForker != nil {
-		wfID, forkErr := h.workflowForker.ForkCatalogWorkflow(
-			r.Context(), user.ID, catalogID,
-			entry.Name, entry.Description, entry.Icon,
-			entry.WorkflowGraphJSON, entry.SubAgentsJSON,
-		)
+	// ── Composed catalog entry: create sub-agents + composed agent ──
+	if entry.IsWorkflow() {
+		agentID, forkErr := h.forkComposedCatalogEntry(r.Context(), user.ID, catalogID, entry)
 		if forkErr != nil {
-			h.log.Error(r.Context(), "failed to fork catalog workflow", "error", forkErr, "catalogID", catalogID)
-			http.Error(w, "Failed to add workflow", http.StatusInternalServerError)
+			h.log.Error(r.Context(), "failed to fork composed catalog entry", "error", forkErr, "catalogID", catalogID)
+			http.Error(w, "Failed to add agent", http.StatusInternalServerError)
 			return
 		}
-
-		// Also create a tracking agent entry so ExistsByCatalogID works for de-duplication.
-		trackingAgent := &AgentDefinition{
-			UserID:          user.ID,
-			Name:            entry.Name,
-			Description:     entry.Description,
-			SystemPrompt:    entry.SystemPrompt,
-			Icon:            entry.Icon,
-			SourceCatalogID: catalogID,
-			WorkflowID:      wfID,
-		}
-		_ = h.agentRepo.Create(r.Context(), trackingAgent)
 
 		_ = h.catalog.IncrementAddCount(r.Context(), catalogID)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]string{
-			"id":     wfID,
+			"id":     agentID,
 			"name":   entry.Name,
 			"status": "added",
-			"type":   "workflow",
 		})
 		return
 	}
 
-	// ── Single agent catalog entry: fork as before ──
+	// ── Simple agent catalog entry ──
 	agent := &AgentDefinition{
 		UserID:          user.ID,
 		Name:            entry.Name,
@@ -268,4 +248,62 @@ func (h *catalogHandler) addToMyAgents(w http.ResponseWriter, r *http.Request) {
 		"name":   agent.Name,
 		"status": "added",
 	})
+}
+
+// forkComposedCatalogEntry creates standalone sub-agents and a composed parent agent
+// from a catalog entry with a workflow graph.
+func (h *catalogHandler) forkComposedCatalogEntry(
+	ctx context.Context,
+	userID, catalogID string,
+	entry *AgentCatalogEntry,
+) (string, error) {
+	// Parse sub-agent definitions from catalog.
+	var subAgents []CatalogSubAgent
+	if entry.SubAgentsJSON != "" {
+		if err := json.Unmarshal([]byte(entry.SubAgentsJSON), &subAgents); err != nil {
+			return "", err
+		}
+	}
+
+	// Parse the composition graph.
+	var graph CompositionNode
+	if err := json.Unmarshal([]byte(entry.WorkflowGraphJSON), &graph); err != nil {
+		return "", err
+	}
+
+	// Create each sub-agent as a standalone visible agent, building an ID remap.
+	idMap := make(map[string]string, len(subAgents))
+	for _, sa := range subAgents {
+		agent := &AgentDefinition{
+			UserID:       userID,
+			Name:         sa.Name,
+			Description:  sa.Description,
+			SystemPrompt: sa.SystemPrompt,
+			Icon:         sa.Icon,
+		}
+		if err := h.agentRepo.Create(ctx, agent); err != nil {
+			return "", err
+		}
+		idMap[sa.ID] = agent.ID
+	}
+
+	// Remap placeholder agent IDs in the graph to real IDs.
+	remapGraphAgentIDs(&graph, idMap)
+
+	// Create the composed agent with the graph.
+	composed := &AgentDefinition{
+		UserID:          userID,
+		Name:            entry.Name,
+		Description:     entry.Description,
+		SystemPrompt:    entry.SystemPrompt,
+		Icon:            entry.Icon,
+		SourceCatalogID: catalogID,
+		Graph:           &graph,
+	}
+
+	if err := h.agentRepo.Create(ctx, composed); err != nil {
+		return "", err
+	}
+
+	return composed.ID, nil
 }

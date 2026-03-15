@@ -310,7 +310,7 @@ templ docsMultiAgentOrchestration() {
 			</thead>
 			<tbody>
 				@docsTableRow2("foundation/agent", "Framework-agnostic Config struct: name, system prompt, tools, transfer policy, output key, include contents, global instruction, I/O schemas")
-				@docsTableRow2("modules/multiagent", "WorkflowNode recursive tree type stored as JSONB. Supports per-node overrides of transfer policy and context control.")
+				@docsTableRow2("modules/agentstore", "Unified AgentDefinition with CompositionNode graph stored as JSONB. Supports per-node overrides of transfer policy and context control.")
 				@docsTableRow2("adapters/adkgo", "Bridges foundation types to Google ADK-Go agents. Resolves precedence: node override > agent definition > default.")
 				@docsTableRow2("adapters.go", "Composition root. Converts DB models to foundation types and wires everything together.")
 			</tbody>

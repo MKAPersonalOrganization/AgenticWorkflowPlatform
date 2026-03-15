@@ -16,19 +16,20 @@ templ AgentsDialog() {
 		x-data="agentsManager"
 		@open-agents-dialog.window="open()"
 		@open-agent-store.window="open(); $nextTick(() => activeTab = 'store')"
+		@agents-updated.window="fetchAgents()"
 	>
 		@dialog.Dialog(dialog.Props{
 			ID: "agents-manager-dialog",
 		}) {
 			@dialog.Content(dialog.ContentProps{
-				Class: "sm:max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden",
+				Class: "sm:max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden transition-all duration-300 ease-in-out",
 				Attributes: templ.Attributes{
-					":class": "(view === 'workflow-form' || (view === 'form' && formMode === 'workflow')) ? 'sm:!max-w-6xl' : ''",
+					":class": "expanded ? '!max-w-[calc(100vw-2rem)] !max-h-[calc(100vh-2rem)] !w-[calc(100vw-2rem)] !h-[calc(100vh-2rem)]' : ''",
 				},
 			}) {
 				<!-- Main View (Agent List + Store Tabs) -->
 				<template x-if="view === 'list'">
-					<div class="flex flex-col h-full max-h-[90vh]">
+					<div class="flex flex-col h-full" :class="expanded ? 'max-h-[calc(100vh-2rem)]' : 'max-h-[90vh]'">
 						@dialog.Header(dialog.HeaderProps{Class: "p-4 pb-0 border-b border-border"}) {
 							<div class="flex items-center justify-between mb-3">
 								<div>
@@ -39,6 +40,22 @@ templ AgentsDialog() {
 										{ i18n.T(ctx, "Manage personal agents or browse the store.") }
 									}
 								</div>
+								@button.Button(button.Props{
+									Size:    button.SizeIcon,
+									Variant: button.VariantGhost,
+									Class:   "size-7 text-muted-foreground",
+									Attributes: templ.Attributes{
+										"@click": "toggleExpand()",
+										"title":  i18n.T(ctx, "Toggle fullscreen"),
+									},
+								}) {
+									<span x-show="!expanded">
+										@icon.Maximize2(icon.Props{Class: "size-3.5"})
+									</span>
+									<span x-show="expanded">
+										@icon.Minimize2(icon.Props{Class: "size-3.5"})
+									</span>
+								}
 							</div>
 							<!-- Tab Bar -->
 							<div class="flex gap-0 -mb-px">
@@ -153,17 +170,17 @@ templ AgentsDialog() {
 															:class="selectedAgent === ag.id ? 'bg-primary' : 'bg-transparent group-hover:bg-border'"
 														></div>
 														<div class="flex items-start gap-3.5 p-3.5 ps-5">
-															<!-- Agent/Workflow Icon -->
+															<!-- Agent Icon -->
 															<div
 																class="size-11 rounded-xl flex items-center justify-center shrink-0 [&_svg]:size-5 transition-colors duration-200"
 																:class="selectedAgent === ag.id
 																	? 'bg-primary text-primary-foreground shadow-sm'
 																	: 'bg-primary/10 text-primary'"
 															>
-																<template x-if="ag._isWorkflow">
+																<template x-if="ag.isComposed">
 																	@icon.GitBranch(icon.Props{Class: "size-5"})
 																</template>
-																<template x-if="!ag._isWorkflow">
+																<template x-if="!ag.isComposed">
 																	<span x-html="ag.icon"></span>
 																</template>
 															</div>
@@ -171,11 +188,11 @@ templ AgentsDialog() {
 															<div class="flex-1 min-w-0">
 																<div class="flex items-center gap-2 mb-0.5">
 																	<h3 class="text-sm font-semibold text-foreground truncate" x-text="ag.name"></h3>
-																	<!-- Workflow badge -->
-																	<template x-if="ag._isWorkflow">
+																	<!-- Composed agent badge -->
+																	<template x-if="ag.isComposed">
 																		@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "text-[9px] px-1.5 py-0 h-4 shrink-0 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"}) {
 																			@icon.GitBranch(icon.Props{Class: "size-2.5 me-0.5"})
-																			{ i18n.T(ctx, "Workflow") }
+																			{ i18n.T(ctx, "Composed") }
 																		}
 																	</template>
 																	<template x-if="selectedAgent === ag.id">
@@ -190,7 +207,7 @@ templ AgentsDialog() {
 																</div>
 																<p class="text-xs text-muted-foreground mt-0.5 line-clamp-2" x-text="ag.description || 'No description'"></p>
 																<div class="flex items-center gap-3 mt-2">
-																	<template x-if="ag._isWorkflow && ag.graph">
+																	<template x-if="ag.isComposed && ag.graph">
 																		<span class="text-[10px] text-muted-foreground" x-text="collectAgentIds(ag.graph).length + ' agents'"></span>
 																	</template>
 																	<span class="text-[10px] text-muted-foreground" x-text="'Created ' + formatDate(ag.createdAt || ag.created_at)"></span>
@@ -226,7 +243,7 @@ templ AgentsDialog() {
 																		Variant: button.VariantGhost,
 																		Class:   "size-7",
 																		Attributes: templ.Attributes{
-																			"@click.stop": "ag._isWorkflow ? showEditWorkflowForm(ag) : showEditForm(ag)",
+																			"@click.stop": "showEditForm(ag)",
 																			"title":       i18n.T(ctx, "Edit"),
 																		},
 																	}) {
@@ -237,7 +254,7 @@ templ AgentsDialog() {
 																		Variant: button.VariantGhost,
 																		Class:   "size-7 text-destructive hover:text-destructive",
 																		Attributes: templ.Attributes{
-																			"@click.stop": "ag._isWorkflow ? confirmDeleteWorkflow(ag) : confirmDelete(ag)",
+																			"@click.stop": "confirmDelete(ag)",
 																			"title":       i18n.T(ctx, "Delete"),
 																		},
 																	}) {
@@ -335,10 +352,10 @@ templ AgentsDialog() {
 															<div class="flex-1 min-w-0">
 																<div class="flex items-center gap-2">
 																	<h3 class="text-sm font-semibold text-foreground truncate" x-text="entry.name"></h3>
-																	<template x-if="entry.isWorkflow">
+																	<template x-if="entry.isComposed">
 																		@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "text-[9px] px-1.5 py-0 h-4 shrink-0 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"}) {
 																			@icon.GitBranch(icon.Props{Class: "size-2.5"})
-																			{ i18n.T(ctx, "Workflow") }
+																			{ i18n.T(ctx, "Composed") }
 																		}
 																	</template>
 																</div>
@@ -423,7 +440,7 @@ templ AgentsDialog() {
 				</template>
 				<!-- Create/Edit Form View -->
 				<template x-if="view === 'form'">
-					<div class="flex flex-col h-full max-h-[90vh]">
+					<div class="flex flex-col h-full" :class="expanded ? 'max-h-[calc(100vh-2rem)]' : 'max-h-[90vh]'">
 						@dialog.Header(dialog.HeaderProps{Class: "p-4 pb-3 border-b border-border"}) {
 							<div class="flex items-center gap-2">
 								@button.Button(button.Props{
@@ -438,577 +455,552 @@ templ AgentsDialog() {
 								}
 								<div class="flex-1">
 									@dialog.Title() {
-										<span x-text="editingAgent ? (formMode === 'workflow' ? 'Edit Workflow' : 'Edit Agent') : (formMode === 'workflow' ? 'Create Workflow' : 'Create Agent')"></span>
+										<span x-text="editingAgent ? 'Edit Agent' : 'Create Agent'"></span>
 									}
 									@dialog.Description() {
-										<span x-text="editingAgent ? (formMode === 'workflow' ? 'Modify your workflow composition.' : 'Modify your agent configuration.') : (formMode === 'workflow' ? 'Compose agents into a multi-agent workflow.' : 'Configure your new AI agent.')"></span>
+										<span x-text="editingAgent ? 'Modify your agent configuration.' : 'Configure your new AI agent.'"></span>
 									}
 								</div>
-								<!-- Agent / Workflow Toggle (only in create mode, not when editing) -->
-								<template x-if="!editingAgent">
-									<div class="flex items-center rounded-lg border border-border bg-muted/50 p-0.5 shrink-0">
-										<button
-											type="button"
-											@click="formMode = 'agent'"
-											class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-150"
-											:class="formMode === 'agent' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
-										>
-											@icon.CompassLogo("size-3.5")
-											{ i18n.T(ctx, "Agent") }
-										</button>
-										<button
-											type="button"
-											@click="formMode = 'workflow'"
-											class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-150"
-											:class="formMode === 'workflow' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
-										>
-											@icon.GitBranch(icon.Props{Class: "size-3.5"})
-											{ i18n.T(ctx, "Workflow") }
-										</button>
-									</div>
-								</template>
+								@button.Button(button.Props{
+									Size:    button.SizeIcon,
+									Variant: button.VariantGhost,
+									Class:   "size-7 text-muted-foreground",
+									Attributes: templ.Attributes{
+										"@click": "toggleExpand()",
+										"title":  i18n.T(ctx, "Toggle fullscreen"),
+									},
+								}) {
+									<span x-show="!expanded">
+										@icon.Maximize2(icon.Props{Class: "size-3.5"})
+									</span>
+									<span x-show="expanded">
+										@icon.Minimize2(icon.Props{Class: "size-3.5"})
+									</span>
+								}
 							</div>
 						}
-						<!-- ═══════ Agent Form (single agent mode) ═══════ -->
-						<template x-if="formMode === 'agent'">
-							<div class="flex-1 overflow-y-auto p-4 scrollbar-thin space-y-4">
-								<!-- Agent Name -->
-								<div class="space-y-2">
-									@label.Label(label.Props{}) {
-										{ i18n.T(ctx, "Agent Name") }
-										<span class="text-destructive">*</span>
-									}
-									@input.Input(input.Props{
-										Placeholder: i18n.T(ctx, "e.g., Writing Coach, Code Reviewer..."),
-										Attributes: templ.Attributes{
-											"x-model":   "form.name",
-											"maxlength": "100",
-										},
-									})
-								</div>
-								<!-- Description -->
-								<div class="space-y-2">
-									@label.Label(label.Props{}) {
-										{ i18n.T(ctx, "Description") }
-									}
-									@input.Input(input.Props{
-										Placeholder: i18n.T(ctx, "Brief description of what this agent does..."),
-										Attributes: templ.Attributes{
-											"x-model":   "form.description",
-											"maxlength": "500",
-										},
-									})
-								</div>
-								<!-- System Prompt -->
-								<div class="space-y-2">
-									@label.Label(label.Props{}) {
-										{ i18n.T(ctx, "System Prompt") }
-										<span class="text-destructive">*</span>
-									}
-									@textarea.Textarea(textarea.Props{
-										Placeholder: i18n.T(ctx, "Instructions for how the agent should behave..."),
-										Class:       "min-h-[120px] resize-y",
-										Rows:        5,
-										Attributes: templ.Attributes{
-											"x-model": "form.systemPrompt",
-										},
-									})
-									<p class="text-[11px] text-muted-foreground">
-										{ i18n.T(ctx, "This is the instruction that defines the agent's personality, expertise, and behavior.") }
-									</p>
-								</div>
-								<!-- ═══════ Multi-Agent Orchestration Section ═══════ -->
-								<div class="border border-border rounded-lg">
-									<button
-										type="button"
-										@click="showOrchestration = !showOrchestration"
-										class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
-									>
-										<span class="flex items-center gap-2">
-											@icon.GitBranch(icon.Props{Class: "size-4 text-muted-foreground"})
-											{ i18n.T(ctx, "Multi-Agent Orchestration") }
-											<span class="text-[10px] text-muted-foreground" x-text="orchestrationSummary"></span>
-										</span>
-										<span
-											class="transition-transform duration-200"
-											:class="showOrchestration ? 'rotate-180' : ''"
-										>
-											@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
-										</span>
-									</button>
-									<div x-show="showOrchestration" x-collapse class="px-3 pb-3 border-t border-border pt-3 space-y-4">
-										<p class="text-[11px] text-muted-foreground">
-											{ i18n.T(ctx, "Configure how this agent participates in multi-agent workflows. These settings control delegation, state sharing, and I/O behaviour when combined with other agents.") }
-										</p>
-										<!-- Transfer Policy -->
-										<div class="space-y-2">
-											<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
-												@icon.ArrowRightLeft(icon.Props{Class: "size-3.5 text-muted-foreground"})
-												{ i18n.T(ctx, "Transfer Policy") }
-											</span>
-											<p class="text-[11px] text-muted-foreground">
-												{ i18n.T(ctx, "Controls whether the LLM can delegate tasks to other agents via the transfer_to_agent tool.") }
-											</p>
-											<div class="space-y-2 ps-1">
-												<!-- Disallow Transfer to Parent -->
-												<label class="flex items-center justify-between gap-2 py-1.5 cursor-pointer">
-													<div class="flex-1 min-w-0">
-														<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Block transfer to parent") }</span>
-														<p class="text-[10px] text-muted-foreground mt-0.5">{ i18n.T(ctx, "Prevents this agent from escalating back to its parent agent.") }</p>
-													</div>
-													<button
-														type="button"
-														@click="form.disallowTransferToParent = !form.disallowTransferToParent"
-														class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
-														:class="form.disallowTransferToParent ? 'bg-primary' : 'bg-input'"
-														role="switch"
-														:aria-checked="form.disallowTransferToParent"
-													>
-														<span
-															class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
-															:class="form.disallowTransferToParent ? 'translate-x-4' : 'translate-x-0'"
-														></span>
-													</button>
-												</label>
-												<!-- Disallow Transfer to Peers -->
-												<label class="flex items-center justify-between gap-2 py-1.5 cursor-pointer">
-													<div class="flex-1 min-w-0">
-														<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Block transfer to peers") }</span>
-														<p class="text-[10px] text-muted-foreground mt-0.5">{ i18n.T(ctx, "Prevents this agent from delegating to sibling agents.") }</p>
-													</div>
-													<button
-														type="button"
-														@click="form.disallowTransferToPeers = !form.disallowTransferToPeers"
-														class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
-														:class="form.disallowTransferToPeers ? 'bg-primary' : 'bg-input'"
-														role="switch"
-														:aria-checked="form.disallowTransferToPeers"
-													>
-														<span
-															class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
-															:class="form.disallowTransferToPeers ? 'translate-x-4' : 'translate-x-0'"
-														></span>
-													</button>
-												</label>
-											</div>
-										</div>
-										<!-- Output Key -->
-										<div class="space-y-2">
-											<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
-												@icon.Key(icon.Props{Class: "size-3.5 text-muted-foreground"})
-												{ i18n.T(ctx, "Output Key") }
-											</span>
-											@input.Input(input.Props{
-												Placeholder: i18n.T(ctx, "e.g., research_results, draft_content..."),
-												Class:       "h-8 text-xs",
-												Attributes: templ.Attributes{
-													"x-model":   "form.outputKey",
-													"maxlength": "100",
-												},
-											})
-											<p class="text-[10px] text-muted-foreground">
-												{ i18n.T(ctx, "Stores this agent's final output in session state. Downstream agents can reference it via {key_name} in their instructions.") }
-											</p>
-										</div>
-										<!-- Include Contents -->
-										<div class="space-y-2">
-											<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
-												@icon.MessageSquare(icon.Props{Class: "size-3.5 text-muted-foreground"})
-												{ i18n.T(ctx, "History Forwarding") }
-											</span>
-											<div class="flex gap-2">
-												<button
-													type="button"
-													@click="form.includeContents = ''"
-													class="flex-1 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors"
-													:class="!form.includeContents || form.includeContents === 'default' ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted/50 text-muted-foreground border-border hover:bg-accent'"
-												>
-													{ i18n.T(ctx, "Include History") }
-												</button>
-												<button
-													type="button"
-													@click="form.includeContents = 'none'"
-													class="flex-1 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors"
-													:class="form.includeContents === 'none' ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted/50 text-muted-foreground border-border hover:bg-accent'"
-												>
-													{ i18n.T(ctx, "Fresh Context") }
-												</button>
-											</div>
-											<p class="text-[10px] text-muted-foreground">
-												{ i18n.T(ctx, "Controls whether conversation history is forwarded when this agent runs as a sub-agent. 'Fresh Context' starts with a clean slate.") }
-											</p>
-										</div>
-										<!-- Global Instruction -->
-										<div class="space-y-2">
-											<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
-												@icon.Globe(icon.Props{Class: "size-3.5 text-muted-foreground"})
-												{ i18n.T(ctx, "Global Instruction") }
-											</span>
-											@textarea.Textarea(textarea.Props{
-												Placeholder: i18n.T(ctx, "Shared instruction applied to all agents in the workflow tree..."),
-												Class:       "min-h-[60px] resize-y text-xs",
-												Rows:        2,
-												Attributes: templ.Attributes{
-													"x-model": "form.globalInstruction",
-												},
-											})
-											<p class="text-[10px] text-muted-foreground">
-												{ i18n.T(ctx, "Only effective when this agent is the root of a workflow. Applies to all agents in the tree (e.g., organization policies, safety rules).") }
-											</p>
-										</div>
-										<!-- Output Schema -->
-										<div class="space-y-2">
-											<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
-												@icon.Braces(icon.Props{Class: "size-3.5 text-muted-foreground"})
-												{ i18n.T(ctx, "Output Schema (JSON)") }
-											</span>
-											@textarea.Textarea(textarea.Props{
-												Placeholder: i18n.T(ctx, `{"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]}`),
-												Class:       "min-h-[60px] resize-y font-mono text-[11px]",
-												Rows:        2,
-												Attributes: templ.Attributes{
-													"x-model": "form.outputSchema",
-												},
-											})
-											<p class="text-[10px] text-muted-foreground">
-												{ i18n.T(ctx, "Forces the agent to produce structured JSON matching this schema. When set, tool use is disabled. Leave empty for free-form responses.") }
-											</p>
-										</div>
-									</div>
-								</div>
-								<!-- Tools & Knowledge Bases (only when editing an existing agent) -->
-								<template x-if="editingAgent">
-									<div class="space-y-4">
-										<!-- Tools Section -->
-										<div class="border border-border rounded-lg">
-											<button
-												type="button"
-												@click="showTools = !showTools"
-												class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
-											>
-												<span class="flex items-center gap-2">
-													@icon.Blocks(icon.Props{Class: "size-4 text-muted-foreground"})
-													{ i18n.T(ctx, "Tools") }
-													<span class="text-[10px] text-muted-foreground tabular-nums" x-text="toolsSummary"></span>
-												</span>
-												<span
-													class="transition-transform duration-200"
-													:class="showTools ? 'rotate-180' : ''"
-												>
-													@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
-												</span>
-											</button>
-											<div x-show="showTools" x-collapse class="px-3 pb-3 border-t border-border pt-3">
-												<!-- Loading -->
-												<template x-if="loadingTools">
-													<div class="space-y-2">
-														<template x-for="i in 3" :key="i">
-															<div class="flex items-center gap-3 p-2 animate-pulse rounded-md">
-																<div class="size-7 rounded bg-muted"></div>
-																<div class="flex-1 space-y-1">
-																	<div class="h-3 bg-muted rounded w-1/3"></div>
-																	<div class="h-2 bg-muted rounded w-2/3"></div>
-																</div>
-															</div>
-														</template>
-													</div>
-												</template>
-												<!-- Loaded plugins -->
-												<template x-if="!loadingTools">
-													<div>
-														<template x-if="agentPlugins.length === 0">
-															<div class="py-4 text-center text-xs text-muted-foreground">
-																{ i18n.T(ctx, "No plugins available. Add plugins from the Tools sidebar.") }
-															</div>
-														</template>
-														<div class="space-y-1.5">
-															<template x-for="plugin in agentPlugins" :key="plugin.id">
-																<div class="rounded-md border border-border">
-																	<!-- Plugin header with toggle -->
-																	<div class="flex items-center justify-between p-2 hover:bg-accent/20 transition-colors">
-																		<div class="flex items-center gap-2 flex-1 min-w-0">
-																			<div class="size-7 rounded-md bg-primary/10 flex items-center justify-center text-primary shrink-0">
-																				@icon.Blocks(icon.Props{Class: "size-3.5"})
-																			</div>
-																			<div class="flex-1 min-w-0">
-																				<div class="text-xs font-medium text-foreground truncate" x-text="plugin.name"></div>
-																				<div class="text-[10px] text-muted-foreground truncate" x-text="plugin.tools.length + ' tools'"></div>
-																			</div>
-																		</div>
-																		<button
-																			@click="toggleAgentPlugin(plugin)"
-																			class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-																			:class="plugin.enabled ? 'bg-primary' : 'bg-input'"
-																			role="switch"
-																			:aria-checked="plugin.enabled"
-																		>
-																			<span
-																				class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
-																				:class="plugin.enabled ? 'translate-x-4' : 'translate-x-0'"
-																			></span>
-																		</button>
-																	</div>
-																	<!-- Individual tools (collapsible, only when plugin is enabled) -->
-																	<template x-if="plugin.enabled && plugin.tools.length > 1">
-																		<div class="border-t border-border/50 px-2 py-1.5 space-y-1">
-																			<template x-for="tool in plugin.tools" :key="tool.id">
-																				<div class="flex items-center justify-between py-1 px-2 rounded hover:bg-accent/20">
-																					<span class="text-[11px] text-muted-foreground truncate flex-1" x-text="tool.name"></span>
-																					<button
-																						@click="toggleAgentTool(plugin, tool)"
-																						class="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
-																						:class="tool.enabled ? 'bg-primary' : 'bg-input'"
-																						role="switch"
-																						:aria-checked="tool.enabled"
-																					>
-																						<span
-																							class="pointer-events-none inline-block h-3 w-3 rounded-full bg-background shadow ring-0 transition-transform duration-200 ease-in-out"
-																							:class="tool.enabled ? 'translate-x-3' : 'translate-x-0'"
-																						></span>
-																					</button>
-																				</div>
-																			</template>
-																		</div>
-																	</template>
-																</div>
-															</template>
-														</div>
-													</div>
-												</template>
-											</div>
-										</div>
-										<!-- Knowledge Bases Section -->
-										<div class="border border-border rounded-lg">
-											<button
-												type="button"
-												@click="showKnowledgeBases = !showKnowledgeBases"
-												class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
-											>
-												<span class="flex items-center gap-2">
-													@icon.Library(icon.Props{Class: "size-4 text-muted-foreground"})
-													{ i18n.T(ctx, "Knowledge Bases") }
-													<span class="text-[10px] text-muted-foreground tabular-nums" x-text="kbSummary"></span>
-												</span>
-												<span
-													class="transition-transform duration-200"
-													:class="showKnowledgeBases ? 'rotate-180' : ''"
-												>
-													@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
-												</span>
-											</button>
-											<div x-show="showKnowledgeBases" x-collapse class="px-3 pb-3 border-t border-border pt-3">
-												<!-- Loading -->
-												<template x-if="loadingKBs">
-													<div class="space-y-2">
-														<template x-for="i in 3" :key="i">
-															<div class="flex items-center gap-3 p-2 animate-pulse rounded-md">
-																<div class="size-7 rounded bg-muted"></div>
-																<div class="flex-1 space-y-1">
-																	<div class="h-3 bg-muted rounded w-1/3"></div>
-																	<div class="h-2 bg-muted rounded w-2/3"></div>
-																</div>
-															</div>
-														</template>
-													</div>
-												</template>
-												<!-- Loaded workspaces -->
-												<template x-if="!loadingKBs">
-													<div>
-														<template x-if="agentWorkspaces.length === 0">
-															<div class="py-4 text-center text-xs text-muted-foreground">
-																{ i18n.T(ctx, "No knowledge bases available. Create one from the Resources sidebar.") }
-															</div>
-														</template>
-														<div class="space-y-1.5">
-															<template x-for="ws in agentWorkspaces" :key="ws.id">
-																<div class="flex items-center justify-between p-2 rounded-md border border-border hover:bg-accent/20 transition-colors">
-																	<div class="flex items-center gap-2 flex-1 min-w-0">
-																		<div class="size-7 rounded-md bg-primary/10 flex items-center justify-center text-primary shrink-0">
-																			@icon.Library(icon.Props{Class: "size-3.5"})
-																		</div>
-																		<div class="flex-1 min-w-0">
-																			<div class="text-xs font-medium text-foreground truncate" x-text="ws.name"></div>
-																			<div class="text-[10px] text-muted-foreground truncate" x-text="ws.description || ws.slug"></div>
-																		</div>
-																	</div>
-																	<button
-																		@click="toggleAgentWorkspace(ws)"
-																		class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-																		:class="ws.enabled ? 'bg-primary' : 'bg-input'"
-																		role="switch"
-																		:aria-checked="ws.enabled"
-																	>
-																		<span
-																			class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
-																			:class="ws.enabled ? 'translate-x-4' : 'translate-x-0'"
-																		></span>
-																	</button>
-																</div>
-															</template>
-														</div>
-													</div>
-												</template>
-											</div>
-										</div>
-										<!-- Filesystems Section -->
-										<div class="border border-border rounded-lg">
-											<button
-												type="button"
-												@click="showFilesystems = !showFilesystems"
-												class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
-											>
-												<span class="flex items-center gap-2">
-													@icon.Folder(icon.Props{Class: "size-4 text-muted-foreground"})
-													{ i18n.T(ctx, "Filesystems") }
-													<span class="text-[10px] text-muted-foreground tabular-nums" x-text="fsSummary"></span>
-												</span>
-												<span
-													class="transition-transform duration-200"
-													:class="showFilesystems ? 'rotate-180' : ''"
-												>
-													@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
-												</span>
-											</button>
-											<div x-show="showFilesystems" x-collapse class="px-3 pb-3 border-t border-border pt-3">
-												<!-- Loading -->
-												<template x-if="loadingFilesystems">
-													<div class="space-y-2">
-														<template x-for="i in 3" :key="i">
-															<div class="flex items-center gap-3 p-2 animate-pulse rounded-md">
-																<div class="size-7 rounded bg-muted"></div>
-																<div class="flex-1 space-y-1">
-																	<div class="h-3 bg-muted rounded w-1/3"></div>
-																	<div class="h-2 bg-muted rounded w-2/3"></div>
-																</div>
-															</div>
-														</template>
-													</div>
-												</template>
-												<!-- Loaded filesystems -->
-												<template x-if="!loadingFilesystems">
-													<div>
-														<template x-if="agentFilesystems.length === 0">
-															<div class="py-4 text-center text-xs text-muted-foreground">
-																{ i18n.T(ctx, "No filesystems available. Create one from the Files sidebar.") }
-															</div>
-														</template>
-														<div class="space-y-1.5">
-															<template x-for="fs in agentFilesystems" :key="fs.id">
-																<div class="flex items-center justify-between p-2 rounded-md border border-border hover:bg-accent/20 transition-colors">
-																	<div class="flex items-center gap-2 flex-1 min-w-0">
-																		<div class="size-7 rounded-md bg-primary/10 flex items-center justify-center text-primary shrink-0">
-																			@icon.Folder(icon.Props{Class: "size-3.5"})
-																		</div>
-																		<div class="flex-1 min-w-0">
-																			<div class="text-xs font-medium text-foreground truncate" x-text="fs.name"></div>
-																			<div class="text-[10px] text-muted-foreground truncate" x-text="fs.description || fs.type"></div>
-																		</div>
-																	</div>
-																	<button
-																		@click="toggleAgentFilesystem(fs)"
-																		class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-																		:class="fs.enabled ? 'bg-primary' : 'bg-input'"
-																		role="switch"
-																		:aria-checked="fs.enabled"
-																	>
-																		<span
-																			class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
-																			:class="fs.enabled ? 'translate-x-4' : 'translate-x-0'"
-																		></span>
-																	</button>
-																</div>
-															</template>
-														</div>
-													</div>
-												</template>
-											</div>
-										</div>
-									</div>
-								</template>
-								<!-- Tools Notice (create mode only) -->
-								<template x-if="!editingAgent">
-									<div class="border border-border rounded-lg p-3 flex items-start gap-2 bg-muted/30">
-										@icon.Info(icon.Props{Class: "size-4 text-muted-foreground shrink-0 mt-0.5"})
-										<p class="text-[11px] text-muted-foreground">
-											{ i18n.T(ctx, "After creating the agent, you can configure its tools and knowledge bases by editing it.") }
-										</p>
-									</div>
-								</template>
+						<!-- ═══════ Unified Agent Form ═══════ -->
+						<div class="flex-1 overflow-y-auto p-4 scrollbar-thin space-y-4">
+							<!-- Agent Name -->
+							<div class="space-y-2">
+								@label.Label(label.Props{}) {
+									{ i18n.T(ctx, "Agent Name") }
+									<span class="text-destructive">*</span>
+								}
+								@input.Input(input.Props{
+									Placeholder: i18n.T(ctx, "e.g., Writing Coach, Code Reviewer..."),
+									Attributes: templ.Attributes{
+										"x-model":   "form.name",
+										"maxlength": "100",
+									},
+								})
 							</div>
-						</template>
-						<!-- ═══════ Workflow Form (workflow mode) ═══════ -->
-						<template x-if="formMode === 'workflow'">
-							<div class="flex-1 overflow-hidden flex flex-col">
-								<div class="flex-1 overflow-hidden flex">
-									<!-- Left column: Form + Tree Editor -->
-									<div class="flex-1 min-w-0 overflow-y-auto p-4 scrollbar-thin space-y-4">
-										<!-- Workflow Name -->
-										<div class="space-y-2">
-											@label.Label(label.Props{}) {
-												{ i18n.T(ctx, "Name") }
-												<span class="text-destructive">*</span>
-											}
-											@input.Input(input.Props{
-												Placeholder: i18n.T(ctx, "e.g., Research Pipeline, Content Creator..."),
-												Attributes: templ.Attributes{
-													"x-model":   "workflowForm.name",
-													"maxlength": "100",
-												},
-											})
+							<!-- Description -->
+							<div class="space-y-2">
+								@label.Label(label.Props{}) {
+									{ i18n.T(ctx, "Description") }
+								}
+								@input.Input(input.Props{
+									Placeholder: i18n.T(ctx, "Brief description of what this agent does..."),
+									Attributes: templ.Attributes{
+										"x-model":   "form.description",
+										"maxlength": "500",
+									},
+								})
+							</div>
+							<!-- System Prompt -->
+							<div class="space-y-2">
+								@label.Label(label.Props{}) {
+									{ i18n.T(ctx, "System Prompt") }
+									<span class="text-destructive">*</span>
+								}
+								@textarea.Textarea(textarea.Props{
+									Placeholder: i18n.T(ctx, "Instructions for how the agent should behave..."),
+									Class:       "min-h-[120px] resize-y",
+									Rows:        5,
+									Attributes: templ.Attributes{
+										"x-model": "form.systemPrompt",
+									},
+								})
+								<p class="text-[11px] text-muted-foreground">
+									{ i18n.T(ctx, "This is the instruction that defines the agent's personality, expertise, and behavior.") }
+								</p>
+							</div>
+							<!-- ═══════ Multi-Agent Orchestration Section ═══════ -->
+							<div class="border border-border rounded-lg">
+								<button
+									type="button"
+									@click="showOrchestration = !showOrchestration"
+									class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
+								>
+									<span class="flex items-center gap-2">
+										@icon.GitBranch(icon.Props{Class: "size-4 text-muted-foreground"})
+										{ i18n.T(ctx, "Multi-Agent Orchestration") }
+										<span class="text-[10px] text-muted-foreground" x-text="orchestrationSummary"></span>
+									</span>
+									<span
+										class="transition-transform duration-200"
+										:class="showOrchestration ? 'rotate-180' : ''"
+									>
+										@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+									</span>
+								</button>
+								<div x-show="showOrchestration" x-collapse class="px-3 pb-3 border-t border-border pt-3 space-y-4">
+									<p class="text-[11px] text-muted-foreground">
+										{ i18n.T(ctx, "Configure how this agent participates in multi-agent workflows. These settings control delegation, state sharing, and I/O behaviour when combined with other agents.") }
+									</p>
+									<!-- Transfer Policy -->
+									<div class="space-y-2">
+										<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
+											@icon.ArrowRightLeft(icon.Props{Class: "size-3.5 text-muted-foreground"})
+											{ i18n.T(ctx, "Transfer Policy") }
+										</span>
+										<p class="text-[11px] text-muted-foreground">
+											{ i18n.T(ctx, "Controls whether the LLM can delegate tasks to other agents via the transfer_to_agent tool.") }
+										</p>
+										<div class="space-y-2 ps-1">
+											<!-- Disallow Transfer to Parent -->
+											<label class="flex items-center justify-between gap-2 py-1.5 cursor-pointer">
+												<div class="flex-1 min-w-0">
+													<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Block transfer to parent") }</span>
+													<p class="text-[10px] text-muted-foreground mt-0.5">{ i18n.T(ctx, "Prevents this agent from escalating back to its parent agent.") }</p>
+												</div>
+												<button
+													type="button"
+													@click="form.disallowTransferToParent = !form.disallowTransferToParent"
+													class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
+													:class="form.disallowTransferToParent ? 'bg-primary' : 'bg-input'"
+													role="switch"
+													:aria-checked="form.disallowTransferToParent"
+												>
+													<span
+														class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
+														:class="form.disallowTransferToParent ? 'translate-x-4' : 'translate-x-0'"
+													></span>
+												</button>
+											</label>
+											<!-- Disallow Transfer to Peers -->
+											<label class="flex items-center justify-between gap-2 py-1.5 cursor-pointer">
+												<div class="flex-1 min-w-0">
+													<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Block transfer to peers") }</span>
+													<p class="text-[10px] text-muted-foreground mt-0.5">{ i18n.T(ctx, "Prevents this agent from delegating to sibling agents.") }</p>
+												</div>
+												<button
+													type="button"
+													@click="form.disallowTransferToPeers = !form.disallowTransferToPeers"
+													class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
+													:class="form.disallowTransferToPeers ? 'bg-primary' : 'bg-input'"
+													role="switch"
+													:aria-checked="form.disallowTransferToPeers"
+												>
+													<span
+														class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
+														:class="form.disallowTransferToPeers ? 'translate-x-4' : 'translate-x-0'"
+													></span>
+												</button>
+											</label>
 										</div>
-										<!-- Description -->
-										<div class="space-y-2">
-											@label.Label(label.Props{}) {
-												{ i18n.T(ctx, "Description") }
-											}
-											@input.Input(input.Props{
-												Placeholder: i18n.T(ctx, "Brief description of what this workflow does..."),
-												Attributes: templ.Attributes{
-													"x-model":   "workflowForm.description",
-													"maxlength": "500",
-												},
-											})
+									</div>
+									<!-- Output Key -->
+									<div class="space-y-2">
+										<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
+											@icon.Key(icon.Props{Class: "size-3.5 text-muted-foreground"})
+											{ i18n.T(ctx, "Output Key") }
+										</span>
+										@input.Input(input.Props{
+											Placeholder: i18n.T(ctx, "e.g., research_results, draft_content..."),
+											Class:       "h-8 text-xs",
+											Attributes: templ.Attributes{
+												"x-model":   "form.outputKey",
+												"maxlength": "100",
+											},
+										})
+										<p class="text-[10px] text-muted-foreground">
+											{ i18n.T(ctx, "Stores this agent's final output in session state. Downstream agents can reference it via {key_name} in their instructions.") }
+										</p>
+									</div>
+									<!-- Include Contents -->
+									<div class="space-y-2">
+										<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
+											@icon.MessageSquare(icon.Props{Class: "size-3.5 text-muted-foreground"})
+											{ i18n.T(ctx, "History Forwarding") }
+										</span>
+										<div class="flex gap-2">
+											<button
+												type="button"
+												@click="form.includeContents = ''"
+												class="flex-1 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors"
+												:class="!form.includeContents || form.includeContents === 'default' ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted/50 text-muted-foreground border-border hover:bg-accent'"
+											>
+												{ i18n.T(ctx, "Include History") }
+											</button>
+											<button
+												type="button"
+												@click="form.includeContents = 'none'"
+												class="flex-1 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors"
+												:class="form.includeContents === 'none' ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted/50 text-muted-foreground border-border hover:bg-accent'"
+											>
+												{ i18n.T(ctx, "Fresh Context") }
+											</button>
 										</div>
-										<!-- Composition Tree -->
-										<div class="space-y-2">
-											@label.Label(label.Props{}) {
-												{ i18n.T(ctx, "Composition Tree") }
-												<span class="text-destructive">*</span>
-											}
-											<p class="text-[11px] text-muted-foreground mb-2">
-												{ i18n.T(ctx, "Build your workflow by nesting agents inside sequential, parallel, or loop nodes. Any node can contain any other node type.") }
-											</p>
-											<!-- Recursive tree rendered via Alpine.js -->
-											<div class="space-y-2" x-data="workflowTreeBuilder()" x-init="init()">
-												<template x-if="true">
-													<div x-html="renderNode(workflowForm.graph, 'graph', 0, false)"></div>
-												</template>
-											</div>
-										</div>
-										<!-- Tree stats -->
-										<div class="flex items-center gap-4 p-2 rounded-lg bg-muted/30 border border-border">
-											<span class="text-[11px] text-muted-foreground" x-text="countNodes(workflowForm.graph) + ' nodes'"></span>
-											<span class="text-[11px] text-muted-foreground" x-text="'depth ' + nodeDepth(workflowForm.graph)"></span>
-											<span class="text-[11px] text-muted-foreground" x-text="collectAgentIds(workflowForm.graph).length + ' agents'"></span>
-											<template x-if="countNodes(workflowForm.graph) >= 50">
-												<span class="text-[11px] text-amber-600 dark:text-amber-400 font-medium">{ i18n.T(ctx, "Node limit reached") }</span>
+										<p class="text-[10px] text-muted-foreground">
+											{ i18n.T(ctx, "Controls whether conversation history is forwarded when this agent runs as a sub-agent. 'Fresh Context' starts with a clean slate.") }
+										</p>
+									</div>
+									<!-- Global Instruction -->
+									<div class="space-y-2">
+										<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
+											@icon.Globe(icon.Props{Class: "size-3.5 text-muted-foreground"})
+											{ i18n.T(ctx, "Global Instruction") }
+										</span>
+										@textarea.Textarea(textarea.Props{
+											Placeholder: i18n.T(ctx, "Shared instruction applied to all agents in the workflow tree..."),
+											Class:       "min-h-[60px] resize-y text-xs",
+											Rows:        2,
+											Attributes: templ.Attributes{
+												"x-model": "form.globalInstruction",
+											},
+										})
+										<p class="text-[10px] text-muted-foreground">
+											{ i18n.T(ctx, "Only effective when this agent is the root of a workflow. Applies to all agents in the tree (e.g., organization policies, safety rules).") }
+										</p>
+									</div>
+									<!-- Output Schema -->
+									<div class="space-y-2">
+										<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
+											@icon.Braces(icon.Props{Class: "size-3.5 text-muted-foreground"})
+											{ i18n.T(ctx, "Output Schema (JSON)") }
+										</span>
+										@textarea.Textarea(textarea.Props{
+											Placeholder: i18n.T(ctx, `{"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]}`),
+											Class:       "min-h-[60px] resize-y font-mono text-[11px]",
+											Rows:        2,
+											Attributes: templ.Attributes{
+												"x-model": "form.outputSchema",
+											},
+										})
+										<p class="text-[10px] text-muted-foreground">
+											{ i18n.T(ctx, "Forces the agent to produce structured JSON matching this schema. When set, tool use is disabled. Leave empty for free-form responses.") }
+										</p>
+									</div>
+								</div>
+							</div>
+							<!-- Tools & Knowledge Bases (only when editing an existing agent) -->
+							<template x-if="editingAgent">
+								<div class="space-y-4">
+									<!-- Tools Section -->
+									<div class="border border-border rounded-lg">
+										<button
+											type="button"
+											@click="showTools = !showTools"
+											class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
+										>
+											<span class="flex items-center gap-2">
+												@icon.Blocks(icon.Props{Class: "size-4 text-muted-foreground"})
+												{ i18n.T(ctx, "Tools") }
+												<span class="text-[10px] text-muted-foreground tabular-nums" x-text="toolsSummary"></span>
+											</span>
+											<span
+												class="transition-transform duration-200"
+												:class="showTools ? 'rotate-180' : ''"
+											>
+												@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+											</span>
+										</button>
+										<div x-show="showTools" x-collapse class="px-3 pb-3 border-t border-border pt-3">
+											<!-- Loading -->
+											<template x-if="loadingTools">
+												<div class="space-y-2">
+													<template x-for="i in 3" :key="i">
+														<div class="flex items-center gap-3 p-2 animate-pulse rounded-md">
+															<div class="size-7 rounded bg-muted"></div>
+															<div class="flex-1 space-y-1">
+																<div class="h-3 bg-muted rounded w-1/3"></div>
+																<div class="h-2 bg-muted rounded w-2/3"></div>
+															</div>
+														</div>
+													</template>
+												</div>
+											</template>
+											<!-- Loaded plugins -->
+											<template x-if="!loadingTools">
+												<div>
+													<template x-if="agentPlugins.length === 0">
+														<div class="py-4 text-center text-xs text-muted-foreground">
+															{ i18n.T(ctx, "No plugins available. Add plugins from the Tools sidebar.") }
+														</div>
+													</template>
+													<div class="space-y-1.5">
+														<template x-for="plugin in agentPlugins" :key="plugin.id">
+															<div class="rounded-md border border-border">
+																<!-- Plugin header with toggle -->
+																<div class="flex items-center justify-between p-2 hover:bg-accent/20 transition-colors">
+																	<div class="flex items-center gap-2 flex-1 min-w-0">
+																		<div class="size-7 rounded-md bg-primary/10 flex items-center justify-center text-primary shrink-0">
+																			@icon.Blocks(icon.Props{Class: "size-3.5"})
+																		</div>
+																		<div class="flex-1 min-w-0">
+																			<div class="text-xs font-medium text-foreground truncate" x-text="plugin.name"></div>
+																			<div class="text-[10px] text-muted-foreground truncate" x-text="plugin.tools.length + ' tools'"></div>
+																		</div>
+																	</div>
+																	<button
+																		@click="toggleAgentPlugin(plugin)"
+																		class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+																		:class="plugin.enabled ? 'bg-primary' : 'bg-input'"
+																		role="switch"
+																		:aria-checked="plugin.enabled"
+																	>
+																		<span
+																			class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
+																			:class="plugin.enabled ? 'translate-x-4' : 'translate-x-0'"
+																		></span>
+																	</button>
+																</div>
+																<!-- Individual tools (collapsible, only when plugin is enabled) -->
+																<template x-if="plugin.enabled && plugin.tools.length > 1">
+																	<div class="border-t border-border/50 px-2 py-1.5 space-y-1">
+																		<template x-for="tool in plugin.tools" :key="tool.id">
+																			<div class="flex items-center justify-between py-1 px-2 rounded hover:bg-accent/20">
+																				<span class="text-[11px] text-muted-foreground truncate flex-1" x-text="tool.name"></span>
+																				<button
+																					@click="toggleAgentTool(plugin, tool)"
+																					class="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
+																					:class="tool.enabled ? 'bg-primary' : 'bg-input'"
+																					role="switch"
+																					:aria-checked="tool.enabled"
+																				>
+																					<span
+																						class="pointer-events-none inline-block h-3 w-3 rounded-full bg-background shadow ring-0 transition-transform duration-200 ease-in-out"
+																						:class="tool.enabled ? 'translate-x-3' : 'translate-x-0'"
+																					></span>
+																				</button>
+																			</div>
+																		</template>
+																	</div>
+																</template>
+															</div>
+														</template>
+													</div>
+												</div>
 											</template>
 										</div>
 									</div>
-									<!-- Right column: Pipeline Preview -->
-									<div class="w-[340px] shrink-0 border-l border-border overflow-y-auto scrollbar-thin bg-muted/5">
-										<div class="p-3 border-b border-border">
-											<span class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "Pipeline Preview") }</span>
-										</div>
-										<div
-											x-data="workflowTreeVisualizer()"
+									<!-- Knowledge Bases Section -->
+									<div class="border border-border rounded-lg">
+										<button
+											type="button"
+											@click="showKnowledgeBases = !showKnowledgeBases"
+											class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
 										>
-											<div x-html="renderTree(workflowForm.graph, agents)"></div>
+											<span class="flex items-center gap-2">
+												@icon.Library(icon.Props{Class: "size-4 text-muted-foreground"})
+												{ i18n.T(ctx, "Knowledge Bases") }
+												<span class="text-[10px] text-muted-foreground tabular-nums" x-text="kbSummary"></span>
+											</span>
+											<span
+												class="transition-transform duration-200"
+												:class="showKnowledgeBases ? 'rotate-180' : ''"
+											>
+												@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+											</span>
+										</button>
+										<div x-show="showKnowledgeBases" x-collapse class="px-3 pb-3 border-t border-border pt-3">
+											<!-- Loading -->
+											<template x-if="loadingKBs">
+												<div class="space-y-2">
+													<template x-for="i in 3" :key="i">
+														<div class="flex items-center gap-3 p-2 animate-pulse rounded-md">
+															<div class="size-7 rounded bg-muted"></div>
+															<div class="flex-1 space-y-1">
+																<div class="h-3 bg-muted rounded w-1/3"></div>
+																<div class="h-2 bg-muted rounded w-2/3"></div>
+															</div>
+														</div>
+													</template>
+												</div>
+											</template>
+											<!-- Loaded workspaces -->
+											<template x-if="!loadingKBs">
+												<div>
+													<template x-if="agentWorkspaces.length === 0">
+														<div class="py-4 text-center text-xs text-muted-foreground">
+															{ i18n.T(ctx, "No knowledge bases available. Create one from the Resources sidebar.") }
+														</div>
+													</template>
+													<div class="space-y-1.5">
+														<template x-for="ws in agentWorkspaces" :key="ws.id">
+															<div class="flex items-center justify-between p-2 rounded-md border border-border hover:bg-accent/20 transition-colors">
+																<div class="flex items-center gap-2 flex-1 min-w-0">
+																	<div class="size-7 rounded-md bg-primary/10 flex items-center justify-center text-primary shrink-0">
+																		@icon.Library(icon.Props{Class: "size-3.5"})
+																	</div>
+																	<div class="flex-1 min-w-0">
+																		<div class="text-xs font-medium text-foreground truncate" x-text="ws.name"></div>
+																		<div class="text-[10px] text-muted-foreground truncate" x-text="ws.description || ws.slug"></div>
+																	</div>
+																</div>
+																<button
+																	@click="toggleAgentWorkspace(ws)"
+																	class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+																	:class="ws.enabled ? 'bg-primary' : 'bg-input'"
+																	role="switch"
+																	:aria-checked="ws.enabled"
+																>
+																	<span
+																		class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
+																		:class="ws.enabled ? 'translate-x-4' : 'translate-x-0'"
+																	></span>
+																</button>
+															</div>
+														</template>
+													</div>
+												</div>
+											</template>
+										</div>
+									</div>
+									<!-- Filesystems Section -->
+									<div class="border border-border rounded-lg">
+										<button
+											type="button"
+											@click="showFilesystems = !showFilesystems"
+											class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
+										>
+											<span class="flex items-center gap-2">
+												@icon.Folder(icon.Props{Class: "size-4 text-muted-foreground"})
+												{ i18n.T(ctx, "Filesystems") }
+												<span class="text-[10px] text-muted-foreground tabular-nums" x-text="fsSummary"></span>
+											</span>
+											<span
+												class="transition-transform duration-200"
+												:class="showFilesystems ? 'rotate-180' : ''"
+											>
+												@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+											</span>
+										</button>
+										<div x-show="showFilesystems" x-collapse class="px-3 pb-3 border-t border-border pt-3">
+											<!-- Loading -->
+											<template x-if="loadingFilesystems">
+												<div class="space-y-2">
+													<template x-for="i in 3" :key="i">
+														<div class="flex items-center gap-3 p-2 animate-pulse rounded-md">
+															<div class="size-7 rounded bg-muted"></div>
+															<div class="flex-1 space-y-1">
+																<div class="h-3 bg-muted rounded w-1/3"></div>
+																<div class="h-2 bg-muted rounded w-2/3"></div>
+															</div>
+														</div>
+													</template>
+												</div>
+											</template>
+											<!-- Loaded filesystems -->
+											<template x-if="!loadingFilesystems">
+												<div>
+													<template x-if="agentFilesystems.length === 0">
+														<div class="py-4 text-center text-xs text-muted-foreground">
+															{ i18n.T(ctx, "No filesystems available. Create one from the Files sidebar.") }
+														</div>
+													</template>
+													<div class="space-y-1.5">
+														<template x-for="fs in agentFilesystems" :key="fs.id">
+															<div class="flex items-center justify-between p-2 rounded-md border border-border hover:bg-accent/20 transition-colors">
+																<div class="flex items-center gap-2 flex-1 min-w-0">
+																	<div class="size-7 rounded-md bg-primary/10 flex items-center justify-center text-primary shrink-0">
+																		@icon.Folder(icon.Props{Class: "size-3.5"})
+																	</div>
+																	<div class="flex-1 min-w-0">
+																		<div class="text-xs font-medium text-foreground truncate" x-text="fs.name"></div>
+																		<div class="text-[10px] text-muted-foreground truncate" x-text="fs.description || fs.type"></div>
+																	</div>
+																</div>
+																<button
+																	@click="toggleAgentFilesystem(fs)"
+																	class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+																	:class="fs.enabled ? 'bg-primary' : 'bg-input'"
+																	role="switch"
+																	:aria-checked="fs.enabled"
+																>
+																	<span
+																		class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
+																		:class="fs.enabled ? 'translate-x-4' : 'translate-x-0'"
+																	></span>
+																</button>
+															</div>
+														</template>
+													</div>
+												</div>
+											</template>
 										</div>
 									</div>
 								</div>
+							</template>
+							<!-- Tools Notice (create mode only) -->
+							<template x-if="!editingAgent">
+								<div class="border border-border rounded-lg p-3 flex items-start gap-2 bg-muted/30">
+									@icon.Info(icon.Props{Class: "size-4 text-muted-foreground shrink-0 mt-0.5"})
+									<p class="text-[11px] text-muted-foreground">
+										{ i18n.T(ctx, "After creating the agent, you can configure its tools and knowledge bases by editing it.") }
+									</p>
+								</div>
+							</template>
+							<!-- ═══════ Composition (inline collapsible) ═══════ -->
+							<div class="border border-border rounded-lg">
+								<button
+									type="button"
+									@click="showComposition ? disableComposition() : enableComposition()"
+									class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
+								>
+									<span class="flex items-center gap-2">
+										@icon.GitBranch(icon.Props{Class: "size-4 text-muted-foreground"})
+										{ i18n.T(ctx, "Compose Sub-Agents") }
+										<template x-if="showComposition && form.graph">
+											<span class="text-[10px] text-muted-foreground" x-text="collectAgentIds(form.graph).length + ' agents · ' + countNodes(form.graph) + ' nodes'"></span>
+										</template>
+									</span>
+									<span class="flex items-center gap-1.5">
+										<template x-if="!showComposition">
+											<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "off") }</span>
+										</template>
+										<template x-if="showComposition">
+											<span class="text-[10px] text-primary font-medium">{ i18n.T(ctx, "on") }</span>
+										</template>
+										<span
+											class="relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
+											:class="showComposition ? 'bg-primary' : 'bg-input'"
+										>
+											<span
+												class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
+												:class="showComposition ? 'translate-x-4' : 'translate-x-0'"
+											></span>
+										</span>
+									</span>
+								</button>
+								<div x-show="showComposition" x-collapse class="border-t border-border">
+									<div class="p-3 space-y-3">
+										<p class="text-[11px] text-muted-foreground">
+											{ i18n.T(ctx, "Compose this agent from sub-agents using sequential, parallel, or loop patterns.") }
+										</p>
+										<!-- Recursive tree rendered via Alpine.js -->
+										<template x-if="form.graph">
+											<div>
+												<div class="space-y-2" x-data="workflowTreeBuilder()" x-init="init()">
+													<div x-html="renderNode(form.graph, 'graph', 0, false)"></div>
+												</div>
+												<!-- Tree stats -->
+												<div class="flex items-center gap-4 p-2 mt-3 rounded-lg bg-muted/30 border border-border">
+													<span class="text-[11px] text-muted-foreground" x-text="countNodes(form.graph) + ' nodes'"></span>
+													<span class="text-[11px] text-muted-foreground" x-text="'depth ' + nodeDepth(form.graph)"></span>
+													<span class="text-[11px] text-muted-foreground" x-text="collectAgentIds(form.graph).length + ' agents'"></span>
+													<template x-if="countNodes(form.graph) >= 50">
+														<span class="text-[11px] text-amber-600 dark:text-amber-400 font-medium">{ i18n.T(ctx, "Node limit reached") }</span>
+													</template>
+												</div>
+											</div>
+										</template>
+									</div>
+								</div>
 							</div>
-						</template>
+						</div>
 						@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
 							<div class="flex items-center justify-end gap-2 w-full">
 								@button.Button(button.Props{
@@ -1024,11 +1016,11 @@ templ AgentsDialog() {
 									Variant: button.VariantDefault,
 									Class:   "h-8 px-4 text-xs gap-1.5",
 									Attributes: templ.Attributes{
-										"@click":    "formMode === 'workflow' ? saveWorkflow() : saveAgent()",
-										":disabled": "saving || (formMode === 'workflow' ? !workflowForm.name.trim() : !form.name.trim())",
+										"@click":    "saveAgent()",
+										":disabled": "saving || !form.name.trim()",
 									},
 								}) {
-									<span x-show="!saving" x-text="editingAgent ? 'Save Changes' : (formMode === 'workflow' ? 'Create Workflow' : 'Create Agent')"></span>
+									<span x-show="!saving" x-text="editingAgent ? 'Save Changes' : 'Create Agent'"></span>
 									<span x-show="saving" class="flex items-center gap-1.5">
 										<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
 										{ i18n.T(ctx, "Saving...") }
@@ -1038,12 +1030,12 @@ templ AgentsDialog() {
 						}
 					</div>
 				</template>
-				<!-- Delete Confirmation View (handles both agents and workflows) -->
+				<!-- Delete Confirmation View -->
 				<template x-if="view === 'delete'">
 					<div class="flex flex-col h-full">
 						@dialog.Header(dialog.HeaderProps{Class: "p-4 pb-3 border-b border-border"}) {
 							@dialog.Title() {
-								<span x-text="deletingWorkflow ? 'Delete Workflow' : 'Delete Agent'"></span>
+								{ i18n.T(ctx, "Delete Agent") }
 							}
 							@dialog.Description() {
 								{ i18n.T(ctx, "This action cannot be undone.") }
@@ -1055,7 +1047,7 @@ templ AgentsDialog() {
 							</div>
 							<p class="text-sm text-center text-foreground">
 								{ i18n.T(ctx, "Are you sure you want to delete") }
-								<span class="font-semibold" x-text="(deletingWorkflow?.name || deletingAgent?.name)"></span>?
+								<span class="font-semibold" x-text="deletingAgent?.name"></span>?
 							</p>
 						</div>
 						@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
@@ -1073,7 +1065,7 @@ templ AgentsDialog() {
 									Variant: button.VariantDestructive,
 									Class:   "h-8 px-4 text-xs gap-1.5",
 									Attributes: templ.Attributes{
-										"@click":    "deletingWorkflow ? deleteWorkflow() : deleteAgent()",
+										"@click":    "deleteAgent()",
 										":disabled": "saving",
 									},
 								}) {
