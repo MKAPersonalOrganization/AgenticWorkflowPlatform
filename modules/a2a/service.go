@@ -550,14 +550,17 @@ func (s *Service) CountSkillsByConnectors(ctx context.Context, ids []string) (ma
 	return s.repo.CountSkillsByConnectors(ctx, ids)
 }
 
-// ResolveEnabledTools returns executable tools from all connected A2A agents
-// for a given user, filtered by permission callbacks. This mirrors MCP's
-// ResolveEnabledTools pattern for agent wiring.
+// ResolveEnabledTools returns ONE executable tool per connected A2A agent.
+//
+// Unlike MCP (which exposes individual tools per server), an A2A agent is an
+// opaque peer — the correct granularity is one tool per agent, matching the
+// ADK-Go agenttool pattern. Enable/disable is at the agent level only;
+// hasToolPerm is accepted for interface symmetry but not used.
 func (s *Service) ResolveEnabledTools(
 	ctx context.Context,
 	userID string,
 	hasToolSetPerm func(toolSetID string) bool,
-	hasToolPerm func(toolSetID, toolID string) bool,
+	_ func(toolSetID, toolID string) bool, // unused — A2A agents are atomic
 ) []agent.ExecutableTool {
 	connectors, err := s.repo.ListByUser(ctx, userID)
 	if err != nil {
@@ -565,7 +568,7 @@ func (s *Service) ResolveEnabledTools(
 		return nil
 	}
 
-	// Collect connected connector IDs
+	// Collect connected, permitted connector IDs.
 	var connectedIDs []string
 	connectorMap := make(map[string]A2AConnector)
 	for _, c := range connectors {
@@ -584,23 +587,18 @@ func (s *Service) ResolveEnabledTools(
 		return nil
 	}
 
-	// Batch fetch skills
+	// Batch fetch skills — used for the tool description so the LLM knows
+	// the agent's capabilities, but they are NOT individual tools.
 	allSkills, err := s.repo.ListSkillsByConnectors(ctx, connectedIDs)
 	if err != nil {
 		s.log.Error(ctx, "a2a: failed to batch list skills", "error", err)
 		return nil
 	}
 
-	var tools []agent.ExecutableTool
+	tools := make([]agent.ExecutableTool, 0, len(connectedIDs))
 	for _, connID := range connectedIDs {
-		toolSetID := "a2a-" + connID
-		for _, skill := range allSkills[connID] {
-			toolID := "a2a-" + connID + "-" + skill.SkillID
-			if hasToolPerm != nil && !hasToolPerm(toolSetID, toolID) {
-				continue
-			}
-			tools = append(tools, NewA2ARemoteTool(s, connID, userID, skill))
-		}
+		c := connectorMap[connID]
+		tools = append(tools, NewA2ARemoteTool(s, c, userID, allSkills[connID]))
 	}
 
 	return tools
@@ -618,28 +616,34 @@ func (s *Service) registerConnectorInToolRegistry(connector *A2AConnector, skill
 	ctx := context.Background()
 	toolSetID := "a2a-" + connector.ID
 
-	// Register the tool set
-	ts := &toolregistry.ToolSet{
-		ID:          toolSetID,
-		Name:        connector.Title,
-		Description: "A2A Agent: " + connector.AgentURL,
-		Category:    "a2a",
+	// A2A agents are atomic — ONE tool set with ONE tool per agent.
+	name := connector.Title
+	if connector.AgentName != "" {
+		name = connector.AgentName
 	}
 
-	toolIDs := make([]string, 0, len(skills))
-	regTools := make([]*toolregistry.Tool, 0, len(skills))
-	for _, skill := range skills {
-		toolID := "a2a-" + connector.ID + "-" + skill.SkillID
-		toolIDs = append(toolIDs, toolID)
-		regTools = append(regTools, &toolregistry.Tool{
-			ID:          toolID,
-			Name:        skill.Name,
-			Description: skill.Description,
-			Category:    "a2a",
-			ToolSetID:   toolSetID,
-		})
+	toolID := toolSetID // single tool has same ID as the set
+
+	ts := &toolregistry.ToolSet{
+		ID:          toolSetID,
+		Name:        name,
+		Description: "A2A Agent: " + connector.AgentURL,
+		Category:    "a2a",
+		ToolIDs:     []string{toolID},
+		Metadata: map[string]string{
+			"type":      "a2a",
+			"agent_url": connector.AgentURL,
+			"user_id":   connector.UserID,
+		},
 	}
-	ts.ToolIDs = toolIDs
+
+	regTools := []*toolregistry.Tool{{
+		ID:          toolID,
+		Name:        name,
+		Description: connector.AgentDescription,
+		Category:    "a2a",
+		ToolSetID:   toolSetID,
+	}}
 
 	if err := s.toolRegistry.RegisterToolSet(ctx, ts); err != nil {
 		s.log.Error(ctx, "a2a: failed to register tool set", "error", err, "connector_id", connector.ID)

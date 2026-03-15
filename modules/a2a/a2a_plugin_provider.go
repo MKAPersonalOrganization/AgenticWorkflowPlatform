@@ -12,6 +12,9 @@ import (
 
 // A2APluginProvider wraps a connected A2A agent as a PluginProvider,
 // making it appear in the plugin sidebar alongside built-in plugins and MCP servers.
+//
+// Following the ADK-Go agenttool pattern, each A2A agent is ONE tool —
+// skills are metadata for the UI only, never individual tools.
 type A2APluginProvider struct {
 	connector        A2AConnector
 	discoveredSkills []A2ADiscoveredSkill
@@ -32,25 +35,24 @@ func (p *A2APluginProvider) ID() string {
 	return "a2a-" + p.connector.ID
 }
 
-// DefaultSets returns a single tool set containing all discovered skills.
-func (p *A2APluginProvider) DefaultSets() []toolregistry.ToolSet {
-	toolIDs := make([]string, len(p.discoveredSkills))
-	for i, s := range p.discoveredSkills {
-		toolIDs[i] = "a2a-" + p.connector.ID + "-" + s.SkillID
-	}
-
-	name := p.connector.Title
+func (p *A2APluginProvider) agentName() string {
 	if p.connector.AgentName != "" {
-		name = p.connector.AgentName
+		return p.connector.AgentName
 	}
+	return p.connector.Title
+}
+
+// DefaultSets returns a single tool set with a single tool (the agent itself).
+func (p *A2APluginProvider) DefaultSets() []toolregistry.ToolSet {
+	toolSetID := "a2a-" + p.connector.ID
 
 	return []toolregistry.ToolSet{
 		{
-			ID:          "a2a-" + p.connector.ID,
-			Name:        name,
-			Description: "Skills from A2A agent: " + p.connector.AgentURL,
+			ID:          toolSetID,
+			Name:        p.agentName(),
+			Description: "A2A Agent: " + p.connector.AgentURL,
 			Category:    "A2A",
-			ToolIDs:     toolIDs,
+			ToolIDs:     []string{toolSetID}, // one tool = the agent
 			Metadata: map[string]string{
 				"type":      "a2a",
 				"agent_url": p.connector.AgentURL,
@@ -60,34 +62,29 @@ func (p *A2APluginProvider) DefaultSets() []toolregistry.ToolSet {
 	}
 }
 
-// DefaultTools returns tool registry entries for each discovered skill.
+// DefaultTools returns a SINGLE tool representing the entire A2A agent.
 func (p *A2APluginProvider) DefaultTools() []toolregistry.Tool {
-	tools := make([]toolregistry.Tool, len(p.discoveredSkills))
-	for i, s := range p.discoveredSkills {
-		tools[i] = toolregistry.Tool{
-			ID:          "a2a-" + p.connector.ID + "-" + s.SkillID,
-			Name:        s.Name,
-			Description: s.Description,
+	toolSetID := "a2a-" + p.connector.ID
+	return []toolregistry.Tool{
+		{
+			ID:          toolSetID, // same as set — one tool per agent
+			Name:        p.agentName(),
+			Description: p.connector.AgentDescription,
 			Category:    "A2A",
-			ToolSetID:   "a2a-" + p.connector.ID,
+			ToolSetID:   toolSetID,
 			Metadata: map[string]string{
 				"a2a_connector_id": p.connector.ID,
 				"a2a_agent_url":    p.connector.AgentURL,
-				"skill_id":         s.SkillID,
-				"tags":             s.Tags,
 			},
-		}
+		},
 	}
-	return tools
 }
 
-// CreateExecutable creates an executable tool by delegating to the A2A service.
+// CreateExecutable creates the single agent-level executable tool.
 func (p *A2APluginProvider) CreateExecutable(_ context.Context, toolID string, _ toolregistry.FactoryDeps) (agent.ExecutableTool, error) {
-	for _, s := range p.discoveredSkills {
-		expectedID := "a2a-" + p.connector.ID + "-" + s.SkillID
-		if toolID == expectedID || toolID == s.SkillID {
-			return NewA2ARemoteTool(p.service, p.connector.ID, p.connector.UserID, s), nil
-		}
+	toolSetID := "a2a-" + p.connector.ID
+	if toolID == toolSetID {
+		return NewA2ARemoteTool(p.service, p.connector, p.connector.UserID, p.discoveredSkills), nil
 	}
 	return nil, nil
 }
@@ -103,24 +100,25 @@ func (p *A2APluginProvider) UIHandledTools() []string {
 }
 
 // ConnectorToPluginResponse converts an A2A connector into the plugin list format
-// expected by the tools dialog JS component.
+// expected by the tools dialog JS component. Skills are listed as informational
+// metadata only — they are NOT individual tools.
 func ConnectorToPluginResponse(connector A2AConnector, skills []A2ADiscoveredSkill) map[string]any {
 	name := connector.Title
 	if connector.AgentName != "" {
 		name = connector.AgentName
 	}
 
+	// Skills are exposed as informational display items in the UI,
+	// but the entire agent is ONE tool with enable/disable at agent level.
 	skillList := make([]map[string]any, len(skills))
 	for i, s := range skills {
 		var tags []string
 		json.Unmarshal([]byte(s.Tags), &tags) //nolint:errcheck
 
 		skillList[i] = map[string]any{
-			"id":          "a2a-" + connector.ID + "-" + s.SkillID,
+			"id":          s.SkillID,
 			"name":        s.Name,
 			"description": s.Description,
-			"category":    "A2A",
-			"enabled":     true,
 			"tags":        tags,
 		}
 	}
@@ -131,7 +129,7 @@ func ConnectorToPluginResponse(connector A2AConnector, skills []A2ADiscoveredSki
 		"description": "A2A Agent: " + connector.AgentURL,
 		"category":    "A2A",
 		"enabled":     connector.Status == ConnectorStatusConnected,
-		"tools":       skillList,
+		"skills":      skillList, // informational only — not tools
 		"metadata": map[string]any{
 			"type":              "a2a",
 			"agent_url":         connector.AgentURL,
