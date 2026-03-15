@@ -14,12 +14,14 @@ import (
 //   - examples/workflowagents/parallel/main.go         → Parallel Agent
 //   - examples/workflowagents/loop/main.go             → Loop Agent
 func workflowCatalog() []AgentCatalogEntry {
-	return []AgentCatalogEntry{
+	adk := []AgentCatalogEntry{
 		sequentialAgentEntry(),
 		codeGenerationPipelineEntry(),
 		parallelAgentEntry(),
 		loopAgentEntry(),
+		courseGenerationPipelineEntry(),
 	}
+	return append(adk, crewAICatalog()...)
 }
 
 // ─── Sequential Agent ────────────────────────────────────────────────────────
@@ -281,6 +283,202 @@ Always label your response with the current pass: "Pass 1:", "Pass 2:", "Pass 3:
 		[]string{"loop", "iterative", "max-iterations", "escalate", "adk-example"},
 		iconRefresh,
 		false,
+		subs,
+		graph,
+	)
+}
+
+// ─── Course Generation Pipeline ──────────────────────────────────────────────
+// Mirrors: examples/course-generator (CrewAI reference implementation)
+//
+// Four specialised LLM agents in a sequentialagent, mapping the CrewAI
+// Crew + Flow hybrid pattern onto ADK-Go's composition model.
+//
+// CrewAI concept             →  ADK-Go equivalent
+// ─────────────────────────────────────────────────────────────
+// Crew (sequential process)  →  sequentialagent.New()
+// Task context dependencies  →  OutputKey + {variable} templates
+// Agent role / backstory     →  Instruction (system prompt)
+// Flow state (Pydantic)      →  session.State via OutputKey
+// Flow quality router        →  loop node with exit_loop escalation
+//
+// Pipeline:
+//   CurriculumArchitect  → output_key: "curriculum_plan"
+//   ContentWriter        → reads {curriculum_plan}, output_key: "lesson_content"
+//   QuizMaster           → reads {curriculum_plan} + {lesson_content},
+//                           output_key: "temp:quiz_material"
+//   CodeReviewer         → reads {lesson_content} + {temp:quiz_material},
+//                           output_key: "review_report"
+
+func courseGenerationPipelineEntry() AgentCatalogEntry {
+	fence := "```"
+
+	subs := []CatalogSubAgent{
+		// ── 1. Curriculum Architect ──────────────────────────────────────
+		// CrewAI: curriculum_expert_agent (Instructional Designer)
+		// Produces structured learning plan that downstream agents consume.
+		{
+			ID:          "sub-curriculum-architect",
+			Name:        "CurriculumArchitect",
+			Description: "Analyses a topic and produces a structured curriculum plan with learning objectives, lesson outline, prerequisites, and suggested code examples.",
+			Icon:        iconGraduationCap,
+			SystemPrompt: `You are a Curriculum Architect — an expert Instructional Designer.
+
+Given a **topic** and **difficulty level** (beginner / intermediate / advanced) provided by the user, produce a structured curriculum plan in Markdown.
+
+**Your plan MUST include:**
+1. **Learning Objectives** — 3-5 clear, measurable outcomes (use Bloom's taxonomy verbs).
+2. **Prerequisites** — what the learner should already know.
+3. **Lesson Outline** — numbered sections with titles and one-sentence descriptions.
+4. **Suggested Code Examples** — for each section, list 1-2 code examples with a short description of what they demonstrate (simple → intermediate → advanced progression).
+5. **Estimated Duration** — total time and per-section breakdown.
+
+Output *only* the curriculum plan. Do not write the actual lesson content — that is the next agent's job.`,
+		},
+		// ── 2. Content Writer ─────────────────────────────────────────────
+		// CrewAI: content_writer_agent (Technical Writer)
+		// Reads {curriculum_plan} via OutputKey and writes the full lesson.
+		{
+			ID:          "sub-content-writer",
+			Name:        "ContentWriter",
+			Description: "Writes a complete Markdown lesson with 3+ code examples based on the curriculum plan. Reads {curriculum_plan} from session state.",
+			Icon:        iconPencilLine,
+			SystemPrompt: `You are a Content Writer — an expert Technical Writer.
+
+You receive a structured curriculum plan produced by the Curriculum Architect.
+
+**Curriculum Plan:**
+{curriculum_plan}
+
+**Your task:**
+Write a **complete, publication-ready lesson** in Markdown that follows the plan above.
+
+**Requirements:**
+- Follow the outline section-by-section. Do not skip or reorder.
+- Include **at least 3 working code examples** progressing from simple → intermediate → advanced.
+- Wrap each code example in fenced code blocks with the correct language tag.
+- Add practical tips, common pitfalls, and best-practice callouts where appropriate.
+- Use clear, accessible language appropriate for the stated difficulty level.
+- End with a concise **Summary** recapping the key takeaways.
+
+Output *only* the lesson in Markdown. Do not repeat the curriculum plan.`,
+		},
+		// ── 3. Quiz Master ────────────────────────────────────────────────
+		// CrewAI: quiz_creator_agent (Assessment Specialist)
+		// Reads {curriculum_plan} + {lesson_content}; produces assessment.
+		{
+			ID:          "sub-quiz-master",
+			Name:        "QuizMaster",
+			Description: "Creates 5 quiz questions and a hands-on exercise from the curriculum plan and lesson content. Reads {curriculum_plan} and {lesson_content}.",
+			Icon:        iconClipboardCheck,
+			SystemPrompt: `You are a Quiz Master — an expert Assessment Specialist.
+
+You receive two inputs produced by earlier agents:
+
+**Curriculum Plan:**
+{curriculum_plan}
+
+**Lesson Content:**
+{lesson_content}
+
+**Your task:**
+Create an **assessment section** in Markdown that tests the learner's understanding.
+
+**Requirements:**
+1. **5 Quiz Questions** — mix of:
+   - Multiple choice (at least 2)
+   - True / False (at least 1)
+   - "What's wrong with this code?" (at least 1 — include a code snippet with a subtle bug)
+   - Conceptual / short-answer (at least 1)
+2. **1 Hands-On Exercise** (15-30 minutes):
+   - Clear objective and acceptance criteria.
+   - Starter code scaffold in a fenced code block.
+   - A complete reference solution in a separate fenced code block (labelled "Solution").
+3. **Answer Key** — correct answers for all 5 quiz questions at the end.
+
+Output *only* the assessment material in Markdown. Do not repeat the lesson content.`,
+		},
+		// ── 4. Code Reviewer ───────────────────────────────────────────────
+		// CrewAI: quality_assurance_agent (Senior Engineer)
+		// Reads {lesson_content} + {temp:quiz_material}; validates all code.
+		{
+			ID:          "sub-code-reviewer-edu",
+			Name:        "CodeReviewer",
+			Description: "Reviews every code snippet in the lesson and quiz for correctness, best practices, and consistency. Reads {lesson_content} and {temp:quiz_material}.",
+			Icon:        iconSearchCode,
+			SystemPrompt: `You are a Code Reviewer — a Senior Software Engineer.
+
+You receive two inputs from earlier agents:
+
+**Lesson Content (with code examples):**
+{lesson_content}
+
+**Quiz & Exercise Material (with code snippets):**
+{temp:quiz_material}
+
+**Your task:**
+Review **every code snippet** across both inputs.
+
+**For each snippet, evaluate:**
+1. **Correctness** — Does it compile / run without errors? Logic bugs?
+2. **Best Practices** — Idiomatic style, proper error handling, naming conventions?
+3. **Consistency** — Do examples use compatible library versions and import styles?
+4. **Educational Value** — Does the code clearly demonstrate the concept it claims to?
+
+**Output format (Markdown):**
+
+` + fence + `
+## Code Review Report
+
+### Overall Assessment
+<Approved / Needs Changes>
+
+### Snippet Reviews
+For each snippet that needs attention:
+- **Location:** <section or question number>
+- **Issue:** <description>
+- **Suggested Fix:** <corrected code or guidance>
+
+### Final Verdict
+<"Production-ready" or "Needs revision" with summary>
+` + fence + `
+
+If all code is correct, state: "All code reviewed — production-ready. No issues found."
+Output *only* the review report.`,
+		},
+	}
+
+	// Sequential graph with OutputKey state passing — mirrors the CrewAI
+	// task context chain:
+	//   curriculum_task → content_task → quiz_task → review_task
+	//
+	// ADK-Go equivalent: each node's OutputKey saves its output into
+	// session.State; downstream nodes read it via {variable} in Instruction.
+	graph := map[string]interface{}{
+		"id":   "root",
+		"type": "sequential",
+		"children": []map[string]interface{}{
+			// CurriculumArchitect → saves plan for ContentWriter + QuizMaster.
+			{"id": "n1", "type": "agent", "agent_id": "sub-curriculum-architect", "output_key": "curriculum_plan"},
+			// ContentWriter → saves lesson for QuizMaster + CodeReviewer.
+			{"id": "n2", "type": "agent", "agent_id": "sub-content-writer", "output_key": "lesson_content"},
+			// QuizMaster → temp: prefix means state is discarded after pipeline.
+			{"id": "n3", "type": "agent", "agent_id": "sub-quiz-master", "output_key": "temp:quiz_material"},
+			// CodeReviewer → final output delivered to the user.
+			{"id": "n4", "type": "agent", "agent_id": "sub-code-reviewer-edu", "output_key": "review_report"},
+		},
+	}
+
+	return catalogWorkflowEntry(
+		"Course Generation Pipeline",
+		"Four-agent sequential pipeline that generates a complete course lesson. "+
+			"Mirrors the CrewAI course-generator example: CurriculumArchitect → ContentWriter → QuizMaster → CodeReviewer. "+
+			"Demonstrates ADK-Go's OutputKey → {variable} state passing across 4 agents in a sequentialagent.",
+		"Generate a structured course lesson with curriculum plan, written content, assessments, and code review.",
+		"Examples",
+		[]string{"sequential", "state-passing", "output-key", "education", "course", "crew-ai", "adk-example"},
+		iconBookOpen,
+		true,
 		subs,
 		graph,
 	)
