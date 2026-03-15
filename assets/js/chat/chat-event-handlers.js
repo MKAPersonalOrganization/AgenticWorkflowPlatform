@@ -441,12 +441,22 @@ export function createEventHandlerMethods() {
                 msgIndex = state.messages.length - 1;
             }
 
-            // Append directly to the message's content property
-            state.messages[msgIndex].content += event.delta;
-
             // Log very selectively (first few chars) to avoid log spam but confirm it's working
-            if (state.messages[msgIndex].content.length <= event.delta.length) {
+            if (!this.__tokenBuffer?.[resolvedId] && state.messages[msgIndex].content.length === 0) {
                 console.log(`[STREAM] First token for ${event.messageId}: "${event.delta}"`);
+            }
+
+            // Buffer delta into a plain (non-reactive) map — avoids triggering Alpine
+            // reactivity (and the full markdown render pipeline) on every single token.
+            // A single requestAnimationFrame flush caps re-renders at ~60fps.
+            if (!this.__tokenBuffer) this.__tokenBuffer = {};
+            this.__tokenBuffer[resolvedId] = (this.__tokenBuffer[resolvedId] || '') + event.delta;
+
+            if (!this.__tokenRafId) {
+                this.__tokenRafId = requestAnimationFrame(() => {
+                    this.__flushTokenBuffer(state);
+                    this.__tokenRafId = null;
+                });
             }
 
             if (threadId === this.__currentThreadId && !this.__abortScroll) {
@@ -458,15 +468,37 @@ export function createEventHandlerMethods() {
         },
 
         /**
+         * Flush buffered token deltas into Alpine reactive state.
+         * Called by the RAF callback and on TEXT_MESSAGE_END.
+         */
+        __flushTokenBuffer(state) {
+            if (!this.__tokenBuffer) return;
+            for (const [resolvedId, delta] of Object.entries(this.__tokenBuffer)) {
+                const idx = state.messages.findIndex(m => m.id === resolvedId);
+                if (idx !== -1) state.messages[idx].content += delta;
+            }
+            this.__tokenBuffer = {};
+        },
+
+        /**
          * Handle TEXT_MESSAGE_END event
          */
         __handleTextMessageEnd(event, state, threadId) {
             // Resolve coalesced parallel message ID
             const resolvedId = state.parallelCoalesceMap[event.messageId] || event.messageId;
             console.log(`[STREAM] TEXT_MESSAGE_END for messageId: ${event.messageId}${resolvedId !== event.messageId ? ` (coalesced → ${resolvedId})` : ''}`);
+
+            // Cancel any pending RAF and flush remaining buffered tokens.
+            // The KaTeX cache + output cache in renderMarkdown make this final
+            // render fast — most expressions are already cached from streaming.
+            if (this.__tokenRafId) {
+                cancelAnimationFrame(this.__tokenRafId);
+                this.__tokenRafId = null;
+            }
+            this.__flushTokenBuffer(state);
+
             const endMsgIndex = state.messages.findIndex(m => m.id === resolvedId);
             if (endMsgIndex !== -1) {
-                // Only mark as not-streaming if no other coalesced ID is still active
                 state.messages[endMsgIndex].streaming = false;
             }
 

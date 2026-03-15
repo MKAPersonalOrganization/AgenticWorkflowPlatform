@@ -5,7 +5,6 @@
  * Larger concerns have been extracted to focused modules:
  * - chat-toasts.js: Toast notification system
  * - chat-scroll.js: Scroll management
- * - chat-event-log.js: AG-UI event logging
  * - chat-input.js: Slash commands and file handling
  * - chat-profile.js: Profile and banner CRUD
  */
