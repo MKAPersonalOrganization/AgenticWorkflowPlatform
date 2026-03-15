@@ -581,7 +581,7 @@ templ agentNodeForm() {
 			},
 		})
 		<p class="text-[11px] text-muted-foreground">
-			{ i18n.T(ctx, "Maps to llmagent.Config.Instruction. In a Workflow Agent, use {output_key} to read session state set by upstream agents (e.g., {research_data} or {temp:review_comments}).") }
+			{ i18n.T(ctx, "→ llmagent.Config.Instruction. Supports {key} template syntax to inject session state (e.g., {research_data}). Append ? for optional keys: {var?}.") }
 		</p>
 	</div>
 	<!-- Multi-Agent Orchestration Section -->
@@ -593,7 +593,7 @@ templ agentNodeForm() {
 		>
 			<span class="flex items-center gap-2">
 				@icon.GitBranch(icon.Props{Class: "size-4 text-muted-foreground"})
-				{ i18n.T(ctx, "Orchestration Settings") }
+				{ i18n.T(ctx, "Multi-Agent & Schema Settings") }
 				<span class="text-[10px] text-muted-foreground" x-text="orchestrationSummary"></span>
 			</span>
 			<span class="transition-transform duration-200" :class="showOrchestration ? 'rotate-180' : ''">
@@ -602,7 +602,7 @@ templ agentNodeForm() {
 		</button>
 		<div x-show="showOrchestration" x-collapse class="px-3 pb-3 border-t border-border pt-3 space-y-4">
 			<p class="text-[11px] text-muted-foreground">
-				{ i18n.T(ctx, "Configure how this agent participates when composed in pipelines. Maps to ADK-Go llmagent.Config fields.") }
+				{ i18n.T(ctx, "These fields map directly to llmagent.Config in ADK-Go. They control how this agent behaves when composed in a Workflow Agent.") }
 			</p>
 			@orchestrationFields()
 		</div>
@@ -635,7 +635,7 @@ templ orchestrationFields() {
 			{ i18n.T(ctx, "Transfer Policy") }
 		</span>
 		<p class="text-[11px] text-muted-foreground">
-			{ i18n.T(ctx, "Maps to ADK-Go DisallowTransferToParent / DisallowTransferToPeers flags.") }
+			{ i18n.T(ctx, "→ llmagent.Config.DisallowTransferToParent / DisallowTransferToPeers") }
 		</p>
 		<div class="space-y-2 ps-1">
 			@toggleSwitch("form.disallowTransferToParent", i18n.T(ctx, "Block transfer to parent"), i18n.T(ctx, "Prevents this agent from escalating back to its parent."))
@@ -657,7 +657,7 @@ templ orchestrationFields() {
 			},
 		})
 		<p class="text-[10px] text-muted-foreground">
-			{ i18n.T(ctx, "Maps to ADK-Go OutputKey — stores this agent's output in session state for downstream agents.") }
+			{ i18n.T(ctx, "→ llmagent.Config.OutputKey — stores this agent's final text output in session state. Downstream agents reference it as {key} in their Instruction.") }
 		</p>
 	</div>
 	<!-- Include Contents / History Forwarding -->
@@ -685,7 +685,7 @@ templ orchestrationFields() {
 			</button>
 		</div>
 		<p class="text-[10px] text-muted-foreground">
-			{ i18n.T(ctx, "Maps to ADK-Go IncludeContents. 'Fresh Context' = IncludeContentsNone.") }
+			{ i18n.T(ctx, "→ llmagent.Config.IncludeContents. 'Fresh Context' = IncludeContentsNone (agent sees only current turn).") }
 		</p>
 	</div>
 	<!-- Global Instruction -->
@@ -703,7 +703,25 @@ templ orchestrationFields() {
 			},
 		})
 		<p class="text-[10px] text-muted-foreground">
-			{ i18n.T(ctx, "Maps to ADK-Go GlobalInstruction. Only effective when this agent is the root of a workflow.") }
+			{ i18n.T(ctx, "→ llmagent.Config.GlobalInstruction. Propagated to ALL agents in the tree. Only effective when this agent is the root.") }
+		</p>
+	</div>
+	<!-- Input Schema -->
+	<div class="space-y-2">
+		<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
+			@icon.Braces(icon.Props{Class: "size-3.5 text-muted-foreground"})
+			{ i18n.T(ctx, "Input Schema (JSON)") }
+		</span>
+		@textarea.Textarea(textarea.Props{
+			Placeholder: i18n.T(ctx, `{"type": "object", "properties": {"topic": {"type": "string"}}, "required": ["topic"]}`),
+			Class:       "min-h-[60px] resize-y font-mono text-[11px]",
+			Rows:        2,
+			Attributes: templ.Attributes{
+				"x-model": "form.inputSchema",
+			},
+		})
+		<p class="text-[10px] text-muted-foreground">
+			{ i18n.T(ctx, "→ llmagent.Config.InputSchema. Defines expected input when this agent is invoked as a tool (via agent transfer).") }
 		</p>
 	</div>
 	<!-- Output Schema -->
@@ -721,7 +739,7 @@ templ orchestrationFields() {
 			},
 		})
 		<p class="text-[10px] text-muted-foreground">
-			{ i18n.T(ctx, "Maps to ADK-Go GenerateContentConfig.ResponseSchema. Forces structured JSON output.") }
+			{ i18n.T(ctx, "→ llmagent.Config.OutputSchema (via GenerateContentConfig.ResponseSchema). Forces structured JSON output. When set, tool use is disabled.") }
 		</p>
 	</div>
 }
@@ -1085,22 +1103,22 @@ templ pipelineConfigForm() {
 		<div class="grid grid-cols-2 gap-1.5">
 			<div class="flex items-center gap-1.5">
 				<span class="size-2 rounded-full bg-blue-500"></span>
-				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Sequential — ordered steps") }</span>
+				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Sequential → sequentialagent.New") }</span>
 			</div>
 			<div class="flex items-center gap-1.5">
 				<span class="size-2 rounded-full bg-amber-500"></span>
-				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Parallel — concurrent branches") }</span>
+				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Parallel → parallelagent.New") }</span>
 			</div>
 			<div class="flex items-center gap-1.5">
 				<span class="size-2 rounded-full bg-purple-500"></span>
-				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Loop — repeat until exit") }</span>
+				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Loop → loopagent.New (exit_loop on last child)") }</span>
 			</div>
 			<div class="flex items-center gap-1.5">
 				<span class="size-2 rounded-full bg-emerald-500"></span>
-				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Agent — LLM Agent (leaf)") }</span>
+				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Agent → llmagent.New (leaf node)") }</span>
 			</div>
 			<div class="col-span-2 flex items-start gap-1.5 mt-0.5">
-				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "💡 Set OutputKey on each agent node, then reference it as {key} in downstream Instructions.") }</span>
+				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "💡 Set OutputKey on each agent, reference as {key} in downstream Instructions. Loop's last child auto-receives exit_loop tool.") }</span>
 			</div>
 		</div>
 	</div>

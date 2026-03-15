@@ -54,6 +54,7 @@ export const agentDesigner = () => ({
         outputKey: '',
         includeContents: '',
         globalInstruction: '',
+        inputSchema: '',
         outputSchema: '',
     },
 
@@ -210,6 +211,7 @@ export const agentDesigner = () => ({
             outputKey: '',
             includeContents: '',
             globalInstruction: '',
+            inputSchema: '',
             outputSchema: '',
         };
         this.showTools = false;
@@ -228,12 +230,13 @@ export const agentDesigner = () => ({
             name: agent.name || '',
             description: agent.description || '',
             systemPrompt: agent.systemPrompt || '',
-            graph: null, // Node mode = simple agent, no graph
+            graph: null, // Node mode = simple LLM agent, no composition graph
             disallowTransferToParent: agent.disallowTransferToParent || false,
             disallowTransferToPeers: agent.disallowTransferToPeers || false,
             outputKey: agent.outputKey || '',
             includeContents: agent.includeContents || '',
             globalInstruction: agent.globalInstruction || '',
+            inputSchema: agent.inputSchema || '',
             outputSchema: agent.outputSchema || '',
         };
         this.showTools = false;
@@ -256,12 +259,13 @@ export const agentDesigner = () => ({
                 name: this.form.name.trim(),
                 description: this.form.description.trim(),
                 systemPrompt: this.form.systemPrompt.trim(),
-                // Node mode → no graph (simple agent for ADK-Go llmagent)
+                // Node mode → no graph (simple LLM agent → llmagent.New)
                 disallowTransferToParent: this.form.disallowTransferToParent || false,
                 disallowTransferToPeers: this.form.disallowTransferToPeers || false,
                 outputKey: this.form.outputKey.trim(),
                 includeContents: this.form.includeContents || '',
                 globalInstruction: this.form.globalInstruction.trim(),
+                inputSchema: this.form.inputSchema.trim(),
                 outputSchema: this.form.outputSchema.trim(),
             };
 
@@ -359,7 +363,8 @@ export const agentDesigner = () => ({
         if (this.form.outputKey) flags.push('key:' + this.form.outputKey);
         if (this.form.includeContents === 'none') flags.push('fresh ctx');
         if (this.form.globalInstruction) flags.push('global');
-        if (this.form.outputSchema) flags.push('schema');
+        if (this.form.inputSchema) flags.push('in-schema');
+        if (this.form.outputSchema) flags.push('out-schema');
         return flags.length ? flags.join(' · ') : '';
     },
 
@@ -627,11 +632,14 @@ export const agentDesigner = () => ({
 
     /**
      * Create a new composition node.
-     * ADK-Go mapping:
-     *   - 'agent' → leaf node → llmagent.New(...)
-     *   - 'sequential' → sequentialagent.New({ SubAgents })
-     *   - 'parallel' → parallelagent.New({ SubAgents })
-     *   - 'loop' → loopagent.New({ SubAgents, MaxIterations })
+     *
+     * ADK-Go equivalence:
+     *   'agent'      → leaf node → llmagent.New(llmagent.Config{Name, Instruction, Tools, ...})
+     *   'sequential' → sequentialagent.New(sequentialagent.Config{AgentConfig: agent.Config{Name, SubAgents}})
+     *   'parallel'   → parallelagent.New(parallelagent.Config{AgentConfig: agent.Config{Name, SubAgents}})
+     *   'loop'       → loopagent.New(loopagent.Config{AgentConfig: agent.Config{Name, SubAgents}, MaxIterations})
+     *
+     * label → agent.Config.Name (for composite nodes, auto-generated if empty)
      */
     createNode(type) {
         const id = this._nextNodeId();
@@ -643,6 +651,7 @@ export const agentDesigner = () => ({
                 include_contents: '',
             };
         }
+        // Composite node — label maps to agent.Config.Name in ADK-Go
         const node = { id, type, label: '', children: [] };
         if (type === 'loop') { node.max_iterations = 3; }
         return node;
@@ -768,50 +777,63 @@ export const agentDesigner = () => ({
     // ══════════════════════════════════════════
 
     /**
-     * Validate the pipeline graph matches ADK-Go expectations:
-     * - Root must be a composite node (sequential/parallel/loop)
-     * - All agent leaf nodes must have agent_id set
-     * - Sequential/parallel/loop must have at least one child
-     * - Max 50 nodes
-     * - No cycles (tree structure enforced by design)
+     * Validate the workflow graph matches ADK-Go's composition model:
+     *
+     * - Root must be a composite node (sequential/parallel/loop) — workflow
+     *   agents are always orchestrators containing sub-agents.
+     * - All agent (leaf) nodes must reference an existing LLM Agent via agent_id.
+     * - Composite nodes (sequential/parallel/loop) must have ≥1 child.
+     * - Loop nodes must have max_iterations ≥ 1.
+     * - Max 50 nodes total (matches backend maxTreeNodes).
+     * - Max depth 5 (matches backend maxTreeDepth).
      */
     validatePipeline() {
         const errors = [];
         if (!this.pipelineGraph) {
-            errors.push('Pipeline must have a root node');
+            errors.push('Workflow Agent must have a root node');
             return errors;
         }
 
         if (!this.pipelineName.trim()) {
-            errors.push('Pipeline must have a name');
+            errors.push('Workflow Agent requires a name (→ maps to the root agent.Config.Name)');
         }
 
-        const walk = (node, path) => {
+        // Root must be composite — a workflow agent is a sequentialagent/parallelagent/loopagent
+        const rootType = this.pipelineGraph.type;
+        if (rootType === 'agent') {
+            errors.push('Root node must be Sequential, Parallel, or Loop (a Workflow Agent orchestrates sub-agents — use the LLM Agent tab for a single agent)');
+        }
+
+        const walk = (node, path, depth) => {
             if (!node) return;
-            const isComposite = ['sequential', 'parallel', 'loop'].includes(node.type);
+            const isComposite = node.type === 'sequential' || node.type === 'parallel' || node.type === 'loop';
 
             if (node.type === 'agent') {
                 if (!node.agent_id) {
-                    errors.push(`Node at ${path}: agent node requires an agent selection`);
+                    errors.push(`${path}: agent node requires an LLM Agent selection (→ resolves to llmagent.New)`);
                 }
             } else if (isComposite) {
                 if (!node.children || node.children.length === 0) {
-                    errors.push(`Node at ${path}: ${node.type} node requires at least one child`);
+                    errors.push(`${path}: ${node.type}agent requires at least one SubAgent`);
                 }
                 if (node.type === 'loop' && (!node.max_iterations || node.max_iterations < 1)) {
-                    errors.push(`Node at ${path}: loop must have max_iterations >= 1`);
+                    errors.push(`${path}: loopagent.Config.MaxIterations must be ≥ 1`);
                 }
+            }
+
+            if (depth > 5) {
+                errors.push(`${path}: tree exceeds maximum depth of 5`);
             }
 
             if (node.children) {
-                node.children.forEach((child, i) => walk(child, `${path}.${i}`));
+                node.children.forEach((child, i) => walk(child, `${path}.${i}`, depth + 1));
             }
         };
 
-        walk(this.pipelineGraph, 'graph');
+        walk(this.pipelineGraph, 'root', 1);
 
         if (this.countNodes(this.pipelineGraph) > 50) {
-            errors.push('Pipeline exceeds maximum of 50 nodes');
+            errors.push('Workflow tree exceeds maximum of 50 nodes');
         }
 
         return errors;
