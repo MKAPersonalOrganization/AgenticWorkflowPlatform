@@ -6,7 +6,8 @@
 export const agentsManager = () => ({
     // State
     view: 'list', // 'list' | 'form' | 'delete'
-    activeTab: 'my-agents', // 'my-agents' | 'store' | 'workflows'
+    activeTab: 'my-agents', // 'my-agents' | 'store'
+    formMode: 'agent', // 'agent' | 'workflow' — toggle inside the create/edit form
     agents: [],
     filteredAgents: [],
     loading: false,
@@ -84,10 +85,8 @@ export const agentsManager = () => ({
         if (this.storeEntries.length === 0) {
             await this.fetchCatalog();
         }
-        // Pre-fetch workflows in background
-        if (this.workflows.length === 0) {
-            this.fetchWorkflows();
-        }
+        // Fetch workflows to merge into agent list
+        await this.fetchWorkflows();
     },
 
     // ============================================
@@ -101,7 +100,7 @@ export const agentsManager = () => ({
             if (response.ok) {
                 const data = await response.json();
                 this.agents = data.agents || [];
-                this.applyFilter();
+                this.mergeAndFilter();
             }
         } catch (err) {
             console.error('Failed to fetch agents:', err);
@@ -123,17 +122,27 @@ export const agentsManager = () => ({
             }
         } catch (err) {
             console.error('Failed to search agents:', err);
-            this.applyFilter();
+            this.mergeAndFilter();
         }
     },
 
-    applyFilter() {
+    /** Merge single agents + workflows into one unified list, then apply the search filter. */
+    mergeAndFilter() {
+        // Build a combined list: regular agents + workflow entries (marked with _isWorkflow)
+        const agentList = [...this.agents];
+        const workflowItems = this.workflows.map(wf => ({
+            ...wf,
+            _isWorkflow: true,
+            createdAt: wf.created_at || wf.createdAt,
+        }));
+        const combined = [...agentList, ...workflowItems];
+
         let results;
         if (!this.searchQuery.trim()) {
-            results = [...this.agents];
+            results = combined;
         } else {
             const q = this.searchQuery.toLowerCase();
-            results = this.agents.filter(a =>
+            results = combined.filter(a =>
                 a.name.toLowerCase().includes(q) ||
                 (a.description && a.description.toLowerCase().includes(q))
             );
@@ -150,12 +159,18 @@ export const agentsManager = () => ({
         this.filteredAgents = results;
     },
 
+    applyFilter() {
+        this.mergeAndFilter();
+    },
+
     // ============================================
     // Form operations
     // ============================================
 
     showCreateForm() {
         this.editingAgent = null;
+        this.editingWorkflow = null;
+        this.formMode = 'agent';
         this.form = {
             name: '',
             description: '',
@@ -166,6 +181,17 @@ export const agentsManager = () => ({
             includeContents: '',
             globalInstruction: '',
             outputSchema: '',
+        };
+        this._nodeCounter = 1;
+        this.workflowForm = {
+            name: '',
+            description: '',
+            graph: {
+                id: 'node-1',
+                type: 'sequential',
+                label: '',
+                children: [this.createNode('agent')],
+            },
         };
         this.showTools = false;
         this.showKnowledgeBases = false;
@@ -179,6 +205,8 @@ export const agentsManager = () => ({
 
     showEditForm(agent) {
         this.editingAgent = agent;
+        this.editingWorkflow = null;
+        this.formMode = 'agent';
         this.form = {
             name: agent.name || '',
             description: agent.description || '',
@@ -264,6 +292,7 @@ export const agentsManager = () => ({
 
     confirmDelete(agent) {
         this.deletingAgent = agent;
+        this.deletingWorkflow = null;
         this.view = 'delete';
     },
 
@@ -464,9 +493,6 @@ export const agentsManager = () => ({
         if (tab === 'store' && this.storeEntries.length === 0) {
             this.fetchCatalog();
         }
-        if (tab === 'workflows' && this.workflows.length === 0) {
-            this.fetchWorkflows();
-        }
     },
 
     async fetchCatalog() {
@@ -589,6 +615,7 @@ export const agentsManager = () => ({
                 const data = await response.json();
                 this.workflows = data.workflows || [];
                 this.filterWorkflows();
+                this.mergeAndFilter(); // re-merge into the unified agent list
             }
         } catch (err) {
             console.error('Failed to fetch workflows:', err);
@@ -752,7 +779,9 @@ export const agentsManager = () => ({
     },
 
     showCreateWorkflowForm() {
+        this.editingAgent = null;
         this.editingWorkflow = null;
+        this.formMode = 'workflow';
         this._nodeCounter = 1;
         this.workflowForm = {
             name: '',
@@ -764,11 +793,24 @@ export const agentsManager = () => ({
                 children: [this.createNode('agent')],
             },
         };
-        this.view = 'workflow-form';
+        this.form = {
+            name: '',
+            description: '',
+            systemPrompt: '',
+            disallowTransferToParent: false,
+            disallowTransferToPeers: false,
+            outputKey: '',
+            includeContents: '',
+            globalInstruction: '',
+            outputSchema: '',
+        };
+        this.view = 'form';
     },
 
     showEditWorkflowForm(wf) {
         this.editingWorkflow = wf;
+        this.editingAgent = wf; // treat as editing so toggle is hidden
+        this.formMode = 'workflow';
         // Find the max node counter to avoid ID collisions.
         let maxId = 0;
         const walk = (n) => {
@@ -791,7 +833,7 @@ export const agentsManager = () => ({
                 children: [this.createNode('agent')],
             },
         };
-        this.view = 'workflow-form';
+        this.view = 'form';
     },
 
     async saveWorkflow() {
@@ -822,8 +864,8 @@ export const agentsManager = () => ({
 
             if (response.ok) {
                 await this.fetchWorkflows();
+                await this.fetchAgents();
                 this.view = 'list';
-                this.activeTab = 'workflows';
             } else {
                 const err = await response.json().catch(() => ({}));
                 console.error('Failed to save workflow:', err);
@@ -839,7 +881,8 @@ export const agentsManager = () => ({
 
     confirmDeleteWorkflow(wf) {
         this.deletingWorkflow = wf;
-        this.view = 'workflow-delete';
+        this.deletingAgent = null;
+        this.view = 'delete';
     },
 
     async deleteWorkflow() {
@@ -851,8 +894,8 @@ export const agentsManager = () => ({
             });
             if (response.ok || response.status === 204) {
                 await this.fetchWorkflows();
+                await this.fetchAgents();
                 this.view = 'list';
-                this.activeTab = 'workflows';
             } else {
                 const err = await response.json().catch(() => ({}));
                 console.error('Failed to delete workflow:', err);

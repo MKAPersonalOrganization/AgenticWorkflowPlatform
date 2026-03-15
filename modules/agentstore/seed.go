@@ -52,10 +52,26 @@ var (
 	iconGamepad   = svg(`<line x1="6" x2="10" y1="12" y2="12"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="15" x2="15.01" y1="13" y2="13"/><line x1="18" x2="18.01" y1="11" y2="11"/><rect width="20" height="12" x="2" y="6" rx="2"/>`)
 	iconBrain     = svg(`<path d="M12 18V5"/><path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4"/><path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5"/><path d="M17.997 5.125a4 4 0 0 1 2.526 5.77"/><path d="M18 18a4 4 0 0 0 2-7.464"/><path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517"/><path d="M6 18a4 4 0 0 1-2-7.464"/><path d="M6.003 5.125a4 4 0 0 0-2.526 5.77"/>`)
 	iconMusic     = svg(`<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>`)
+
+	// Workflow icons
+	iconWorkflow = svg(`<circle cx="12" cy="12" r="3"/><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="m15 9-3 3-3-3"/>`)
+	iconPipeline = svg(`<path d="M12 3v18"/><path d="M18 9H6"/><path d="M18 15H6"/>`)
 )
 
 // SeedCatalog returns the initial 30 agents for the agent store catalog.
 func seedCatalog() []AgentCatalogEntry {
+	single := singleAgentCatalog()
+	workflows := workflowCatalog()
+	// Assign deterministic IDs to single-agent entries that don't have one.
+	for i := range single {
+		if single[i].ID == "" {
+			single[i].ID = deterministicID("catalog-single:" + single[i].Name)
+		}
+	}
+	return append(single, workflows...)
+}
+
+func singleAgentCatalog() []AgentCatalogEntry {
 	return []AgentCatalogEntry{
 		// ── Learning & Development ──
 		{Name: "Study Planner", Description: "Creates personalized study schedules and learning roadmaps based on your goals, deadlines, and learning style.", Category: "Learning", Tags: []string{"study", "planning", "productivity"}, AuthorName: "AI Platform", Icon: iconNotebookPen, Featured: true, SystemPrompt: "You are an expert planner. Help users create structured, realistic study and learning plans. Ask about their topics, deadlines, available hours, and preferences. Break goals into daily/weekly tasks. Use spaced repetition principles. Always be encouraging and adapt to their pace."},

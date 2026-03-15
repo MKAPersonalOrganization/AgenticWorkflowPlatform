@@ -1,6 +1,7 @@
 package agentstore
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -9,11 +10,23 @@ import (
 	"school-with-ai/shared"
 )
 
+// WorkflowForker is a callback interface that allows the catalog handler to
+// create workflow definitions without importing the multiagent module directly.
+// The composition root (main.go / agentstore module) wires this up.
+type WorkflowForker interface {
+	// ForkCatalogWorkflow creates sub-agents and a workflow definition for the user.
+	// graphJSON is the WorkflowNode tree (with placeholder agent IDs).
+	// subAgentsJSON is the []CatalogSubAgent definitions for those placeholders.
+	// Returns the workflow definition ID.
+	ForkCatalogWorkflow(ctx context.Context, userID, catalogID, name, description, icon, graphJSON, subAgentsJSON string) (string, error)
+}
+
 // catalogHandler encapsulates HTTP handlers for the shared agent catalog.
 type catalogHandler struct {
-	log       *logger.Logger
-	catalog   AgentCatalogRepository
-	agentRepo AgentDefinitionRepository
+	log            *logger.Logger
+	catalog        AgentCatalogRepository
+	agentRepo      AgentDefinitionRepository
+	workflowForker WorkflowForker // nil if workflow forking is not available
 }
 
 func newCatalogHandler(log *logger.Logger, catalog AgentCatalogRepository, agentRepo AgentDefinitionRepository) *catalogHandler {
@@ -31,6 +44,7 @@ type catalogEntryResponse struct {
 	Icon        string   `json:"icon"`
 	Featured    bool     `json:"featured"`
 	AddCount    int64    `json:"addCount"`
+	IsWorkflow  bool     `json:"isWorkflow"`
 }
 
 // catalogListResponse is the response for listing/searching catalog entries.
@@ -56,6 +70,7 @@ func toCatalogResponse(e *AgentCatalogEntry) catalogEntryResponse {
 		Icon:        e.Icon,
 		Featured:    e.Featured,
 		AddCount:    e.AddCount,
+		IsWorkflow:  e.IsWorkflow(),
 	}
 }
 
@@ -190,6 +205,45 @@ func (h *catalogHandler) addToMyAgents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ── Workflow catalog entry: fork as a multi-agent workflow ──
+	if entry.IsWorkflow() && h.workflowForker != nil {
+		wfID, forkErr := h.workflowForker.ForkCatalogWorkflow(
+			r.Context(), user.ID, catalogID,
+			entry.Name, entry.Description, entry.Icon,
+			entry.WorkflowGraphJSON, entry.SubAgentsJSON,
+		)
+		if forkErr != nil {
+			h.log.Error(r.Context(), "failed to fork catalog workflow", "error", forkErr, "catalogID", catalogID)
+			http.Error(w, "Failed to add workflow", http.StatusInternalServerError)
+			return
+		}
+
+		// Also create a tracking agent entry so ExistsByCatalogID works for de-duplication.
+		trackingAgent := &AgentDefinition{
+			UserID:          user.ID,
+			Name:            entry.Name,
+			Description:     entry.Description,
+			SystemPrompt:    entry.SystemPrompt,
+			Icon:            entry.Icon,
+			SourceCatalogID: catalogID,
+			WorkflowID:      wfID,
+		}
+		_ = h.agentRepo.Create(r.Context(), trackingAgent)
+
+		_ = h.catalog.IncrementAddCount(r.Context(), catalogID)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]string{
+			"id":     wfID,
+			"name":   entry.Name,
+			"status": "added",
+			"type":   "workflow",
+		})
+		return
+	}
+
+	// ── Single agent catalog entry: fork as before ──
 	agent := &AgentDefinition{
 		UserID:          user.ID,
 		Name:            entry.Name,

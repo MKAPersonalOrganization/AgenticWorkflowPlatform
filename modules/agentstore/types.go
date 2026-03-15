@@ -23,6 +23,11 @@ type AgentDefinition struct {
 	Icon            string `json:"icon" db:"icon"`
 	SourceCatalogID string `json:"source_catalog_id,omitempty" db:"source_catalog_id"`
 
+	// WorkflowID links this agent to a workflow definition.
+	// Sub-agents created when forking a workflow catalog entry have this set
+	// to the parent workflow's ID, which hides them from the main agent list.
+	WorkflowID string `json:"workflow_id,omitempty" db:"workflow_id"`
+
 	// ── Multi-Agent Orchestration ──
 
 	// DisallowTransferToParent prevents delegation back to the parent agent.

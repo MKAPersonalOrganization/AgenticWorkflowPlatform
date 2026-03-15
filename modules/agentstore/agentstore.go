@@ -83,6 +83,13 @@ func (m *Module) SeedCatalog(ctx context.Context) error {
 	return m.catalogRepo.Seed(ctx, entries)
 }
 
+// SetWorkflowForker wires the workflow forking capability into the catalog
+// handler. Called after the multiagent module is constructed to avoid
+// circular dependencies during init.
+func (m *Module) SetWorkflowForker(forker WorkflowForker) {
+	m.catalogHandler.workflowForker = forker
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Cross-module accessors
 // ─────────────────────────────────────────────────────────────────────────────
