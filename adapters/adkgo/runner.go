@@ -176,6 +176,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 
 		// 9. Build the ADK-Go agent — either a workflow agent or a regular LLM agent.
 		var adkAgent agent.Agent
+		var agentPositions map[string]AgentPosition
 
 		if wa, isWF := isWorkflowAgent(foundAgent); isWF {
 			// ── Workflow Agent Path ──
@@ -190,7 +191,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 				req:      req,
 			}
 			var wErr error
-			adkAgent, wErr = buildWorkflowAgent(wbc, wa)
+			adkAgent, agentPositions, wErr = buildWorkflowAgent(wbc, wa)
 			if wErr != nil {
 				yield(nil, fmt.Errorf("building workflow agent: %w", wErr))
 				return
@@ -323,6 +324,19 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 		var streamingMsgID string
 		assistantMsgID := generateID()
 
+		// Track the current active agent so we can detect transitions.
+		// ADK-Go sets session.Event.Author to the name of the agent that
+		// produced the event. In workflow execution, this changes as control
+		// passes between sub-agents (e.g., from "researcher" to "fact-checker"
+		// in a sequential pipeline). We emit AgentTransferStarted when the
+		// author changes and update evtCtx.AgentName so all subsequent domain
+		// events carry the correct agent attribution.
+		currentAuthor := agentName
+
+		// Track loop iterations so we can report which iteration the UI
+		// should display. Key = parent loop agent name, value = current iteration.
+		loopIterations := map[string]int{}
+
 		for adkEvt, adkErr := range adkRunner.Run(ctx, req.UserID, sess.ID(), userMsg, agent.RunConfig{
 			StreamingMode: agent.StreamingModeSSE,
 		}) {
@@ -342,6 +356,68 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 					return
 				}
 				continue
+			}
+
+			// ── Agent transition detection ──
+			// ADK-Go sets Author to the name of the sub-agent that produced
+			// the event. When it differs from the last known author, we know
+			// control has transferred to a different agent in the workflow.
+			// We skip "user" authors (those are user-originated function
+			// responses, not agent transitions).
+			if adkEvt.Author != "" && adkEvt.Author != "user" && adkEvt.Author != currentAuthor {
+				// Close any in-progress streaming message before the transfer
+				// so the UI properly ends the previous agent's message.
+				if streamingMsgID != "" {
+					if !yield(&thread.AssistantMessageCompleted{
+						ThreadID:  evtCtx.ThreadID,
+						MessageID: streamingMsgID,
+						Timestamp: time.Now(),
+					}, nil) {
+						return
+					}
+					streamingMsgID = ""
+				}
+
+				// Always generate a fresh message ID for the new agent so
+				// each agent's response is a separate message bubble in
+				// the UI — even if the previous agent's stream already
+				// completed naturally before the transfer event arrived.
+				assistantMsgID = generateID()
+
+				fromAgent := currentAuthor
+				currentAuthor = adkEvt.Author
+				evtCtx.AgentName = currentAuthor
+
+				// Build the transfer event, enriched with workflow position
+				// context when available.
+				transferEvt := &thread.AgentTransferStarted{
+					ThreadID:  evtCtx.ThreadID,
+					FromAgent: fromAgent,
+					ToAgent:   currentAuthor,
+					Timestamp: time.Now(),
+				}
+				if pos, ok := agentPositions[currentAuthor]; ok {
+					transferEvt.WorkflowType = pos.WorkflowType
+					transferEvt.ParentAgent = pos.ParentName
+					transferEvt.StepIndex = pos.StepIndex
+					transferEvt.StepCount = pos.StepCount
+					transferEvt.MaxIterations = pos.MaxIterations
+
+					// Track loop iterations: when we see stepIndex==0 again
+					// within the same loop parent, a new iteration started.
+					if pos.WorkflowType == "loop" {
+						if _, seen := loopIterations[pos.ParentName]; !seen {
+							loopIterations[pos.ParentName] = 1
+						} else if pos.StepIndex == 0 {
+							loopIterations[pos.ParentName]++
+						}
+						transferEvt.Iteration = loopIterations[pos.ParentName]
+					}
+				}
+
+				if !yield(transferEvt, nil) {
+					return
+				}
 			}
 
 			domainEvents := TranslateEvent(adkEvt, evtCtx)

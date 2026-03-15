@@ -152,6 +152,31 @@ func (e *ToolContentStreamed) EventType() string         { return "ToolContentSt
 func (e *ToolContentStreamed) EventTimestamp() time.Time { return e.Timestamp }
 func (e *ToolContentStreamed) AggregateID() string       { return e.ThreadID }
 
+// AgentTransferStarted is emitted when a workflow agent transfers control
+// to a different sub-agent. This is a transient event — NOT persisted to the
+// event store — used to update the UI with the currently active agent name
+// and workflow structure context (step position, branch, iteration).
+type AgentTransferStarted struct {
+	ThreadID  string `json:"threadId"`
+	FromAgent string `json:"fromAgent"`
+	ToAgent   string `json:"toAgent"`
+
+	// Workflow structure context — populated when the agent is part of a
+	// workflow tree so the UI can render step/branch/iteration indicators.
+	WorkflowType  string `json:"workflowType,omitempty"`  // "sequential", "parallel", "loop"
+	ParentAgent   string `json:"parentAgent,omitempty"`   // Name of the parent composite agent
+	StepIndex     int    `json:"stepIndex,omitempty"`     // 0-based position among siblings
+	StepCount     int    `json:"stepCount,omitempty"`     // Total sibling count
+	Iteration     int    `json:"iteration,omitempty"`     // 1-based loop iteration
+	MaxIterations int    `json:"maxIterations,omitempty"` // Loop max iterations
+
+	Timestamp time.Time `json:"timestamp"`
+}
+
+func (e *AgentTransferStarted) EventType() string         { return "AgentTransferStarted" }
+func (e *AgentTransferStarted) EventTimestamp() time.Time { return e.Timestamp }
+func (e *AgentTransferStarted) AggregateID() string       { return e.ThreadID }
+
 // ThreadDeleted is emitted when a thread is deleted.
 type ThreadDeleted struct {
 	ThreadID  string    `json:"threadId"`

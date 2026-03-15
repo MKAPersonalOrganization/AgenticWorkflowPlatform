@@ -168,6 +168,23 @@ func toAguiEventsInternal(event any) []any {
 			}),
 		)}
 
+	case *thread.AgentTransferStarted:
+		return []any{aguievents.NewCustomEvent(
+			"AGENT_TRANSFER_STARTED",
+			aguievents.WithValue(map[string]any{
+				"threadId":      evt.ThreadID,
+				"fromAgent":     evt.FromAgent,
+				"toAgent":       evt.ToAgent,
+				"workflowType":  evt.WorkflowType,
+				"parentAgent":   evt.ParentAgent,
+				"stepIndex":     evt.StepIndex,
+				"stepCount":     evt.StepCount,
+				"iteration":     evt.Iteration,
+				"maxIterations": evt.MaxIterations,
+				"timestamp":     evt.Timestamp,
+			}),
+		)}
+
 	case *thread.UserMessageAdded, *thread.AssistantMessageAdded, *thread.ThreadCreated:
 		// These are handled by the frontend locally or via snapshots, no need to stream
 		return []any{}
