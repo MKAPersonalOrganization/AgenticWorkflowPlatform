@@ -452,6 +452,9 @@ export function createEventHandlerMethods() {
             if (threadId === this.__currentThreadId && !this.__abortScroll) {
                 this.__scrollToBottomThrottled();
             }
+
+            // Drive the navbar brand logo rotation — 1° per token
+            window.dispatchEvent(new CustomEvent('ai-token'));
         },
 
         /**
