@@ -1,4 +1,4 @@
-package tool
+package toolreqs
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPostgresPermissionsRepository(t *testing.T) {
+func TestPostgresRepository(t *testing.T) {
 	host := os.Getenv("APP_DB_HOST")
 	if host == "" {
 		host = "localhost:5435"
@@ -43,7 +43,7 @@ func TestPostgresPermissionsRepository(t *testing.T) {
 		t.Skipf("DB not reachable, skipping integration test: %v", err)
 	}
 
-	repo := NewPostgresPermissionsRepository(db)
+	repo := NewPostgresRepository(db)
 	ctx := context.Background()
 
 	db.Exec("DELETE FROM agent_tool_permissions")

@@ -41,7 +41,7 @@ type RunnerAdapter struct {
 	configResolver         ModelConfigResolver
 	pluginSettingsResolver PluginSettingsResolver
 	profileProvider        UserContextProvider
-	permChecker            ToolPermissionChecker
+	toolReqs               ToolRequirementsService
 	mcpResolver            MCPToolResolver
 	a2aResolver            A2AToolResolver
 	newToolSetFactory      NewToolSetFactoryFunc
@@ -57,7 +57,7 @@ type RunnerAdapterConfig struct {
 	ConfigResolver         ModelConfigResolver
 	PluginSettingsResolver PluginSettingsResolver
 	ProfileProvider        UserContextProvider
-	PermChecker            ToolPermissionChecker
+	ToolReqs               ToolRequirementsService
 	MCPResolver            MCPToolResolver
 	A2AResolver            A2AToolResolver
 	NewToolSetFactory      NewToolSetFactoryFunc
@@ -77,7 +77,7 @@ func NewRunnerAdapter(cfg RunnerAdapterConfig) (*RunnerAdapter, error) {
 		configResolver:         cfg.ConfigResolver,
 		pluginSettingsResolver: cfg.PluginSettingsResolver,
 		profileProvider:        cfg.ProfileProvider,
-		permChecker:            cfg.PermChecker,
+		toolReqs:               cfg.ToolReqs,
 		mcpResolver:            cfg.MCPResolver,
 		a2aResolver:            cfg.A2AResolver,
 		newToolSetFactory:      cfg.NewToolSetFactory,
@@ -226,9 +226,17 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			genCfg := buildGenerateContentConfig(modelCfg)
 
 			// Bridge foundation function middlewares into ADK-Go's tool lifecycle.
+			// Inject confirmation middleware from the tool requirements service.
+			var extraMWs []fagent.Middleware
+			if r.toolReqs != nil {
+				if cmw := r.toolReqs.ConfirmationMiddleware(agentName); cmw != nil {
+					extraMWs = append(extraMWs, cmw)
+				}
+			}
+
 			var beforeToolCBs []llmagent.BeforeToolCallback
 			var afterToolCBs []llmagent.AfterToolCallback
-			if mb := newMiddlewareBridge(agentCfg, agentName, req.SessionID, req.UserID); mb != nil {
+			if mb := newMiddlewareBridge(agentCfg, agentName, req.SessionID, req.UserID, extraMWs...); mb != nil {
 				beforeToolCBs = mb.beforeToolCallbacks()
 				afterToolCBs = mb.afterToolCallbacks()
 			}
@@ -596,9 +604,9 @@ func (r *RunnerAdapter) resolveTools(
 		})
 	}
 
-	// 4. Get enabled tool sets from permissions.
-	if r.permChecker != nil && toolFactory != nil {
-		enabledToolSetIDs, err := r.permChecker.GetEnabledToolSets(ctx, userID, agentName)
+	// 4. Get enabled tool sets via the tool requirements service.
+	if r.toolReqs != nil && toolFactory != nil {
+		enabledToolSetIDs, err := r.toolReqs.GetEnabledToolSets(ctx, userID, agentName)
 		if err != nil {
 			enabledToolSetIDs = []string{}
 		}
@@ -621,10 +629,10 @@ func (r *RunnerAdapter) resolveTools(
 		if r.mcpResolver != nil && userID != "" {
 			mcpTools := r.mcpResolver.ResolveEnabledTools(ctx, userID,
 				func(toolSetID string) bool {
-					return r.permChecker.HasToolSetPermission(ctx, userID, agentName, toolSetID)
+					return r.toolReqs.HasToolSetPermission(ctx, userID, agentName, toolSetID)
 				},
 				func(toolSetID, toolID string) bool {
-					return r.permChecker.HasPermission(ctx, userID, agentName, toolSetID, toolID)
+					return r.toolReqs.HasPermission(ctx, userID, agentName, toolSetID, toolID)
 				},
 			)
 			execTools = append(execTools, mcpTools...)
@@ -634,10 +642,10 @@ func (r *RunnerAdapter) resolveTools(
 		if r.a2aResolver != nil && userID != "" {
 			a2aTools := r.a2aResolver.ResolveEnabledTools(ctx, userID,
 				func(toolSetID string) bool {
-					return r.permChecker.HasToolSetPermission(ctx, userID, agentName, toolSetID)
+					return r.toolReqs.HasToolSetPermission(ctx, userID, agentName, toolSetID)
 				},
 				func(toolSetID, toolID string) bool {
-					return r.permChecker.HasPermission(ctx, userID, agentName, toolSetID, toolID)
+					return r.toolReqs.HasPermission(ctx, userID, agentName, toolSetID, toolID)
 				},
 			)
 			execTools = append(execTools, a2aTools...)
@@ -878,17 +886,24 @@ type middlewareBridge struct {
 // newMiddlewareBridge collects all function middlewares from the agent config
 // (both explicit and requirement-provided) and returns a bridge, or nil if
 // there are no middlewares to run.
-func newMiddlewareBridge(agentCfg *fagent.Config, agentName, sessionID, userID string) *middlewareBridge {
-	if agentCfg == nil {
-		return nil
-	}
-
+//
+// Additional middlewares (e.g., from the toolreqs confirmation system) can be
+// prepended via the extraMiddlewares parameter.
+func newMiddlewareBridge(agentCfg *fagent.Config, agentName, sessionID, userID string, extraMiddlewares ...fagent.Middleware) *middlewareBridge {
 	var mws []fagent.Middleware
-	mws = append(mws, agentCfg.FunctionMiddlewares...)
 
-	for _, req := range agentCfg.Requirements {
-		if fmp, ok := req.(fagent.FunctionMiddlewareProvider); ok {
-			mws = append(mws, fmp.FunctionMiddleware())
+	// 1. Extra middlewares (e.g., toolreqs confirmation) run first.
+	mws = append(mws, extraMiddlewares...)
+
+	if agentCfg != nil {
+		// 2. Explicit function middlewares from agent config.
+		mws = append(mws, agentCfg.FunctionMiddlewares...)
+
+		// 3. Requirement-provided middlewares.
+		for _, req := range agentCfg.Requirements {
+			if fmp, ok := req.(fagent.FunctionMiddlewareProvider); ok {
+				mws = append(mws, fmp.FunctionMiddleware())
+			}
 		}
 	}
 

@@ -1,4 +1,4 @@
-package tool_test
+package toolreqs_test
 
 import (
 	"context"
@@ -6,26 +6,31 @@ import (
 	"testing"
 
 	"school-with-ai/foundation/logger"
-	"school-with-ai/modules/permissions/tool"
-	"school-with-ai/modules/permissions/tool/mocks"
+	"school-with-ai/modules/toolreqs"
+	"school-with-ai/modules/toolreqs/mocks"
 
 	"github.com/alicebob/miniredis/v2"
 	goredis "github.com/redis/go-redis/v9"
 )
 
-func testRedisClient(t *testing.T) *goredis.Client {
+func testRedisClient(t *testing.T) goredis.Cmdable {
 	t.Helper()
 	s := miniredis.RunT(t)
 	return goredis.NewClient(&goredis.Options{Addr: s.Addr()})
 }
 
-func TestToolSetPermissionsService(t *testing.T) {
-	// Create logger for tests
+func testService(t *testing.T) *toolreqs.Service {
+	t.Helper()
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
+	return toolreqs.NewService(toolreqs.ServiceConfig{
+		Log:  log,
+		Repo: mocks.NewInMemoryRepository(),
+		RDB:  testRedisClient(t),
+	})
+}
 
-	// Create service with in-memory repository
-	service := tool.NewService(log, mocks.NewInMemoryRepository(), testRedisClient(t))
-
+func TestToolSetPermissionsService(t *testing.T) {
+	service := testService(t)
 	ctx := context.Background()
 
 	userID := "test-user"
@@ -64,8 +69,7 @@ func TestToolSetPermissionsService(t *testing.T) {
 }
 
 func TestToolSetDisabling(t *testing.T) {
-	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
-	service := tool.NewService(log, mocks.NewInMemoryRepository(), testRedisClient(t))
+	service := testService(t)
 	ctx := context.Background()
 
 	userID := "test-user"
@@ -102,8 +106,7 @@ func TestToolSetDisabling(t *testing.T) {
 }
 
 func TestDefaultToolSets(t *testing.T) {
-	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
-	service := tool.NewService(log, mocks.NewInMemoryRepository(), testRedisClient(t))
+	service := testService(t)
 	ctx := context.Background()
 
 	userID := "test-user"

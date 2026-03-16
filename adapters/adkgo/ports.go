@@ -68,11 +68,21 @@ type NewToolSetFactoryFunc func(cfg ToolFactoryConfig) ToolSetFactory
 // tool-specific settings (API keys, service URLs, etc.).
 type ExtraConfigFunc func(ctx context.Context, userID, agentName string) map[string]string
 
-// ToolPermissionChecker provides per-user, per-agent tool access control.
-type ToolPermissionChecker interface {
+// ToolRequirementsService is the exclusive authority for all tool access
+// decisions. It unifies permission checks, user confirmation, and any future
+// requirement types into a single evaluation pipeline.
+//
+// The adapter uses this for:
+//   - Tool resolution: GetEnabledToolSets, HasToolSetPermission, HasPermission
+//   - Confirmation: ConfirmationMiddleware (injected into the tool execution chain)
+type ToolRequirementsService interface {
 	GetEnabledToolSets(ctx context.Context, userID, agentName string) ([]string, error)
 	HasToolSetPermission(ctx context.Context, userID, agentName, toolSetID string) bool
 	HasPermission(ctx context.Context, userID, agentName, toolSetID, toolID string) bool
+
+	// ConfirmationMiddleware returns middleware enforcing user confirmation
+	// for the given agent.
+	ConfirmationMiddleware(agentID string) agent.Middleware
 }
 
 // MCPToolResolver resolves MCP-based tools for a user.
