@@ -38,7 +38,6 @@ import (
 	chatmemory "school-with-ai/modules/chat/memory"
 	"school-with-ai/modules/chat/thread"
 	"school-with-ai/modules/knowledge/edgequake"
-	permtool "school-with-ai/modules/permissions/tool"
 	"school-with-ai/platform/artifact"
 	"school-with-ai/plugins/askuser"
 	"school-with-ai/plugins/calculator"
@@ -80,6 +79,7 @@ import (
 	permissionsmod "school-with-ai/modules/permissions"
 	pluginsettingsmod "school-with-ai/modules/pluginsettings"
 	resourcesmod "school-with-ai/modules/resources"
+	"school-with-ai/modules/toolreqs"
 	userprofilemod "school-with-ai/modules/userprofile"
 
 	"github.com/ardanlabs/conf/v3"
@@ -460,12 +460,18 @@ func run(ctx context.Context, log *logger.Logger) error {
 	log.Info(ctx, "startup", "status", "perm-cache Redis client initialized", "addr", cfg.Redis.Addr)
 
 	// Create and initialize permissions service
-	permissionsService := permtool.NewService(log, permtool.NewPostgresPermissionsRepository(db), permCacheRedis)
-	log.Info(ctx, "startup", "status", "permissions service initialized")
+	permissionsRepo := toolreqs.NewPostgresRepository(db)
+	log.Info(ctx, "startup", "status", "permissions repository initialized")
 
 	// Create workspace permissions service
 	workspacePermissionsService := permworkspace.NewService(log, permworkspace.NewPostgresWorkspacePermissionsRepository(db), permCacheRedis)
 	log.Info(ctx, "startup", "status", "workspace permissions service initialized")
+
+	// ── Tool Requirements Module ──
+	// Single authority for all tool access decisions: permissions, confirmation, etc.
+	toolReqsModule := toolreqs.New(log, permissionsRepo, permCacheRedis)
+	toolReqsService := toolReqsModule.Service()
+	log.Info(ctx, "startup", "status", "tool requirements module initialized")
 
 	// Initialize Knowledge module (owns Edgequake / RAG services)
 	embeddingResolver := knowledgemod.EmbeddingConfigResolverFunc(func(ctx context.Context, userID string) (*knowledgemod.EmbeddingConfig, error) {
@@ -509,7 +515,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		AgentProvider:      agentProvider,
 		AuthService:        authSvc,
 		ToolRegistry:       toolRegistry,
-		PermissionsService: permissionsService,
+		PermissionsService: toolReqsService,
 		DocumentProvider:   &DocumentProviderAdapter{svc: edgequakeService},
 		TenantID:           cfg.Edgequake.TenantID,
 		AllowedOrigin:      cfg.Auth.AppURL,
@@ -599,7 +605,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		ConfigResolver:         aiSettingsModule,
 		PluginSettingsResolver: pluginSettingsModule,
 		ProfileProvider:        &adkgoProfileAdapter{repo: userProfileRepo},
-		PermChecker:            permissionsService,
+		ToolReqs:               toolReqsService,
 		MCPResolver:            mcpModule.Service(),
 		A2AResolver:            a2aModule.Service(),
 		NewToolSetFactory:      newToolSetFactory,

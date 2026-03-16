@@ -2,9 +2,11 @@ package chatcontracts
 
 import "context"
 
-// ToolPermissionService abstracts the subset of the permissions module
-// that the chat module requires for tool-set and individual-tool toggles.
-// The concrete *tool.Service satisfies this interface implicitly.
+// ToolPermissionService abstracts the tool requirements module that the chat
+// module requires for tool-set and individual-tool toggles.
+//
+// The concrete *toolreqs.Service satisfies this interface implicitly.
+// This is the single authority for all tool access decisions.
 type ToolPermissionService interface {
 	// GetEnabledToolSets returns enabled tool-set IDs for the given user/agent.
 	GetEnabledToolSets(ctx context.Context, userID, agentID string) ([]string, error)

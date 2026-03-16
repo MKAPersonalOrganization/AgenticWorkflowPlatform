@@ -90,6 +90,17 @@ type Enableable interface {
 	Enabled() bool
 }
 
+// FunctionMiddlewareProvider is an optional interface that Requirements can
+// implement to inject FunctionMiddleware into the tool execution pipeline.
+//
+// This bridges the gap between Requirements (evaluated before LLM calls)
+// and FunctionMiddleware (evaluated during tool execution). Some concerns
+// like "ask permission" span both phases.
+type FunctionMiddlewareProvider interface {
+	// FunctionMiddleware returns middleware to wrap tool execution.
+	FunctionMiddleware() Middleware
+}
+
 // =============================================================================
 // RequirementFunc — Functional shorthand (BeeAI's @requirement decorator)
 // =============================================================================
