@@ -68,26 +68,33 @@ type NewToolSetFactoryFunc func(cfg ToolFactoryConfig) ToolSetFactory
 // tool-specific settings (API keys, service URLs, etc.).
 type ExtraConfigFunc func(ctx context.Context, userID, agentName string) map[string]string
 
-// ToolRequirementsService is the exclusive authority for all tool access
-// decisions. It unifies permission checks, user confirmation, and any future
-// requirement types into a single evaluation pipeline.
+// ToolRequirementsService is the authority for tool access decisions
+// during tool resolution. It determines which tools are visible to the LLM.
 //
 // The adapter uses this for:
 //   - Tool resolution: GetEnabledToolSets, HasToolSetPermission, HasPermission
-//   - Confirmation: ConfirmationMiddleware (injected into the tool execution chain)
 type ToolRequirementsService interface {
 	GetEnabledToolSets(ctx context.Context, userID, agentName string) ([]string, error)
 	HasToolSetPermission(ctx context.Context, userID, agentName, toolSetID string) bool
 	HasPermission(ctx context.Context, userID, agentName, toolSetID, toolID string) bool
+}
 
-	// ConfirmationMiddleware returns middleware enforcing user confirmation
-	// for the given agent.
-	ConfirmationMiddleware(agentID string) agent.Middleware
-
+// BlockEnforcer provides runtime enforcement for blocked tools.
+// This is a defense-in-depth safety net — tools should already be filtered at
+// resolution time, but this catches race conditions (config changed mid-conversation).
+type BlockEnforcer interface {
 	// BlockMiddleware returns middleware that prevents execution of tools
-	// the user has blocked. Defense-in-depth: catches blocked tools that
-	// slip past resolution filtering (e.g., race conditions).
+	// the user has blocked.
 	BlockMiddleware(agentID string) agent.Middleware
+}
+
+// ConfirmationEnforcer provides runtime enforcement for user confirmation.
+// It reads per-user requirement configs from the database at execution time,
+// ensuring per-user isolation.
+type ConfirmationEnforcer interface {
+	// ConfirmationMiddleware returns middleware that triggers user confirmation
+	// for tools configured with require_confirmation action.
+	ConfirmationMiddleware(agentID string) agent.Middleware
 }
 
 // MCPToolResolver resolves MCP-based tools for a user.

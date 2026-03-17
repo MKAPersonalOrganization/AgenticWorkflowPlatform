@@ -606,6 +606,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 		PluginSettingsResolver: pluginSettingsModule,
 		ProfileProvider:        &adkgoProfileAdapter{repo: userProfileRepo},
 		ToolReqs:               toolReqsService,
+		BlockEnforcer:          toolReqsService,
+		ConfirmEnforcer:        toolReqsService,
 		MCPResolver:            mcpModule.Service(),
 		A2AResolver:            a2aModule.Service(),
 		NewToolSetFactory:      newToolSetFactory,

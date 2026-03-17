@@ -12,8 +12,8 @@ import (
 // Block Middleware — defense-in-depth enforcement at execution time
 // =============================================================================
 
-// blockChecker is the interface needed by BlockMiddleware to evaluate whether
-// a tool is blocked. It is implemented by [Service].
+// blockChecker is the narrow interface needed by [BlockMiddleware].
+// It is implemented by [Service].
 type blockChecker interface {
 	HasPermission(ctx context.Context, userID, agentID, toolSetID, toolID string) bool
 }
@@ -26,9 +26,8 @@ type blockChecker interface {
 // conditions (config updated mid-conversation) or bugs in resolution could
 // allow a blocked tool through. This middleware catches those cases.
 //
-// The middleware extracts user_id and tool_set_id from context metadata
-// (populated by the middlewareBridge) and calls HasPermission to verify
-// the tool is still allowed.
+// The middleware extracts user_id from context metadata (populated by the
+// middlewareBridge) and calls HasPermission to verify the tool is still allowed.
 func BlockMiddleware(checker blockChecker, agentID string) agent.Middleware {
 	return func(next agent.Handler) agent.Handler {
 		return agent.HandlerFunc(func(c *agent.Context) error {
@@ -47,7 +46,6 @@ func BlockMiddleware(checker blockChecker, agentID string) agent.Middleware {
 			userID, _ := c.Metadata["user_id"].(string)
 			toolSetID, _ := c.Metadata["tool_set_id"].(string)
 
-			// If we have enough context to check permissions, do so.
 			if userID != "" && checker != nil {
 				if !checker.HasPermission(c.Context, userID, agentID, toolSetID, toolName) {
 					c.Result = map[string]any{
@@ -65,65 +63,93 @@ func BlockMiddleware(checker blockChecker, agentID string) agent.Middleware {
 }
 
 // =============================================================================
-// Confirmation Middleware — runtime enforcement via foundation primitives
+// Confirmation Middleware — per-user runtime enforcement
 // =============================================================================
 
+// ConfirmationConfigResolver reads per-user, per-agent tool requirement configs
+// from persistent storage (DB + cache). Implemented by [Service].
+type ConfirmationConfigResolver interface {
+	GetToolRequirementConfig(ctx context.Context, userID, agentID, toolSetID, toolID string) (ToolRequirementConfig, error)
+}
+
 // ConfirmationMiddleware returns a [agent.Middleware] that enforces user
-// confirmation for tools configured in the [ConfirmationRequirement].
+// confirmation for tools whose per-user requirement config has action
+// [RequirementActionRequireConfirmation].
 //
-// This bridges the toolreqs policy layer with the foundation's middleware
-// system. At execution time, the middleware:
+// This middleware reads the user's config from the database (via the resolver)
+// at execution time, ensuring it respects per-user, per-agent isolation.
+// It also checks the in-memory [ConfirmationRequirement] for admin-level
+// global policies that override individual user configs.
 //
-//  1. Checks if the tool requires confirmation via [ConfirmationRequirement].
-//  2. If yes, calls [io.Confirm] which triggers the pause/resume flow
-//     (via PauseHandler in web mode, StdinHandler in CLI, etc.).
-//  3. If the user denies, sets a denial result on the context.
-//  4. If the user approves, proceeds with normal execution.
+// At execution time, the middleware:
 //
-// The middleware is scoped to a specific agent so that agent-specific
-// policies are resolved correctly.
-func ConfirmationMiddleware(cr *ConfirmationRequirement, agentID string) agent.Middleware {
+//  1. Extracts user_id from context metadata (set by middlewareBridge).
+//  2. Checks the per-user requirement config from the DB via the resolver.
+//  3. Also checks global/admin policies via [ConfirmationRequirement].
+//  4. If either requires confirmation, calls [io.Confirm] to trigger the
+//     pause/resume flow (PauseHandler in web, StdinHandler in CLI).
+//  5. If the user denies, sets a denial result on the context.
+//  6. If the user approves, proceeds with normal execution.
+func ConfirmationMiddleware(resolver ConfirmationConfigResolver, cr *ConfirmationRequirement, agentID string) agent.Middleware {
 	return func(next agent.Handler) agent.Handler {
 		return agent.HandlerFunc(func(c *agent.Context) error {
-			// Only intercept tool (function) calls.
 			if !c.IsFunction() {
 				return next.Handle(c)
 			}
 
-			// Extract tool name.
 			toolName := ""
 			if c.Function != nil && c.Function.Tool != nil {
 				toolName = c.Function.Tool.Name()
 			}
+			if toolName == "" {
+				return next.Handle(c)
+			}
 
-			// Extract arguments.
 			var args map[string]any
 			if c.Function != nil {
 				args = c.Function.Arguments
 			}
 
-			// Check if this tool requires confirmation.
-			if !cr.RequiresConfirmation(agentID, toolName, args) {
+			userID, _ := c.Metadata["user_id"].(string)
+			toolSetID, _ := c.Metadata["tool_set_id"].(string)
+
+			needsConfirmation := false
+			hint := ""
+
+			// 1. Check per-user requirement config from DB (primary source).
+			if userID != "" && resolver != nil {
+				cfg, err := resolver.GetToolRequirementConfig(c.Context, userID, agentID, toolSetID, toolName)
+				if err == nil && (cfg.Action == RequirementActionRequireConfirmation || cfg.RequireConfirmation) {
+					needsConfirmation = true
+					hint = cfg.ConfirmationHint
+				}
+			}
+
+			// 2. Check global/admin in-memory policies (override layer).
+			if !needsConfirmation && cr != nil && cr.RequiresConfirmation(agentID, toolName, args) {
+				needsConfirmation = true
+				hint = cr.getHint(agentID, toolName)
+			}
+
+			if !needsConfirmation {
 				return next.Handle(c)
 			}
 
-			// Build confirmation prompt.
-			hint := cr.getHint(agentID, toolName)
+			// Build default hint if none provided.
+			if hint == "" {
+				hint = fmt.Sprintf("Tool '%s' requires your confirmation before executing.", toolName)
+			}
 
-			// Ask for permission via IO handler.
-			// This triggers the pause/resume flow:
+			// Trigger pause/resume flow via IO handler:
 			//   - PauseHandler (web): returns ErrAuthRequired → engine pauses
 			//   - StdinHandler (CLI): blocks on stdin → user types y/n
 			//   - NoopHandler (test): auto-approves
 			approved, err := io.Confirm(c.Context, hint, toolName)
 			if err != nil {
-				// Sentinel errors (ErrAuthRequired, ErrInputRequired)
-				// propagate up to the engine for pause handling.
 				return err
 			}
 
 			if !approved {
-				// User denied — return a denial result without executing the tool.
 				c.Result = map[string]any{
 					"result": fmt.Sprintf("Tool '%s' execution was denied by the user.", toolName),
 					"denied": true,
@@ -132,7 +158,6 @@ func ConfirmationMiddleware(cr *ConfirmationRequirement, agentID string) agent.M
 				return nil
 			}
 
-			// User approved — proceed with tool execution.
 			return next.Handle(c)
 		})
 	}

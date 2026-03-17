@@ -139,9 +139,11 @@ func (s *Service) Confirmation() *ConfirmationRequirement {
 // ConfirmationMiddleware returns a [agent.Middleware] scoped to the given agent
 // that enforces user confirmation at tool execution time.
 //
-// The adapter should include this in the middleware chain for each agent run.
+// The middleware reads per-user requirement configs from the DB (via this
+// service) and also checks admin-level global policies. This ensures per-user
+// isolation — user A's confirmation settings don't affect user B.
 func (s *Service) ConfirmationMiddleware(agentID string) agent.Middleware {
-	return ConfirmationMiddleware(s.confirmReq, agentID)
+	return ConfirmationMiddleware(s, s.confirmReq, agentID)
 }
 
 // BlockMiddleware returns a [agent.Middleware] scoped to the given agent that
@@ -222,16 +224,6 @@ func (s *Service) SetToolRequirementConfig(ctx context.Context, userID, agentID,
 	}
 
 	s.toolCache.Set(userID, existing, agentID, toolSetID, toolID)
-
-	// If confirmation is required, register the policy with the confirmation requirement.
-	if cfg.RequireConfirmation || cfg.Action == RequirementActionRequireConfirmation {
-		s.confirmReq.SetAgentPolicy(agentID, toolID, &ConfirmationPolicy{
-			AlwaysConfirm: true,
-			Hint:          cfg.ConfirmationHint,
-		})
-	} else {
-		s.confirmReq.RemoveAgentPolicy(agentID, toolID)
-	}
 
 	s.log.Info(ctx, "Tool requirement config updated",
 		"user_id", userID, "agent_id", agentID,
