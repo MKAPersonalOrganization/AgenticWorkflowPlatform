@@ -15,7 +15,7 @@ import (
 
 func TestMiddleware_NoPolicy_PassesThrough(t *testing.T) {
 	cr := toolreqs.NewConfirmationRequirement()
-	mw := toolreqs.ConfirmationMiddleware(cr, "agent1")
+	mw := toolreqs.ConfirmationMiddleware(nil, cr, "agent1")
 
 	called := false
 	handler := mw(agent.HandlerFunc(func(c *agent.Context) error {
@@ -39,7 +39,7 @@ func TestMiddleware_WithPolicy_NoopHandler_AutoApproves(t *testing.T) {
 		AlwaysConfirm: true,
 		Hint:          "Confirm dangerous action?",
 	})
-	mw := toolreqs.ConfirmationMiddleware(cr, "agent1")
+	mw := toolreqs.ConfirmationMiddleware(nil, cr, "agent1")
 
 	called := false
 	handler := mw(agent.HandlerFunc(func(c *agent.Context) error {
@@ -65,7 +65,7 @@ func TestMiddleware_WithPolicy_DenyHandler_Blocks(t *testing.T) {
 	cr.SetGlobalPolicy("dangerous_tool", &toolreqs.ConfirmationPolicy{
 		AlwaysConfirm: true,
 	})
-	mw := toolreqs.ConfirmationMiddleware(cr, "agent1")
+	mw := toolreqs.ConfirmationMiddleware(nil, cr, "agent1")
 
 	called := false
 	handler := mw(agent.HandlerFunc(func(c *agent.Context) error {
@@ -99,7 +99,7 @@ func TestMiddleware_WithPolicy_PauseHandler_ReturnsAuthError(t *testing.T) {
 	cr.SetGlobalPolicy("file_delete", &toolreqs.ConfirmationPolicy{
 		AlwaysConfirm: true,
 	})
-	mw := toolreqs.ConfirmationMiddleware(cr, "agent1")
+	mw := toolreqs.ConfirmationMiddleware(nil, cr, "agent1")
 
 	handler := mw(agent.HandlerFunc(func(c *agent.Context) error {
 		t.Error("handler should NOT be called when paused")
@@ -124,7 +124,7 @@ func TestMiddleware_WithPolicy_PauseHandler_ReturnsAuthError(t *testing.T) {
 func TestMiddleware_NonFunctionContext_PassesThrough(t *testing.T) {
 	cr := toolreqs.NewConfirmationRequirement()
 	cr.SetGlobalPolicy("any_tool", &toolreqs.ConfirmationPolicy{AlwaysConfirm: true})
-	mw := toolreqs.ConfirmationMiddleware(cr, "agent1")
+	mw := toolreqs.ConfirmationMiddleware(nil, cr, "agent1")
 
 	called := false
 	handler := mw(agent.HandlerFunc(func(c *agent.Context) error {

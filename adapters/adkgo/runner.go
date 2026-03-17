@@ -42,6 +42,8 @@ type RunnerAdapter struct {
 	pluginSettingsResolver PluginSettingsResolver
 	profileProvider        UserContextProvider
 	toolReqs               ToolRequirementsService
+	blockEnforcer          BlockEnforcer
+	confirmEnforcer        ConfirmationEnforcer
 	mcpResolver            MCPToolResolver
 	a2aResolver            A2AToolResolver
 	newToolSetFactory      NewToolSetFactoryFunc
@@ -58,6 +60,8 @@ type RunnerAdapterConfig struct {
 	PluginSettingsResolver PluginSettingsResolver
 	ProfileProvider        UserContextProvider
 	ToolReqs               ToolRequirementsService
+	BlockEnforcer          BlockEnforcer
+	ConfirmEnforcer        ConfirmationEnforcer
 	MCPResolver            MCPToolResolver
 	A2AResolver            A2AToolResolver
 	NewToolSetFactory      NewToolSetFactoryFunc
@@ -78,6 +82,8 @@ func NewRunnerAdapter(cfg RunnerAdapterConfig) (*RunnerAdapter, error) {
 		pluginSettingsResolver: cfg.PluginSettingsResolver,
 		profileProvider:        cfg.ProfileProvider,
 		toolReqs:               cfg.ToolReqs,
+		blockEnforcer:          cfg.BlockEnforcer,
+		confirmEnforcer:        cfg.ConfirmEnforcer,
 		mcpResolver:            cfg.MCPResolver,
 		a2aResolver:            cfg.A2AResolver,
 		newToolSetFactory:      cfg.NewToolSetFactory,
@@ -226,15 +232,15 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			genCfg := buildGenerateContentConfig(modelCfg)
 
 			// Bridge foundation function middlewares into ADK-Go's tool lifecycle.
-			// Inject block + confirmation middlewares from the tool requirements service.
+			// Inject block + confirmation middlewares from separate enforcers.
 			var extraMWs []fagent.Middleware
-			if r.toolReqs != nil {
-				// Block middleware runs first — prevents execution of blocked tools
-				// that may have slipped past resolution (race condition safety net).
-				if bmw := r.toolReqs.BlockMiddleware(agentName); bmw != nil {
+			if r.blockEnforcer != nil {
+				if bmw := r.blockEnforcer.BlockMiddleware(agentName); bmw != nil {
 					extraMWs = append(extraMWs, bmw)
 				}
-				if cmw := r.toolReqs.ConfirmationMiddleware(agentName); cmw != nil {
+			}
+			if r.confirmEnforcer != nil {
+				if cmw := r.confirmEnforcer.ConfirmationMiddleware(agentName); cmw != nil {
 					extraMWs = append(extraMWs, cmw)
 				}
 			}
