@@ -50,11 +50,12 @@ type WorkflowAgent interface {
 // WorkflowNodeInfo describes a single node in a multi-agent workflow tree.
 // Composite nodes (sequential, parallel, loop) contain children.
 // Leaf nodes (agent) reference an AgentDefinition by ID.
+// Remote nodes (remote) delegate to an external A2A connector.
 type WorkflowNodeInfo struct {
 	// ID is a unique identifier within this tree.
 	ID string
 
-	// Type is "agent", "sequential", "parallel", or "loop".
+	// Type is "agent", "sequential", "parallel", "loop", or "remote".
 	Type string
 
 	// Label is an optional display name for this node.
@@ -62,6 +63,10 @@ type WorkflowNodeInfo struct {
 
 	// AgentID is the ID of the AgentDefinition (only for Type="agent").
 	AgentID string
+
+	// A2AConnectorID references an A2A connector (only for Type="remote").
+	// The connector is looked up at runtime and delegated to via the A2A protocol.
+	A2AConnectorID string
 
 	// OutputKey optionally stores this node's output in session state.
 	OutputKey string

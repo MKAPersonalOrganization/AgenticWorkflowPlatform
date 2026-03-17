@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"iter"
 	"net"
 	"net/http"
 	"net/url"
@@ -18,6 +19,7 @@ import (
 	a2atypes "github.com/a2aproject/a2a-go/v2/a2a"
 	"github.com/a2aproject/a2a-go/v2/a2aclient"
 	"github.com/a2aproject/a2a-go/v2/a2aclient/agentcard"
+	"github.com/a2aproject/a2a-go/v2/a2acompat/a2av0"
 )
 
 // --------------------------------------------------------------------------
@@ -183,6 +185,25 @@ func (s *Service) GetConnector(ctx context.Context, id, userID string) (*A2AConn
 	return c, nil
 }
 
+// GetConnectorInfo retrieves connector metadata for use as a workflow sub-agent.
+// Implements adkgo.A2ASubAgentProvider.
+func (s *Service) GetConnectorInfo(ctx context.Context, connectorID, userID string) (ConnectorInfo, error) {
+	c, err := s.GetConnector(ctx, connectorID, userID)
+	if err != nil {
+		return ConnectorInfo{}, err
+	}
+	name := c.AgentName
+	if name == "" {
+		name = c.Title
+	}
+	return ConnectorInfo{
+		ID:          c.ID,
+		Name:        name,
+		Description: c.AgentDescription,
+		AgentURL:    c.AgentURL,
+	}, nil
+}
+
 // ListConnectors returns all connectors for a user.
 func (s *Service) ListConnectors(ctx context.Context, userID string) ([]A2AConnector, error) {
 	return s.repo.ListByUser(ctx, userID)
@@ -306,7 +327,7 @@ func (s *Service) discoverAgentCard(ctx context.Context, connector *A2AConnector
 			time.Sleep(discoverRetryDelay)
 		}
 
-		resolver := agentcard.NewResolver(s.httpClient)
+		resolver := &agentcard.Resolver{Client: s.httpClient, CardParser: a2av0.NewAgentCardParser()}
 		card, err := resolver.Resolve(ctx, connector.AgentURL, opts...)
 		if err != nil {
 			lastErr = err
@@ -446,8 +467,135 @@ func (s *Service) SendMessage(ctx context.Context, connectorID, userID, message 
 	return extractResponseText(result), nil
 }
 
+// SendStreamingMessage streams text deltas from a remote A2A agent.
+// Implements adkgo.A2ASubAgentProvider.
+func (s *Service) SendStreamingMessage(ctx context.Context, connectorID, userID, message string) iter.Seq2[string, error] {
+	return func(yield func(string, error) bool) {
+		connector, err := s.GetConnector(ctx, connectorID, userID)
+		if err != nil {
+			yield("", err)
+			return
+		}
+		if connector.Status != ConnectorStatusConnected {
+			yield("", ErrConnectorNotConnected)
+			return
+		}
+
+		card, err := s.discoverAgentCard(ctx, connector)
+		if err != nil {
+			yield("", fmt.Errorf("resolving agent card: %w", err))
+			return
+		}
+
+		clientOpts := s.buildClientOptions(connector)
+		client, err := a2aclient.NewFromCard(ctx, card, clientOpts...)
+		if err != nil {
+			yield("", fmt.Errorf("creating A2A client: %w", err))
+			return
+		}
+		defer client.Destroy()
+
+		userMsg := a2atypes.NewMessage(a2atypes.MessageRoleUser, a2atypes.NewTextPart(message))
+		req := &a2atypes.SendMessageRequest{
+			Message: userMsg,
+		}
+
+		taskCtx, cancel := context.WithTimeout(ctx, taskTimeout)
+		defer cancel()
+
+		for event, streamErr := range client.SendStreamingMessage(taskCtx, req) {
+			if streamErr != nil {
+				yield("", fmt.Errorf("streaming from remote agent: %w", streamErr))
+				return
+			}
+
+			text := extractEventText(event)
+			if text != "" {
+				if !yield(text, nil) {
+					return
+				}
+			}
+		}
+	}
+}
+
+// extractEventText extracts the text payload from a streaming A2A event.
+//
+// Only working-state TaskStatusUpdateEvents carry true streaming deltas — all
+// other event types either echo the user's input (submitted state), duplicate
+// already-streamed content (artifact), or carry no new text (terminal states).
+func extractEventText(event a2atypes.Event) string {
+	if event == nil {
+		return ""
+	}
+	switch v := event.(type) {
+	case *a2atypes.Message:
+		// Non-streaming final response (e.g. from sendMessage blocking path).
+		return extractTextFromParts(v.Parts)
+
+	case *a2atypes.TaskStatusUpdateEvent:
+		// Only working-state events carry incremental LLM streaming deltas.
+		// - submitted: echoes the user's own input — skip.
+		// - working (with message): true streaming delta — include.
+		// - working (no message): state heartbeat — skip.
+		// - completed/failed/cancelled: terminal state change, no new content — skip.
+		if v.Status.State != a2atypes.TaskStateWorking {
+			return ""
+		}
+		if v.Status.Message != nil {
+			return extractTextFromParts(v.Status.Message.Parts)
+		}
+
+	case *a2atypes.TaskArtifactUpdateEvent:
+		// Skip: artifact contains the full accumulated response at the end of
+		// a streaming turn. Including it would duplicate content already
+		// delivered incrementally via working-state events above.
+
+	case *a2atypes.Task:
+		// Blocking (non-streaming) response: extract all available content.
+		var texts []string
+		if v.Status.Message != nil {
+			if t := extractTextFromParts(v.Status.Message.Parts); t != "" {
+				texts = append(texts, t)
+			}
+		}
+		for _, artifact := range v.Artifacts {
+			if t := extractTextFromParts(artifact.Parts); t != "" {
+				texts = append(texts, t)
+			}
+		}
+		return strings.Join(texts, "\n")
+	}
+	return ""
+}
+
+// extractTextFromParts extracts and joins text content from A2A parts.
+func extractTextFromParts(parts []*a2atypes.Part) string {
+	var texts []string
+	for _, part := range parts {
+		if text, ok := part.Content.(a2atypes.Text); ok {
+			texts = append(texts, string(text))
+		}
+	}
+	return strings.Join(texts, "")
+}
+
 func (s *Service) buildClientOptions(connector *A2AConnector) []a2aclient.FactoryOption {
-	var opts []a2aclient.FactoryOption
+	opts := []a2aclient.FactoryOption{
+		// Register v0.x JSONRPC compat transport so agents advertising
+		// protocol version 0.2.x / 0.3 are handled correctly.
+		// Register v0.x JSONRPC compat transport. Use connector.AgentURL as the
+		// explicit transport URL so that any docker-rewrite applied at connector
+		// creation time is honoured — the card body may still advertise "localhost".
+		a2aclient.WithCompatTransport(
+			a2av0.Version,
+			a2atypes.TransportProtocolJSONRPC,
+			a2av0.NewJSONRPCTransportFactory(a2av0.JSONRPCTransportConfig{
+				Client: s.httpClient,
+				URL:    connector.AgentURL,
+			}),
+		),
+	}
 
 	// Add auth interceptor if needed
 	if connector.AuthType != "none" && connector.AuthType != "" && connector.AuthToken != "" {

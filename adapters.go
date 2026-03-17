@@ -2,11 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"iter"
 	"strings"
 
+	"school-with-ai/adapters/adkgo"
 	"school-with-ai/foundation/agent"
+	"school-with-ai/modules/a2a"
 	"school-with-ai/modules/agentstore"
 	"school-with-ai/modules/chat/chatcontracts"
 	"school-with-ai/modules/filesystem"
@@ -320,6 +324,8 @@ func (p *userAwareAgentProvider) agentFromDefinition(def *agentstore.AgentDefini
 		OutputKey:         def.OutputKey,
 		IncludeContents:   agent.IncludeContents(def.IncludeContents),
 		GlobalInstruction: def.GlobalInstruction,
+		InputSchema:       parseAgentSchema(def.InputSchemaJSON),
+		OutputSchema:      parseAgentSchema(def.OutputSchemaJSON),
 	}
 	a := newConfigAgent(cfg)
 
@@ -373,6 +379,20 @@ func (a *composedAgentAdapter) WorkflowGraph() agent.WorkflowNodeInfo { return a
 
 var _ agent.WorkflowAgent = (*composedAgentAdapter)(nil)
 
+// parseAgentSchema unmarshals a JSON string into *agent.Schema.
+// Returns nil for empty or invalid input rather than propagating errors,
+// since a missing schema is a valid (schema-less) agent configuration.
+func parseAgentSchema(jsonStr string) *agent.Schema {
+	if jsonStr == "" {
+		return nil
+	}
+	var s agent.Schema
+	if err := json.Unmarshal([]byte(jsonStr), &s); err != nil {
+		return nil
+	}
+	return &s
+}
+
 // convertCompositionNode recursively maps agentstore.CompositionNode to agent.WorkflowNodeInfo.
 func convertCompositionNode(n *agentstore.CompositionNode) agent.WorkflowNodeInfo {
 	if n == nil {
@@ -383,6 +403,7 @@ func convertCompositionNode(n *agentstore.CompositionNode) agent.WorkflowNodeInf
 		Type:                     string(n.Type),
 		Label:                    n.Label,
 		AgentID:                  n.AgentID,
+		A2AConnectorID:           n.A2AConnectorID,
 		OutputKey:                n.OutputKey,
 		MaxIterations:            n.MaxIterations,
 		DisallowTransferToParent: n.DisallowTransferToParent,
@@ -417,3 +438,36 @@ func (a *configAgent) SubAgents() []agent.Agent { return a.config.SubAgents }
 func (a *configAgent) Config() agent.Config     { return a.config }
 
 var _ agent.Configurable = (*configAgent)(nil)
+
+// ──────────────────────────────────────────────────────────────────────────────
+// a2aSubAgentAdapter bridges a2a.Service to adkgo.A2ASubAgentProvider.
+// The two packages use structurally identical but distinct types for
+// ConnectorInfo, so a thin adapter is needed at the composition root.
+// ──────────────────────────────────────────────────────────────────────────────
+
+type a2aSubAgentAdapter struct {
+	svc *a2a.Service
+}
+
+func (a *a2aSubAgentAdapter) GetConnectorInfo(ctx context.Context, connectorID, userID string) (adkgo.A2AConnectorInfo, error) {
+	info, err := a.svc.GetConnectorInfo(ctx, connectorID, userID)
+	if err != nil {
+		return adkgo.A2AConnectorInfo{}, err
+	}
+	return adkgo.A2AConnectorInfo{
+		ID:          info.ID,
+		Name:        info.Name,
+		Description: info.Description,
+		AgentURL:    info.AgentURL,
+	}, nil
+}
+
+func (a *a2aSubAgentAdapter) SendMessage(ctx context.Context, connectorID, userID, message string) (string, error) {
+	return a.svc.SendMessage(ctx, connectorID, userID, message)
+}
+
+func (a *a2aSubAgentAdapter) SendStreamingMessage(ctx context.Context, connectorID, userID, message string) iter.Seq2[string, error] {
+	return a.svc.SendStreamingMessage(ctx, connectorID, userID, message)
+}
+
+var _ adkgo.A2ASubAgentProvider = (*a2aSubAgentAdapter)(nil)
