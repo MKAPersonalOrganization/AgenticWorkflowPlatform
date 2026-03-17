@@ -203,6 +203,17 @@ func toAguiEventsInternal(event any) []any {
 			}),
 		)}
 
+	case *thread.FileAttachmentReceived:
+		return []any{aguievents.NewCustomEvent(
+			"FILE_ATTACHMENT",
+			aguievents.WithValue(map[string]any{
+				"fileUrl":   evt.FileURL,
+				"fileName":  evt.FileName,
+				"mimeType":  evt.MimeType,
+				"agentName": evt.AgentName,
+			}),
+		)}
+
 	case *thread.UserMessageAdded, *thread.AssistantMessageAdded, *thread.ThreadCreated:
 		// These are handled by the frontend locally or via snapshots, no need to stream
 		return []any{}

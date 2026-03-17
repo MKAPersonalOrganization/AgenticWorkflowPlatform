@@ -98,13 +98,26 @@ type ConnectorInfo struct {
 }
 
 // StreamChunk is a single unit yielded by Service.SendStreamingMessage.
-// Delta != "" for incremental text deltas; IsArtifact=true for complete artifacts.
+//
+// Exactly one of [Delta, IsArtifact, IsFile] is set per chunk:
+//   - Delta != "": incremental text streaming delta (status-update working state)
+//   - IsArtifact:  complete text artifact from artifact-update (rendered as card)
+//   - IsFile:      file attachment from artifact-update or message (download card)
 type StreamChunk struct {
-	Delta      string // Non-empty for text streaming deltas
-	IsArtifact bool   // True when this chunk describes a complete artifact
-	ArtifactID string // Artifact identifier (when IsArtifact=true)
-	Title      string // Optional artifact name/title (when IsArtifact=true)
-	Content    string // Full artifact text content (when IsArtifact=true)
+	// Text delta (working status-update)
+	Delta string
+
+	// Text artifact (artifact-update with text content)
+	IsArtifact bool
+	ArtifactID string
+	Title      string
+	Content    string
+
+	// File attachment (artifact-update or message with file/URL parts)
+	IsFile   bool
+	FileURL  string // remote URI or data:[mimeType];base64,... for inline bytes
+	FileName string
+	MimeType string
 }
 
 // A2AConnectorRepository defines persistence for A2A agent connectors.

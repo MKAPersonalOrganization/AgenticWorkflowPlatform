@@ -318,6 +318,22 @@ func (e *A2AArtifactReceived) EventType() string         { return "A2AArtifactRe
 func (e *A2AArtifactReceived) EventTimestamp() time.Time { return e.Timestamp }
 func (e *A2AArtifactReceived) AggregateID() string       { return e.ThreadID }
 
+// FileAttachmentReceived is emitted when a remote A2A agent produces a file
+// attachment (URL or inline data). This is a transient event — NOT persisted.
+type FileAttachmentReceived struct {
+	ThreadID  string    `json:"threadId"`
+	MessageID string    `json:"messageId"`
+	AgentName string    `json:"agentName,omitempty"`
+	FileURL   string    `json:"fileUrl"`
+	FileName  string    `json:"fileName,omitempty"`
+	MimeType  string    `json:"mimeType,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+func (e *FileAttachmentReceived) EventType() string         { return "FileAttachmentReceived" }
+func (e *FileAttachmentReceived) EventTimestamp() time.Time { return e.Timestamp }
+func (e *FileAttachmentReceived) AggregateID() string       { return e.ThreadID }
+
 // RunStarted signals the start of an agent run.
 type RunStarted struct {
 	ThreadID    string    `json:"threadId"`              // ID of the conversation thread

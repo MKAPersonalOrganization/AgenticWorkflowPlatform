@@ -118,14 +118,26 @@ type A2AConnectorInfo struct {
 }
 
 // A2AStreamChunk is a single unit yielded by A2ASubAgentProvider.SendStreamingMessage.
-// Text deltas (Delta != "") carry incremental LLM output; artifact chunks
-// (IsArtifact=true) carry complete artifacts produced by the remote agent.
+//
+// Exactly one kind is set per chunk:
+//   - Delta != "":  incremental text streaming delta
+//   - IsArtifact:   complete text artifact (rendered as a document card)
+//   - IsFile:       file attachment (download card; URL may be remote or data-URI)
 type A2AStreamChunk struct {
-	Delta      string // Non-empty for text streaming deltas
-	IsArtifact bool   // True when this chunk describes a complete artifact
-	ArtifactID string // Artifact identifier (when IsArtifact=true)
-	Title      string // Optional artifact name/title (when IsArtifact=true)
-	Content    string // Full artifact text content (when IsArtifact=true)
+	// Text delta (working status-update streaming)
+	Delta string
+
+	// Text artifact (artifact-update with text content)
+	IsArtifact bool
+	ArtifactID string
+	Title      string
+	Content    string
+
+	// File attachment (artifact-update or message with file/URL parts)
+	IsFile   bool
+	FileURL  string // remote URI or data:[mimeType];base64,... for inline bytes
+	FileName string
+	MimeType string
 }
 
 // A2ASubAgentProvider resolves A2A connectors for use as workflow sub-agents.

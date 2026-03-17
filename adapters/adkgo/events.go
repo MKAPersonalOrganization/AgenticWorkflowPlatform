@@ -180,6 +180,29 @@ func translateStateDelta(evt *session.Event, ctx EventContext) []thread.Event {
 	// the artifact metadata into StateDelta["__a2a_artifact__"] and emits a
 	// content-less session event so artifacts reach the frontend as a separate
 	// thread.A2AArtifactReceived event — distinct from the streaming text bubble.
+	// Check for file attachment marker.
+	if fileRaw, ok := evt.Actions.StateDelta["__a2a_file__"]; ok {
+		if fileJSON, ok := fileRaw.(string); ok && fileJSON != "" {
+			var info struct {
+				FileURL  string `json:"fileURL"`
+				FileName string `json:"fileName"`
+				MimeType string `json:"mimeType"`
+			}
+			if err := json.Unmarshal([]byte(fileJSON), &info); err == nil && info.FileURL != "" {
+				return []thread.Event{&thread.FileAttachmentReceived{
+					ThreadID:  ctx.ThreadID,
+					MessageID: evt.ID,
+					AgentName: ctx.AgentName,
+					FileURL:   info.FileURL,
+					FileName:  info.FileName,
+					MimeType:  info.MimeType,
+					Timestamp: coalesceTime(evt.Timestamp),
+				}}
+			}
+		}
+		return nil
+	}
+
 	artifactRaw, ok := evt.Actions.StateDelta["__a2a_artifact__"]
 	if !ok {
 		return nil
