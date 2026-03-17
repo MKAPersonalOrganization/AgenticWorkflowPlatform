@@ -52,23 +52,23 @@ import (
 // rather than constructed, because they are shared with the runner adapter and
 // other modules.
 type Dependencies struct {
-	Log                *logger.Logger
-	DB                 *sqlx.DB
-	EventStore         thread.EventStore
-	SnapshotStore      es.SnapshotStore // optional — accelerates thread loading
-	ArtifactService    artifact.Service
-	UserProfileRepo    chatcontracts.UserProfileRepository
-	Emitter            agentorchestrator.EventEmitter // transient event router
-	AgentProvider      agent.AgentProvider
-	AuthService        shared.AuthService
-	ToolRegistry       *toolregistry.Registry
-	PermissionsService chatcontracts.ToolPermissionService
-	DocumentProvider   chatcontracts.DocumentProvider
-	TenantID           string
-	AllowedOrigin      string
-	SSE                taskmgmthandlers.SSEConfig
-	Broadcaster        agui.AguiBroadcaster
-	AsynqConfig        taskmanagement.AsynqConfig
+	Log                      *logger.Logger
+	DB                       *sqlx.DB
+	EventStore               thread.EventStore
+	SnapshotStore            es.SnapshotStore // optional — accelerates thread loading
+	ArtifactService          artifact.Service
+	UserProfileRepo          chatcontracts.UserProfileRepository
+	Emitter                  agentorchestrator.EventEmitter // transient event router
+	AgentProvider            agent.AgentProvider
+	AuthService              shared.AuthService
+	ToolRegistry             *toolregistry.Registry
+	RequirementConfigService chatcontracts.ToolRequirementConfigService
+	DocumentProvider         chatcontracts.DocumentProvider
+	TenantID                 string
+	AllowedOrigin            string
+	SSE                      taskmgmthandlers.SSEConfig
+	Broadcaster              agui.AguiBroadcaster
+	AsynqConfig              taskmanagement.AsynqConfig
 }
 
 // Module is the chat bounded context. It owns handlers, services, projections,
@@ -169,7 +169,7 @@ func (m *Module) SetRunner(runner agentorchestrator.Runner) {
 		m.deps.ArtifactService,
 		m.memoryService,
 		m.deps.ToolRegistry,
-		m.deps.PermissionsService,
+		m.deps.RequirementConfigService,
 		m.deps.DocumentProvider,
 		m.deps.TenantID,
 		m.deps.AllowedOrigin,
@@ -231,13 +231,16 @@ func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 
 	// Tool sets (per-agent)
 	r.Get("/v1/agents/{agentId}/toolsets", authMW.RequireAuthFunc(h.ListAgentToolSets))
-	r.Put("/v1/agents/{agentId}/toolsets/{toolSetId}", authMW.RequireAuthFunc(h.ToggleAgentToolSet))
-	r.Put("/v1/agents/{agentId}/toolsets/{toolSetId}/tools/{toolId}", authMW.RequireAuthFunc(h.ToggleIndividualTool))
+
+	// Tool requirement configuration (per-user, per-agent, per-tool)
+	r.Get("/v1/agents/{agentId}/toolsets/{toolSetId}/requirements", authMW.RequireAuthFunc(h.GetToolSetRequirementConfig))
+	r.Put("/v1/agents/{agentId}/toolsets/{toolSetId}/requirements", authMW.RequireAuthFunc(h.SetToolSetRequirementConfig))
+	r.Get("/v1/agents/{agentId}/toolsets/{toolSetId}/tools/requirements", authMW.RequireAuthFunc(h.ListToolRequirementConfigs))
+	r.Get("/v1/agents/{agentId}/toolsets/{toolSetId}/tools/{toolId}/requirements", authMW.RequireAuthFunc(h.GetToolRequirementConfig))
+	r.Put("/v1/agents/{agentId}/toolsets/{toolSetId}/tools/{toolId}/requirements", authMW.RequireAuthFunc(h.SetToolRequirementConfig))
 
 	// Plugins (agent-agnostic, agent_id via query param)
 	r.Get("/v1/plugins", authMW.RequireAuthFunc(h.ListPlugins))
-	r.Put("/v1/plugins/{pluginId}", authMW.RequireAuthFunc(h.TogglePlugin))
-	r.Put("/v1/plugins/{pluginId}/tools/{toolId}", authMW.RequireAuthFunc(h.TogglePluginTool))
 
 	// Documents (Edgequake passthrough)
 	r.Get("/v1/documents", authMW.RequireAuthFunc(h.ListDocuments))

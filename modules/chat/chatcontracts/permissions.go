@@ -2,23 +2,29 @@ package chatcontracts
 
 import "context"
 
-// ToolPermissionService abstracts the tool requirements module that the chat
-// module requires for tool-set and individual-tool toggles.
+// ToolRequirementConfigService abstracts the tool requirements module that the
+// chat module requires for per-user, per-agent, per-tool requirement
+// configuration (allow/block/require_confirmation, etc.).
 //
 // The concrete *toolreqs.Service satisfies this interface implicitly.
 // This is the single authority for all tool access decisions.
-type ToolPermissionService interface {
-	// GetEnabledToolSets returns enabled tool-set IDs for the given user/agent.
-	GetEnabledToolSets(ctx context.Context, userID, agentID string) ([]string, error)
+type ToolRequirementConfigService interface {
+	// GetToolRequirementConfigJSON returns the requirement config JSON for a tool.
+	// Returns "{}" when no explicit config exists.
+	GetToolRequirementConfigJSON(ctx context.Context, userID, agentID, toolSetID, toolID string) (string, error)
 
-	// HasPermission checks whether a specific tool is enabled.
-	HasPermission(ctx context.Context, userID, agentID, toolSetID, toolID string) bool
+	// SetToolRequirementConfigJSON saves the requirement config JSON for a tool.
+	SetToolRequirementConfigJSON(ctx context.Context, userID, agentID, toolSetID, toolID string, configJSON string) error
 
-	// SetToolSetPermission enables or disables a tool set for an agent.
-	SetToolSetPermission(ctx context.Context, userID, agentID, toolSetID string, enabled bool) error
+	// GetToolSetRequirementConfigJSON returns the requirement config JSON for a tool set.
+	GetToolSetRequirementConfigJSON(ctx context.Context, userID, agentID, toolSetID string) (string, error)
 
-	// SetPermission enables or disables an individual tool within a tool set.
-	SetPermission(ctx context.Context, userID, agentID, toolSetID, toolID string, enabled bool) error
+	// SetToolSetRequirementConfigJSON saves the requirement config JSON for a tool set.
+	SetToolSetRequirementConfigJSON(ctx context.Context, userID, agentID, toolSetID string, configJSON string) error
+
+	// ListToolRequirementConfigsJSON returns all tool requirement configs for
+	// a tool set as a map of toolID → config JSON string.
+	ListToolRequirementConfigsJSON(ctx context.Context, userID, agentID, toolSetID string) (map[string]string, error)
 }
 
 // UserProfile represents the extended profile of a user.

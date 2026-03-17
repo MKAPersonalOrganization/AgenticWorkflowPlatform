@@ -29,56 +29,54 @@ func testServiceIndiv(t *testing.T) *toolreqs.Service {
 	})
 }
 
-func TestIndividualToolPermissions(t *testing.T) {
+func TestIndividualToolRequirementConfig(t *testing.T) {
 	service := testServiceIndiv(t)
 	ctx := context.Background()
 
 	agentID := "math-instructor"
 	toolSetID := "calculator-set"
 	toolID := "add"
-
 	userID := "test-user"
 
-	// Test: Set individual tool permission
-	err := service.SetPermission(ctx, userID, agentID, toolSetID, toolID, true)
+	// Test: Set individual tool requirement config to "allow"
+	err := service.SetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID, toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionAllow,
+	})
 	if err != nil {
-		t.Fatalf("Failed to set individual tool permission: %v", err)
+		t.Fatalf("Failed to set tool requirement config: %v", err)
 	}
 
-	// Test: Check individual tool permission
+	// Test: Tool should be allowed
 	hasPermission := service.HasPermission(ctx, userID, agentID, toolSetID, toolID)
 	if !hasPermission {
-		t.Fatal("Expected agent to have permission for individual tool")
+		t.Fatal("Expected tool to be allowed")
 	}
 
-	// Test: Get permission details
-	permission, err := service.GetPermission(ctx, userID, agentID, toolSetID, toolID)
+	// Test: Get requirement config
+	cfg, err := service.GetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID)
 	if err != nil {
-		t.Fatalf("Failed to get individual tool permission: %v", err)
+		t.Fatalf("Failed to get tool requirement config: %v", err)
 	}
 
-	if permission.UserID != userID {
-		t.Errorf("Expected user ID %s, got %s", userID, permission.UserID)
+	if cfg.Action != toolreqs.RequirementActionAllow {
+		t.Errorf("Expected action %s, got %s", toolreqs.RequirementActionAllow, cfg.Action)
 	}
 
-	if permission.AgentID != agentID {
-		t.Errorf("Expected agent ID %s, got %s", agentID, permission.AgentID)
+	// Test: Block the tool
+	err = service.SetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID, toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionBlock,
+	})
+	if err != nil {
+		t.Fatalf("Failed to block tool: %v", err)
 	}
 
-	if permission.ToolSetID != toolSetID {
-		t.Errorf("Expected tool set ID %s, got %s", toolSetID, permission.ToolSetID)
-	}
-
-	if permission.ToolID != toolID {
-		t.Errorf("Expected tool ID %s, got %s", toolID, permission.ToolID)
-	}
-
-	if !permission.Enabled {
-		t.Error("Permission should be enabled")
+	hasPermission = service.HasPermission(ctx, userID, agentID, toolSetID, toolID)
+	if hasPermission {
+		t.Fatal("Blocked tool should not have permission")
 	}
 }
 
-func TestIndividualToolPermissionInheritance(t *testing.T) {
+func TestToolSetRequirementInheritance(t *testing.T) {
 	service := testServiceIndiv(t)
 	ctx := context.Background()
 
@@ -87,34 +85,38 @@ func TestIndividualToolPermissionInheritance(t *testing.T) {
 	toolSetID := "calculator-set"
 	toolID := "multiply"
 
-	// Test: Tool inherits permission from tool set when no explicit permission is set
+	// Test: Tool inherits permission from tool set when no explicit config exists
 
-	// First, enable the tool set
-	err := service.SetToolSetPermission(ctx, userID, agentID, toolSetID, true)
+	// Allow the tool set
+	err := service.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionAllow,
+	})
 	if err != nil {
-		t.Fatalf("Failed to enable tool set: %v", err)
+		t.Fatalf("Failed to allow tool set: %v", err)
 	}
 
-	// Check if individual tool inherits permission from tool set (should be true)
+	// Tool should inherit allowed status from tool set
 	hasPermission := service.HasPermission(ctx, userID, agentID, toolSetID, toolID)
 	if !hasPermission {
-		t.Fatal("Tool should inherit permission from enabled tool set")
+		t.Fatal("Tool should inherit permission from allowed tool set")
 	}
 
-	// Now disable the tool set
-	err = service.SetToolSetPermission(ctx, userID, agentID, toolSetID, false)
+	// Block the tool set
+	err = service.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionBlock,
+	})
 	if err != nil {
-		t.Fatalf("Failed to disable tool set: %v", err)
+		t.Fatalf("Failed to block tool set: %v", err)
 	}
 
-	// Check if individual tool inherits disabled permission from tool set
+	// Tool should inherit blocked status from tool set
 	hasPermission = service.HasPermission(ctx, userID, agentID, toolSetID, toolID)
 	if hasPermission {
-		t.Fatal("Tool should inherit disabled permission from tool set")
+		t.Fatal("Tool should inherit blocked status from tool set")
 	}
 }
 
-func TestIndividualToolPermissionOverride(t *testing.T) {
+func TestToolRequirementOverridesToolSet(t *testing.T) {
 	service := testServiceIndiv(t)
 	ctx := context.Background()
 
@@ -123,37 +125,80 @@ func TestIndividualToolPermissionOverride(t *testing.T) {
 	toolSetID := "calculator-set"
 	toolID := "divide"
 
-	// Test: Individual tool permission overrides tool set permission
-
-	// First, disable the tool set
-	err := service.SetToolSetPermission(ctx, userID, agentID, toolSetID, false)
+	// Block the tool set
+	err := service.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionBlock,
+	})
 	if err != nil {
-		t.Fatalf("Failed to disable tool set: %v", err)
+		t.Fatalf("Failed to block tool set: %v", err)
 	}
 
-	// Explicitly enable the individual tool
-	err = service.SetPermission(ctx, userID, agentID, toolSetID, toolID, true)
+	// Explicitly allow the individual tool
+	err = service.SetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID, toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionAllow,
+	})
 	if err != nil {
-		t.Fatalf("Failed to enable individual tool: %v", err)
+		t.Fatalf("Failed to allow individual tool: %v", err)
 	}
 
-	// The individual tool should be enabled despite the tool set being disabled
+	// Individual tool should be allowed despite tool set being blocked
 	hasPermission := service.HasPermission(ctx, userID, agentID, toolSetID, toolID)
 	if !hasPermission {
-		t.Fatal("Individual tool permission should override tool set permission")
+		t.Fatal("Individual tool config should override tool set config")
 	}
 
-	// Check tool set is still disabled
-	permission, err := service.GetToolSetPermission(ctx, userID, agentID, toolSetID)
-	if err != nil && err.Error() != "tool set permission not found" {
-		// It might be found as disabled
-		if permission != nil && permission.Enabled {
-			t.Fatal("Tool set should remain disabled")
-		}
+	// Tool set should still be blocked
+	hasToolSetPermission := service.HasToolSetPermission(ctx, userID, agentID, toolSetID)
+	if hasToolSetPermission {
+		t.Fatal("Tool set should remain blocked")
 	}
 }
 
-func TestGetEnabledToolsInSet(t *testing.T) {
+func TestRequireConfirmationConfig(t *testing.T) {
+	service := testServiceIndiv(t)
+	ctx := context.Background()
+
+	userID := "test-user"
+	agentID := "math-instructor"
+	toolSetID := "calculator-set"
+	toolID := "divide"
+
+	// Set require_confirmation on the tool
+	err := service.SetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID, toolreqs.ToolRequirementConfig{
+		Action:              toolreqs.RequirementActionRequireConfirmation,
+		RequireConfirmation: true,
+		ConfirmationHint:    "Division can produce unexpected results",
+	})
+	if err != nil {
+		t.Fatalf("Failed to set require_confirmation config: %v", err)
+	}
+
+	// Tool should still be "allowed" (not blocked)
+	hasPermission := service.HasPermission(ctx, userID, agentID, toolSetID, toolID)
+	if !hasPermission {
+		t.Fatal("require_confirmation tool should still have permission (not blocked)")
+	}
+
+	// Config should have confirmation details
+	cfg, err := service.GetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID)
+	if err != nil {
+		t.Fatalf("Failed to get config: %v", err)
+	}
+
+	if cfg.Action != toolreqs.RequirementActionRequireConfirmation {
+		t.Errorf("Expected action %s, got %s", toolreqs.RequirementActionRequireConfirmation, cfg.Action)
+	}
+
+	if !cfg.RequireConfirmation {
+		t.Error("RequireConfirmation should be true")
+	}
+
+	if cfg.ConfirmationHint != "Division can produce unexpected results" {
+		t.Errorf("Unexpected confirmation hint: %s", cfg.ConfirmationHint)
+	}
+}
+
+func TestListToolRequirementConfigs(t *testing.T) {
 	service := testServiceIndiv(t)
 	ctx := context.Background()
 
@@ -161,62 +206,92 @@ func TestGetEnabledToolsInSet(t *testing.T) {
 	agentID := "math-instructor"
 	toolSetID := "calculator-set"
 
-	// Test: Get enabled tools in a disabled tool set (should return empty)
-	err := service.SetToolSetPermission(ctx, userID, agentID, toolSetID, false)
-	if err != nil {
-		t.Fatalf("Failed to disable tool set: %v", err)
+	// Set configs for multiple tools
+	tools := map[string]toolreqs.RequirementAction{
+		"add":      toolreqs.RequirementActionAllow,
+		"subtract": toolreqs.RequirementActionBlock,
+		"multiply": toolreqs.RequirementActionRequireConfirmation,
 	}
 
-	enabledTools, err := service.GetEnabledToolsInSet(ctx, userID, agentID, toolSetID)
-	if err != nil {
-		t.Fatalf("Failed to get enabled tools in set: %v", err)
-	}
-
-	if len(enabledTools) != 0 {
-		t.Errorf("Expected 0 enabled tools in disabled tool set, got %d", len(enabledTools))
-	}
-
-	// Test: Enable tool set and add individual tool permissions
-	err = service.SetToolSetPermission(ctx, userID, agentID, toolSetID, true)
-	if err != nil {
-		t.Fatalf("Failed to enable tool set: %v", err)
-	}
-
-	// Enable specific tools individually
-	tools := []string{"add", "multiply"}
-	for _, toolID := range tools {
-		err = service.SetPermission(ctx, userID, agentID, toolSetID, toolID, true)
+	for toolID, action := range tools {
+		err := service.SetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID, toolreqs.ToolRequirementConfig{
+			Action: action,
+		})
 		if err != nil {
-			t.Fatalf("Failed to enable tool %s: %v", toolID, err)
+			t.Fatalf("Failed to set config for %s: %v", toolID, err)
 		}
 	}
 
-	// Disable one tool
-	err = service.SetPermission(ctx, userID, agentID, toolSetID, "subtract", false)
+	// List all configs in the tool set
+	configs, err := service.ListToolRequirementConfigs(ctx, userID, agentID, toolSetID)
 	if err != nil {
-		t.Fatalf("Failed to disable tool calc-subtract: %v", err)
+		t.Fatalf("Failed to list configs: %v", err)
 	}
 
-	enabledTools, err = service.GetEnabledToolsInSet(ctx, userID, agentID, toolSetID)
-	if err != nil {
-		t.Fatalf("Failed to get enabled tools in set: %v", err)
+	if len(configs) != 3 {
+		t.Errorf("Expected 3 configs, got %d", len(configs))
 	}
 
-	// Should have 2 enabled tools
-	if len(enabledTools) != 2 {
-		t.Errorf("Expected 2 enabled tools, got %d: %v", len(enabledTools), enabledTools)
-	}
-
-	// Check specific tools are in the list
-	expectedTools := map[string]bool{"add": true, "multiply": true}
-	for _, toolID := range enabledTools {
-		if !expectedTools[toolID] {
-			t.Errorf("Unexpected enabled tool: %s", toolID)
+	for toolID, expectedAction := range tools {
+		cfg, ok := configs[toolID]
+		if !ok {
+			t.Errorf("Missing config for tool %s", toolID)
+			continue
 		}
-		delete(expectedTools, toolID)
+		if cfg.Action != expectedAction {
+			t.Errorf("Tool %s: expected action %s, got %s", toolID, expectedAction, cfg.Action)
+		}
+	}
+}
+
+func TestGetAllowedToolSets(t *testing.T) {
+	service := testServiceIndiv(t)
+	ctx := context.Background()
+
+	userID := "test-user"
+	agentID := "math-instructor"
+
+	// Allow two tool sets, block one
+	err := service.SetToolSetRequirementConfig(ctx, userID, agentID, "calc-set", toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionAllow,
+	})
+	if err != nil {
+		t.Fatalf("Failed to allow calc-set: %v", err)
 	}
 
-	if len(expectedTools) > 0 {
-		t.Errorf("Missing expected enabled tools: %v", expectedTools)
+	err = service.SetToolSetRequirementConfig(ctx, userID, agentID, "graph-set", toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionAllow,
+	})
+	if err != nil {
+		t.Fatalf("Failed to allow graph-set: %v", err)
+	}
+
+	err = service.SetToolSetRequirementConfig(ctx, userID, agentID, "blocked-set", toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionBlock,
+	})
+	if err != nil {
+		t.Fatalf("Failed to block blocked-set: %v", err)
+	}
+
+	// GetEnabledToolSets should return only allowed ones
+	allowed, err := service.GetEnabledToolSets(ctx, userID, agentID)
+	if err != nil {
+		t.Fatalf("Failed to get allowed tool sets: %v", err)
+	}
+
+	if len(allowed) != 2 {
+		t.Errorf("Expected 2 allowed tool sets, got %d: %v", len(allowed), allowed)
+	}
+
+	expectedSets := map[string]bool{"calc-set": true, "graph-set": true}
+	for _, id := range allowed {
+		if !expectedSets[id] {
+			t.Errorf("Unexpected allowed tool set: %s", id)
+		}
+		delete(expectedSets, id)
+	}
+
+	if len(expectedSets) > 0 {
+		t.Errorf("Missing expected allowed tool sets: %v", expectedSets)
 	}
 }

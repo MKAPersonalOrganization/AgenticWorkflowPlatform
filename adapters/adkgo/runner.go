@@ -226,9 +226,14 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			genCfg := buildGenerateContentConfig(modelCfg)
 
 			// Bridge foundation function middlewares into ADK-Go's tool lifecycle.
-			// Inject confirmation middleware from the tool requirements service.
+			// Inject block + confirmation middlewares from the tool requirements service.
 			var extraMWs []fagent.Middleware
 			if r.toolReqs != nil {
+				// Block middleware runs first — prevents execution of blocked tools
+				// that may have slipped past resolution (race condition safety net).
+				if bmw := r.toolReqs.BlockMiddleware(agentName); bmw != nil {
+					extraMWs = append(extraMWs, bmw)
+				}
 				if cmw := r.toolReqs.ConfirmationMiddleware(agentName); cmw != nil {
 					extraMWs = append(extraMWs, cmw)
 				}
@@ -622,7 +627,15 @@ func (r *RunnerAdapter) resolveTools(
 			if tErr != nil {
 				continue
 			}
-			execTools = append(execTools, tools...)
+			// Filter out individual tools blocked by per-tool permissions.
+			// Without this, blocking a single tool (e.g. "add") inside an
+			// enabled tool set (e.g. "calculator-set") has no effect—the tool
+			// still gets sent to the LLM and executed.
+			for _, t := range tools {
+				if r.toolReqs.HasPermission(ctx, userID, agentName, toolSetID, t.Name()) {
+					execTools = append(execTools, t)
+				}
+			}
 		}
 
 		// Resolve MCP tools.

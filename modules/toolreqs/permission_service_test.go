@@ -29,27 +29,28 @@ func testService(t *testing.T) *toolreqs.Service {
 	})
 }
 
-func TestToolSetPermissionsService(t *testing.T) {
+func TestToolSetRequirementConfigService(t *testing.T) {
 	service := testService(t)
 	ctx := context.Background()
 
 	userID := "test-user"
-
-	// Test setting a tool set permission
 	agentID := "math-expert"
 	toolSetID := "calculator-set"
 
-	if err := service.SetToolSetPermission(ctx, userID, agentID, toolSetID, true); err != nil {
-		t.Fatalf("Failed to set tool set permission: %v", err)
+	// Allow a tool set via requirement config
+	if err := service.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionAllow,
+	}); err != nil {
+		t.Fatalf("Failed to allow tool set: %v", err)
 	}
 
-	// Test checking tool set permission
+	// Tool set should be allowed
 	hasPermission := service.HasToolSetPermission(ctx, userID, agentID, toolSetID)
 	if !hasPermission {
-		t.Fatal("Expected agent to have permission for tool set")
+		t.Fatal("Expected agent to have permission for allowed tool set")
 	}
 
-	// Test getting enabled tool sets
+	// Should appear in enabled (allowed) tool sets
 	enabledToolSets, err := service.GetEnabledToolSets(ctx, userID, agentID)
 	if err != nil {
 		t.Fatalf("Failed to get enabled tool sets: %v", err)
@@ -64,11 +65,11 @@ func TestToolSetPermissionsService(t *testing.T) {
 	}
 
 	if !found {
-		t.Fatal("Tool set should be in enabled tool sets list")
+		t.Fatal("Tool set should be in allowed tool sets list")
 	}
 }
 
-func TestToolSetDisabling(t *testing.T) {
+func TestToolSetBlockingViaRequirementConfig(t *testing.T) {
 	service := testService(t)
 	ctx := context.Background()
 
@@ -76,23 +77,27 @@ func TestToolSetDisabling(t *testing.T) {
 	agentID := "math-expert"
 	toolSetID := "calculator-set"
 
-	// First enable the tool set
-	if err := service.SetToolSetPermission(ctx, userID, agentID, toolSetID, true); err != nil {
-		t.Fatalf("Failed to enable tool set permission: %v", err)
+	// First allow the tool set
+	if err := service.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionAllow,
+	}); err != nil {
+		t.Fatalf("Failed to allow tool set: %v", err)
 	}
 
-	// Then disable it
-	if err := service.SetToolSetPermission(ctx, userID, agentID, toolSetID, false); err != nil {
-		t.Fatalf("Failed to disable tool set permission: %v", err)
+	// Then block it
+	if err := service.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionBlock,
+	}); err != nil {
+		t.Fatalf("Failed to block tool set: %v", err)
 	}
 
-	// Verify it's disabled
+	// Verify it's blocked
 	hasPermission := service.HasToolSetPermission(ctx, userID, agentID, toolSetID)
 	if hasPermission {
-		t.Fatal("Expected agent to NOT have permission for disabled tool set")
+		t.Fatal("Expected agent to NOT have permission for blocked tool set")
 	}
 
-	// Check enabled tool sets don't include the disabled one
+	// Verify blocked tool set is not in allowed list
 	enabledToolSets, err := service.GetEnabledToolSets(ctx, userID, agentID)
 	if err != nil {
 		t.Fatalf("Failed to get enabled tool sets: %v", err)
@@ -100,7 +105,7 @@ func TestToolSetDisabling(t *testing.T) {
 
 	for _, id := range enabledToolSets {
 		if id == toolSetID {
-			t.Fatal("Disabled tool set should not be in enabled tool sets list")
+			t.Fatal("Blocked tool set should not be in allowed tool sets list")
 		}
 	}
 }
@@ -112,7 +117,7 @@ func TestDefaultToolSets(t *testing.T) {
 	userID := "test-user"
 
 	// With the decoupled architecture, agents start with no default tool sets.
-	// All tool sets must be explicitly enabled per agent.
+	// All tool sets must be explicitly allowed per agent.
 	testCases := []struct {
 		agentID  string
 		expected int

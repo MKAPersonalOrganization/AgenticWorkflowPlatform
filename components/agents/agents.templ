@@ -748,7 +748,7 @@ templ AgentsDialog() {
 													<div class="space-y-1.5">
 														<template x-for="plugin in agentPlugins" :key="plugin.id">
 															<div class="rounded-md border border-border">
-																<!-- Plugin header with toggle -->
+																<!-- Plugin header -->
 																<div class="flex items-center justify-between p-2 hover:bg-accent/20 transition-colors">
 																	<div class="flex items-center gap-2 flex-1 min-w-0">
 																		<div class="size-7 rounded-md bg-primary/10 flex items-center justify-center text-primary shrink-0">
@@ -759,37 +759,27 @@ templ AgentsDialog() {
 																			<div class="text-[10px] text-muted-foreground truncate" x-text="plugin.tools.length + ' tools'"></div>
 																		</div>
 																	</div>
-																	<button
-																		@click="toggleAgentPlugin(plugin)"
-																		class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-																		:class="plugin.enabled ? 'bg-primary' : 'bg-input'"
-																		role="switch"
-																		:aria-checked="plugin.enabled"
-																	>
-																		<span
-																			class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
-																			:class="plugin.enabled ? 'translate-x-4' : 'translate-x-0'"
-																		></span>
-																	</button>
+																	<!-- Requirement badge -->
+																	<template x-if="plugin.requirement_config && plugin.requirement_config.action === 'block'">
+																		<span class="inline-flex items-center rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">blocked</span>
+																	</template>
+																	<template x-if="plugin.requirement_config && plugin.requirement_config.action === 'require_confirmation'">
+																		<span class="inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning">confirm</span>
+																	</template>
 																</div>
-																<!-- Individual tools (collapsible, only when plugin is enabled) -->
-																<template x-if="plugin.enabled && plugin.tools.length > 1">
+																<!-- Individual tools (collapsible) -->
+																<template x-if="plugin.tools.length > 1">
 																	<div class="border-t border-border/50 px-2 py-1.5 space-y-1">
 																		<template x-for="tool in plugin.tools" :key="tool.id">
 																			<div class="flex items-center justify-between py-1 px-2 rounded hover:bg-accent/20">
 																				<span class="text-[11px] text-muted-foreground truncate flex-1" x-text="tool.name"></span>
-																				<button
-																					@click="toggleAgentTool(plugin, tool)"
-																					class="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
-																					:class="tool.enabled ? 'bg-primary' : 'bg-input'"
-																					role="switch"
-																					:aria-checked="tool.enabled"
-																				>
-																					<span
-																						class="pointer-events-none inline-block h-3 w-3 rounded-full bg-background shadow ring-0 transition-transform duration-200 ease-in-out"
-																						:class="tool.enabled ? 'translate-x-3' : 'translate-x-0'"
-																					></span>
-																				</button>
+																				<!-- Tool requirement badge -->
+																				<template x-if="tool.requirement_config && tool.requirement_config.action === 'block'">
+																					<span class="inline-flex items-center rounded-full bg-destructive/10 px-1.5 py-0.5 text-[9px] font-medium text-destructive">blocked</span>
+																				</template>
+																				<template x-if="tool.requirement_config && tool.requirement_config.action === 'require_confirmation'">
+																					<span class="inline-flex items-center rounded-full bg-warning/10 px-1.5 py-0.5 text-[9px] font-medium text-warning">confirm</span>
+																				</template>
 																			</div>
 																		</template>
 																	</div>

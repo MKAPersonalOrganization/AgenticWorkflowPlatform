@@ -32,7 +32,7 @@ func testServiceToolset(t *testing.T) *toolreqs.Service {
 	})
 }
 
-func TestToolSetPermissions(t *testing.T) {
+func TestToolSetRequirementConfigs(t *testing.T) {
 	ctx := context.Background()
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
 
@@ -62,16 +62,20 @@ func TestToolSetPermissions(t *testing.T) {
 		}
 	}
 
-	t.Log("Testing explicit tool set permission changes...")
+	t.Log("Testing explicit tool set requirement config changes...")
 
-	err := service.SetToolSetPermission(ctx, userID, "math-expert", "calculator-set", true)
+	err := service.SetToolSetRequirementConfig(ctx, userID, "math-expert", "calculator-set", toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionAllow,
+	})
 	if err != nil {
-		t.Fatalf("Failed to enable calculator-set for math-expert: %v", err)
+		t.Fatalf("Failed to allow calculator-set for math-expert: %v", err)
 	}
 
-	err = service.SetToolSetPermission(ctx, userID, "math-expert", "cognitive-set", true)
+	err = service.SetToolSetRequirementConfig(ctx, userID, "math-expert", "cognitive-set", toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionAllow,
+	})
 	if err != nil {
-		t.Fatalf("Failed to enable cognitive-set for math-expert: %v", err)
+		t.Fatalf("Failed to allow cognitive-set for math-expert: %v", err)
 	}
 
 	mathToolSets, err := service.GetEnabledToolSets(ctx, userID, "math-expert")
@@ -83,9 +87,12 @@ func TestToolSetPermissions(t *testing.T) {
 		t.Errorf("Expected math-expert to have 2 tool sets, got %d: %v", len(mathToolSets), mathToolSets)
 	}
 
-	err = service.SetToolSetPermission(ctx, userID, "math-expert", "calculator-set", false)
+	// Block calculator-set
+	err = service.SetToolSetRequirementConfig(ctx, userID, "math-expert", "calculator-set", toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionBlock,
+	})
 	if err != nil {
-		t.Fatalf("Failed to disable calculator-set for math-expert: %v", err)
+		t.Fatalf("Failed to block calculator-set for math-expert: %v", err)
 	}
 
 	mathToolSets, err = service.GetEnabledToolSets(ctx, userID, "math-expert")
@@ -95,15 +102,15 @@ func TestToolSetPermissions(t *testing.T) {
 
 	for _, toolSetID := range mathToolSets {
 		if toolSetID == "calculator-set" {
-			t.Errorf("Expected calculator-set to be disabled for math-expert, but it's still enabled")
+			t.Errorf("Expected calculator-set to be blocked for math-expert, but it's still allowed")
 		}
 	}
 
 	if len(mathToolSets) != 1 {
-		t.Errorf("Expected math-expert to have 1 tool set after disabling, got %d: %v", len(mathToolSets), mathToolSets)
+		t.Errorf("Expected math-expert to have 1 tool set after blocking, got %d: %v", len(mathToolSets), mathToolSets)
 	}
 
-	t.Logf("After disabling calculator-set, math-expert has %d tool sets: %v", len(mathToolSets), mathToolSets)
+	t.Logf("After blocking calculator-set, math-expert has %d tool sets: %v", len(mathToolSets), mathToolSets)
 
 	physicsToolSets, err := service.GetEnabledToolSets(ctx, userID, "physics-expert")
 	if err != nil {
@@ -114,50 +121,46 @@ func TestToolSetPermissions(t *testing.T) {
 		t.Errorf("Expected physics-expert to have no tool sets (nothing configured), got %d: %v", len(physicsToolSets), physicsToolSets)
 	}
 
-	err = service.SetToolSetPermission(ctx, userID, "math-expert", "chemistry-set", true)
+	// Allow a new tool set
+	err = service.SetToolSetRequirementConfig(ctx, userID, "math-expert", "chemistry-set", toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionAllow,
+	})
 	if err != nil {
-		t.Fatalf("Failed to enable chemistry-set for math-expert: %v", err)
+		t.Fatalf("Failed to allow chemistry-set for math-expert: %v", err)
 	}
 
 	mathToolSetsAfterEnable, err := service.GetEnabledToolSets(ctx, userID, "math-expert")
 	if err != nil {
-		t.Fatalf("Failed to get enabled tool sets after enabling chemistry-set: %v", err)
+		t.Fatalf("Failed to get enabled tool sets after allowing chemistry-set: %v", err)
 	}
 
-	chemistrySetEnabled := false
+	chemistrySetAllowed := false
 	for _, toolSetID := range mathToolSetsAfterEnable {
 		if toolSetID == "chemistry-set" {
-			chemistrySetEnabled = true
+			chemistrySetAllowed = true
 			break
 		}
 	}
 
-	if !chemistrySetEnabled {
-		t.Errorf("Expected chemistry-set to be enabled for math-expert after manual enable")
+	if !chemistrySetAllowed {
+		t.Errorf("Expected chemistry-set to be allowed for math-expert after manual allow")
 	}
 
-	t.Logf("After enabling chemistry-set, math-expert has %d tool sets: %v", len(mathToolSetsAfterEnable), mathToolSetsAfterEnable)
+	t.Logf("After allowing chemistry-set, math-expert has %d tool sets: %v", len(mathToolSetsAfterEnable), mathToolSetsAfterEnable)
 
-	calcPerm, err := service.GetToolSetPermission(ctx, userID, "math-expert", "calculator-set")
-	if err != nil {
-		t.Fatalf("Failed to get calculator-set permission: %v", err)
-	}
-
-	if calcPerm.Enabled {
-		t.Errorf("Expected calculator-set permission to be disabled, but it's enabled")
-	}
-
+	// Verify blocked tool set via HasToolSetPermission
 	if service.HasToolSetPermission(ctx, userID, "math-expert", "calculator-set") {
 		t.Errorf("Expected math-expert to NOT have calculator-set permission")
 	}
 
-	if service.HasToolSetPermission(ctx, userID, "physics-expert", "calculator-set") {
-		t.Errorf("Expected physics-expert to NOT have calculator-set permission (nothing configured)")
+	// Verify unconfigured tool set — fail-open (no config = allowed)
+	if !service.HasToolSetPermission(ctx, userID, "physics-expert", "calculator-set") {
+		t.Errorf("Expected unconfigured tool set to be allowed (fail-open)")
 	}
 
 	if !service.HasToolSetPermission(ctx, userID, "math-expert", "chemistry-set") {
-		t.Errorf("Expected math-expert to have chemistry-set permission after manual enable")
+		t.Errorf("Expected math-expert to have chemistry-set permission after manual allow")
 	}
 
-	t.Log("Tool set permissions tests passed!")
+	t.Log("Tool set requirement config tests passed!")
 }

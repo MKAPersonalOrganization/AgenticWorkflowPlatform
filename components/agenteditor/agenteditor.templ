@@ -781,6 +781,7 @@ templ toggleSwitch(model string, labelText string, helpText string) {
 }
 
 // toolsSection renders the collapsible tools section for an agent in edit mode.
+// Clicking a tool or toolset name opens the requirements configuration dialog.
 templ toolsSection() {
 	<div class="border border-border rounded-lg">
 		<button
@@ -821,39 +822,57 @@ templ toolsSection() {
 					<div class="space-y-1.5">
 						<template x-for="plugin in agentPlugins" :key="plugin.id">
 							<div class="rounded-md border border-border">
-								<div class="flex items-center justify-between p-2 hover:bg-accent/20 transition-colors">
-									<div class="flex items-center gap-2 flex-1 min-w-0">
+								<!-- Plugin header: clickable name opens config dialog, toggle stays separate -->
+								<div class="flex items-center justify-between p-2 transition-colors">
+									<button
+										type="button"
+										@click.stop="openToolSetRequirements(plugin)"
+										class="flex items-center gap-2 flex-1 min-w-0 rounded-md px-1 py-0.5 -mx-1 hover:bg-accent/30 transition-colors cursor-pointer"
+									>
 										<div class="size-7 rounded-md bg-primary/10 flex items-center justify-center text-primary shrink-0">
 											@icon.Blocks(icon.Props{Class: "size-3.5"})
 										</div>
-										<div class="flex-1 min-w-0">
-											<div class="text-xs font-medium text-foreground truncate" x-text="plugin.name"></div>
+										<div class="flex-1 min-w-0 text-start">
+											<div class="flex items-center gap-1.5">
+												<span class="text-xs font-medium text-foreground truncate" x-text="plugin.name"></span>
+												<!-- Toolset-level requirement badge -->
+												<template x-if="plugin.requirement_config && plugin.requirement_config.action === 'block'">
+													<span class="text-[9px] px-1.5 py-0 rounded-full bg-destructive/10 text-destructive font-medium shrink-0">
+														{ i18n.T(ctx, "blocked") }
+													</span>
+												</template>
+												<template x-if="plugin.requirement_config && plugin.requirement_config.action === 'require_confirmation'">
+													<span class="text-[9px] px-1.5 py-0 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium shrink-0">
+														{ i18n.T(ctx, "confirm") }
+													</span>
+												</template>
+											</div>
 											<div class="text-[10px] text-muted-foreground truncate" x-text="plugin.tools.length + ' tools'"></div>
 										</div>
-									</div>
-									<button
-										@click="toggleAgentPlugin(plugin)"
-										class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
-										:class="plugin.enabled ? 'bg-primary' : 'bg-input'"
-										role="switch"
-										:aria-checked="plugin.enabled"
-									>
-										<span class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200" :class="plugin.enabled ? 'translate-x-4' : 'translate-x-0'"></span>
 									</button>
 								</div>
-								<template x-if="plugin.enabled && plugin.tools.length > 1">
-									<div class="border-t border-border/50 px-2 py-1.5 space-y-1">
+								<!-- Individual tools — clickable to open config dialog -->
+								<template x-if="plugin.tools.length > 1">
+									<div class="border-t border-border/50 px-2 py-1.5 space-y-0.5">
 										<template x-for="tool in plugin.tools" :key="tool.id">
-											<div class="flex items-center justify-between py-1 px-2 rounded hover:bg-accent/20">
-												<span class="text-[11px] text-muted-foreground truncate flex-1" x-text="tool.name"></span>
+											<div class="flex items-center justify-between py-0.5 rounded hover:bg-accent/10 transition-colors">
 												<button
-													@click="toggleAgentTool(plugin, tool)"
-													class="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
-													:class="tool.enabled ? 'bg-primary' : 'bg-input'"
-													role="switch"
-													:aria-checked="tool.enabled"
+													type="button"
+													@click.stop="openToolRequirements(plugin, tool)"
+													class="flex items-center gap-1.5 flex-1 min-w-0 px-2 py-1 rounded cursor-pointer hover:bg-accent/20 transition-colors text-start"
 												>
-													<span class="pointer-events-none inline-block h-3 w-3 rounded-full bg-background shadow ring-0 transition-transform duration-200" :class="tool.enabled ? 'translate-x-3' : 'translate-x-0'"></span>
+													<span class="text-[11px] text-muted-foreground truncate" x-text="tool.name"></span>
+													<!-- Requirement indicator badges -->
+													<template x-if="tool.requirement_config && tool.requirement_config.action === 'block'">
+														<span class="text-[9px] px-1.5 py-0 rounded-full bg-destructive/10 text-destructive font-medium shrink-0">
+															{ i18n.T(ctx, "blocked") }
+														</span>
+													</template>
+													<template x-if="tool.requirement_config && (tool.requirement_config.require_confirmation || tool.requirement_config.action === 'require_confirmation')">
+														<span class="text-[9px] px-1.5 py-0 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium shrink-0">
+															{ i18n.T(ctx, "confirm") }
+														</span>
+													</template>
 												</button>
 											</div>
 										</template>
@@ -864,6 +883,159 @@ templ toolsSection() {
 					</div>
 				</div>
 			</template>
+		</div>
+	</div>
+	<!-- Tool/ToolSet Requirements Config Dialog -->
+	@toolRequirementsDialog()
+}
+
+// toolRequirementsDialog renders a proper modal dialog for configuring tool/toolset
+// requirements. Opens when the user clicks a tool or toolset name.
+// Styled to match the design system dialog (bg-background, rounded-2xl, shadow-modern-xl).
+//
+// Inspired by ADK-Go's RequireConfirmation and AgentStack's approval flow.
+templ toolRequirementsDialog() {
+	<!-- Backdrop overlay -->
+	<div
+		x-show="showRequirementsPanel"
+		x-transition:enter="transition ease-out duration-200"
+		x-transition:enter-start="opacity-0"
+		x-transition:enter-end="opacity-100"
+		x-transition:leave="transition ease-in duration-150"
+		x-transition:leave-start="opacity-100"
+		x-transition:leave-end="opacity-0"
+		@click.self="closeRequirementsPanel()"
+		class="fixed inset-0 z-60 bg-black/40 backdrop-blur-[3px]"
+	></div>
+	<!-- Dialog content -->
+	<div
+		x-show="showRequirementsPanel"
+		x-transition:enter="transition ease-out duration-200"
+		x-transition:enter-start="opacity-0 scale-[0.97]"
+		x-transition:enter-end="opacity-100 scale-100"
+		x-transition:leave="transition ease-in duration-150"
+		x-transition:leave-start="opacity-100 scale-100"
+		x-transition:leave-end="opacity-0 scale-[0.97]"
+		@keydown.escape.window="closeRequirementsPanel()"
+		class="fixed z-60 left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] bg-background rounded-2xl border border-border/60 shadow-modern-xl w-full max-w-[calc(100%-2rem)] sm:max-w-md"
+	>
+		<!-- Header -->
+		<div class="flex items-center justify-between px-5 pt-5 pb-0">
+			<div class="flex items-center gap-2.5">
+				<div class="size-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+					@icon.Shield(icon.Props{Class: "size-4"})
+				</div>
+				<div>
+					<h3 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Tool Requirements") }</h3>
+					<p class="text-xs text-muted-foreground" x-text="reqConfigTarget?.name || ''"></p>
+				</div>
+			</div>
+			<button
+				type="button"
+				@click="closeRequirementsPanel()"
+				class="size-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+			>
+				@icon.X(icon.Props{Class: "size-4"})
+			</button>
+		</div>
+		<!-- Body -->
+		<div class="px-5 py-4 space-y-4">
+			<!-- Access Policy -->
+			<div class="space-y-2">
+				<label class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Access Policy") }</label>
+				<div class="grid grid-cols-3 gap-2">
+					<button
+						type="button"
+						@click="setReqConfigAction('allow')"
+						class="flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-xl border text-xs font-medium transition-all"
+						:class="(!reqConfig.action || reqConfig.action === 'allow') ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 ring-1 ring-emerald-500/20' : 'bg-muted/30 text-muted-foreground border-border hover:bg-accent/50 hover:text-foreground'"
+					>
+						@icon.CircleCheck(icon.Props{Class: "size-4"})
+						{ i18n.T(ctx, "Allow") }
+					</button>
+					<button
+						type="button"
+						@click="setReqConfigAction('block')"
+						class="flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-xl border text-xs font-medium transition-all"
+						:class="reqConfig.action === 'block' ? 'bg-destructive/10 text-destructive border-destructive/30 ring-1 ring-destructive/20' : 'bg-muted/30 text-muted-foreground border-border hover:bg-accent/50 hover:text-foreground'"
+					>
+						@icon.Ban(icon.Props{Class: "size-4"})
+						{ i18n.T(ctx, "Block") }
+					</button>
+					<button
+						type="button"
+						@click="setReqConfigAction('require_confirmation')"
+						class="flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-xl border text-xs font-medium transition-all"
+						:class="reqConfig.action === 'require_confirmation' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 ring-1 ring-amber-500/20' : 'bg-muted/30 text-muted-foreground border-border hover:bg-accent/50 hover:text-foreground'"
+					>
+						@icon.ShieldAlert(icon.Props{Class: "size-4"})
+						{ i18n.T(ctx, "Confirm") }
+					</button>
+				</div>
+			</div>
+			<!-- Confirmation hint (only when action = require_confirmation) -->
+			<template x-if="reqConfig.action === 'require_confirmation'">
+				<div class="space-y-2">
+					<label class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Confirmation Prompt") }</label>
+					@textarea.Textarea(textarea.Props{
+						Placeholder: i18n.T(ctx, "e.g., This tool will modify files. Are you sure?"),
+						Class:       "min-h-[56px] resize-y text-xs",
+						Rows:        2,
+						Attributes: templ.Attributes{
+							"x-model": "reqConfig.confirmation_hint",
+						},
+					})
+					<p class="text-[11px] text-muted-foreground leading-relaxed">
+						{ i18n.T(ctx, "Shown to the user before the tool runs.") }
+					</p>
+				</div>
+			</template>
+			<!-- Max invocations per turn -->
+			<div class="space-y-2">
+				<label class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Max Invocations per Turn") }</label>
+				@input.Input(input.Props{
+					Type:        input.TypeNumber,
+					Placeholder: i18n.T(ctx, "0 = unlimited"),
+					Class:       "h-8 text-xs",
+					Attributes: templ.Attributes{
+						"x-model.number": "reqConfig.max_invocations",
+						"min":            "0",
+						"max":            "100",
+					},
+				})
+				<p class="text-[11px] text-muted-foreground leading-relaxed">
+					{ i18n.T(ctx, "Limits how many times this tool can be called per conversation turn.") }
+				</p>
+			</div>
+		</div>
+		<!-- Footer -->
+		<div class="flex items-center justify-end gap-2 px-5 pb-5 pt-0">
+			@button.Button(button.Props{
+				Variant: button.VariantOutline,
+				Class:   "h-8 px-3 text-xs",
+				Attributes: templ.Attributes{
+					"@click": "closeRequirementsPanel()",
+				},
+			}) {
+				{ i18n.T(ctx, "Cancel") }
+			}
+			@button.Button(button.Props{
+				Variant: button.VariantDefault,
+				Class:   "h-8 px-4 text-xs gap-1.5",
+				Attributes: templ.Attributes{
+					"@click":    "saveRequirementConfig()",
+					":disabled": "savingReqConfig",
+				},
+			}) {
+				<span x-show="!savingReqConfig" class="flex items-center gap-1.5">
+					@icon.Check(icon.Props{Class: "size-3.5"})
+					{ i18n.T(ctx, "Save") }
+				</span>
+				<span x-show="savingReqConfig" class="flex items-center gap-1.5">
+					<span class="animate-spin size-3.5 border-2 border-current border-t-transparent rounded-full"></span>
+					{ i18n.T(ctx, "Saving...") }
+				</span>
+			}
 		</div>
 	</div>
 }
