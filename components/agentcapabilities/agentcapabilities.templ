@@ -83,7 +83,6 @@ templ capabilitiesPanelContent() {
 	{{ kbsLabel := i18n.T(ctx, "knowledge bases") }}
 	{{ fsLabel := i18n.T(ctx, "filesystem") }}
 	{{ fssLabel := i18n.T(ctx, "filesystems") }}
-	{{ offLabel := i18n.T(ctx, "off") }}
 	<div class="flex flex-col h-full max-h-[inherit]">
 		<!-- Header -->
 		<div class="flex items-center gap-3 px-5 pt-4 pb-3 border-b border-border/50">
@@ -176,33 +175,40 @@ templ capabilitiesPanelContent() {
 										<div class="flex items-center gap-2 px-2.5 py-1.5 bg-muted/30">
 											<div
 												class="size-5 rounded flex items-center justify-center shrink-0"
-												:class="plugin.enabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'"
+												:class="plugin.requirement_config?.action === 'block' ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'"
 											>
 												@icon.Blocks(icon.Props{Class: "size-3"})
 											</div>
 											<span
 												class="text-[11px] font-medium truncate flex-1"
-												:class="plugin.enabled ? 'text-foreground' : 'text-muted-foreground line-through'"
+												:class="plugin.requirement_config?.action === 'block' ? 'text-muted-foreground line-through' : 'text-foreground'"
 												x-text="plugin.name"
 											></span>
-											<span
-												class="text-[9px] tabular-nums shrink-0"
-												:class="plugin.enabled ? 'text-primary' : 'text-muted-foreground'"
-												x-text={ "plugin.enabled ? enabledToolCount(plugin) + '/' + plugin.tools.length : '" + offLabel + "'" }
-											></span>
+											<template x-if="plugin.requirement_config?.action === 'block'">
+												<span class="inline-flex items-center rounded-full bg-destructive/10 px-1.5 py-0.5 text-[9px] font-medium text-destructive">blocked</span>
+											</template>
+											<template x-if="plugin.requirement_config?.action === 'require_confirmation'">
+												<span class="inline-flex items-center rounded-full bg-warning/10 px-1.5 py-0.5 text-[9px] font-medium text-warning">confirm</span>
+											</template>
+											<template x-if="plugin.requirement_config?.action !== 'block'">
+												<span
+													class="text-[9px] tabular-nums shrink-0 text-primary"
+													x-text="enabledToolCount(plugin) + '/' + plugin.tools.length"
+												></span>
+											</template>
 										</div>
-										<!-- Individual tools (only for enabled plugins with >1 tool) -->
-										<template x-if="plugin.enabled && plugin.tools.length > 1">
+										<!-- Individual tools (only for non-blocked plugins with >1 tool) -->
+										<template x-if="plugin.requirement_config?.action !== 'block' && plugin.tools.length > 1">
 											<div class="border-t border-border/30 px-2.5 py-1 space-y-0.5 bg-background/50">
 												<template x-for="tool in plugin.tools" :key="tool.id">
 													<div class="flex items-center gap-1.5 py-px">
 														<span
 															class="size-1.5 rounded-full shrink-0"
-															:class="tool.enabled ? 'bg-primary' : 'bg-muted-foreground/30'"
+															:class="tool.requirement_config?.action === 'block' ? 'bg-muted-foreground/30' : 'bg-primary'"
 														></span>
 														<span
 															class="text-[10px] truncate"
-															:class="tool.enabled ? 'text-foreground' : 'text-muted-foreground line-through'"
+															:class="tool.requirement_config?.action === 'block' ? 'text-muted-foreground line-through' : 'text-foreground'"
 															x-text="tool.name"
 														></span>
 													</div>

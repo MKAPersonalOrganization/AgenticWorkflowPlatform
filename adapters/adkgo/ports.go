@@ -83,6 +83,11 @@ type ToolRequirementsService interface {
 	// ConfirmationMiddleware returns middleware enforcing user confirmation
 	// for the given agent.
 	ConfirmationMiddleware(agentID string) agent.Middleware
+
+	// BlockMiddleware returns middleware that prevents execution of tools
+	// the user has blocked. Defense-in-depth: catches blocked tools that
+	// slip past resolution filtering (e.g., race conditions).
+	BlockMiddleware(agentID string) agent.Middleware
 }
 
 // MCPToolResolver resolves MCP-based tools for a user.

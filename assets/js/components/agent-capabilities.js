@@ -54,9 +54,9 @@ export const agentCapabilities = () => ({
     get enabledTools() {
         let count = 0;
         for (const p of this.plugins) {
-            if (!p.enabled) continue;
+            if (p.requirement_config?.action === 'block') continue;
             for (const t of p.tools) {
-                if (t.enabled) count++;
+                if (t.requirement_config?.action !== 'block') count++;
             }
         }
         return count;
@@ -118,7 +118,7 @@ export const agentCapabilities = () => ({
      * @returns {number}
      */
     enabledToolCount(plugin) {
-        return plugin.tools.filter(t => t.enabled).length;
+        return plugin.tools.filter(t => t.requirement_config?.action !== 'block').length;
     },
 
     /**

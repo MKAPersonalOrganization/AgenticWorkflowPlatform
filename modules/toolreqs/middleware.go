@@ -1,11 +1,68 @@
 package toolreqs
 
 import (
+	"context"
 	"fmt"
 
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/agent/io"
 )
+
+// =============================================================================
+// Block Middleware — defense-in-depth enforcement at execution time
+// =============================================================================
+
+// blockChecker is the interface needed by BlockMiddleware to evaluate whether
+// a tool is blocked. It is implemented by [Service].
+type blockChecker interface {
+	HasPermission(ctx context.Context, userID, agentID, toolSetID, toolID string) bool
+}
+
+// BlockMiddleware returns a [agent.Middleware] that prevents execution of tools
+// the user has blocked via the requirement configuration.
+//
+// This is a safety net: normally, blocked tools are filtered out during tool
+// resolution (resolveTools) so the LLM never sees them. However, race
+// conditions (config updated mid-conversation) or bugs in resolution could
+// allow a blocked tool through. This middleware catches those cases.
+//
+// The middleware extracts user_id and tool_set_id from context metadata
+// (populated by the middlewareBridge) and calls HasPermission to verify
+// the tool is still allowed.
+func BlockMiddleware(checker blockChecker, agentID string) agent.Middleware {
+	return func(next agent.Handler) agent.Handler {
+		return agent.HandlerFunc(func(c *agent.Context) error {
+			if !c.IsFunction() {
+				return next.Handle(c)
+			}
+
+			toolName := ""
+			if c.Function != nil && c.Function.Tool != nil {
+				toolName = c.Function.Tool.Name()
+			}
+			if toolName == "" {
+				return next.Handle(c)
+			}
+
+			userID, _ := c.Metadata["user_id"].(string)
+			toolSetID, _ := c.Metadata["tool_set_id"].(string)
+
+			// If we have enough context to check permissions, do so.
+			if userID != "" && checker != nil {
+				if !checker.HasPermission(c.Context, userID, agentID, toolSetID, toolName) {
+					c.Result = map[string]any{
+						"result":  fmt.Sprintf("Tool '%s' is blocked by your configuration.", toolName),
+						"blocked": true,
+						"tool":    toolName,
+					}
+					return nil
+				}
+			}
+
+			return next.Handle(c)
+		})
+	}
+}
 
 // =============================================================================
 // Confirmation Middleware — runtime enforcement via foundation primitives

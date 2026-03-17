@@ -76,6 +76,18 @@ export const agentDesigner = () => ({
     // Delete state
     deletingAgent: null,
 
+    // Requirement config state
+    showRequirementsPanel: false,
+    reqConfigTarget: null,      // { type: 'tool'|'toolset', pluginId, toolId?, name }
+    reqConfig: {
+        action: 'allow',
+        require_confirmation: false,
+        confirmation_hint: '',
+        max_invocations: 0,
+        priority: 0,
+    },
+    savingReqConfig: false,
+
     // Pipeline composition state
     _nodeCounter: 0,
     showComposition: false,
@@ -218,6 +230,7 @@ export const agentDesigner = () => ({
         this.showKnowledgeBases = false;
         this.showFilesystems = false;
         this.showOrchestration = false;
+        this.showRequirementsPanel = false;
         this.agentPlugins = [];
         this.agentWorkspaces = [];
         this.agentFilesystems = [];
@@ -243,6 +256,7 @@ export const agentDesigner = () => ({
         this.showKnowledgeBases = false;
         this.showFilesystems = false;
         this.showOrchestration = false;
+        this.showRequirementsPanel = false;
         this.nodeView = 'form';
 
         // Load tool/KB/FS data
@@ -340,8 +354,9 @@ export const agentDesigner = () => ({
 
     get toolsSummary() {
         if (this.loadingTools) return '';
-        const enabled = this.agentPlugins.filter(p => p.enabled).length;
-        return `${enabled}/${this.agentPlugins.length}`;
+        const blocked = this.agentPlugins.filter(p => p.requirement_config && p.requirement_config.action === 'block').length;
+        if (blocked > 0) return `${this.agentPlugins.length - blocked}/${this.agentPlugins.length}`;
+        return `${this.agentPlugins.length}`;
     },
 
     get kbSummary() {
@@ -413,42 +428,6 @@ export const agentDesigner = () => ({
         }
     },
 
-    async toggleAgentPlugin(plugin) {
-        if (!this.editingAgent) return;
-        const newState = !plugin.enabled;
-        try {
-            const response = await fetch(`/v1/plugins/${plugin.id}?agent_id=${encodeURIComponent(this.editingAgent.id)}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ enabled: newState }),
-            });
-            if (response.ok) {
-                plugin.enabled = newState;
-                plugin.tools.forEach(t => t.enabled = newState);
-            }
-        } catch (err) {
-            console.error('Failed to toggle agent plugin:', err);
-        }
-    },
-
-    async toggleAgentTool(plugin, tool) {
-        if (!this.editingAgent) return;
-        const newState = !tool.enabled;
-        try {
-            const response = await fetch(`/v1/plugins/${plugin.id}/tools/${tool.id}?agent_id=${encodeURIComponent(this.editingAgent.id)}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ enabled: newState }),
-            });
-            if (response.ok) {
-                tool.enabled = newState;
-                plugin.enabled = plugin.tools.some(t => t.enabled);
-            }
-        } catch (err) {
-            console.error('Failed to toggle agent tool:', err);
-        }
-    },
-
     async toggleAgentWorkspace(ws) {
         if (!this.editingAgent) return;
         const newState = !ws.enabled;
@@ -473,6 +452,130 @@ export const agentDesigner = () => ({
             });
             if (response.ok) { fs.enabled = newState; }
         } catch (err) { console.error('Failed to toggle agent filesystem:', err); }
+    },
+
+    // ══════════════════════════════════════════
+    // Tool Requirement Configuration
+    // (per-user, per-agent, per-tool/toolset)
+    //
+    // Maps to:
+    //   - ADK-Go: RequireConfirmation, BeforeToolCallback
+    //   - AgentStack: approval extension, demand/fulfillment
+    //   - Backend: toolreqs.ToolRequirementConfig
+    // ══════════════════════════════════════════
+
+    /**
+     * Open the requirements configuration panel for a tool set (plugin).
+     */
+    openToolSetRequirements(plugin) {
+        this.reqConfigTarget = {
+            type: 'toolset',
+            pluginId: plugin.id,
+            name: plugin.name,
+        };
+        // Pre-fill from existing config
+        this.reqConfig = {
+            action: plugin.requirement_config?.action || 'allow',
+            require_confirmation: plugin.requirement_config?.require_confirmation || false,
+            confirmation_hint: plugin.requirement_config?.confirmation_hint || '',
+            max_invocations: plugin.requirement_config?.max_invocations || 0,
+            priority: plugin.requirement_config?.priority || 0,
+        };
+        this.showRequirementsPanel = true;
+    },
+
+    /**
+     * Open the requirements configuration panel for an individual tool.
+     */
+    openToolRequirements(plugin, tool) {
+        this.reqConfigTarget = {
+            type: 'tool',
+            pluginId: plugin.id,
+            toolId: tool.id,
+            name: tool.name,
+        };
+        // Pre-fill from existing config
+        this.reqConfig = {
+            action: tool.requirement_config?.action || 'allow',
+            require_confirmation: tool.requirement_config?.require_confirmation || false,
+            confirmation_hint: tool.requirement_config?.confirmation_hint || '',
+            max_invocations: tool.requirement_config?.max_invocations || 0,
+            priority: tool.requirement_config?.priority || 0,
+        };
+        this.showRequirementsPanel = true;
+    },
+
+    /**
+     * Close the requirements panel without saving.
+     */
+    closeRequirementsPanel() {
+        this.showRequirementsPanel = false;
+        this.reqConfigTarget = null;
+    },
+
+    /**
+     * Update the action in the current requirement config.
+     * Syncs require_confirmation flag with the action.
+     */
+    setReqConfigAction(action) {
+        this.reqConfig.action = action;
+        this.reqConfig.require_confirmation = (action === 'require_confirmation');
+    },
+
+    /**
+     * Save the current requirement config to the backend.
+     * Updates the local plugin/tool state optimistically.
+     */
+    async saveRequirementConfig() {
+        if (!this.editingAgent || !this.reqConfigTarget) return;
+        this.savingReqConfig = true;
+
+        try {
+            const agentId = this.editingAgent.id;
+            const target = this.reqConfigTarget;
+            const payload = { ...this.reqConfig };
+
+            let url;
+            if (target.type === 'toolset') {
+                url = `/v1/agents/${encodeURIComponent(agentId)}/toolsets/${encodeURIComponent(target.pluginId)}/requirements`;
+            } else {
+                url = `/v1/agents/${encodeURIComponent(agentId)}/toolsets/${encodeURIComponent(target.pluginId)}/tools/${encodeURIComponent(target.toolId)}/requirements`;
+            }
+
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+
+            if (response.ok) {
+                // Update local state optimistically
+                if (target.type === 'toolset') {
+                    const plugin = this.agentPlugins.find(p => p.id === target.pluginId);
+                    if (plugin) {
+                        plugin.requirement_config = { ...payload };
+                    }
+                } else {
+                    const plugin = this.agentPlugins.find(p => p.id === target.pluginId);
+                    if (plugin) {
+                        const tool = plugin.tools.find(t => t.id === target.toolId);
+                        if (tool) {
+                            tool.requirement_config = { ...payload };
+                        }
+                    }
+                }
+                this.closeRequirementsPanel();
+            } else {
+                const err = await response.json().catch(() => ({}));
+                console.error('Failed to save requirement config:', err);
+                alert(err.error || 'Failed to save requirement config');
+            }
+        } catch (err) {
+            console.error('Failed to save requirement config:', err);
+            alert('Failed to save requirement config');
+        } finally {
+            this.savingReqConfig = false;
+        }
     },
 
     // ══════════════════════════════════════════

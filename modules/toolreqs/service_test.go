@@ -51,11 +51,15 @@ func TestService_GetEnabledToolSets_WithData(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()
 
-	// Set up some tool sets.
-	if err := svc.SetToolSetPermission(ctx, "user1", "agent1", "calculator", true); err != nil {
+	// Set up some tool sets via requirement config.
+	if err := svc.SetToolSetRequirementConfig(ctx, "user1", "agent1", "calculator", toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionAllow,
+	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.SetToolSetPermission(ctx, "user1", "agent1", "web-search", true); err != nil {
+	if err := svc.SetToolSetRequirementConfig(ctx, "user1", "agent1", "web-search", toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionAllow,
+	}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -72,9 +76,13 @@ func TestService_HasPermission_Allowed(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()
 
-	// Enable tool set and individual tool.
-	svc.SetToolSetPermission(ctx, "user1", "agent1", "calc-set", true)
-	svc.SetPermission(ctx, "user1", "agent1", "calc-set", "add", true)
+	// Allow tool set and individual tool via requirement config.
+	svc.SetToolSetRequirementConfig(ctx, "user1", "agent1", "calc-set", toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionAllow,
+	})
+	svc.SetToolRequirementConfig(ctx, "user1", "agent1", "calc-set", "add", toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionAllow,
+	})
 
 	if !svc.HasPermission(ctx, "user1", "agent1", "calc-set", "add") {
 		t.Error("expected tool to be allowed")
@@ -85,9 +93,13 @@ func TestService_HasPermission_Blocked(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()
 
-	// Enable tool set but disable individual tool.
-	svc.SetToolSetPermission(ctx, "user1", "agent1", "calc-set", true)
-	svc.SetPermission(ctx, "user1", "agent1", "calc-set", "add", false)
+	// Allow tool set but block individual tool via requirement config.
+	svc.SetToolSetRequirementConfig(ctx, "user1", "agent1", "calc-set", toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionAllow,
+	})
+	svc.SetToolRequirementConfig(ctx, "user1", "agent1", "calc-set", "add", toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionBlock,
+	})
 
 	if svc.HasPermission(ctx, "user1", "agent1", "calc-set", "add") {
 		t.Error("expected tool to be blocked")
@@ -98,9 +110,17 @@ func TestService_HasToolSetPermission(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()
 
-	// Not configured → blocked.
-	if svc.HasToolSetPermission(ctx, "user1", "agent1", "disabled-set") {
-		t.Error("expected tool set to be blocked")
+	// Not configured → allowed (fail-open: no config means no block).
+	if !svc.HasToolSetPermission(ctx, "user1", "agent1", "unconfigured-set") {
+		t.Error("expected unconfigured tool set to be allowed (fail-open)")
+	}
+
+	// Explicitly blocked → blocked.
+	svc.SetToolSetRequirementConfig(ctx, "user1", "agent1", "blocked-set", toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionBlock,
+	})
+	if svc.HasToolSetPermission(ctx, "user1", "agent1", "blocked-set") {
+		t.Error("expected explicitly blocked tool set to be blocked")
 	}
 }
 
@@ -108,9 +128,13 @@ func TestService_EvaluateTool_WithConfirmation(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()
 
-	// Enable permissions so we can test confirmation.
-	svc.SetToolSetPermission(ctx, "user1", "agent1", "tools", true)
-	svc.SetPermission(ctx, "user1", "agent1", "tools", "dangerous_tool", true)
+	// Allow permissions via requirement config so we can test confirmation.
+	svc.SetToolSetRequirementConfig(ctx, "user1", "agent1", "tools", toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionAllow,
+	})
+	svc.SetToolRequirementConfig(ctx, "user1", "agent1", "tools", "dangerous_tool", toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionAllow,
+	})
 
 	// Configure confirmation for the tool.
 	svc.Confirmation().SetGlobalPolicy("dangerous_tool", &toolreqs.ConfirmationPolicy{
@@ -146,8 +170,10 @@ func TestService_EvaluateTool_PermissionBlockOverridesConfirm(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()
 
-	// Tool set disabled.
-	svc.SetToolSetPermission(ctx, "user1", "agent1", "set1", false)
+	// Tool set blocked via requirement config.
+	svc.SetToolSetRequirementConfig(ctx, "user1", "agent1", "set1", toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionBlock,
+	})
 
 	svc.Confirmation().SetGlobalPolicy("tool_x", &toolreqs.ConfirmationPolicy{
 		AlwaysConfirm: true,

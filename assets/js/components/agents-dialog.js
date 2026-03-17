@@ -338,8 +338,9 @@ export const agentsManager = () => ({
 
     get toolsSummary() {
         if (this.loadingTools) return '';
-        const enabled = this.agentPlugins.filter(p => p.enabled).length;
-        return `${enabled}/${this.agentPlugins.length}`;
+        const blocked = this.agentPlugins.filter(p => p.requirement_config?.action === 'block').length;
+        const active = this.agentPlugins.length - blocked;
+        return `${active}/${this.agentPlugins.length}`;
     },
 
     get kbSummary() {
@@ -410,41 +411,7 @@ export const agentsManager = () => ({
         }
     },
 
-    async toggleAgentPlugin(plugin) {
-        if (!this.editingAgent) return;
-        const newState = !plugin.enabled;
-        try {
-            const response = await fetch(`/v1/plugins/${plugin.id}?agent_id=${encodeURIComponent(this.editingAgent.id)}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ enabled: newState }),
-            });
-            if (response.ok) {
-                plugin.enabled = newState;
-                plugin.tools.forEach(t => t.enabled = newState);
-            }
-        } catch (err) {
-            console.error('Failed to toggle agent plugin:', err);
-        }
-    },
 
-    async toggleAgentTool(plugin, tool) {
-        if (!this.editingAgent) return;
-        const newState = !tool.enabled;
-        try {
-            const response = await fetch(`/v1/plugins/${plugin.id}/tools/${tool.id}?agent_id=${encodeURIComponent(this.editingAgent.id)}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ enabled: newState }),
-            });
-            if (response.ok) {
-                tool.enabled = newState;
-                plugin.enabled = plugin.tools.some(t => t.enabled);
-            }
-        } catch (err) {
-            console.error('Failed to toggle agent tool:', err);
-        }
-    },
 
     async toggleAgentWorkspace(ws) {
         if (!this.editingAgent) return;
