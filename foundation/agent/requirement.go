@@ -59,7 +59,6 @@ type Rule struct {
 //   - ToolProvider: provides additional tools to the agent
 //   - PromptProvider: contributes to the system prompt
 //   - Enableable: can be dynamically enabled/disabled
-//   - FunctionMiddlewareProvider: injects middleware into tool execution
 type Requirement interface {
 	// Run evaluates the requirement and returns rules for the current turn.
 	Run(ctx context.Context, inv *Invocation) ([]Rule, error)
@@ -88,17 +87,6 @@ type PromptProvider interface {
 type Enableable interface {
 	// Enabled returns whether this requirement should be evaluated.
 	Enabled() bool
-}
-
-// FunctionMiddlewareProvider is an optional interface that Requirements can
-// implement to inject FunctionMiddleware into the tool execution pipeline.
-//
-// This bridges the gap between Requirements (evaluated before LLM calls)
-// and FunctionMiddleware (evaluated during tool execution). Some concerns
-// like "ask permission" span both phases.
-type FunctionMiddlewareProvider interface {
-	// FunctionMiddleware returns middleware to wrap tool execution.
-	FunctionMiddleware() Middleware
 }
 
 // =============================================================================

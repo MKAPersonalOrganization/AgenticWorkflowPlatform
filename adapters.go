@@ -260,18 +260,13 @@ func mapFileStat(s *filesystem.FileStat) *fsplugin.FileStat {
 // ──────────────────────────────────────────────────────────────────────────────
 
 type userAwareAgentProvider struct {
-	repo                agentstore.AgentDefinitionRepository
-	functionMiddlewares []agent.Middleware
+	repo agentstore.AgentDefinitionRepository
 }
 
 func newUserAwareAgentProvider(
 	repo agentstore.AgentDefinitionRepository,
-	funcMw []agent.Middleware,
 ) *userAwareAgentProvider {
-	return &userAwareAgentProvider{
-		repo:                repo,
-		functionMiddlewares: funcMw,
-	}
+	return &userAwareAgentProvider{repo: repo}
 }
 
 func (p *userAwareAgentProvider) Get(name string) (agent.Agent, error) {
@@ -315,12 +310,9 @@ func (p *userAwareAgentProvider) ListForUser(ctx context.Context, userID string)
 
 func (p *userAwareAgentProvider) agentFromDefinition(def *agentstore.AgentDefinition) agent.Agent {
 	cfg := agent.Config{
-		Name:                def.ID,
-		Description:         def.Description,
-		SystemPrompt:        def.SystemPrompt,
-		Tools:               []agent.Tool{},
-		Requirements:        []agent.Requirement{},
-		FunctionMiddlewares: p.functionMiddlewares,
+		Name:         def.ID,
+		Description:  def.Description,
+		SystemPrompt: def.SystemPrompt,
 		TransferPolicy: agent.TransferPolicy{
 			DisallowTransferToParent: def.DisallowTransferToParent,
 			DisallowTransferToPeers:  def.DisallowTransferToPeers,

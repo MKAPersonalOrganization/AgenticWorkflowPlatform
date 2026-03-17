@@ -108,38 +108,6 @@ func Chain(mws ...Middleware) Middleware {
 	}
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Tool execution phase markers
-//
-// These constants are used by the middleware bridge to communicate which phase
-// of tool execution is active — "before" (pre-execution) or "after" (post-execution).
-// Middlewares that need different behaviour per phase (e.g., ToolLogging) should
-// check c.Metadata[ToolPhaseKey] to determine the current phase.
-//
-// When ToolPhaseKey is absent from metadata, the middleware is running in
-// single-pass mode (not bridged through ADK-Go callbacks) and should execute
-// the full before+after logic inline.
-// ──────────────────────────────────────────────────────────────────────────────
-
-const (
-	// ToolPhaseKey is the metadata key used by the middleware bridge to
-	// communicate the current execution phase to middlewares.
-	ToolPhaseKey = "tool_phase"
-
-	// ToolPhaseBefore indicates the pre-execution (before) phase.
-	// Middlewares should perform setup, validation, and logging here.
-	ToolPhaseBefore = "before"
-
-	// ToolPhaseAfter indicates the post-execution (after) phase.
-	// Middlewares should perform cleanup, result logging, and caching here.
-	ToolPhaseAfter = "after"
-
-	// ToolStartTimeKey is the metadata key used to persist the tool call
-	// start time between the before and after phases, enabling accurate
-	// duration measurement across the ADK-Go callback split.
-	ToolStartTimeKey = "tool_start_time"
-)
-
 // NewAgentContext creates a Context for an agent operation.
 func NewAgentContext(ctx context.Context, agent Agent, messages []Message, streaming bool) *Context {
 	return &Context{

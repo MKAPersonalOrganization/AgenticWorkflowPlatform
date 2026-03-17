@@ -38,7 +38,6 @@ const (
 //   - I/O Schema:   InputSchema, OutputSchema
 //   - Execution:    MaxIterations, OutputKey, IncludeContents
 //   - Global:       GlobalInstruction (shared across agent tree)
-//   - Observability: FunctionMiddlewares (tool-call cross-cutting concerns)
 type Config struct {
 	// Name is the unique identifier for the agent.
 	// Must be unique within the agent tree. Cannot be "user" (reserved).
@@ -69,7 +68,6 @@ type Config struct {
 	// Requirements are declarative constraints evaluated before each LLM turn.
 	// Requirements that implement ToolProvider automatically contribute tools.
 	// Requirements that implement PromptProvider automatically contribute to the system prompt.
-	// Requirements that implement FunctionMiddlewareProvider contribute to the tool pipeline.
 	//
 	// Example:
 	//
@@ -108,10 +106,6 @@ type Config struct {
 	// conforming to this schema. When set, tool use is disabled.
 	OutputSchema *Schema
 
-	// FunctionMiddlewares are cross-cutting concerns run around each tool execution
-	// (e.g. logging, rate-limiting, argument validation, caching).
-	// These are bridged to ADK-Go's BeforeToolCallback / AfterToolCallback.
-	FunctionMiddlewares []Middleware
 }
 
 // DefaultConfig returns a Config with sensible defaults.
