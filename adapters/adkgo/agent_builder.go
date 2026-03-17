@@ -10,6 +10,38 @@ import (
 	fagent "school-with-ai/foundation/agent"
 )
 
+// foundationSchemaToGenAI converts a foundation agent.Schema to a genai.Schema.
+// Used to populate llmagent.Config.InputSchema and OutputSchema.
+func foundationSchemaToGenAI(s *fagent.Schema) *genai.Schema {
+	if s == nil {
+		return nil
+	}
+	gs := &genai.Schema{
+		Type:        genai.Type(string(s.Type)),
+		Description: s.Description,
+	}
+	if s.Nullable {
+		t := true
+		gs.Nullable = &t
+	}
+	if len(s.Properties) > 0 {
+		gs.Properties = make(map[string]*genai.Schema, len(s.Properties))
+		for k, v := range s.Properties {
+			gs.Properties[k] = foundationSchemaToGenAI(v)
+		}
+	}
+	if len(s.Required) > 0 {
+		gs.Required = s.Required
+	}
+	if s.Items != nil {
+		gs.Items = foundationSchemaToGenAI(s.Items)
+	}
+	if len(s.Enum) > 0 {
+		gs.Enum = s.Enum
+	}
+	return gs
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // LLM Agent Builder
 //
@@ -69,6 +101,8 @@ func buildLLMAgent(p llmAgentParams) (agent.Agent, error) {
 		cfg.DisallowTransferToPeers = p.agentCfg.TransferPolicy.DisallowTransferToPeers
 		cfg.OutputKey = p.agentCfg.OutputKey
 		cfg.GlobalInstruction = p.agentCfg.GlobalInstruction
+		cfg.InputSchema = foundationSchemaToGenAI(p.agentCfg.InputSchema)
+		cfg.OutputSchema = foundationSchemaToGenAI(p.agentCfg.OutputSchema)
 
 		if p.agentCfg.IncludeContents == fagent.IncludeContentsNone {
 			cfg.IncludeContents = llmagent.IncludeContentsNone
@@ -85,6 +119,8 @@ func buildLLMAgent(p llmAgentParams) (agent.Agent, error) {
 		}
 		if n.IncludeContents == "none" {
 			cfg.IncludeContents = llmagent.IncludeContentsNone
+		} else if n.IncludeContents == "default" {
+			cfg.IncludeContents = llmagent.IncludeContentsDefault
 		}
 		if n.OutputKey != "" {
 			cfg.OutputKey = n.OutputKey

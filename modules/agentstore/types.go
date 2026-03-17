@@ -107,6 +107,7 @@ func (a *AgentDefinition) UnmarshalGraph() error {
 //   - "sequential" → sequentialagent.New (runs children in order)
 //   - "parallel"   → parallelagent.New (runs children concurrently)
 //   - "loop"       → loopagent.New (repeats children until exit condition)
+//   - "remote"     → custom agent.New wrapping an A2A connector (delegates via A2A protocol)
 //
 // Example tree:
 //
@@ -128,6 +129,7 @@ const (
 	NodeSequential NodeType = "sequential"
 	NodeParallel   NodeType = "parallel"
 	NodeLoop       NodeType = "loop"
+	NodeRemote     NodeType = "remote"
 )
 
 // ValidNodeTypes is the set of supported node types.
@@ -136,6 +138,7 @@ var ValidNodeTypes = map[NodeType]bool{
 	NodeSequential: true,
 	NodeParallel:   true,
 	NodeLoop:       true,
+	NodeRemote:     true,
 }
 
 // IsComposite returns true if the node type can contain children.
@@ -151,7 +154,11 @@ type CompositionNode struct {
 	Label string   `json:"label,omitempty"`
 
 	// ── Leaf-node fields (Type = "agent") ──
-	AgentID                  string `json:"agent_id,omitempty"`
+	AgentID string `json:"agent_id,omitempty"`
+
+	// ── Remote-node fields (Type = "remote") ──
+	// A2AConnectorID references a registered A2A connector for remote delegation.
+	A2AConnectorID string `json:"a2a_connector_id,omitempty"`
 	OutputKey                string `json:"output_key,omitempty"`
 	DisallowTransferToParent *bool  `json:"disallow_transfer_to_parent,omitempty"`
 	DisallowTransferToPeers  *bool  `json:"disallow_transfer_to_peers,omitempty"`

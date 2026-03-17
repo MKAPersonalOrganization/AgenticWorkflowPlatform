@@ -266,7 +266,7 @@ func (s *service) forkShared(ctx context.Context, token, targetUserID string) (*
 func (s *service) validateGraph(ctx context.Context, node *CompositionNode, userID string) error {
 	// Root must be composite — a workflow agent orchestrates sub-agents.
 	// A single agent doesn't need a composition graph.
-	if node.Type == NodeAgent {
+	if node.Type == NodeAgent || node.Type == NodeRemote {
 		return fmt.Errorf("root node must be sequential, parallel, or loop (use a simple agent definition for a single LLM agent)")
 	}
 	if node.CountNodes() > maxTreeNodes {
@@ -296,6 +296,14 @@ func (s *service) validateNode(ctx context.Context, node *CompositionNode, userI
 		_, err := s.repo.GetByID(ctx, node.AgentID, userID)
 		if err != nil {
 			return fmt.Errorf("node %q: agent %q not found: %w", node.ID, node.AgentID, err)
+		}
+
+	case NodeRemote:
+		if node.A2AConnectorID == "" {
+			return fmt.Errorf("node %q: remote node requires a2a_connector_id", node.ID)
+		}
+		if len(node.Children) > 0 {
+			return fmt.Errorf("node %q: remote node cannot have children", node.ID)
 		}
 
 	case NodeSequential, NodeParallel, NodeLoop:

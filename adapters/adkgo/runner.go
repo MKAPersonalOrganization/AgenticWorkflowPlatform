@@ -45,6 +45,7 @@ type RunnerAdapter struct {
 	confirmEnforcer        ConfirmationEnforcer
 	mcpResolver            MCPToolResolver
 	a2aResolver            A2AToolResolver
+	a2aSubAgentProvider    A2ASubAgentProvider
 	newToolSetFactory      NewToolSetFactoryFunc
 	promptInjectors        []PromptInjector
 	extraConfigFn          ExtraConfigFunc
@@ -63,6 +64,7 @@ type RunnerAdapterConfig struct {
 	ConfirmEnforcer        ConfirmationEnforcer
 	MCPResolver            MCPToolResolver
 	A2AResolver            A2AToolResolver
+	A2ASubAgentProvider    A2ASubAgentProvider
 	NewToolSetFactory      NewToolSetFactoryFunc
 	PromptInjectors        []PromptInjector
 	ExtraConfigFn          ExtraConfigFunc
@@ -85,6 +87,7 @@ func NewRunnerAdapter(cfg RunnerAdapterConfig) (*RunnerAdapter, error) {
 		confirmEnforcer:        cfg.ConfirmEnforcer,
 		mcpResolver:            cfg.MCPResolver,
 		a2aResolver:            cfg.A2AResolver,
+		a2aSubAgentProvider:    cfg.A2ASubAgentProvider,
 		newToolSetFactory:      cfg.NewToolSetFactory,
 		promptInjectors:        cfg.PromptInjectors,
 		extraConfigFn:          cfg.ExtraConfigFn,
@@ -450,6 +453,11 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 					}
 
 				case *thread.AssistantMessageAdded:
+					// Ensure a stable message ID — A2A-sourced events may arrive
+					// with an empty session.Event.ID, which would fail persistence.
+					if evt.MessageID == "" {
+						evt.MessageID = assistantMsgID
+					}
 					// When streaming, emit AssistantMessageCompleted first so the
 					// frontend receives TEXT_MESSAGE_END. AssistantMessageAdded is
 					// always yielded regardless — it is the durable persistence event
@@ -466,6 +474,35 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 							return
 						}
 						streamingMsgID = ""
+					} else if evt.Content != "" {
+						// Non-streaming response (e.g. A2A remote agent): no
+						// AssistantContentStreamed deltas were emitted, so the
+						// frontend has nothing to show. Synthesize the full
+						// TEXT_MESSAGE lifecycle as transient events.
+						if !yield(&thread.AssistantMessageStarted{
+							ThreadID:  evt.ThreadID,
+							MessageID: evt.MessageID,
+							Timestamp: evt.Timestamp,
+						}, nil) {
+							return
+						}
+						if !yield(&thread.AssistantContentStreamed{
+							ThreadID:  evt.ThreadID,
+							MessageID: evt.MessageID,
+							Delta:     evt.Content,
+							Timestamp: evt.Timestamp,
+						}, nil) {
+							return
+						}
+						if !yield(&thread.AssistantMessageCompleted{
+							ThreadID:  evt.ThreadID,
+							MessageID: evt.MessageID,
+							Content:   evt.Content,
+							AgentName: evt.AgentName,
+							Timestamp: evt.Timestamp,
+						}, nil) {
+							return
+						}
 					}
 					if !yield(de, nil) {
 						return

@@ -4,6 +4,7 @@ package adkgo
 
 import (
 	"context"
+	"iter"
 
 	"school-with-ai/foundation/agent"
 	"school-with-ai/modules/chat/thread"
@@ -105,6 +106,30 @@ type MCPToolResolver interface {
 		hasToolSetPerm func(toolSetID string) bool,
 		hasToolPerm func(toolSetID, toolID string) bool,
 	) []agent.ExecutableTool
+}
+
+// A2AConnectorInfo carries the metadata needed to describe a remote A2A agent
+// as a workflow sub-agent.
+type A2AConnectorInfo struct {
+	ID          string
+	Name        string
+	Description string
+	AgentURL    string
+}
+
+// A2ASubAgentProvider resolves A2A connectors for use as workflow sub-agents.
+// This is distinct from A2AToolResolver (which exposes connectors as tools)
+// because sub-agents delegate an entire turn rather than a single tool call.
+type A2ASubAgentProvider interface {
+	// GetConnectorInfo retrieves the metadata for a connector, scoped to user.
+	GetConnectorInfo(ctx context.Context, connectorID, userID string) (A2AConnectorInfo, error)
+	// SendMessage sends a message to the remote agent and returns its complete response.
+	SendMessage(ctx context.Context, connectorID, userID, message string) (string, error)
+	// SendStreamingMessage streams text deltas from the remote agent as they arrive.
+	// Each yielded string is an incremental text chunk. The caller accumulates the
+	// chunks to form the full response. Streaming falls back to SendMessage when the
+	// remote agent does not support streaming.
+	SendStreamingMessage(ctx context.Context, connectorID, userID, message string) iter.Seq2[string, error]
 }
 
 // A2AToolResolver resolves A2A-based tools for a user.

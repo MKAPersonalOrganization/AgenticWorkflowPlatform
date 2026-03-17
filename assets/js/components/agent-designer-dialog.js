@@ -106,6 +106,9 @@ export const agentDesigner = () => ({
     editingPipeline: null,
     pipelineSaving: false,
 
+    // A2A connectors (for remote nodes)
+    connectors: [],
+
     // Pipeline list state
     pipelines: [],
     filteredPipelines: [],
@@ -126,7 +129,7 @@ export const agentDesigner = () => ({
         this.searchQuery = '';
         this.pipelineSearchQuery = '';
         this.selectedNodePath = null;
-        await this.fetchAgents();
+        await Promise.all([this.fetchAgents(), this.fetchConnectors()]);
         this.filterPipelines();
     },
 
@@ -162,6 +165,18 @@ export const agentDesigner = () => ({
             console.error('Failed to fetch agents:', err);
         } finally {
             this.loading = false;
+        }
+    },
+
+    async fetchConnectors() {
+        try {
+            const response = await fetch('/v1/a2a/connectors');
+            if (response.ok) {
+                const data = await response.json();
+                this.connectors = data.connectors || [];
+            }
+        } catch (err) {
+            console.error('Failed to fetch A2A connectors:', err);
         }
     },
 
@@ -754,6 +769,9 @@ export const agentDesigner = () => ({
                 include_contents: '',
             };
         }
+        if (type === 'remote') {
+            return { id, type: 'remote', label: '', a2a_connector_id: '', output_key: '' };
+        }
         // Composite node — label maps to agent.Config.Name in ADK-Go
         const node = { id, type, label: '', children: [] };
         if (type === 'loop') { node.max_iterations = 3; }
@@ -804,13 +822,24 @@ export const agentDesigner = () => ({
         if (newType === 'agent') {
             delete node.children;
             delete node.max_iterations;
+            delete node.a2a_connector_id;
             node.agent_id = '';
             node.output_key = '';
             node.disallow_transfer_to_parent = null;
             node.disallow_transfer_to_peers = null;
             node.include_contents = '';
+        } else if (newType === 'remote') {
+            delete node.children;
+            delete node.max_iterations;
+            delete node.agent_id;
+            delete node.disallow_transfer_to_parent;
+            delete node.disallow_transfer_to_peers;
+            delete node.include_contents;
+            node.a2a_connector_id = node.a2a_connector_id || '';
+            node.output_key = node.output_key || '';
         } else {
             delete node.agent_id;
+            delete node.a2a_connector_id;
             delete node.output_key;
             delete node.disallow_transfer_to_parent;
             delete node.disallow_transfer_to_peers;
@@ -845,7 +874,7 @@ export const agentDesigner = () => ({
     },
 
     nodeTypeLabel(type) {
-        const labels = { sequential: 'Sequential', parallel: 'Parallel', loop: 'Loop', agent: 'Agent' };
+        const labels = { sequential: 'Sequential', parallel: 'Parallel', loop: 'Loop', agent: 'Agent', remote: 'Remote A2A' };
         return labels[type] || type;
     },
 
@@ -855,6 +884,7 @@ export const agentDesigner = () => ({
             parallel: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
             loop: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
             agent: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+            remote: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
         };
         return classes[type] || '';
     },
@@ -903,7 +933,7 @@ export const agentDesigner = () => ({
 
         // Root must be composite — a workflow agent is a sequentialagent/parallelagent/loopagent
         const rootType = this.pipelineGraph.type;
-        if (rootType === 'agent') {
+        if (rootType === 'agent' || rootType === 'remote') {
             errors.push('Root node must be Sequential, Parallel, or Loop (a Workflow Agent orchestrates sub-agents — use the LLM Agent tab for a single agent)');
         }
 
@@ -914,6 +944,10 @@ export const agentDesigner = () => ({
             if (node.type === 'agent') {
                 if (!node.agent_id) {
                     errors.push(`${path}: agent node requires an LLM Agent selection (→ resolves to llmagent.New)`);
+                }
+            } else if (node.type === 'remote') {
+                if (!node.a2a_connector_id) {
+                    errors.push(`${path}: remote node requires an A2A Connector selection`);
                 }
             } else if (isComposite) {
                 if (!node.children || node.children.length === 0) {

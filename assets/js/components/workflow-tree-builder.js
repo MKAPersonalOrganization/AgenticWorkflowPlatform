@@ -8,6 +8,7 @@
  *   ↓ Sequential         → sequentialagent.New(sequentialagent.Config{AgentConfig: agent.Config{Name, SubAgents}})
  *   ∥ Parallel           → parallelagent.New(parallelagent.Config{AgentConfig: agent.Config{Name, SubAgents}})
  *   ↻ Loop               → loopagent.New(loopagent.Config{AgentConfig: agent.Config{Name, SubAgents}, MaxIterations})
+ *   ⇝ Remote             → agent.New wrapping A2A connector (delegates full turn via A2A protocol)
  *
  * Key ADK-Go behaviors surfaced:
  *   - Every agent has a Name (agent.Config.Name) — composite nodes expose a Label input
@@ -57,6 +58,7 @@ export function workflowTreeBuilder() {
                 ['sequential', 'Sequential → sequentialagent'],
                 ['parallel', 'Parallel → parallelagent'],
                 ['loop', 'Loop → loopagent'],
+                ['remote', 'Remote Agent → A2A'],
             ]) {
                 html += `<option value="${val}"${val === node.type ? ' selected' : ''}>${lbl}</option>`;
             }
@@ -87,6 +89,11 @@ export function workflowTreeBuilder() {
             // ── Agent leaf node fields ──
             if (node.type === 'agent') {
                 html += this._renderAgentFields(node, path, isLastInLoop);
+            }
+
+            // ── Remote leaf node fields ──
+            if (node.type === 'remote') {
+                html += this._renderRemoteFields(node, path);
             }
 
             // ── Loop: max iterations ──
@@ -198,6 +205,41 @@ export function workflowTreeBuilder() {
         },
 
         // ══════════════════════════════════════════════════════════════════
+        // Remote leaf node fields (Type = "remote")
+        // ══════════════════════════════════════════════════════════════════
+
+        _renderRemoteFields(node, path) {
+            // Resolve connectors from nearest Alpine parent scope
+            const src = Alpine.closestDataStack(this.$el).find(d => d.connectors);
+            const connectors = src ? (src.connectors || []) : [];
+
+            let html = `<div class="space-y-2">`;
+
+            // Connector selector — delegates an entire turn to a registered A2A endpoint
+            html += `<select class="w-full h-8 rounded-md border border-border bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" `;
+            html += `onchange="const n=Alpine.closestDataStack(this).find(d=>d._getNodeByPath)?._getNodeByPath('${path}');if(n)n.a2a_connector_id=this.value">`;
+            html += `<option value="">Select an A2A Connector (→ remote agent.New via A2A protocol)...</option>`;
+            for (const conn of connectors) {
+                html += `<option value="${this._esc(conn.id)}"${conn.id === node.a2a_connector_id ? ' selected' : ''}>${this._esc(conn.title || conn.agent_name || conn.id)}</option>`;
+            }
+            html += `</select>`;
+
+            // OutputKey — saves remote response to session state
+            html += `<input type="text" placeholder="OutputKey → saves remote response to session state (reference as {key} downstream)" maxlength="50" `;
+            html += `class="w-full h-7 rounded-md border border-border bg-background px-3 text-[11px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring" `;
+            html += `value="${this._esc(node.output_key || '')}" `;
+            html += `oninput="const n=Alpine.closestDataStack(this).find(d=>d._getNodeByPath)?._getNodeByPath('${path}');if(n)n.output_key=this.value">`;
+
+            html += `<div class="flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-rose-500/10 border border-rose-500/20">`;
+            html += `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5 text-rose-600 dark:text-rose-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>`;
+            html += `<span class="text-[10px] text-rose-600 dark:text-rose-400">Delegates the full turn to a registered A2A remote agent. The response is returned as plain text and optionally stored via OutputKey.</span>`;
+            html += `</div>`;
+
+            html += `</div>`;
+            return html;
+        },
+
+        // ══════════════════════════════════════════════════════════════════
         // Loop fields
         // ══════════════════════════════════════════════════════════════════
 
@@ -223,11 +265,13 @@ export function workflowTreeBuilder() {
                 { type: 'sequential', icon: '+↓', color: 'hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400', label: 'Sequential' },
                 { type: 'parallel', icon: '+∥', color: 'hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400', label: 'Parallel' },
                 { type: 'loop', icon: '+↻', color: 'hover:bg-purple-500/10 hover:text-purple-600 dark:hover:text-purple-400', label: 'Loop' },
+                { type: 'remote', icon: '+⇝', color: 'hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400', label: 'Remote A2A' },
             ];
             let html = `<div class="flex items-center gap-1.5 mt-1">`;
             for (const { type, icon, color, label } of types) {
                 html += `<button type="button" class="h-6 px-2 rounded text-[10px] font-medium border border-dashed border-border text-muted-foreground ${color} transition-colors" `;
-                html += `title="Add ${label} child (→ ${type === 'agent' ? 'llmagent' : type + 'agent'}.New)" `;
+                const titleSuffix = type === 'agent' ? 'llmagent.New' : type === 'remote' ? 'agent.New via A2A' : type + 'agent.New';
+                html += `title="Add ${label} child (→ ${titleSuffix})" `;
                 html += `onclick="Alpine.closestDataStack(this).find(d=>d.addChildToNode)?.addChildToNode('${path}','${type}')"`;
                 html += `>${icon} ${label}</button>`;
             }
@@ -245,6 +289,7 @@ export function workflowTreeBuilder() {
                 parallel: { border: 'border-amber-500/30', bg: 'bg-amber-500/5', badge: 'bg-amber-500/15 text-amber-600 dark:text-amber-400', label: '∥ Parallel' },
                 loop: { border: 'border-purple-500/30', bg: 'bg-purple-500/5', badge: 'bg-purple-500/15 text-purple-600 dark:text-purple-400', label: '↻ Loop' },
                 agent: { border: 'border-emerald-500/30', bg: 'bg-emerald-500/5', badge: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400', label: '● LLM Agent' },
+                remote: { border: 'border-rose-500/30', bg: 'bg-rose-500/5', badge: 'bg-rose-500/15 text-rose-600 dark:text-rose-400', label: '⇝ Remote A2A' },
             };
             return styles[type] || styles.agent;
         },

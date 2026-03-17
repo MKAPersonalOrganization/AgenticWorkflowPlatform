@@ -14,6 +14,8 @@ github.com/a-h/parse v0.0.0-20250122154542-74294addb73e h1:HjVbSQHy+dnlS6C3XajZ6
 github.com/a-h/parse v0.0.0-20250122154542-74294addb73e/go.mod h1:3mnrkvGpurZ4ZrTDbYU84xhwXW2TjTKShSwjRi2ihfQ=
 github.com/a-h/templ v0.3.1001 h1:yHDTgexACdJttyiyamcTHXr2QkIeVF1MukLy44EAhMY=
 github.com/a-h/templ v0.3.1001/go.mod h1:oCZcnKRf5jjsGpf2yELzQfodLphd2mwecwG4Crk5HBo=
+github.com/a2aproject/a2a-go v0.3.7 h1:yw3wqvIoafE5KBh66qYdc0Na1y87H2zEX0R1hHFTcww=
+github.com/a2aproject/a2a-go v0.3.7/go.mod h1:I7Cm+a1oL+UT6zMoP+roaRE5vdfUa1iQGVN8aSOuZ0I=
 github.com/a2aproject/a2a-go/v2 v2.0.0-20260313155851-b1f055ce0fbd h1:p9x833wKs8AZCg4ebdK7Xv87Mr3plPjJDIbB0K6J/78=
 github.com/a2aproject/a2a-go/v2 v2.0.0-20260313155851-b1f055ce0fbd/go.mod h1:zxrqbi85M0ufPMqgYIn91upId0vYRZAbqt+6o6UWIV8=
 github.com/ag-ui-protocol/ag-ui/sdks/community/go v0.0.0-20251230070606-5ae00423dc91 h1:ibA1bYEpLNW08/PVjAeX88a0JKgq8SXRXrONyXWH/GU=

@@ -606,6 +606,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		ConfirmEnforcer:        toolReqsService,
 		MCPResolver:            mcpModule.Service(),
 		A2AResolver:            a2aModule.Service(),
+		A2ASubAgentProvider:    &a2aSubAgentAdapter{svc: a2aModule.Service()},
 		NewToolSetFactory:      newToolSetFactory,
 		PromptInjectors:        []adkgo.PromptInjector{kbPromptInjector},
 		ExtraConfigFn:          extraConfigFn,

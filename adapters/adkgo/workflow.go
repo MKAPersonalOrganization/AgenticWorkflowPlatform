@@ -3,6 +3,8 @@ package adkgo
 import (
 	"context"
 	"fmt"
+	"iter"
+	"strings"
 
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
@@ -10,7 +12,9 @@ import (
 	"google.golang.org/adk/agent/workflowagents/parallelagent"
 	"google.golang.org/adk/agent/workflowagents/sequentialagent"
 	adkmodel "google.golang.org/adk/model"
+	"google.golang.org/adk/session"
 	"google.golang.org/adk/tool/exitlooptool"
+	"google.golang.org/genai"
 
 	fagent "school-with-ai/foundation/agent"
 )
@@ -118,6 +122,9 @@ func buildNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, isLastI
 
 	case "loop":
 		return buildLoopNode(wbc, node)
+
+	case "remote":
+		return buildRemoteAgentNode(wbc, node)
 
 	default:
 		return nil, fmt.Errorf("node %q: unsupported type %q", node.ID, node.Type)
@@ -347,6 +354,116 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 		beforeToolCallbacks:  beforeToolCBs,
 		afterToolCallbacks:   afterToolCBs,
 		nodeOverride:         node,
+	})
+}
+
+// buildRemoteAgentNode creates a custom ADK-Go agent that delegates to an
+// external A2A endpoint via the A2ASubAgentProvider port.
+//
+// Because ADK-Go's remoteagent package uses a different version of the a2a-go
+// module (v0.3.3 vs our v2), we cannot use remoteagent.NewA2A() directly.
+// Instead we build a plain agent.New() whose Run function calls our existing
+// a2a.Service.SendMessage() infrastructure, keeping all auth and transport
+// logic in one place.
+func buildRemoteAgentNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo) (agent.Agent, error) {
+	if node.A2AConnectorID == "" {
+		return nil, fmt.Errorf("node %q: remote node requires a2a_connector_id", node.ID)
+	}
+	if wbc.adapter.a2aSubAgentProvider == nil {
+		return nil, fmt.Errorf("node %q: A2ASubAgentProvider not configured", node.ID)
+	}
+
+	// Resolve connector metadata once at build time for name/description.
+	info, err := wbc.adapter.a2aSubAgentProvider.GetConnectorInfo(wbc.ctx, node.A2AConnectorID, wbc.userID)
+	if err != nil {
+		return nil, fmt.Errorf("node %q: resolving A2A connector %q: %w", node.ID, node.A2AConnectorID, err)
+	}
+
+	name := node.Label
+	if name == "" {
+		name = info.Name
+	}
+	agentName := wbc.uniqueName(name)
+
+	connectorID := node.A2AConnectorID
+	userID := wbc.userID
+	outputKey := node.OutputKey
+	provider := wbc.adapter.a2aSubAgentProvider
+
+	runFn := func(ictx agent.InvocationContext) iter.Seq2[*session.Event, error] {
+		return func(yield func(*session.Event, error) bool) {
+			// Extract the user's message text from the invocation context.
+			var message string
+			if uc := ictx.UserContent(); uc != nil {
+				for _, part := range uc.Parts {
+					if part != nil && part.Text != "" {
+						message = part.Text
+						break
+					}
+				}
+			}
+
+			// Stream text deltas from the remote agent.
+			//
+			// Each delta is buffered one step behind: we emit the previous
+			// delta as a PARTIAL event (AssistantContentStreamed → live display)
+			// only once we know there is a following delta. The very last delta
+			// is emitted as the NON-PARTIAL event so ADK-Go persists the full
+			// accumulated text to the session — no separate final event needed,
+			// which avoids re-displaying the content a second time.
+			var accumulated strings.Builder
+			var pendingEvt *session.Event
+
+			for delta, streamErr := range provider.SendStreamingMessage(ictx, connectorID, userID, message) {
+				if streamErr != nil {
+					yield(nil, fmt.Errorf("remote agent %q: %w", agentName, streamErr))
+					return
+				}
+				if delta == "" {
+					continue
+				}
+
+				// Flush the previous delta as PARTIAL now that we know it is
+				// not the last chunk.
+				if pendingEvt != nil {
+					if !yield(pendingEvt, nil) {
+						return
+					}
+				}
+
+				accumulated.WriteString(delta)
+
+				// Buffer this delta — it will become PARTIAL if another delta
+				// follows, or NON-PARTIAL if the stream ends here.
+				pendingEvt = session.NewEvent(ictx.InvocationID())
+				pendingEvt.Author = agentName
+				pendingEvt.Content = &genai.Content{
+					Role:  "model",
+					Parts: []*genai.Part{{Text: delta}},
+				}
+				pendingEvt.Partial = true
+			}
+
+			// Emit the last buffered event as NON-PARTIAL with the full
+			// accumulated text so the session service persists the message.
+			if pendingEvt != nil {
+				pendingEvt.Partial = false
+				pendingEvt.Content = &genai.Content{
+					Role:  "model",
+					Parts: []*genai.Part{{Text: accumulated.String()}},
+				}
+				if outputKey != "" {
+					pendingEvt.Actions.StateDelta = map[string]any{outputKey: accumulated.String()}
+				}
+				yield(pendingEvt, nil)
+			}
+		}
+	}
+
+	return agent.New(agent.Config{
+		Name:        agentName,
+		Description: info.Description,
+		Run:         runFn,
 	})
 }
 

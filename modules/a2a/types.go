@@ -88,6 +88,15 @@ type A2ADiscoveredSkill struct {
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
+// ConnectorInfo is a lightweight view of an A2AConnector used by workflow
+// sub-agent resolution (adkgo.A2ASubAgentProvider).
+type ConnectorInfo struct {
+	ID          string
+	Name        string
+	Description string
+	AgentURL    string
+}
+
 // A2AConnectorRepository defines persistence for A2A agent connectors.
 type A2AConnectorRepository interface {
 	// Connector CRUD
