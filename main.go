@@ -6,7 +6,6 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -22,7 +21,6 @@ import (
 	"school-with-ai/components/docs"
 	"school-with-ai/components/landing"
 	"school-with-ai/components/pricing"
-	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/auth"
 	"school-with-ai/foundation/debug"
 	"school-with-ai/foundation/event"
@@ -491,13 +489,11 @@ func run(ctx context.Context, log *logger.Logger) error {
 	log.Info(ctx, "startup", "status", "knowledge module initialized", "baseURL", cfg.Edgequake.BaseURL)
 
 	// Initialize Agents
-	slogLogger := slog.New(log)
 
 	// All agents (including the default assistant) live in the database.
 	// In the unified model, both simple and composed agents are AgentDefinitions.
 	agentProvider := newUserAwareAgentProvider(
 		agentStoreModule.AgentDefinitionRepo(),
-		[]agent.Middleware{agent.ToolLogging(slogLogger)},
 	)
 
 	// -------------------------------------------------------------------------

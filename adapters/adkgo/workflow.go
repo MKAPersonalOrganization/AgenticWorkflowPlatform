@@ -313,27 +313,27 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 		}
 	}
 
-	// Build middleware bridge for this workflow sub-agent.
-	// Workflow sub-agents get the same middleware pipeline as regular agents
-	// (tool logging, block enforcement, confirmation enforcement).
-	var extraMWs []fagent.Middleware
-	if wbc.adapter.blockEnforcer != nil {
-		if bmw := wbc.adapter.blockEnforcer.BlockMiddleware(node.AgentID); bmw != nil {
-			extraMWs = append(extraMWs, bmw)
-		}
-	}
-	if wbc.adapter.confirmEnforcer != nil {
-		if cmw := wbc.adapter.confirmEnforcer.ConfirmationMiddleware(node.AgentID); cmw != nil {
-			extraMWs = append(extraMWs, cmw)
-		}
-	}
-
+	// Build native ADK tool callbacks for this workflow sub-agent:
+	// the same logging + enforcement pipeline as regular agents.
 	var beforeToolCBs []llmagent.BeforeToolCallback
 	var afterToolCBs []llmagent.AfterToolCallback
-	if mb := newMiddlewareBridge(agentCfg, agentName, wbc.threadID, wbc.userID, extraMWs...); mb != nil {
-		beforeToolCBs = mb.beforeToolCallbacks()
-		afterToolCBs = mb.afterToolCallbacks()
+
+	// 1. Tool logging — native Before/After callbacks.
+	if wbc.adapter.log != nil {
+		logBefore, logAfter := toolLoggingCallbacks(wbc.adapter.log, agentName, wbc.threadID, wbc.userID)
+		beforeToolCBs = append(beforeToolCBs, logBefore)
+		afterToolCBs = append(afterToolCBs, logAfter)
 	}
+
+	// 2. Block and confirmation enforcement — before-only.
+	var enforcerMWs []fagent.Middleware
+	if wbc.adapter.blockEnforcer != nil {
+		enforcerMWs = append(enforcerMWs, wbc.adapter.blockEnforcer.BlockMiddleware(node.AgentID))
+	}
+	if wbc.adapter.confirmEnforcer != nil {
+		enforcerMWs = append(enforcerMWs, wbc.adapter.confirmEnforcer.ConfirmationMiddleware(node.AgentID))
+	}
+	beforeToolCBs = append(beforeToolCBs, buildBeforeOnlyCallbacks(agentName, wbc.threadID, wbc.userID, enforcerMWs...)...)
 
 	return buildLLMAgent(llmAgentParams{
 		name:                 agentName,

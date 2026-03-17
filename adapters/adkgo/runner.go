@@ -218,25 +218,27 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 
 			genCfg := buildGenerateContentConfig(modelCfg)
 
-			// Build middleware from enforcers and agent config.
-			var extraMWs []fagent.Middleware
-			if r.blockEnforcer != nil {
-				if bmw := r.blockEnforcer.BlockMiddleware(agentName); bmw != nil {
-					extraMWs = append(extraMWs, bmw)
-				}
-			}
-			if r.confirmEnforcer != nil {
-				if cmw := r.confirmEnforcer.ConfirmationMiddleware(agentName); cmw != nil {
-					extraMWs = append(extraMWs, cmw)
-				}
-			}
-
+			// Build native ADK tool callbacks: logging + enforcement.
 			var beforeToolCBs []llmagent.BeforeToolCallback
 			var afterToolCBs []llmagent.AfterToolCallback
-			if mb := newMiddlewareBridge(agentCfg, agentName, req.SessionID, req.UserID, extraMWs...); mb != nil {
-				beforeToolCBs = mb.beforeToolCallbacks()
-				afterToolCBs = mb.afterToolCallbacks()
+
+			// 1. Tool logging — native Before/After callbacks.
+			if r.log != nil {
+				logBefore, logAfter := toolLoggingCallbacks(r.log, agentName, req.SessionID, req.UserID)
+				beforeToolCBs = append(beforeToolCBs, logBefore)
+				afterToolCBs = append(afterToolCBs, logAfter)
 			}
+
+			// 2. Block and confirmation enforcement — before-only foundation
+			//    middlewares converted to a single native BeforeToolCallback.
+			var enforcerMWs []fagent.Middleware
+			if r.blockEnforcer != nil {
+				enforcerMWs = append(enforcerMWs, r.blockEnforcer.BlockMiddleware(agentName))
+			}
+			if r.confirmEnforcer != nil {
+				enforcerMWs = append(enforcerMWs, r.confirmEnforcer.ConfirmationMiddleware(agentName))
+			}
+			beforeToolCBs = append(beforeToolCBs, buildBeforeOnlyCallbacks(agentName, req.SessionID, req.UserID, enforcerMWs...)...)
 
 			var aErr error
 			adkAgent, aErr = buildLLMAgent(llmAgentParams{
