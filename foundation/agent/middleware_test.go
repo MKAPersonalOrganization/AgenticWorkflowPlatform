@@ -23,8 +23,8 @@ func TestNewAgentContext(t *testing.T) {
 	if c.IsChat() {
 		t.Error("IsChat() should return false")
 	}
-	if c.IsFunction() {
-		t.Error("IsFunction() should return false")
+	if c.IsTool() {
+		t.Error("IsTool() should return false")
 	}
 	if c.Agent == nil {
 		t.Error("Agent should not be nil")
@@ -32,8 +32,8 @@ func TestNewAgentContext(t *testing.T) {
 	if c.Chat != nil {
 		t.Error("Chat should be nil")
 	}
-	if c.Function != nil {
-		t.Error("Function should be nil")
+	if c.Tool != nil {
+		t.Error("Tool should be nil")
 	}
 }
 
@@ -58,20 +58,20 @@ func TestNewChatContext(t *testing.T) {
 	}
 }
 
-func TestNewFunctionContext(t *testing.T) {
+func TestNewToolContext(t *testing.T) {
 	ctx := context.Background()
-	c := NewFunctionContext(ctx, nil, map[string]any{"key": "value"})
+	c := NewToolContext(ctx, nil, map[string]any{"key": "value"})
 
-	if c.Kind != OperationFunction {
-		t.Errorf("expected OperationFunction, got %v", c.Kind)
+	if c.Kind != OperationTool {
+		t.Errorf("expected OperationTool, got %v", c.Kind)
 	}
-	if !c.IsFunction() {
-		t.Error("IsFunction() should return true")
+	if !c.IsTool() {
+		t.Error("IsTool() should return true")
 	}
-	if c.Function == nil {
-		t.Error("Function should not be nil")
+	if c.Tool == nil {
+		t.Error("Tool should not be nil")
 	}
-	if c.Function.Arguments["key"] != "value" {
+	if c.Tool.Arguments["key"] != "value" {
 		t.Error("Arguments should contain key=value")
 	}
 }
@@ -109,7 +109,7 @@ func TestChain_ExecutesInOrder(t *testing.T) {
 	chain := Chain(mw1, mw2)
 	handler := chain(final)
 
-	c := NewFunctionContext(context.Background(), nil, nil)
+	c := NewToolContext(context.Background(), nil, nil)
 	if err := handler.Handle(c); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestChain_EmptyMiddleware(t *testing.T) {
 	chain := Chain()
 	handler := chain(final)
 
-	c := NewFunctionContext(context.Background(), nil, nil)
+	c := NewToolContext(context.Background(), nil, nil)
 	if err := handler.Handle(c); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -170,20 +170,20 @@ func (m *mockCache) Set(key string, value any) {
 	m.data[key] = value
 }
 
-func TestFunctionCaching_PassesThroughNonFunctionOps(t *testing.T) {
+func TestFunctionCaching_PassesThroughNonToolOps(t *testing.T) {
 	cache := &mockCache{data: make(map[string]any)}
 	keyFunc := func(tool Tool, args map[string]any) string { return "key" }
 	mw := FunctionCaching(cache, keyFunc)
 	handler := mw(NoOpHandler)
 
-	// Context with nil Function field — should pass through without caching.
+	// Context with nil Tool field — should pass through without caching.
 	c := NewAgentContext(context.Background(), nil, nil, false)
 	if err := handler.Handle(c); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	if len(cache.data) != 0 {
-		t.Error("cache should not be modified for non-function ops")
+		t.Error("cache should not be modified for non-tool ops")
 	}
 }
 
@@ -199,7 +199,7 @@ func TestFunctionCaching_CachesFunctionResults(t *testing.T) {
 		return nil
 	}))
 
-	c := NewFunctionContext(context.Background(), nil, nil)
+	c := NewToolContext(context.Background(), nil, nil)
 
 	// First call - should execute handler
 	if err := handler.Handle(c); err != nil {
@@ -213,7 +213,7 @@ func TestFunctionCaching_CachesFunctionResults(t *testing.T) {
 	}
 
 	// Second call - should use cache
-	c2 := NewFunctionContext(context.Background(), nil, nil)
+	c2 := NewToolContext(context.Background(), nil, nil)
 	if err := handler.Handle(c2); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -232,7 +232,7 @@ func TestFunctionTimeout_TimesOut(t *testing.T) {
 		return nil
 	}))
 
-	c := NewFunctionContext(context.Background(), nil, nil)
+	c := NewToolContext(context.Background(), nil, nil)
 	err := handler.Handle(c)
 
 	if err == nil {

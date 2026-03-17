@@ -244,7 +244,8 @@ func buildLoopNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo) (ag
 }
 
 // buildLeafAgent resolves a single agent node into an ADK-Go LLM agent.
-// It uses the same tool resolution and prompt building pipeline as regular agents.
+// It uses the same tool resolution, prompt building, and middleware pipeline
+// as the regular single-agent path in Run().
 //
 // Transfer policies are resolved with this precedence:
 //  1. Workflow node override (DisallowTransferToParent/Peers in WorkflowNodeInfo)
@@ -273,20 +274,8 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 		Context:   wbc.req.Context,
 	}
 
-	// Evaluate requirements for this agent.
-	var precomputedRules []fagent.Rule
-	if agentCfg != nil {
-		for _, requirement := range agentCfg.Requirements {
-			if e, ok := requirement.(fagent.Enableable); ok && !e.Enabled() {
-				continue
-			}
-			rules, rErr := requirement.Run(wbc.ctx, inv)
-			if rErr != nil {
-				continue
-			}
-			precomputedRules = append(precomputedRules, rules...)
-		}
-	}
+	// Evaluate requirements once; reuse for tool filtering and guidance injection.
+	precomputedRules := evaluateRequirements(wbc.ctx, agentCfg, inv)
 
 	// Resolve tools.
 	adkTools := wbc.adapter.resolveTools(
@@ -324,53 +313,41 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 		}
 	}
 
-	cfg := llmagent.Config{
-		Name:                  agentName,
-		Description:           foundAgent.Description(),
-		Model:                 wbc.llm,
-		Instruction:           systemPrompt,
-		Tools:                 adkTools,
-		GenerateContentConfig: genCfg,
+	// Build middleware bridge for this workflow sub-agent.
+	// Workflow sub-agents get the same middleware pipeline as regular agents
+	// (tool logging, block enforcement, confirmation enforcement).
+	var extraMWs []fagent.Middleware
+	if wbc.adapter.blockEnforcer != nil {
+		if bmw := wbc.adapter.blockEnforcer.BlockMiddleware(node.AgentID); bmw != nil {
+			extraMWs = append(extraMWs, bmw)
+		}
+	}
+	if wbc.adapter.confirmEnforcer != nil {
+		if cmw := wbc.adapter.confirmEnforcer.ConfirmationMiddleware(node.AgentID); cmw != nil {
+			extraMWs = append(extraMWs, cmw)
+		}
 	}
 
-	// ── Transfer Policy ──
-	// Workflow node overrides take precedence over agent definition defaults.
-	if agentCfg != nil {
-		cfg.DisallowTransferToParent = agentCfg.TransferPolicy.DisallowTransferToParent
-		cfg.DisallowTransferToPeers = agentCfg.TransferPolicy.DisallowTransferToPeers
-	}
-	if node.DisallowTransferToParent != nil {
-		cfg.DisallowTransferToParent = *node.DisallowTransferToParent
-	}
-	if node.DisallowTransferToPeers != nil {
-		cfg.DisallowTransferToPeers = *node.DisallowTransferToPeers
+	var beforeToolCBs []llmagent.BeforeToolCallback
+	var afterToolCBs []llmagent.AfterToolCallback
+	if mb := newMiddlewareBridge(agentCfg, agentName, wbc.threadID, wbc.userID, extraMWs...); mb != nil {
+		beforeToolCBs = mb.beforeToolCallbacks()
+		afterToolCBs = mb.afterToolCallbacks()
 	}
 
-	// ── Include Contents ──
-	includeContents := ""
-	if agentCfg != nil && agentCfg.IncludeContents != "" {
-		includeContents = string(agentCfg.IncludeContents)
-	}
-	if node.IncludeContents != "" {
-		includeContents = node.IncludeContents
-	}
-	if includeContents == "none" {
-		cfg.IncludeContents = llmagent.IncludeContentsNone
-	}
-
-	// ── Output Key ──
-	if node.OutputKey != "" {
-		cfg.OutputKey = node.OutputKey
-	} else if agentCfg != nil && agentCfg.OutputKey != "" {
-		cfg.OutputKey = agentCfg.OutputKey
-	}
-
-	// ── Global Instruction (only meaningful on root, but set if provided) ──
-	if agentCfg != nil && agentCfg.GlobalInstruction != "" {
-		cfg.GlobalInstruction = agentCfg.GlobalInstruction
-	}
-
-	return llmagent.New(cfg)
+	return buildLLMAgent(llmAgentParams{
+		name:                 agentName,
+		foundAgent:           foundAgent,
+		agentCfg:             agentCfg,
+		llm:                  wbc.llm,
+		genCfg:               genCfg,
+		tools:                adkTools,
+		prompt:               systemPrompt,
+		beforeAgentCallbacks: buildBeforeRunHooks(precomputedRules),
+		beforeToolCallbacks:  beforeToolCBs,
+		afterToolCallbacks:   afterToolCBs,
+		nodeOverride:         node,
+	})
 }
 
 // isWorkflowAgent checks whether a foundation Agent implements the WorkflowAgent interface.

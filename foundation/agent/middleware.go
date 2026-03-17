@@ -8,12 +8,12 @@ type OperationKind int
 const (
 	OperationAgent OperationKind = iota
 	OperationChat
-	OperationFunction
+	OperationTool
 )
 
 // Context carries all operation data through the middleware chain.
 // Embeds context.Context for cancellation/timeout support.
-// Exactly one of Agent, Chat, or Function is non-nil.
+// Exactly one of Agent, Chat, or Tool is non-nil.
 type Context struct {
 	context.Context
 
@@ -21,9 +21,9 @@ type Context struct {
 	Kind OperationKind
 
 	// Exactly one is non-nil
-	Agent    *AgentOp
-	Chat     *ChatOp
-	Function *FunctionOp
+	Agent *AgentOp
+	Chat  *ChatOp
+	Tool  *ToolOp
 
 	// Shared across middleware
 	Metadata map[string]any
@@ -37,9 +37,11 @@ type Context struct {
 }
 
 // Helper methods
-func (c *Context) IsAgent() bool    { return c.Kind == OperationAgent }
-func (c *Context) IsChat() bool     { return c.Kind == OperationChat }
-func (c *Context) IsFunction() bool { return c.Kind == OperationFunction }
+func (c *Context) IsAgent() bool { return c.Kind == OperationAgent }
+func (c *Context) IsChat() bool  { return c.Kind == OperationChat }
+
+// IsTool reports whether this context wraps a tool invocation.
+func (c *Context) IsTool() bool { return c.Kind == OperationTool }
 
 // AgentOp groups agent-level data.
 type AgentOp struct {
@@ -68,8 +70,10 @@ type ChatOptions struct {
 	Metadata   map[string]any
 }
 
-// FunctionOp groups tool call data.
-type FunctionOp struct {
+// ToolOp groups tool call data for middleware execution.
+// This is the primary type for tool-related middleware contexts,
+// aligned with ADK-Go's "tool" terminology.
+type ToolOp struct {
 	Tool      Tool
 	Arguments map[string]any
 }
@@ -104,6 +108,38 @@ func Chain(mws ...Middleware) Middleware {
 	}
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Tool execution phase markers
+//
+// These constants are used by the middleware bridge to communicate which phase
+// of tool execution is active — "before" (pre-execution) or "after" (post-execution).
+// Middlewares that need different behaviour per phase (e.g., ToolLogging) should
+// check c.Metadata[ToolPhaseKey] to determine the current phase.
+//
+// When ToolPhaseKey is absent from metadata, the middleware is running in
+// single-pass mode (not bridged through ADK-Go callbacks) and should execute
+// the full before+after logic inline.
+// ──────────────────────────────────────────────────────────────────────────────
+
+const (
+	// ToolPhaseKey is the metadata key used by the middleware bridge to
+	// communicate the current execution phase to middlewares.
+	ToolPhaseKey = "tool_phase"
+
+	// ToolPhaseBefore indicates the pre-execution (before) phase.
+	// Middlewares should perform setup, validation, and logging here.
+	ToolPhaseBefore = "before"
+
+	// ToolPhaseAfter indicates the post-execution (after) phase.
+	// Middlewares should perform cleanup, result logging, and caching here.
+	ToolPhaseAfter = "after"
+
+	// ToolStartTimeKey is the metadata key used to persist the tool call
+	// start time between the before and after phases, enabling accurate
+	// duration measurement across the ADK-Go callback split.
+	ToolStartTimeKey = "tool_start_time"
+)
+
 // NewAgentContext creates a Context for an agent operation.
 func NewAgentContext(ctx context.Context, agent Agent, messages []Message, streaming bool) *Context {
 	return &Context{
@@ -132,12 +168,12 @@ func NewChatContext(ctx context.Context, model Model, messages []Message, option
 	}
 }
 
-// NewFunctionContext creates a Context for a function/tool operation.
-func NewFunctionContext(ctx context.Context, tool Tool, arguments map[string]any) *Context {
+// NewToolContext creates a Context for a tool invocation.
+func NewToolContext(ctx context.Context, tool Tool, arguments map[string]any) *Context {
 	return &Context{
 		Context: ctx,
-		Kind:    OperationFunction,
-		Function: &FunctionOp{
+		Kind:    OperationTool,
+		Tool: &ToolOp{
 			Tool:      tool,
 			Arguments: arguments,
 		},
