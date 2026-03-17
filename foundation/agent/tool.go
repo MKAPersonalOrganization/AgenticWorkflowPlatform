@@ -38,6 +38,13 @@ type Result struct {
 	Content  []any    // Output content (can be string, Content, or any serializable type)
 	Error    error    // Execution error, if any
 	Metadata Metadata // Additional result metadata
+
+	// Actions optionally carries runtime directives for the framework to apply
+	// after this tool call completes (e.g. TransferToAgent, Escalate, StateDelta).
+	// Mirrors ADK's tool.Context.Actions() — tools signal routing by bundling
+	// directives with their result rather than mutating external state.
+	// nil means no directives.
+	Actions *EventActions
 }
 
 // Tool represents metadata for a capability that an agent can invoke.

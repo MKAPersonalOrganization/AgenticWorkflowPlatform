@@ -101,8 +101,13 @@ func NewEvent(eventType EventType, data any) Event {
 
 // MessageEvent is emitted when a complete message is available.
 // This is a PERSISTENT event - it represents a domain state change.
+//
+// Actions optionally carries runtime directives (routing, state mutations)
+// that should be applied atomically when this message is committed.
+// Mirrors ADK's session.Event.Actions on a final-response event.
 type MessageEvent struct {
 	Message   *Message
+	Actions   *EventActions // nil when no directives
 	EventTime time.Time
 }
 
@@ -139,9 +144,14 @@ func (e *ToolCallEvent) ephemeral()           {}
 
 // ToolResultEvent is emitted when a tool execution completes.
 // This is a PERSISTENT event - it represents a domain state change.
+//
+// Actions optionally carries runtime directives returned by the tool
+// (e.g. TransferToAgent, Escalate). Mirrors ADK's tool.Context.Actions()
+// — tools signal routing by returning directives alongside their result.
 type ToolResultEvent struct {
 	Result    *ToolResult
 	AgentName string
+	Actions   *EventActions // nil when the tool emits no directives
 	EventTime time.Time
 }
 
@@ -216,6 +226,33 @@ func (e *StateChangeEvent) Type() EventType      { return EventTypeStateChange }
 func (e *StateChangeEvent) Timestamp() time.Time { return e.EventTime }
 func (e *StateChangeEvent) Data() any            { return map[string]any{e.Key: e.Value} }
 func (e *StateChangeEvent) persistent()          {}
+
+// EventActions carries runtime directives emitted alongside an event.
+// These instruct the framework how to proceed after processing the event.
+//
+// Mirrors ADK's session.EventActions — an agent or tool can bundle routing
+// and state-mutation signals with the event that triggered them, keeping
+// cause and effect atomic rather than split across separate events.
+type EventActions struct {
+	// StateDelta contains key-value pairs to apply atomically to session state
+	// when this event is committed. Keys follow the state-scope prefix
+	// conventions defined in state.go (e.g. "app:", "user:", "temp:").
+	StateDelta map[string]any
+
+	// TransferToAgent requests that the framework hand control to the named
+	// agent after this event. The named agent continues the current invocation.
+	// Mirrors ADK's EventActions.TransferToAgent.
+	TransferToAgent string
+
+	// Escalate requests that control return to the parent agent.
+	// Mirrors ADK's EventActions.Escalate.
+	Escalate bool
+
+	// EndInvocation signals that the invocation should stop after this event,
+	// even if the normal termination condition has not been reached.
+	// Mirrors ADK's InvocationContext.EndInvocation().
+	EndInvocation bool
+}
 
 // Verify interface implementations at compile time
 var (

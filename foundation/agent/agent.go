@@ -112,6 +112,10 @@ type AgentProvider interface {
 //
 // History is populated from the thread aggregate and used by Requirements
 // (e.g. ConditionalRequirement) to inspect tool-call history.
+//
+// State provides read-only access to the live session state, mirroring
+// ADK's InvocationContext.Session().State() — enabling InstructionFunc and
+// Requirements to read values accumulated by prior agents (e.g. via OutputKey).
 type Invocation struct {
 	// ID is a unique identifier for this invocation.
 	ID string
@@ -128,6 +132,10 @@ type Invocation struct {
 	// History contains previous messages in the conversation.
 	// Used by Requirements to evaluate tool-call history.
 	History []*Message
+
+	// State provides read-only access to the current session state.
+	// nil when the adapter does not populate state (e.g. in tests).
+	State ReadonlyState
 
 	// Context is custom context data (e.g., attachment refs).
 	Context map[string]any
