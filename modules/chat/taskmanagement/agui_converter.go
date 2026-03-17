@@ -185,6 +185,24 @@ func toAguiEventsInternal(event any) []any {
 			}),
 		)}
 
+	case *thread.A2AArtifactReceived:
+		// Emit a generic ARTIFACT custom event — the frontend treats this as a
+		// UI affordance (document card) with no knowledge of A2A internals.
+		id := evt.ArtifactID
+		if id == "" {
+			id = evt.MessageID
+		}
+		return []any{aguievents.NewCustomEvent(
+			"ARTIFACT",
+			aguievents.WithValue(map[string]any{
+				"id":        id,
+				"title":     evt.Title,
+				"content":   evt.Content,
+				"mimeType":  "text/markdown",
+				"agentName": evt.AgentName,
+			}),
+		)}
+
 	case *thread.UserMessageAdded, *thread.AssistantMessageAdded, *thread.ThreadCreated:
 		// These are handled by the frontend locally or via snapshots, no need to stream
 		return []any{}

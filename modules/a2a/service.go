@@ -467,30 +467,32 @@ func (s *Service) SendMessage(ctx context.Context, connectorID, userID, message 
 	return extractResponseText(result), nil
 }
 
-// SendStreamingMessage streams text deltas from a remote A2A agent.
+// SendStreamingMessage streams chunks from a remote A2A agent.
+// Text deltas (Delta != "") carry incremental LLM output; artifact chunks
+// (IsArtifact=true) carry complete artifacts produced by the remote agent.
 // Implements adkgo.A2ASubAgentProvider.
-func (s *Service) SendStreamingMessage(ctx context.Context, connectorID, userID, message string) iter.Seq2[string, error] {
-	return func(yield func(string, error) bool) {
+func (s *Service) SendStreamingMessage(ctx context.Context, connectorID, userID, message string) iter.Seq2[StreamChunk, error] {
+	return func(yield func(StreamChunk, error) bool) {
 		connector, err := s.GetConnector(ctx, connectorID, userID)
 		if err != nil {
-			yield("", err)
+			yield(StreamChunk{}, err)
 			return
 		}
 		if connector.Status != ConnectorStatusConnected {
-			yield("", ErrConnectorNotConnected)
+			yield(StreamChunk{}, ErrConnectorNotConnected)
 			return
 		}
 
 		card, err := s.discoverAgentCard(ctx, connector)
 		if err != nil {
-			yield("", fmt.Errorf("resolving agent card: %w", err))
+			yield(StreamChunk{}, fmt.Errorf("resolving agent card: %w", err))
 			return
 		}
 
 		clientOpts := s.buildClientOptions(connector)
 		client, err := a2aclient.NewFromCard(ctx, card, clientOpts...)
 		if err != nil {
-			yield("", fmt.Errorf("creating A2A client: %w", err))
+			yield(StreamChunk{}, fmt.Errorf("creating A2A client: %w", err))
 			return
 		}
 		defer client.Destroy()
@@ -505,13 +507,13 @@ func (s *Service) SendStreamingMessage(ctx context.Context, connectorID, userID,
 
 		for event, streamErr := range client.SendStreamingMessage(taskCtx, req) {
 			if streamErr != nil {
-				yield("", fmt.Errorf("streaming from remote agent: %w", streamErr))
+				yield(StreamChunk{}, fmt.Errorf("streaming from remote agent: %w", streamErr))
 				return
 			}
 
-			text := extractEventText(event)
-			if text != "" {
-				if !yield(text, nil) {
+			chunks := extractEventChunks(event)
+			for _, chunk := range chunks {
+				if !yield(chunk, nil) {
 					return
 				}
 			}
@@ -519,19 +521,24 @@ func (s *Service) SendStreamingMessage(ctx context.Context, connectorID, userID,
 	}
 }
 
-// extractEventText extracts the text payload from a streaming A2A event.
+// extractEventChunks extracts StreamChunks from a streaming A2A event.
 //
-// Only working-state TaskStatusUpdateEvents carry true streaming deltas — all
-// other event types either echo the user's input (submitted state), duplicate
-// already-streamed content (artifact), or carry no new text (terminal states).
-func extractEventText(event a2atypes.Event) string {
+// Text deltas: only working-state TaskStatusUpdateEvents carry true LLM streaming
+// deltas. Submitted echoes user input; terminal states carry no new text.
+//
+// Artifacts: TaskArtifactUpdateEvents with LastChunk=true (or non-append)
+// are emitted as artifact chunks so the frontend can display them separately
+// from the streaming text response.
+func extractEventChunks(event a2atypes.Event) []StreamChunk {
 	if event == nil {
-		return ""
+		return nil
 	}
 	switch v := event.(type) {
 	case *a2atypes.Message:
 		// Non-streaming final response (e.g. from sendMessage blocking path).
-		return extractTextFromParts(v.Parts)
+		if text := extractTextFromParts(v.Parts); text != "" {
+			return []StreamChunk{{Delta: text}}
+		}
 
 	case *a2atypes.TaskStatusUpdateEvent:
 		// Only working-state events carry incremental LLM streaming deltas.
@@ -540,33 +547,57 @@ func extractEventText(event a2atypes.Event) string {
 		// - working (no message): state heartbeat — skip.
 		// - completed/failed/cancelled: terminal state change, no new content — skip.
 		if v.Status.State != a2atypes.TaskStateWorking {
-			return ""
+			return nil
 		}
 		if v.Status.Message != nil {
-			return extractTextFromParts(v.Status.Message.Parts)
+			if text := extractTextFromParts(v.Status.Message.Parts); text != "" {
+				return []StreamChunk{{Delta: text}}
+			}
 		}
 
 	case *a2atypes.TaskArtifactUpdateEvent:
-		// Skip: artifact contains the full accumulated response at the end of
-		// a streaming turn. Including it would duplicate content already
-		// delivered incrementally via working-state events above.
+		// Emit complete artifacts (LastChunk=true or standalone non-append artifacts).
+		// Append-mode partial chunks are skipped — we only surface the final content.
+		// LastChunk signals the artifact content is complete and ready to display.
+		if v.Artifact == nil {
+			return nil
+		}
+		if v.Append && !v.LastChunk {
+			// Partial streaming artifact chunk — skip, wait for LastChunk.
+			return nil
+		}
+		content := extractTextFromParts(v.Artifact.Parts)
+		if content == "" {
+			return nil
+		}
+		return []StreamChunk{{
+			IsArtifact: true,
+			ArtifactID: string(v.Artifact.ID),
+			Title:      v.Artifact.Name,
+			Content:    content,
+		}}
 
 	case *a2atypes.Task:
-		// Blocking (non-streaming) response: extract all available content.
-		var texts []string
+		// Blocking (non-streaming) response: yield text then artifacts.
+		var chunks []StreamChunk
 		if v.Status.Message != nil {
 			if t := extractTextFromParts(v.Status.Message.Parts); t != "" {
-				texts = append(texts, t)
+				chunks = append(chunks, StreamChunk{Delta: t})
 			}
 		}
 		for _, artifact := range v.Artifacts {
 			if t := extractTextFromParts(artifact.Parts); t != "" {
-				texts = append(texts, t)
+				chunks = append(chunks, StreamChunk{
+					IsArtifact: true,
+					ArtifactID: string(artifact.ID),
+					Title:      artifact.Name,
+					Content:    t,
+				})
 			}
 		}
-		return strings.Join(texts, "\n")
+		return chunks
 	}
-	return ""
+	return nil
 }
 
 // extractTextFromParts extracts and joins text content from A2A parts.

@@ -175,13 +175,38 @@ func translateStateDelta(evt *session.Event, ctx EventContext) []thread.Event {
 		return nil
 	}
 
-	// State deltas are accumulated by ADK-Go's transactional state system.
-	// We don't emit individual thread events for each delta — the state is
-	// committed at the session level by ADK-Go's runner. This function is a
-	// hook point for future state-change telemetry if needed.
-	//
-	// For now, state deltas are handled internally by ADK-Go's session service.
-	return nil
+	// Check for A2A artifact marker embedded by buildRemoteAgentNode in workflow.go.
+	// When a remote A2A agent yields an artifact chunk, the workflow node encodes
+	// the artifact metadata into StateDelta["__a2a_artifact__"] and emits a
+	// content-less session event so artifacts reach the frontend as a separate
+	// thread.A2AArtifactReceived event — distinct from the streaming text bubble.
+	artifactRaw, ok := evt.Actions.StateDelta["__a2a_artifact__"]
+	if !ok {
+		return nil
+	}
+	artifactJSON, ok := artifactRaw.(string)
+	if !ok || artifactJSON == "" {
+		return nil
+	}
+
+	var info struct {
+		ArtifactID string `json:"artifactId"`
+		Title      string `json:"title"`
+		Content    string `json:"content"`
+	}
+	if err := json.Unmarshal([]byte(artifactJSON), &info); err != nil || info.Content == "" {
+		return nil
+	}
+
+	return []thread.Event{&thread.A2AArtifactReceived{
+		ThreadID:   ctx.ThreadID,
+		MessageID:  evt.ID,
+		AgentName:  ctx.AgentName,
+		ArtifactID: info.ArtifactID,
+		Title:      info.Title,
+		Content:    info.Content,
+		Timestamp:  coalesceTime(evt.Timestamp),
+	}}
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

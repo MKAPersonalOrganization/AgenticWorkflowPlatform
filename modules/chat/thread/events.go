@@ -300,6 +300,24 @@ func (e *ToolCancelled) EventType() string         { return "ToolCancelled" }
 func (e *ToolCancelled) EventTimestamp() time.Time { return e.Timestamp }
 func (e *ToolCancelled) AggregateID() string       { return e.ThreadID }
 
+// A2AArtifactReceived is emitted when a remote A2A agent produces a complete
+// artifact. Artifacts are distinct named output items (e.g. generated text,
+// documents) separate from the streaming text response bubble.
+// This is a transient event — NOT persisted to the event store.
+type A2AArtifactReceived struct {
+	ThreadID   string    `json:"threadId"`
+	MessageID  string    `json:"messageId"`
+	AgentName  string    `json:"agentName,omitempty"`
+	ArtifactID string    `json:"artifactId,omitempty"`
+	Title      string    `json:"title,omitempty"`
+	Content    string    `json:"content"`
+	Timestamp  time.Time `json:"timestamp"`
+}
+
+func (e *A2AArtifactReceived) EventType() string         { return "A2AArtifactReceived" }
+func (e *A2AArtifactReceived) EventTimestamp() time.Time { return e.Timestamp }
+func (e *A2AArtifactReceived) AggregateID() string       { return e.ThreadID }
+
 // RunStarted signals the start of an agent run.
 type RunStarted struct {
 	ThreadID    string    `json:"threadId"`              // ID of the conversation thread
