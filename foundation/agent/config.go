@@ -28,7 +28,7 @@ const (
 //
 // Config is the central description of an agent's identity, behaviour, and
 // capabilities. It is framework-agnostic — adapters translate it to their
-// native configuration (ADK-Go's llmagent.Config, etc.).
+// native configuration format.
 //
 // Layering:
 //   - Identity:     Name, Description

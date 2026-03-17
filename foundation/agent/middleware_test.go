@@ -20,41 +20,14 @@ func TestNewAgentContext(t *testing.T) {
 	if !c.IsAgent() {
 		t.Error("IsAgent() should return true")
 	}
-	if c.IsChat() {
-		t.Error("IsChat() should return false")
-	}
 	if c.IsTool() {
 		t.Error("IsTool() should return false")
 	}
 	if c.Agent == nil {
 		t.Error("Agent should not be nil")
 	}
-	if c.Chat != nil {
-		t.Error("Chat should be nil")
-	}
 	if c.Tool != nil {
 		t.Error("Tool should be nil")
-	}
-}
-
-func TestNewChatContext(t *testing.T) {
-	ctx := context.Background()
-	c := NewChatContext(ctx, nil, nil, nil)
-
-	if c.Kind != OperationChat {
-		t.Errorf("expected OperationChat, got %v", c.Kind)
-	}
-	if c.IsAgent() {
-		t.Error("IsAgent() should return false")
-	}
-	if !c.IsChat() {
-		t.Error("IsChat() should return true")
-	}
-	if c.Agent != nil {
-		t.Error("Agent should be nil")
-	}
-	if c.Chat == nil {
-		t.Error("Chat should not be nil")
 	}
 }
 
