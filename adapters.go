@@ -466,8 +466,24 @@ func (a *a2aSubAgentAdapter) SendMessage(ctx context.Context, connectorID, userI
 	return a.svc.SendMessage(ctx, connectorID, userID, message)
 }
 
-func (a *a2aSubAgentAdapter) SendStreamingMessage(ctx context.Context, connectorID, userID, message string) iter.Seq2[string, error] {
-	return a.svc.SendStreamingMessage(ctx, connectorID, userID, message)
+func (a *a2aSubAgentAdapter) SendStreamingMessage(ctx context.Context, connectorID, userID, message string) iter.Seq2[adkgo.A2AStreamChunk, error] {
+	return func(yield func(adkgo.A2AStreamChunk, error) bool) {
+		for chunk, err := range a.svc.SendStreamingMessage(ctx, connectorID, userID, message) {
+			if err != nil {
+				yield(adkgo.A2AStreamChunk{}, err)
+				return
+			}
+			if !yield(adkgo.A2AStreamChunk{
+				Delta:      chunk.Delta,
+				IsArtifact: chunk.IsArtifact,
+				ArtifactID: chunk.ArtifactID,
+				Title:      chunk.Title,
+				Content:    chunk.Content,
+			}, nil) {
+				return
+			}
+		}
+	}
 }
 
 var _ adkgo.A2ASubAgentProvider = (*a2aSubAgentAdapter)(nil)

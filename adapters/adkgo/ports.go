@@ -117,6 +117,17 @@ type A2AConnectorInfo struct {
 	AgentURL    string
 }
 
+// A2AStreamChunk is a single unit yielded by A2ASubAgentProvider.SendStreamingMessage.
+// Text deltas (Delta != "") carry incremental LLM output; artifact chunks
+// (IsArtifact=true) carry complete artifacts produced by the remote agent.
+type A2AStreamChunk struct {
+	Delta      string // Non-empty for text streaming deltas
+	IsArtifact bool   // True when this chunk describes a complete artifact
+	ArtifactID string // Artifact identifier (when IsArtifact=true)
+	Title      string // Optional artifact name/title (when IsArtifact=true)
+	Content    string // Full artifact text content (when IsArtifact=true)
+}
+
 // A2ASubAgentProvider resolves A2A connectors for use as workflow sub-agents.
 // This is distinct from A2AToolResolver (which exposes connectors as tools)
 // because sub-agents delegate an entire turn rather than a single tool call.
@@ -125,11 +136,10 @@ type A2ASubAgentProvider interface {
 	GetConnectorInfo(ctx context.Context, connectorID, userID string) (A2AConnectorInfo, error)
 	// SendMessage sends a message to the remote agent and returns its complete response.
 	SendMessage(ctx context.Context, connectorID, userID, message string) (string, error)
-	// SendStreamingMessage streams text deltas from the remote agent as they arrive.
-	// Each yielded string is an incremental text chunk. The caller accumulates the
-	// chunks to form the full response. Streaming falls back to SendMessage when the
-	// remote agent does not support streaming.
-	SendStreamingMessage(ctx context.Context, connectorID, userID, message string) iter.Seq2[string, error]
+	// SendStreamingMessage streams chunks from the remote agent as they arrive.
+	// Text delta chunks (Delta != "") carry incremental LLM output; artifact chunks
+	// (IsArtifact=true) carry complete remote artifacts for separate display.
+	SendStreamingMessage(ctx context.Context, connectorID, userID, message string) iter.Seq2[A2AStreamChunk, error]
 }
 
 // A2AToolResolver resolves A2A-based tools for a user.

@@ -97,6 +97,16 @@ type ConnectorInfo struct {
 	AgentURL    string
 }
 
+// StreamChunk is a single unit yielded by Service.SendStreamingMessage.
+// Delta != "" for incremental text deltas; IsArtifact=true for complete artifacts.
+type StreamChunk struct {
+	Delta      string // Non-empty for text streaming deltas
+	IsArtifact bool   // True when this chunk describes a complete artifact
+	ArtifactID string // Artifact identifier (when IsArtifact=true)
+	Title      string // Optional artifact name/title (when IsArtifact=true)
+	Content    string // Full artifact text content (when IsArtifact=true)
+}
+
 // A2AConnectorRepository defines persistence for A2A agent connectors.
 type A2AConnectorRepository interface {
 	// Connector CRUD

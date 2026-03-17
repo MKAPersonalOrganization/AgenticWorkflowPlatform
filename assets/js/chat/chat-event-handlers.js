@@ -603,6 +603,34 @@ export function createEventHandlerMethods() {
         },
 
         // ============================================
+        // Artifact Handler
+        // ============================================
+
+        /**
+         * Handle ARTIFACT event — renders a document/file produced by any agent as a card.
+         * Generic UI affordance; no knowledge of the underlying transport (A2A, tool, etc.).
+         */
+        __handleArtifact(value, state, threadId) {
+            const { id, title, content, mimeType, agentName } = value;
+
+            state.messages.push({
+                id: `artifact_${id || Date.now()}`,
+                type: 'artifact',
+                artifactId: id || '',
+                title: title || '',
+                content: content || '',
+                mimeType: mimeType || 'text/plain',
+                agentName: agentName || '',
+                timestamp: new Date().toISOString(),
+            });
+
+            if (threadId === this.__currentThreadId && !this.__abortScroll) {
+                this.$nextTick(() => this.__scrollToBottomStreaming());
+            }
+        },
+
+        // ============================================
+        // ============================================
         // Tool Call Message Helpers
         // ============================================
 

@@ -388,6 +388,9 @@ export function createStreamingMethods() {
                 case 'AGENT_TRANSFER_STARTED':
                     this.__handleAgentTransferStarted(event.value, state, threadId);
                     break;
+                case 'ARTIFACT':
+                    this.__handleArtifact(event.value, state, threadId);
+                    break;
                 default:
                     console.warn('[Streaming] Unknown custom event:', event.name);
             }

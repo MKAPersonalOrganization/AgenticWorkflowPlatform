@@ -2,6 +2,7 @@ package adkgo
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"iter"
 	"strings"
@@ -403,23 +404,61 @@ func buildRemoteAgentNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeIn
 				}
 			}
 
-			// Stream text deltas from the remote agent.
+			// Stream chunks from the remote agent.
 			//
-			// Each delta is buffered one step behind: we emit the previous
-			// delta as a PARTIAL event (AssistantContentStreamed → live display)
-			// only once we know there is a following delta. The very last delta
-			// is emitted as the NON-PARTIAL event so ADK-Go persists the full
-			// accumulated text to the session — no separate final event needed,
-			// which avoids re-displaying the content a second time.
+			// Text deltas are buffered one step behind: we emit the previous delta
+			// as a PARTIAL event (AssistantContentStreamed → live display) only once
+			// we know there is a following delta. The very last delta is emitted as
+			// the NON-PARTIAL event so ADK-Go persists the full accumulated text to
+			// the session — no separate final event needed, which avoids re-displaying
+			// the content a second time.
+			//
+			// Artifact chunks are emitted immediately as separate non-content events
+			// carrying the artifact data in StateDelta, which TranslateEvent converts
+			// to thread.A2AArtifactReceived for separate frontend display.
 			var accumulated strings.Builder
 			var pendingEvt *session.Event
 
-			for delta, streamErr := range provider.SendStreamingMessage(ictx, connectorID, userID, message) {
+			for chunk, streamErr := range provider.SendStreamingMessage(ictx, connectorID, userID, message) {
 				if streamErr != nil {
 					yield(nil, fmt.Errorf("remote agent %q: %w", agentName, streamErr))
 					return
 				}
-				if delta == "" {
+
+				if chunk.IsArtifact {
+					// Skip artifacts whose content duplicates the accumulated streaming
+					// text. Python ADK always packages the complete response as a final
+					// artifact even for plain conversational responses — showing it would
+					// repeat the message the user already sees in the stream.
+					// Only surface artifacts with genuinely distinct content (e.g. a
+					// generated playlist document, file, or structured output).
+					if chunk.Content == "" || chunk.Content == accumulated.String() {
+						continue
+					}
+
+					// Encode artifact metadata into StateDelta so TranslateEvent
+					// can emit thread.A2AArtifactReceived without changing the
+					// session.Event structure.
+					// Note: pendingEvt is intentionally NOT flushed here — the normal
+					// end-of-loop path emits the final NON-PARTIAL text event so the
+					// message is persisted correctly regardless of artifact ordering.
+					artifactData, _ := json.Marshal(map[string]any{
+						"artifactId": chunk.ArtifactID,
+						"title":      chunk.Title,
+						"content":    chunk.Content,
+					})
+					artifactEvt := session.NewEvent(ictx.InvocationID())
+					artifactEvt.Author = agentName
+					artifactEvt.Actions.StateDelta = map[string]any{
+						"__a2a_artifact__": string(artifactData),
+					}
+					if !yield(artifactEvt, nil) {
+						return
+					}
+					continue
+				}
+
+				if chunk.Delta == "" {
 					continue
 				}
 
@@ -431,7 +470,7 @@ func buildRemoteAgentNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeIn
 					}
 				}
 
-				accumulated.WriteString(delta)
+				accumulated.WriteString(chunk.Delta)
 
 				// Buffer this delta — it will become PARTIAL if another delta
 				// follows, or NON-PARTIAL if the stream ends here.
@@ -439,7 +478,7 @@ func buildRemoteAgentNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeIn
 				pendingEvt.Author = agentName
 				pendingEvt.Content = &genai.Content{
 					Role:  "model",
-					Parts: []*genai.Part{{Text: delta}},
+					Parts: []*genai.Part{{Text: chunk.Delta}},
 				}
 				pendingEvt.Partial = true
 			}
