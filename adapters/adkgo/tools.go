@@ -1,7 +1,6 @@
 package adkgo
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 
@@ -94,8 +93,13 @@ func WrapExecutableTools(tools []agent.ExecutableTool, sessionID, userID string)
 // executeFoundationTool bridges adk-go's tool interface to the foundation
 // ExecutableTool.Execute contract. It converts the typed agent.Result into
 // the map[string]any that ADK-Go expects as FunctionResponse.Response.
+//
+// ctx is adktool.Context (not plain context.Context) so we can:
+//   - populate Arguments.CallID from ctx.FunctionCallID()
+//   - forward Result.Actions (TransferToAgent, Escalate, StateDelta) to
+//     ctx.Actions(), matching ADK's tool.Context.Actions() semantics.
 func executeFoundationTool(
-	ctx context.Context,
+	ctx adktool.Context,
 	et agent.ExecutableTool,
 	args map[string]any,
 	sessionID, userID string,
@@ -107,6 +111,7 @@ func executeFoundationTool(
 
 	result, err := et.Execute(ctx, agent.Arguments{
 		Raw:       raw,
+		CallID:    ctx.FunctionCallID(),
 		SessionID: sessionID,
 		UserID:    userID,
 	})
@@ -116,7 +121,41 @@ func executeFoundationTool(
 		return map[string]any{errorKey: err.Error()}, nil
 	}
 
+	// Forward any runtime directives the tool emitted (transfer, escalate, state).
+	applyEventActions(ctx, result.Actions)
+
 	return resultToMap(result), nil
+}
+
+// applyEventActions maps foundation EventActions onto ADK's mutable EventActions.
+// This is the bridge for Result.Actions → ctx.Actions(), giving foundation tools
+// the same routing capability as ADK's tool.Context.Actions().
+//
+// Note: EventActions.EndInvocation has no equivalent in ADK's tool.Context
+// (it maps to InvocationContext.EndInvocation(), which is not accessible here).
+// Tools that need to stop an invocation should do so via agent-level callbacks.
+func applyEventActions(ctx adktool.Context, actions *agent.EventActions) {
+	if actions == nil {
+		return
+	}
+	adkActions := ctx.Actions()
+	if adkActions == nil {
+		return
+	}
+	if actions.TransferToAgent != "" {
+		adkActions.TransferToAgent = actions.TransferToAgent
+	}
+	if actions.Escalate {
+		adkActions.Escalate = true
+	}
+	if len(actions.StateDelta) > 0 {
+		if adkActions.StateDelta == nil {
+			adkActions.StateDelta = make(map[string]any)
+		}
+		for k, v := range actions.StateDelta {
+			adkActions.StateDelta[k] = v
+		}
+	}
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

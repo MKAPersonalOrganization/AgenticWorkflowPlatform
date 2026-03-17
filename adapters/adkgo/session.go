@@ -3,11 +3,13 @@ package adkgo
 import (
 	"context"
 	"encoding/json"
+	"iter"
 	"time"
 
 	"google.golang.org/adk/session"
 	"google.golang.org/genai"
 
+	fagent "school-with-ai/foundation/agent"
 	"school-with-ai/modules/chat/thread"
 )
 
@@ -149,6 +151,32 @@ func buildAssistantParts(msg thread.Message) []*genai.Part {
 
 	return parts
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// adkSessionState — ReadonlyState adapter
+//
+// Wraps session.State so the adapter can populate Invocation.State, giving
+// InstructionFunc and Requirements read access to values accumulated in the
+// session (e.g. output written by a prior agent via Config.OutputKey).
+//
+// ADK's State.Get returns (any, error); our ReadonlyState.Get returns (any, bool).
+// ──────────────────────────────────────────────────────────────────────────────
+
+type adkSessionState struct {
+	state session.State
+}
+
+func (s *adkSessionState) Get(key string) (any, bool) {
+	v, err := s.state.Get(key)
+	return v, err == nil
+}
+
+func (s *adkSessionState) All() iter.Seq2[string, any] {
+	return s.state.All()
+}
+
+// Verify interface compliance at compile time.
+var _ fagent.ReadonlyState = (*adkSessionState)(nil)
 
 // authorFromRole maps a thread message role to an adk-go event author.
 func authorFromRole(role string, agentName string) string {

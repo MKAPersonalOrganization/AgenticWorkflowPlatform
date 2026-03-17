@@ -162,7 +162,37 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 		// 3. Extract full agent config for requirements, middlewares, tools.
 		agentCfg := extractAgentConfig(foundAgent)
 
-		// 4. Build invocation with history for Requirements.
+		// 4. Build in-memory session from thread history.
+		//
+		// Must happen before Invocation is constructed so inv.State reflects
+		// any values accumulated by prior agents (e.g. via Config.OutputKey).
+		// InstructionFunc and Requirements read inv.State.
+		sessionSvc := session.InMemoryService()
+		var sess session.Session
+		if agg != nil && len(agg.Messages) > 0 {
+			sess, err = BuildSessionFromThread(ctx, sessionSvc, agg, req.UserID)
+			if err != nil {
+				yield(nil, fmt.Errorf("building session from thread: %w", err))
+				return
+			}
+		} else {
+			threadID := req.SessionID
+			if threadID == "" {
+				threadID = generateID()
+			}
+			createResp, cErr := sessionSvc.Create(ctx, &session.CreateRequest{
+				AppName:   appName,
+				UserID:    req.UserID,
+				SessionID: threadID,
+			})
+			if cErr != nil {
+				yield(nil, fmt.Errorf("creating session: %w", cErr))
+				return
+			}
+			sess = createResp.Session
+		}
+
+		// 5. Build invocation with history and live session state for Requirements.
 		inv := &fagent.Invocation{
 			ID:        req.InvocationID,
 			SessionID: req.SessionID,
@@ -170,6 +200,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			Message:   req.Message,
 			Config:    req.Config,
 			Context:   req.Context,
+			State:     &adkSessionState{state: sess.State()},
 		}
 		if agg != nil {
 			inv.History = threadHistoryToMessages(agg.Messages)
@@ -257,33 +288,6 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 				yield(nil, fmt.Errorf("creating adk-go agent: %w", aErr))
 				return
 			}
-		}
-
-		// 10. Build session from thread history.
-		sessionSvc := session.InMemoryService()
-		var sess session.Session
-		if agg != nil && len(agg.Messages) > 0 {
-			sess, err = BuildSessionFromThread(ctx, sessionSvc, agg, req.UserID)
-			if err != nil {
-				yield(nil, fmt.Errorf("building session from thread: %w", err))
-				return
-			}
-		} else {
-			// No history — create empty session.
-			threadID := req.SessionID
-			if threadID == "" {
-				threadID = generateID()
-			}
-			createResp, cErr := sessionSvc.Create(ctx, &session.CreateRequest{
-				AppName:   appName,
-				UserID:    req.UserID,
-				SessionID: threadID,
-			})
-			if cErr != nil {
-				yield(nil, fmt.Errorf("creating session: %w", cErr))
-				return
-			}
-			sess = createResp.Session
 		}
 
 		// 11. Build adk-go runner.
