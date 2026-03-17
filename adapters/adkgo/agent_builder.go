@@ -1,0 +1,95 @@
+package adkgo
+
+import (
+	"google.golang.org/adk/agent"
+	"google.golang.org/adk/agent/llmagent"
+	adkmodel "google.golang.org/adk/model"
+	adktool "google.golang.org/adk/tool"
+	"google.golang.org/genai"
+
+	fagent "school-with-ai/foundation/agent"
+)
+
+// ──────────────────────────────────────────────────────────────────────────────
+// LLM Agent Builder
+//
+// buildLLMAgent centralises the construction of an ADK-Go llmagent from the
+// resolved dependencies. Both the regular single-agent path (runner.go) and
+// the workflow leaf-agent path (workflow.go) use this helper, eliminating the
+// duplication that previously existed between Run() and buildLeafAgent().
+//
+// Precedence for overrideable fields (highest wins):
+//  1. Workflow node override (WorkflowNodeInfo fields)
+//  2. Agent config default (Config fields)
+//  3. ADK-Go default (zero value)
+//
+// ──────────────────────────────────────────────────────────────────────────────
+
+// llmAgentParams carries all resolved dependencies needed to build an LLM agent.
+type llmAgentParams struct {
+	// Core identity
+	name       string
+	foundAgent fagent.Agent
+	agentCfg   *fagent.Config // may be nil for agents without Configurable
+
+	// Execution
+	llm    adkmodel.LLM
+	genCfg *genai.GenerateContentConfig
+	tools  []adktool.Tool
+	prompt string
+
+	// Callbacks (from middleware bridge and requirements)
+	beforeAgentCallbacks []agent.BeforeAgentCallback
+	beforeToolCallbacks  []llmagent.BeforeToolCallback
+	afterToolCallbacks   []llmagent.AfterToolCallback
+
+	// Optional workflow node overrides (nil for regular agents)
+	nodeOverride *fagent.WorkflowNodeInfo
+}
+
+// buildLLMAgent creates an ADK-Go llmagent from the resolved parameters.
+// It applies agent config defaults, then overrides with workflow node values
+// where provided.
+func buildLLMAgent(p llmAgentParams) (agent.Agent, error) {
+	cfg := llmagent.Config{
+		Name:                  p.name,
+		Description:           p.foundAgent.Description(),
+		Model:                 p.llm,
+		Instruction:           p.prompt,
+		Tools:                 p.tools,
+		GenerateContentConfig: p.genCfg,
+		BeforeAgentCallbacks:  p.beforeAgentCallbacks,
+		BeforeToolCallbacks:   p.beforeToolCallbacks,
+		AfterToolCallbacks:    p.afterToolCallbacks,
+	}
+
+	// Apply agent config defaults.
+	if p.agentCfg != nil {
+		cfg.DisallowTransferToParent = p.agentCfg.TransferPolicy.DisallowTransferToParent
+		cfg.DisallowTransferToPeers = p.agentCfg.TransferPolicy.DisallowTransferToPeers
+		cfg.OutputKey = p.agentCfg.OutputKey
+		cfg.GlobalInstruction = p.agentCfg.GlobalInstruction
+
+		if p.agentCfg.IncludeContents == fagent.IncludeContentsNone {
+			cfg.IncludeContents = llmagent.IncludeContentsNone
+		}
+	}
+
+	// Apply workflow node overrides (higher precedence than config defaults).
+	if n := p.nodeOverride; n != nil {
+		if n.DisallowTransferToParent != nil {
+			cfg.DisallowTransferToParent = *n.DisallowTransferToParent
+		}
+		if n.DisallowTransferToPeers != nil {
+			cfg.DisallowTransferToPeers = *n.DisallowTransferToPeers
+		}
+		if n.IncludeContents == "none" {
+			cfg.IncludeContents = llmagent.IncludeContentsNone
+		}
+		if n.OutputKey != "" {
+			cfg.OutputKey = n.OutputKey
+		}
+	}
+
+	return llmagent.New(cfg)
+}

@@ -24,7 +24,7 @@ func TestMiddleware_NoPolicy_PassesThrough(t *testing.T) {
 	}))
 
 	tool := &mockTool{name: "calculator"}
-	ctx := agent.NewFunctionContext(context.Background(), tool, map[string]any{"x": 1})
+	ctx := agent.NewToolContext(context.Background(), tool, map[string]any{"x": 1})
 	if err := handler.Handle(ctx); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestMiddleware_WithPolicy_NoopHandler_AutoApproves(t *testing.T) {
 	// NoopHandler auto-approves all confirmations.
 	goCtx := io.WithHandler(context.Background(), &io.NoopHandler{})
 	tool := &mockTool{name: "dangerous_tool"}
-	ctx := agent.NewFunctionContext(goCtx, tool, nil)
+	ctx := agent.NewToolContext(goCtx, tool, nil)
 
 	if err := handler.Handle(ctx); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -76,7 +76,7 @@ func TestMiddleware_WithPolicy_DenyHandler_Blocks(t *testing.T) {
 	// DenyHandler rejects all confirmations.
 	goCtx := io.WithHandler(context.Background(), &io.DenyHandler{})
 	tool := &mockTool{name: "dangerous_tool"}
-	ctx := agent.NewFunctionContext(goCtx, tool, nil)
+	ctx := agent.NewToolContext(goCtx, tool, nil)
 
 	if err := handler.Handle(ctx); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -109,7 +109,7 @@ func TestMiddleware_WithPolicy_PauseHandler_ReturnsAuthError(t *testing.T) {
 	// PauseHandler returns ErrAuthRequired to pause execution.
 	goCtx := io.WithHandler(context.Background(), &io.PauseHandler{})
 	tool := &mockTool{name: "file_delete"}
-	ctx := agent.NewFunctionContext(goCtx, tool, nil)
+	ctx := agent.NewToolContext(goCtx, tool, nil)
 
 	err := handler.Handle(ctx)
 	if err == nil {

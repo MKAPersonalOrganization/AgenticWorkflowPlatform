@@ -94,6 +94,52 @@ func IsStreamingTool(tool ExecutableTool) (StreamingExecutableTool, bool) {
 	return st, ok
 }
 
+// LongRunningTool is implemented by tools that initiate a background operation
+// and return immediately with a status identifier, completing asynchronously.
+// Aligned with ADK-Go's tool.Tool.IsLongRunning() semantics.
+//
+// When a tool implements this interface and returns true, the adapter will mark
+// the corresponding ADK-Go function tool as long-running, causing the LLM to
+// avoid re-calling the tool if it has already returned a pending status.
+type LongRunningTool interface {
+	// IsLongRunning returns true if this tool starts a long-running operation.
+	IsLongRunning() bool
+}
+
+// IsLongRunningTool returns true if the tool implements LongRunningTool and
+// reports itself as long running. Returns false for all other tools.
+func IsLongRunningTool(t Tool) bool {
+	if lrt, ok := t.(LongRunningTool); ok {
+		return lrt.IsLongRunning()
+	}
+	return false
+}
+
+// Toolset provides a dynamic, named collection of tools resolved per invocation.
+// This mirrors ADK-Go's tool.Toolset interface, enabling context-sensitive tool
+// sets such as MCP servers, A2A agents, or user-enabled plugin groups.
+//
+// Unlike a static []Tool slice in Config, a Toolset can filter tools based on
+// runtime state (permissions, feature flags, user context, etc.).
+//
+// Example:
+//
+//	type CalculatorToolset struct{}
+//
+//	func (s *CalculatorToolset) Name() string { return "calculator" }
+//
+//	func (s *CalculatorToolset) Tools(ctx context.Context) ([]ExecutableTool, error) {
+//	    return []ExecutableTool{NewAddTool(), NewSubtractTool()}, nil
+//	}
+type Toolset interface {
+	// Name returns the toolset's unique identifier.
+	Name() string
+
+	// Tools returns the available tools for the current invocation.
+	// Implementations may filter dynamically based on the context.
+	Tools(ctx context.Context) ([]ExecutableTool, error)
+}
+
 // Arguments holds the decoded arguments for a tool invocation.
 type Arguments struct {
 	Raw    json.RawMessage // Original JSON

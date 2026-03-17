@@ -13,7 +13,6 @@ import (
 	"google.golang.org/adk/runner"
 	"google.golang.org/adk/session"
 	adktool "google.golang.org/adk/tool"
-	"google.golang.org/genai"
 
 	fagent "school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
@@ -207,21 +206,9 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			}
 		} else {
 			// ── Regular LLM Agent Path ──
-			// 5. Evaluate requirements once and reuse the rules for both tool
-			// filtering (resolveTools) and guidance injection (buildBeforeRunHooks).
-			var precomputedRules []fagent.Rule
-			if agentCfg != nil {
-				for _, requirement := range agentCfg.Requirements {
-					if e, ok := requirement.(fagent.Enableable); ok && !e.Enabled() {
-						continue
-					}
-					rules, rErr := requirement.Run(ctx, inv)
-					if rErr != nil {
-						continue
-					}
-					precomputedRules = append(precomputedRules, rules...)
-				}
-			}
+			// 5. Evaluate requirements once and reuse rules for tool filtering
+			// and LLM guidance injection.
+			precomputedRules := evaluateRequirements(ctx, agentCfg, inv)
 
 			// 6. Build tools from agent config + enabled tool sets + MCP.
 			adkTools := r.resolveTools(ctx, req.UserID, agentName, modelCfg, req.SessionID, agentCfg, req, precomputedRules)
@@ -231,8 +218,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 
 			genCfg := buildGenerateContentConfig(modelCfg)
 
-			// Bridge foundation function middlewares into ADK-Go's tool lifecycle.
-			// Inject block + confirmation middlewares from separate enforcers.
+			// Build middleware from enforcers and agent config.
 			var extraMWs []fagent.Middleware
 			if r.blockEnforcer != nil {
 				if bmw := r.blockEnforcer.BlockMiddleware(agentName); bmw != nil {
@@ -252,25 +238,18 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 				afterToolCBs = mb.afterToolCallbacks()
 			}
 
-			// Build before-agent callbacks for requirements guidance injection.
-			beforeAgentCBs := buildBeforeRunHooks(precomputedRules)
-
 			var aErr error
-			adkAgent, aErr = llmagent.New(llmagent.Config{
-				Name:                     agentName,
-				Description:              foundAgent.Description(),
-				Model:                    llm,
-				Instruction:              systemPrompt,
-				Tools:                    adkTools,
-				GenerateContentConfig:    genCfg,
-				BeforeAgentCallbacks:     beforeAgentCBs,
-				BeforeToolCallbacks:      beforeToolCBs,
-				AfterToolCallbacks:       afterToolCBs,
-				DisallowTransferToParent: transferPolicy(agentCfg).DisallowTransferToParent,
-				DisallowTransferToPeers:  transferPolicy(agentCfg).DisallowTransferToPeers,
-				IncludeContents:          resolveIncludeContents(agentCfg),
-				OutputKey:                outputKey(agentCfg),
-				GlobalInstruction:        globalInstruction(agentCfg),
+			adkAgent, aErr = buildLLMAgent(llmAgentParams{
+				name:                 agentName,
+				foundAgent:           foundAgent,
+				agentCfg:             agentCfg,
+				llm:                  llm,
+				genCfg:               genCfg,
+				tools:                adkTools,
+				prompt:               systemPrompt,
+				beforeAgentCallbacks: buildBeforeRunHooks(precomputedRules),
+				beforeToolCallbacks:  beforeToolCBs,
+				afterToolCallbacks:   afterToolCBs,
 			})
 			if aErr != nil {
 				yield(nil, fmt.Errorf("creating adk-go agent: %w", aErr))
@@ -833,209 +812,4 @@ func extractAgentConfig(a fagent.Agent) *fagent.Config {
 		return &cfg
 	}
 	return nil
-}
-
-// transferPolicy extracts the TransferPolicy from an agent config, or returns
-// a zero-value policy (allow all transfers) if config is nil.
-func transferPolicy(cfg *fagent.Config) fagent.TransferPolicy {
-	if cfg == nil {
-		return fagent.TransferPolicy{}
-	}
-	return cfg.TransferPolicy
-}
-
-// resolveIncludeContents maps foundation IncludeContents to ADK-Go's type.
-func resolveIncludeContents(cfg *fagent.Config) llmagent.IncludeContents {
-	if cfg == nil || cfg.IncludeContents == "" || cfg.IncludeContents == fagent.IncludeContentsDefault {
-		return "" // ADK-Go default
-	}
-	if cfg.IncludeContents == fagent.IncludeContentsNone {
-		return llmagent.IncludeContentsNone
-	}
-	return ""
-}
-
-// outputKey returns the OutputKey from an agent config, or empty string.
-func outputKey(cfg *fagent.Config) string {
-	if cfg == nil {
-		return ""
-	}
-	return cfg.OutputKey
-}
-
-// globalInstruction returns the GlobalInstruction from an agent config, or empty string.
-func globalInstruction(cfg *fagent.Config) string {
-	if cfg == nil {
-		return ""
-	}
-	return cfg.GlobalInstruction
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Middleware Bridge
-//
-// ADK-Go splits tool lifecycle into BeforeToolCallback and AfterToolCallback.
-// The foundation middleware system wraps the entire execution in a single
-// chain (before → execute → after, like HTTP middleware). We bridge these
-// two models by:
-//
-//   - BeforeToolCallback: runs the full middleware chain around a no-op
-//     terminal handler. This gives logging, rate-limiting, etc. their
-//     "before" phase. We set context metadata so middleware_common.go
-//     can log agent_name, thread_id, etc.
-//
-//   - AfterToolCallback: populates c.Result with the tool output and runs
-//     the chain again so the logging middleware can record the result.
-//     This is best-effort — tool failures don't propagate from here.
-//
-// This is a pragmatic bridge. The custom adapter wraps execution in one chain
-// call; ADK-Go forces the split. The middlewareBridge encapsulates this
-// so runner.go stays clean.
-// ──────────────────────────────────────────────────────────────────────────────
-
-// middlewareBridge wraps the foundation FunctionMiddleware chain into ADK-Go's
-// split before/after tool callback model.
-type middlewareBridge struct {
-	middlewares []fagent.Middleware
-	agentName   string
-	sessionID   string
-	userID      string
-}
-
-// newMiddlewareBridge collects all function middlewares from the agent config
-// (both explicit and requirement-provided) and returns a bridge, or nil if
-// there are no middlewares to run.
-//
-// Additional middlewares (e.g., from the toolreqs confirmation system) can be
-// prepended via the extraMiddlewares parameter.
-func newMiddlewareBridge(agentCfg *fagent.Config, agentName, sessionID, userID string, extraMiddlewares ...fagent.Middleware) *middlewareBridge {
-	var mws []fagent.Middleware
-
-	// 1. Extra middlewares (e.g., toolreqs confirmation) run first.
-	mws = append(mws, extraMiddlewares...)
-
-	if agentCfg != nil {
-		// 2. Explicit function middlewares from agent config.
-		mws = append(mws, agentCfg.FunctionMiddlewares...)
-
-		// 3. Requirement-provided middlewares.
-		for _, req := range agentCfg.Requirements {
-			if fmp, ok := req.(fagent.FunctionMiddlewareProvider); ok {
-				mws = append(mws, fmp.FunctionMiddleware())
-			}
-		}
-	}
-
-	if len(mws) == 0 {
-		return nil
-	}
-
-	return &middlewareBridge{
-		middlewares: mws,
-		agentName:   agentName,
-		sessionID:   sessionID,
-		userID:      userID,
-	}
-}
-
-// newContext creates a foundation middleware Context with properly populated
-// metadata, matching what middleware_common.go expects.
-func (mb *middlewareBridge) newContext(ctx context.Context, toolName, toolDesc string, args map[string]any) *fagent.Context {
-	tool := &adkToolBridge{name: toolName, desc: toolDesc}
-	fCtx := fagent.NewFunctionContext(ctx, tool, args)
-	fCtx.Metadata["agent_name"] = mb.agentName
-	fCtx.Metadata["thread_id"] = mb.sessionID
-	fCtx.Metadata["message_id"] = "" // Not available at tool-call level.
-	fCtx.Metadata["user_id"] = mb.userID
-	return fCtx
-}
-
-// runChain executes the middleware chain with the given context and terminal handler.
-func (mb *middlewareBridge) runChain(fCtx *fagent.Context, terminal fagent.HandlerFunc) error {
-	chain := fagent.Chain(mb.middlewares...)
-	return chain(terminal).Handle(fCtx)
-}
-
-// beforeToolCallbacks returns the ADK-Go BeforeToolCallback slice.
-func (mb *middlewareBridge) beforeToolCallbacks() []llmagent.BeforeToolCallback {
-	return []llmagent.BeforeToolCallback{
-		func(ctx adktool.Context, t adktool.Tool, args map[string]any) (map[string]any, error) {
-			fCtx := mb.newContext(ctx, t.Name(), t.Description(), args)
-
-			if err := mb.runChain(fCtx, func(c *fagent.Context) error {
-				return nil // Terminal: allow tool to proceed.
-			}); err != nil {
-				return map[string]any{errorKey: err.Error()}, nil
-			}
-
-			return nil, nil // nil = continue with original args.
-		},
-	}
-}
-
-// afterToolCallbacks returns the ADK-Go AfterToolCallback slice.
-func (mb *middlewareBridge) afterToolCallbacks() []llmagent.AfterToolCallback {
-	return []llmagent.AfterToolCallback{
-		func(ctx adktool.Context, t adktool.Tool, args, result map[string]any, _ error) (map[string]any, error) {
-			fCtx := mb.newContext(ctx, t.Name(), t.Description(), args)
-			fCtx.Result = result // Populate so logging middleware sees the output.
-
-			// Best-effort: don't fail the tool over post-execution middleware errors.
-			_ = mb.runChain(fCtx, func(c *fagent.Context) error {
-				return nil
-			})
-
-			return nil, nil // nil = keep original result unchanged.
-		},
-	}
-}
-
-// adkToolBridge adapts an adk-go tool name/description to the foundation Tool interface.
-type adkToolBridge struct {
-	name string
-	desc string
-}
-
-func (t *adkToolBridge) Name() string           { return t.name }
-func (t *adkToolBridge) Description() string    { return t.desc }
-func (t *adkToolBridge) Schema() *fagent.Schema { return nil }
-
-// buildBeforeRunHooks creates ADK-Go BeforeAgentCallbacks that inject
-// pre-computed requirement guidance into the LLM turn as a system-role
-// Content message. Requirements are evaluated once in Run() and the
-// resulting rules are passed in — no double evaluation.
-func buildBeforeRunHooks(rules []fagent.Rule) []agent.BeforeAgentCallback {
-	if len(rules) == 0 {
-		return nil
-	}
-
-	// Pre-build guidance text from the rules.
-	var guidance strings.Builder
-	for _, rule := range rules {
-		if rule.Blocked && rule.Reason != "" {
-			guidance.WriteString(fmt.Sprintf("IMPORTANT: The tool '%s' is currently disabled: %s\n", rule.TargetTool, rule.Reason))
-		}
-		if rule.Forced && rule.Reason != "" {
-			guidance.WriteString(fmt.Sprintf("IMPORTANT: You MUST use the tool '%s': %s\n", rule.TargetTool, rule.Reason))
-		}
-		if rule.PreventStop && rule.Reason != "" {
-			guidance.WriteString(fmt.Sprintf("IMPORTANT: You must not stop yet: %s\n", rule.Reason))
-		}
-	}
-
-	if guidance.Len() == 0 {
-		return nil
-	}
-
-	guidanceText := guidance.String()
-	return []agent.BeforeAgentCallback{
-		func(_ agent.CallbackContext) (*genai.Content, error) {
-			// Return guidance as a system-role Content so ADK injects it
-			// into the current LLM turn, making it visible to the model.
-			return &genai.Content{
-				Role:  "user",
-				Parts: []*genai.Part{{Text: guidanceText}},
-			}, nil
-		},
-	}
 }

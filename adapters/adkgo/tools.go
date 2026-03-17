@@ -49,11 +49,14 @@ func WrapExecutableTool(et agent.ExecutableTool, sessionID, userID string) adkto
 		return executeFoundationTool(ctx, et, args, sessionID, userID)
 	}
 
+	isLongRunning := agent.IsLongRunningTool(et)
+
 	t, buildErr := functiontool.New(
 		functiontool.Config{
-			Name:        et.Name(),
-			Description: et.Description(),
-			InputSchema: inputSchema,
+			Name:          et.Name(),
+			Description:   et.Description(),
+			InputSchema:   inputSchema,
+			IsLongRunning: isLongRunning,
 		},
 		exec,
 	)
@@ -62,8 +65,9 @@ func WrapExecutableTool(et agent.ExecutableTool, sessionID, userID string) adkto
 		// a tool without schema — the LLM still sees name + description.
 		t, _ = functiontool.New(
 			functiontool.Config{
-				Name:        et.Name(),
-				Description: et.Description(),
+				Name:          et.Name(),
+				Description:   et.Description(),
+				IsLongRunning: isLongRunning,
 			},
 			exec,
 		)

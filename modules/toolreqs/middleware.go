@@ -31,13 +31,13 @@ type blockChecker interface {
 func BlockMiddleware(checker blockChecker, agentID string) agent.Middleware {
 	return func(next agent.Handler) agent.Handler {
 		return agent.HandlerFunc(func(c *agent.Context) error {
-			if !c.IsFunction() {
+			if !c.IsTool() {
 				return next.Handle(c)
 			}
 
 			toolName := ""
-			if c.Function != nil && c.Function.Tool != nil {
-				toolName = c.Function.Tool.Name()
+			if c.Tool != nil && c.Tool.Tool != nil {
+				toolName = c.Tool.Tool.Name()
 			}
 			if toolName == "" {
 				return next.Handle(c)
@@ -93,21 +93,21 @@ type ConfirmationConfigResolver interface {
 func ConfirmationMiddleware(resolver ConfirmationConfigResolver, cr *ConfirmationRequirement, agentID string) agent.Middleware {
 	return func(next agent.Handler) agent.Handler {
 		return agent.HandlerFunc(func(c *agent.Context) error {
-			if !c.IsFunction() {
+			if !c.IsTool() {
 				return next.Handle(c)
 			}
 
 			toolName := ""
-			if c.Function != nil && c.Function.Tool != nil {
-				toolName = c.Function.Tool.Name()
+			if c.Tool != nil && c.Tool.Tool != nil {
+				toolName = c.Tool.Tool.Name()
 			}
 			if toolName == "" {
 				return next.Handle(c)
 			}
 
 			var args map[string]any
-			if c.Function != nil {
-				args = c.Function.Arguments
+			if c.Tool != nil {
+				args = c.Tool.Arguments
 			}
 
 			userID, _ := c.Metadata["user_id"].(string)
