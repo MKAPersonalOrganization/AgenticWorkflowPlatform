@@ -425,6 +425,25 @@ func buildRemoteAgentNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeIn
 					return
 				}
 
+				if chunk.IsFile {
+					// Encode file metadata into StateDelta so TranslateEvent can emit
+					// a FileAttachmentReceived event for separate frontend display.
+					fileData, _ := json.Marshal(map[string]any{
+						"fileURL":  chunk.FileURL,
+						"fileName": chunk.FileName,
+						"mimeType": chunk.MimeType,
+					})
+					fileEvt := session.NewEvent(ictx.InvocationID())
+					fileEvt.Author = agentName
+					fileEvt.Actions.StateDelta = map[string]any{
+						"__a2a_file__": string(fileData),
+					}
+					if !yield(fileEvt, nil) {
+						return
+					}
+					continue
+				}
+
 				if chunk.IsArtifact {
 					// Skip artifacts whose content duplicates the accumulated streaming
 					// text. Python ADK always packages the complete response as a final

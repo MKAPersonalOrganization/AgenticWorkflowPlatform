@@ -479,6 +479,10 @@ func (a *a2aSubAgentAdapter) SendStreamingMessage(ctx context.Context, connector
 				ArtifactID: chunk.ArtifactID,
 				Title:      chunk.Title,
 				Content:    chunk.Content,
+				IsFile:     chunk.IsFile,
+				FileURL:    chunk.FileURL,
+				FileName:   chunk.FileName,
+				MimeType:   chunk.MimeType,
 			}, nil) {
 				return
 			}

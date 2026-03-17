@@ -2,6 +2,7 @@ package a2a
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"iter"
@@ -511,7 +512,11 @@ func (s *Service) SendStreamingMessage(ctx context.Context, connectorID, userID,
 				return
 			}
 
-			chunks := extractEventChunks(event)
+			chunks, err := extractEventChunks(event)
+			if err != nil {
+				yield(StreamChunk{}, err)
+				return
+			}
 			for _, chunk := range chunks {
 				if !yield(chunk, nil) {
 					return
@@ -521,83 +526,149 @@ func (s *Service) SendStreamingMessage(ctx context.Context, connectorID, userID,
 	}
 }
 
-// extractEventChunks extracts StreamChunks from a streaming A2A event.
+// extractEventChunks mirrors AgentStack's handleStatusUpdate + handleArtifactUpdate
+// from client.ts, translating raw A2A events into typed StreamChunks.
 //
-// Text deltas: only working-state TaskStatusUpdateEvents carry true LLM streaming
-// deltas. Submitted echoes user input; terminal states carry no new text.
-//
-// Artifacts: TaskArtifactUpdateEvents with LastChunk=true (or non-append)
-// are emitted as artifact chunks so the frontend can display them separately
-// from the streaming text response.
-func extractEventChunks(event a2atypes.Event) []StreamChunk {
+// Rules (same as AgentStack):
+//   - failed/rejected state   → return error (AgentStack throws)
+//   - working state + message → text delta chunks + file chunks from message parts
+//   - artifact-update, text only   → artifact card chunk + file chunks
+//   - artifact-update, files only  → file chunks (no card wrapper)
+//   - artifact-update, text+files  → artifact card chunk + file chunks
+func extractEventChunks(event a2atypes.Event) ([]StreamChunk, error) {
 	if event == nil {
-		return nil
+		return nil, nil
 	}
 	switch v := event.(type) {
 	case *a2atypes.Message:
-		// Non-streaming final response (e.g. from sendMessage blocking path).
-		if text := extractTextFromParts(v.Parts); text != "" {
-			return []StreamChunk{{Delta: text}}
-		}
+		// Non-streaming final response (e.g. agents using sendMessage).
+		// Extract text deltas + file chunks from all parts.
+		return splitPartsToChunks(v.Parts, ""), nil
 
 	case *a2atypes.TaskStatusUpdateEvent:
-		// Only working-state events carry incremental LLM streaming deltas.
-		// - submitted: echoes the user's own input — skip.
-		// - working (with message): true streaming delta — include.
-		// - working (no message): state heartbeat — skip.
-		// - completed/failed/cancelled: terminal state change, no new content — skip.
-		if v.Status.State != a2atypes.TaskStateWorking {
-			return nil
-		}
-		if v.Status.Message != nil {
-			if text := extractTextFromParts(v.Status.Message.Parts); text != "" {
-				return []StreamChunk{{Delta: text}}
+		state := v.Status.State
+		// failed/rejected → propagate as error (mirrors AgentStack throw).
+		if state == a2atypes.TaskStateFailed || state == a2atypes.TaskStateRejected {
+			msg := "remote agent task failed"
+			if v.Status.Message != nil {
+				if t := extractTextFromParts(v.Status.Message.Parts); t != "" {
+					msg = t
+				}
 			}
+			return nil, fmt.Errorf("%s", msg)
 		}
+		// Only working-state events carry incremental streaming deltas.
+		if state != a2atypes.TaskStateWorking || v.Status.Message == nil {
+			return nil, nil
+		}
+		return splitPartsToChunks(v.Status.Message.Parts, ""), nil
 
 	case *a2atypes.TaskArtifactUpdateEvent:
-		// Emit complete artifacts (LastChunk=true or standalone non-append artifacts).
-		// Append-mode partial chunks are skipped — we only surface the final content.
-		// LastChunk signals the artifact content is complete and ready to display.
+		// Mirror handleArtifactUpdate: split text vs file parts.
+		// Partial append chunks are skipped — wait for LastChunk.
 		if v.Artifact == nil {
-			return nil
+			return nil, nil
 		}
 		if v.Append && !v.LastChunk {
-			// Partial streaming artifact chunk — skip, wait for LastChunk.
-			return nil
+			return nil, nil
 		}
-		content := extractTextFromParts(v.Artifact.Parts)
-		if content == "" {
-			return nil
-		}
-		return []StreamChunk{{
-			IsArtifact: true,
-			ArtifactID: string(v.Artifact.ID),
-			Title:      v.Artifact.Name,
-			Content:    content,
-		}}
+		return buildArtifactChunks(v.Artifact), nil
 
 	case *a2atypes.Task:
-		// Blocking (non-streaming) response: yield text then artifacts.
+		// Blocking response: text delta from status message + artifact chunks.
 		var chunks []StreamChunk
 		if v.Status.Message != nil {
-			if t := extractTextFromParts(v.Status.Message.Parts); t != "" {
-				chunks = append(chunks, StreamChunk{Delta: t})
-			}
+			chunks = append(chunks, splitPartsToChunks(v.Status.Message.Parts, "")...)
 		}
-		for _, artifact := range v.Artifacts {
-			if t := extractTextFromParts(artifact.Parts); t != "" {
-				chunks = append(chunks, StreamChunk{
-					IsArtifact: true,
-					ArtifactID: string(artifact.ID),
-					Title:      artifact.Name,
-					Content:    t,
+		for _, a := range v.Artifacts {
+			chunks = append(chunks, buildArtifactChunks(a)...)
+		}
+		return chunks, nil
+	}
+	return nil, nil
+}
+
+// buildArtifactChunks mirrors handleArtifactUpdate from AgentStack client.ts:
+// - Split artifact parts into text chunks and file chunks.
+// - If only files (no text) → return file chunks directly (no card).
+// - If has text → return [artifactCard, ...fileChunks].
+func buildArtifactChunks(artifact *a2atypes.Artifact) []StreamChunk {
+	textChunks, fileChunks := splitPartsTyped(artifact.Parts)
+
+	if len(textChunks) == 0 {
+		// Files only — return as plain file attachment chunks (no artifact card).
+		return fileChunks
+	}
+
+	// Concatenate all text parts into one artifact card.
+	var sb strings.Builder
+	for _, c := range textChunks {
+		sb.WriteString(c.Content)
+	}
+	artifactChunk := StreamChunk{
+		IsArtifact: true,
+		ArtifactID: string(artifact.ID),
+		Title:      artifact.Name,
+		Content:    sb.String(),
+	}
+	return append([]StreamChunk{artifactChunk}, fileChunks...)
+}
+
+// splitPartsToChunks converts a slice of Parts into StreamChunks.
+// Text parts → Delta chunks; URL/Raw parts → file chunks; Data parts → skipped.
+func splitPartsToChunks(parts a2atypes.ContentParts, _ string) []StreamChunk {
+	textChunks, fileChunks := splitPartsTyped(parts)
+	// For plain message parts, text becomes Delta chunks (streaming text).
+	var result []StreamChunk
+	for _, c := range textChunks {
+		result = append(result, StreamChunk{Delta: c.Content})
+	}
+	return append(result, fileChunks...)
+}
+
+// splitPartsTyped separates parts into text-content chunks and file chunks.
+func splitPartsTyped(parts a2atypes.ContentParts) (textChunks []StreamChunk, fileChunks []StreamChunk) {
+	for _, part := range parts {
+		if part == nil {
+			continue
+		}
+		switch c := part.Content.(type) {
+		case a2atypes.Text:
+			if string(c) != "" {
+				textChunks = append(textChunks, StreamChunk{Content: string(c)})
+			}
+		case a2atypes.URL:
+			if string(c) != "" {
+				fileChunks = append(fileChunks, StreamChunk{
+					IsFile:   true,
+					FileURL:  string(c),
+					FileName: part.Filename,
+					MimeType: part.MediaType,
 				})
 			}
+		case a2atypes.Raw:
+			if len(c) > 0 {
+				mimeType := part.MediaType
+				if mimeType == "" {
+					mimeType = "application/octet-stream"
+				}
+				dataURL := "data:" + mimeType + ";base64," + encodeBase64([]byte(c))
+				fileChunks = append(fileChunks, StreamChunk{
+					IsFile:   true,
+					FileURL:  dataURL,
+					FileName: part.Filename,
+					MimeType: mimeType,
+				})
+			}
+		// Data parts (structured JSON) are skipped — no UI representation yet.
 		}
-		return chunks
 	}
-	return nil
+	return
+}
+
+// encodeBase64 encodes bytes to standard base64 string.
+func encodeBase64(b []byte) string {
+	return base64.StdEncoding.EncodeToString(b)
 }
 
 // extractTextFromParts extracts and joins text content from A2A parts.

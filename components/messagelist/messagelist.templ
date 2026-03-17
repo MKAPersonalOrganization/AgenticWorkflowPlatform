@@ -180,6 +180,37 @@ templ ArtifactCard(ctx context.Context) {
 	</div>
 }
 
+// FileCard renders a downloadable file attachment produced by an agent.
+// Generic UI affordance — no transport-specific details exposed here.
+templ FileCard(ctx context.Context) {
+	<div
+		x-show="message.type === 'file_attachment'"
+		x-cloak
+		class="w-full my-2 animate-in fade-in slide-in-from-bottom-2 duration-300"
+	>
+		<div class="rounded-lg border border-border bg-card overflow-hidden shadow-modern-xs">
+			<div class="flex items-center gap-3 px-4 py-3 bg-muted/30">
+				<svg class="size-4 text-muted-foreground shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+					<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+					<polyline points="7 10 12 15 17 10"></polyline>
+					<line x1="12" y1="15" x2="12" y2="3"></line>
+				</svg>
+				<a
+					:href="message.fileUrl"
+					:download="message.fileName || true"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="text-sm font-medium text-foreground hover:text-primary flex-1 truncate transition-colors"
+					x-text="message.fileName || 'Download file'"
+				></a>
+				<template x-if="message.agentName">
+					<span class="text-xs text-muted-foreground shrink-0" x-text="message.agentName"></span>
+				</template>
+			</div>
+		</div>
+	</div>
+}
+
 // ThinkingSkeleton - Premium thinking indicator for assistant activity
 templ ThinkingSkeleton() {
 	<div
@@ -390,6 +421,8 @@ templ MessageList() {
 				@message.AssistantMessage()
 				<!-- Artifact Card -->
 				@ArtifactCard(ctx)
+				<!-- File Attachment Card -->
+				@FileCard(ctx)
 			</div>
 		</template>
 		<!-- Right-click Context Menu -->

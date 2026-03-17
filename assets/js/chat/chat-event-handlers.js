@@ -629,6 +629,28 @@ export function createEventHandlerMethods() {
             }
         },
 
+        /**
+         * Handle FILE_ATTACHMENT event — renders a downloadable file card.
+         * Generic UI affordance; no knowledge of the underlying transport.
+         */
+        __handleFileAttachment(value, state, threadId) {
+            const { fileUrl, fileName, mimeType, agentName } = value;
+
+            state.messages.push({
+                id: `file_${Date.now()}`,
+                type: 'file_attachment',
+                fileUrl: fileUrl || '',
+                fileName: fileName || '',
+                mimeType: mimeType || 'application/octet-stream',
+                agentName: agentName || '',
+                timestamp: new Date().toISOString(),
+            });
+
+            if (threadId === this.__currentThreadId && !this.__abortScroll) {
+                this.$nextTick(() => this.__scrollToBottomStreaming());
+            }
+        },
+
         // ============================================
         // ============================================
         // Tool Call Message Helpers
