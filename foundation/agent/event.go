@@ -57,9 +57,6 @@ const (
 	// EventTypeError indicates an error occurred.
 	EventTypeError EventType = "error"
 
-	// EventTypeUsage indicates token usage.
-	EventTypeUsage EventType = "usage"
-
 	// EventTypeTitleGenerated indicates a conversation title was created.
 	EventTypeTitleGenerated EventType = "title_generated"
 
@@ -166,18 +163,6 @@ func (e *ErrorEvent) Timestamp() time.Time { return e.EventTime }
 func (e *ErrorEvent) Data() any            { return e.Error }
 func (e *ErrorEvent) ephemeral()           {}
 
-// UsageEvent is emitted with token consumption metrics.
-// This is a PERSISTENT event - usage tracking is a business requirement.
-type UsageEvent struct {
-	Usage     *Usage
-	EventTime time.Time
-}
-
-func (e *UsageEvent) Type() EventType      { return EventTypeUsage }
-func (e *UsageEvent) Timestamp() time.Time { return e.EventTime }
-func (e *UsageEvent) Data() any            { return e.Usage }
-func (e *UsageEvent) persistent()          {}
-
 // TitleEvent is emitted when a conversation title is generated.
 // This is a PERSISTENT event - title is part of thread state.
 type TitleEvent struct {
@@ -236,7 +221,6 @@ func (e *StateChangeEvent) persistent()          {}
 var (
 	_ PersistentEvent = (*MessageEvent)(nil)
 	_ PersistentEvent = (*ToolResultEvent)(nil)
-	_ PersistentEvent = (*UsageEvent)(nil)
 	_ PersistentEvent = (*TitleEvent)(nil)
 	_ PersistentEvent = (*ToolInteractionEvent)(nil)
 	_ PersistentEvent = (*StateChangeEvent)(nil)

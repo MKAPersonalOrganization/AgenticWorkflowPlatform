@@ -7,13 +7,12 @@ type OperationKind int
 
 const (
 	OperationAgent OperationKind = iota
-	OperationChat
 	OperationTool
 )
 
 // Context carries all operation data through the middleware chain.
 // Embeds context.Context for cancellation/timeout support.
-// Exactly one of Agent, Chat, or Tool is non-nil.
+// Exactly one of Agent or Tool is non-nil.
 type Context struct {
 	context.Context
 
@@ -22,7 +21,6 @@ type Context struct {
 
 	// Exactly one is non-nil
 	Agent *AgentOp
-	Chat  *ChatOp
 	Tool  *ToolOp
 
 	// Shared across middleware
@@ -38,7 +36,6 @@ type Context struct {
 
 // Helper methods
 func (c *Context) IsAgent() bool { return c.Kind == OperationAgent }
-func (c *Context) IsChat() bool  { return c.Kind == OperationChat }
 
 // IsTool reports whether this context wraps a tool invocation.
 func (c *Context) IsTool() bool { return c.Kind == OperationTool }
@@ -48,26 +45,6 @@ type AgentOp struct {
 	Agent     Agent
 	Messages  []Message
 	Streaming bool
-}
-
-// ChatOp groups LLM call data.
-type ChatOp struct {
-	Model    Model
-	Messages []Message
-	Tools    []Tool // Available tools for this LLM call
-	Options  *ChatOptions
-}
-
-// ChatOptions holds LLM configuration.
-type ChatOptions struct {
-	Temperature   float64
-	MaxTokens     int
-	StopSequences []string
-	// ToolChoice constrains which tool the LLM must use.
-	// Values: "" (no constraint), "auto", "required" (must call some tool),
-	// or a specific tool name (must call that exact tool).
-	ToolChoice string
-	Metadata   map[string]any
 }
 
 // ToolOp groups tool call data for middleware execution.
@@ -117,20 +94,6 @@ func NewAgentContext(ctx context.Context, agent Agent, messages []Message, strea
 			Agent:     agent,
 			Messages:  messages,
 			Streaming: streaming,
-		},
-		Metadata: make(map[string]any),
-	}
-}
-
-// NewChatContext creates a Context for a chat/LLM operation.
-func NewChatContext(ctx context.Context, model Model, messages []Message, options *ChatOptions) *Context {
-	return &Context{
-		Context: ctx,
-		Kind:    OperationChat,
-		Chat: &ChatOp{
-			Model:    model,
-			Messages: messages,
-			Options:  options,
 		},
 		Metadata: make(map[string]any),
 	}

@@ -20,9 +20,6 @@ type Message struct {
 	// Status indicates the message generation state (for streaming).
 	Status MessageStatus
 
-	// FinishReason indicates why generation stopped.
-	FinishReason FinishReason
-
 	// ToolCallID links tool results to their originating call.
 	ToolCallID string
 
@@ -31,9 +28,6 @@ type Message struct {
 
 	// InvocationID links the message to its originating invocation.
 	InvocationID string
-
-	// Usage contains token consumption metrics.
-	Usage *Usage
 
 	// Metadata for extensibility (e.g., model info).
 	Metadata map[string]any

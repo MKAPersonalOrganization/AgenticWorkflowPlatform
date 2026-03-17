@@ -5,7 +5,7 @@ type ID = string
 
 // Agent represents an AI agent definition — its identity and capability tree.
 //
-// Execution is delegated entirely to the framework adapter (ADK-Go).
+// Execution is delegated entirely to the framework adapter.
 // Agents form a tree: each agent can have SubAgents for delegation/transfer.
 type Agent interface {
 	// ID returns the unique identifier for this agent.
@@ -36,7 +36,7 @@ type Configurable interface {
 // (sequential, parallel, loop) containing child nodes — enabling arbitrary
 // nesting like: Sequential → [Agent, Parallel → [Agent, Loop → [Agent, Agent]]].
 //
-// The adapter layer uses this to recursively build the appropriate ADK-Go
+// The adapter layer uses this to recursively build the appropriate
 // workflow agent tree at runtime.
 //
 // See arch/adr/019-multi-agent-workflow-composition.md.
