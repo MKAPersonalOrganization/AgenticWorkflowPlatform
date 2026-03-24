@@ -259,17 +259,31 @@ func translateToolConfirmations(evt *session.Event, ctx EventContext) []thread.E
 		return nil
 	}
 
+	// Build a callID → toolName lookup from any FunctionCall parts in the event.
+	// ADK-Go keys RequestedToolConfirmations by function call ID, not tool name.
+	// The matching FunctionCall parts (if present) carry the actual tool name.
+	callIDToName := make(map[string]string)
+	if evt.Content != nil {
+		for _, p := range evt.Content.Parts {
+			if p.FunctionCall != nil && p.FunctionCall.ID != "" {
+				callIDToName[p.FunctionCall.ID] = p.FunctionCall.Name
+			}
+		}
+	}
+
 	var events []thread.Event
 	now := coalesceTime(evt.Timestamp)
 
 	for callID, confirmation := range evt.Actions.RequestedToolConfirmations {
-		// ADK-Go's ToolConfirmation has a Hint field explaining why confirmation
-		// is needed. We map this to our ToolNeedsInput with an ElicitationSpec.
+		toolName := callIDToName[callID]
+		if toolName == "" {
+			toolName = callID // fallback: use call ID when name can't be resolved
+		}
 		events = append(events, &thread.ToolNeedsInput{
 			ThreadID:   ctx.ThreadID,
 			MessageID:  evt.ID,
 			ToolCallID: callID,
-			ToolName:   callID, // The map key is the function call ID.
+			ToolName:   toolName,
 			Elicitation: &thread.ElicitationSpec{
 				Question: confirmation.Hint,
 			},
@@ -362,18 +376,20 @@ func translateUsageMetadata(evt *session.Event, ctx EventContext) thread.Event {
 // Content Extraction Helpers
 // ──────────────────────────────────────────────────────────────────────────────
 
-// extractTextFromContent concatenates all text parts from genai.Content.
+// extractTextFromContent concatenates non-thought text parts from genai.Content.
+// Thought parts (internal reasoning produced by thinking models like Gemini 2.5)
+// are filtered out — they must not be shown in the chat UI.
 func extractTextFromContent(c *genai.Content) string {
 	if c == nil {
 		return ""
 	}
-	var text string
+	var sb strings.Builder
 	for _, p := range c.Parts {
-		if p.Text != "" {
-			text += p.Text
+		if p.Text != "" && !p.Thought {
+			sb.WriteString(p.Text)
 		}
 	}
-	return text
+	return sb.String()
 }
 
 // extractToolCalls extracts FunctionCall parts as thread.ToolCall slice.
