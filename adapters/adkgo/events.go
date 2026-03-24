@@ -2,10 +2,11 @@ package adkgo
 
 import (
 	"encoding/json"
- 	"strings"
+	"strings"
 	"time"
 
 	"google.golang.org/adk/session"
+	adktool "google.golang.org/adk/tool"
 	"google.golang.org/genai"
 
 	"school-with-ai/modules/chat/thread"
@@ -335,6 +336,12 @@ func translateFunctionResponses(evt *session.Event, ctx EventContext) []thread.E
 // isErrorResponse returns true when the FunctionResponse map represents an
 // error result. The convention (from tools.go) is: the map contains an "error"
 // key and no success-indicator keys ("result", "results", "success").
+//
+// ADK-Go v1.0.0 introduced ErrConfirmationRequired and ErrConfirmationRejected
+// as exported sentinel errors. When a native ADK tool using tool.WithConfirmation()
+// surfaces one of these, the error string is embedded in the result map. We
+// detect these and return false so the frontend does not show a red error
+// indicator for HITL flow-control signals.
 func isErrorResponse(resp map[string]any) bool {
 	if resp == nil {
 		return false
@@ -346,6 +353,15 @@ func isErrorResponse(resp map[string]any) bool {
 	// not a pure error (the tool returned usable data alongside the error).
 	for _, key := range []string{"result", "results", "success"} {
 		if _, exists := resp[key]; exists {
+			return false
+		}
+	}
+	// Confirmation-flow errors are HITL signals, not failures.
+	// Our toolErrorCallback converts these to {"status":"confirmation_required",...}
+	// maps, but if they bypass that path the raw error string may appear here.
+	if errVal, ok := resp[errorKey].(string); ok {
+		if strings.Contains(errVal, adktool.ErrConfirmationRequired.Error()) ||
+			strings.Contains(errVal, adktool.ErrConfirmationRejected.Error()) {
 			return false
 		}
 	}

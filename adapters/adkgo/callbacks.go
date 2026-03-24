@@ -2,6 +2,8 @@ package adkgo
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -138,3 +140,73 @@ type adkToolBridge struct {
 func (t *adkToolBridge) Name() string           { return t.name }
 func (t *adkToolBridge) Description() string    { return t.desc }
 func (t *adkToolBridge) Schema() *fagent.Schema { return nil }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// OnToolErrorCallback
+//
+// ADK-Go v1.0.0 added ErrConfirmationRequired / ErrConfirmationRejected as
+// exported sentinel errors so callers can detect them via errors.Is().
+// Previously the retry-and-reflect plugin matched them by string; now it uses
+// errors.Is(), which is more robust.
+//
+// toolErrorCallback returns an llmagent.OnToolErrorCallback that:
+//  1. Converts ErrConfirmationRequired/ErrConfirmationRejected to clean
+//     result maps (HITL flow-control, not failures — the LLM should not
+//     see a raw error string for these).
+//  2. Logs unexpected native tool errors (tool-not-found, exitlooptool
+//     failures, etc.) that our wrapped tools would never produce.
+//
+// This callback fires only when a Go error is returned from BeforeToolCallback
+// (if it returns (nil, err)) or from tool.Run() — not from our own wrapped
+// tools, which surface errors as {"error":"..."} maps and return (map, nil).
+// ──────────────────────────────────────────────────────────────────────────────
+
+func toolErrorCallback(
+	log *logger.Logger,
+	agentName, sessionID string,
+) llmagent.OnToolErrorCallback {
+	return func(ctx adktool.Context, t adktool.Tool, args map[string]any, err error) (map[string]any, error) {
+		// ── Confirmation-flow errors (ADK-Go v1.0.0 sentinels) ──────────────
+		// These are HITL flow-control signals, not actual failures.
+		// Return a structured result so the LLM gets clear guidance instead
+		// of a raw sentinel error string.
+		if errors.Is(err, adktool.ErrConfirmationRequired) {
+			if log != nil {
+				log.Info(ctx, "tool awaiting confirmation",
+					"agent", agentName,
+					"thread_id", sessionID,
+					"tool", t.Name(),
+				)
+			}
+			return map[string]any{
+				"status":  "confirmation_required",
+				"message": fmt.Sprintf("Tool '%s' requires user confirmation before proceeding.", t.Name()),
+			}, nil
+		}
+		if errors.Is(err, adktool.ErrConfirmationRejected) {
+			if log != nil {
+				log.Info(ctx, "tool confirmation rejected",
+					"agent", agentName,
+					"thread_id", sessionID,
+					"tool", t.Name(),
+				)
+			}
+			return map[string]any{
+				"status":  "rejected",
+				"message": fmt.Sprintf("Tool '%s' execution was rejected by the user.", t.Name()),
+			}, nil
+		}
+
+		// ── Unexpected native tool error ─────────────────────────────────────
+		// Log it and return nil so ADK-Go converts the error to {"error":"..."}.
+		if log != nil {
+			log.Error(ctx, "native tool error",
+				"agent", agentName,
+				"thread_id", sessionID,
+				"tool", t.Name(),
+				"error", err,
+			)
+		}
+		return nil, nil
+	}
+}
