@@ -295,9 +295,10 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 
 		// 11. Build adk-go runner.
 		adkRunner, rErr := runner.New(runner.Config{
-			AppName:        appName,
-			Agent:          adkAgent,
-			SessionService: sessionSvc,
+			AppName:           appName,
+			Agent:             adkAgent,
+			SessionService:    sessionSvc,
+			AutoCreateSession: true, // defensive: session is pre-built, but allow fallback
 		})
 		if rErr != nil {
 			yield(nil, fmt.Errorf("creating adk-go runner: %w", rErr))
