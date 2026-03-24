@@ -83,8 +83,6 @@ export const agentDesigner = () => ({
         action: 'allow',
         require_confirmation: false,
         confirmation_hint: '',
-        max_invocations: 0,
-        priority: 0,
     },
     savingReqConfig: false,
 
@@ -493,8 +491,6 @@ export const agentDesigner = () => ({
             action: plugin.requirement_config?.action || 'allow',
             require_confirmation: plugin.requirement_config?.require_confirmation || false,
             confirmation_hint: plugin.requirement_config?.confirmation_hint || '',
-            max_invocations: plugin.requirement_config?.max_invocations || 0,
-            priority: plugin.requirement_config?.priority || 0,
         };
         this.showRequirementsPanel = true;
     },
@@ -514,8 +510,6 @@ export const agentDesigner = () => ({
             action: tool.requirement_config?.action || 'allow',
             require_confirmation: tool.requirement_config?.require_confirmation || false,
             confirmation_hint: tool.requirement_config?.confirmation_hint || '',
-            max_invocations: tool.requirement_config?.max_invocations || 0,
-            priority: tool.requirement_config?.priority || 0,
         };
         this.showRequirementsPanel = true;
     },
@@ -529,12 +523,79 @@ export const agentDesigner = () => ({
     },
 
     /**
-     * Update the action in the current requirement config.
+     * Update the action in the current requirement config (used by the advanced settings dialog).
      * Syncs require_confirmation flag with the action.
      */
     setReqConfigAction(action) {
         this.reqConfig.action = action;
         this.reqConfig.require_confirmation = (action === 'require_confirmation');
+    },
+
+    /**
+     * Set the access action for a tool set (plugin) immediately.
+     * Saves to the backend without opening a modal — the inline segmented control calls this.
+     * @param {Object} plugin
+     * @param {'allow'|'block'|'require_confirmation'} action
+     */
+    async setToolSetAction(plugin, action) {
+        if (!this.editingAgent) return;
+        const agentId = this.editingAgent.id;
+
+        // Optimistic update
+        if (!plugin.requirement_config) plugin.requirement_config = {};
+        plugin.requirement_config.action = action;
+        plugin.requirement_config.require_confirmation = (action === 'require_confirmation');
+
+        const payload = {
+            action,
+            require_confirmation: action === 'require_confirmation',
+            confirmation_hint: plugin.requirement_config.confirmation_hint || '',
+        };
+
+        try {
+            const url = `/v1/agents/${encodeURIComponent(agentId)}/toolsets/${encodeURIComponent(plugin.id)}/requirements`;
+            await fetch(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+        } catch (err) {
+            console.error('Failed to set toolset action:', err);
+        }
+    },
+
+    /**
+     * Set the access action for an individual tool immediately.
+     * Saves to the backend without opening a modal — the inline segmented control calls this.
+     * @param {Object} plugin
+     * @param {Object} tool
+     * @param {'allow'|'block'|'require_confirmation'} action
+     */
+    async setToolAction(plugin, tool, action) {
+        if (!this.editingAgent) return;
+        const agentId = this.editingAgent.id;
+
+        // Optimistic update
+        if (!tool.requirement_config) tool.requirement_config = {};
+        tool.requirement_config.action = action;
+        tool.requirement_config.require_confirmation = (action === 'require_confirmation');
+
+        const payload = {
+            action,
+            require_confirmation: action === 'require_confirmation',
+            confirmation_hint: tool.requirement_config.confirmation_hint || '',
+        };
+
+        try {
+            const url = `/v1/agents/${encodeURIComponent(agentId)}/toolsets/${encodeURIComponent(plugin.id)}/tools/${encodeURIComponent(tool.id)}/requirements`;
+            await fetch(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+        } catch (err) {
+            console.error('Failed to set tool action:', err);
+        }
     },
 
     /**
