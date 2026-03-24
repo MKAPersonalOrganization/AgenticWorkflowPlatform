@@ -342,10 +342,14 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 	var afterToolCBs []llmagent.AfterToolCallback
 
 	// 1. Tool logging — native Before/After callbacks.
+	var onToolErrorCBs []llmagent.OnToolErrorCallback
 	if wbc.adapter.log != nil {
 		logBefore, logAfter := toolLoggingCallbacks(wbc.adapter.log, agentName, wbc.threadID, wbc.userID)
 		beforeToolCBs = append(beforeToolCBs, logBefore)
 		afterToolCBs = append(afterToolCBs, logAfter)
+		// OnToolErrorCallback handles ErrConfirmationRequired/ErrConfirmationRejected
+		// (ADK-Go v1.0.0 sentinels) and logs unexpected native tool errors.
+		onToolErrorCBs = append(onToolErrorCBs, toolErrorCallback(wbc.adapter.log, agentName, wbc.threadID))
 	}
 
 	// 2. Block and confirmation enforcement — before-only.
@@ -369,6 +373,7 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 		beforeAgentCallbacks: buildBeforeRunHooks(precomputedRules),
 		beforeToolCallbacks:  beforeToolCBs,
 		afterToolCallbacks:   afterToolCBs,
+		onToolErrorCallbacks: onToolErrorCBs,
 		nodeOverride:         node,
 	})
 }

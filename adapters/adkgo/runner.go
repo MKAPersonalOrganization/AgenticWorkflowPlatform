@@ -10,7 +10,7 @@ import (
 
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
-	"google.golang.org/adk/runner"
+	adkrunner "google.golang.org/adk/runner"
 	"google.golang.org/adk/session"
 	adktool "google.golang.org/adk/tool"
 
@@ -257,10 +257,14 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			var afterToolCBs []llmagent.AfterToolCallback
 
 			// 1. Tool logging — native Before/After callbacks.
+			var onToolErrorCBs []llmagent.OnToolErrorCallback
 			if r.log != nil {
 				logBefore, logAfter := toolLoggingCallbacks(r.log, agentName, req.SessionID, req.UserID)
 				beforeToolCBs = append(beforeToolCBs, logBefore)
 				afterToolCBs = append(afterToolCBs, logAfter)
+				// OnToolErrorCallback handles ErrConfirmationRequired/ErrConfirmationRejected
+				// (ADK-Go v1.0.0 sentinels) and logs unexpected native tool errors.
+				onToolErrorCBs = append(onToolErrorCBs, toolErrorCallback(r.log, agentName, req.SessionID))
 			}
 
 			// 2. Block and confirmation enforcement — before-only foundation
@@ -286,6 +290,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 				beforeAgentCallbacks: buildBeforeRunHooks(precomputedRules),
 				beforeToolCallbacks:  beforeToolCBs,
 				afterToolCallbacks:   afterToolCBs,
+				onToolErrorCallbacks: onToolErrorCBs,
 			})
 			if aErr != nil {
 				yield(nil, fmt.Errorf("creating adk-go agent: %w", aErr))
@@ -294,7 +299,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 		}
 
 		// 11. Build adk-go runner.
-		adkRunner, rErr := runner.New(runner.Config{
+		adkRunner, rErr := adkrunner.New(adkrunner.Config{
 			AppName:           appName,
 			Agent:             adkAgent,
 			SessionService:    sessionSvc,
@@ -348,9 +353,19 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 		// should display. Key = parent loop agent name, value = current iteration.
 		loopIterations := map[string]int{}
 
+		// Build run options. WithStateDelta (ADK-Go v1.0.0) injects per-invocation
+		// state at run start using the "temp:" prefix so it is never persisted or
+		// surfaced as a StateChangeReported event (translateStateDelta filters temp: keys).
+		var runOpts []adkrunner.RunOption
+		if req.InvocationID != "" {
+			runOpts = append(runOpts, adkrunner.WithStateDelta(map[string]any{
+				"temp:invocation_id": req.InvocationID,
+			}))
+		}
+
 		for adkEvt, adkErr := range adkRunner.Run(ctx, req.UserID, sess.ID(), userMsg, agent.RunConfig{
 			StreamingMode: agent.StreamingModeSSE,
-		}) {
+		}, runOpts...) {
 			if adkErr != nil {
 				// Close the streaming message before surfacing the error.
 				if streamingMsgID != "" {
