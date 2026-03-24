@@ -250,7 +250,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			// 7. Build system prompt (agent config + requirements + workspace KB + skills + profile).
 			systemPrompt := r.buildSystemPrompt(ctx, foundAgent, req.UserID, agentName, req.SessionID, agentCfg, inv)
 
-			genCfg := buildGenerateContentConfig(modelCfg)
+			genCfg := buildGenerateContentConfig(modelCfg, req.Config)
 
 			// Build native ADK tool callbacks: logging + enforcement.
 			var beforeToolCBs []llmagent.BeforeToolCallback

@@ -248,7 +248,15 @@ func agentSchemaToJSONSchema(s *agent.Schema) *jsonschema.Schema {
 	}
 
 	js := &jsonschema.Schema{}
-	js.Type = string(s.Type)
+
+	// Nullable fields use JSON Schema's multi-type array: ["string", "null"].
+	// This matches the JSON Schema draft 2020-12 pattern and is understood
+	// by ADK-Go's functiontool when building the LLM function declaration.
+	if s.Nullable && s.Type != "" {
+		js.Types = []string{string(s.Type), "null"}
+	} else {
+		js.Type = string(s.Type)
+	}
 
 	if s.Description != "" {
 		js.Description = s.Description

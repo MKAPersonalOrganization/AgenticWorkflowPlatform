@@ -110,21 +110,29 @@ func buildWorkflowAgent(wbc *workflowBuildContext, wa fagent.WorkflowAgent) (age
 // ADK-Go agent. Leaf nodes become LLM agents; composite nodes become
 // sequential/parallel/loop agents wrapping their children.
 // parentCtx carries the parent composite node's info for position tracking.
+//
+// isLastInLoop is propagated into composite nodes so that the exit_loop tool
+// reaches the deepest last leaf even when intermediate composite nodes sit
+// between the loop and the leaf agent.
 func buildNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, isLastInLoop bool, parentCtx *agentPositionCtx) (agent.Agent, error) {
 	switch node.Type {
 	case "agent":
 		return buildLeafAgent(wbc, node, isLastInLoop, parentCtx)
 
 	case "sequential":
-		return buildSequentialNode(wbc, node)
+		// Propagate isLastInLoop: only the last child in the sequence is last.
+		return buildSequentialNode(wbc, node, isLastInLoop)
 
 	case "parallel":
-		return buildParallelNode(wbc, node)
+		// Propagate isLastInLoop to all children: any branch may signal exit.
+		return buildParallelNode(wbc, node, isLastInLoop)
 
 	case "loop":
+		// Nested loops manage their own exit_loop tool; do not inherit outer flag.
 		return buildLoopNode(wbc, node)
 
 	case "remote":
+		// Remote agents run externally and cannot invoke the exit_loop tool.
 		return buildRemoteAgentNode(wbc, node)
 
 	default:
@@ -133,7 +141,9 @@ func buildNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, isLastI
 }
 
 // buildSequentialNode creates an ADK-Go sequentialagent from a composite node.
-func buildSequentialNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo) (agent.Agent, error) {
+// isLastInLoop is forwarded to the last child so the exit_loop tool reaches
+// the final agent even when a sequential node sits inside a loop.
+func buildSequentialNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, isLastInLoop bool) (agent.Agent, error) {
 	if len(node.Children) == 0 {
 		return nil, fmt.Errorf("node %q: sequential node has no children", node.ID)
 	}
@@ -145,6 +155,7 @@ func buildSequentialNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInf
 	}
 	parentName := wbc.uniqueName(name)
 
+	lastIdx := len(node.Children) - 1
 	subAgents := make([]agent.Agent, 0, len(node.Children))
 	for i := range node.Children {
 		childCtx := &agentPositionCtx{
@@ -153,7 +164,9 @@ func buildSequentialNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInf
 			stepIndex:    i,
 			stepCount:    len(node.Children),
 		}
-		child, err := buildNode(wbc, &node.Children[i], false, childCtx)
+		// Only the last child of this sequential is "last in loop".
+		childIsLast := isLastInLoop && i == lastIdx
+		child, err := buildNode(wbc, &node.Children[i], childIsLast, childCtx)
 		if err != nil {
 			return nil, fmt.Errorf("node %q child %d: %w", node.ID, i, err)
 		}
@@ -169,7 +182,9 @@ func buildSequentialNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInf
 }
 
 // buildParallelNode creates an ADK-Go parallelagent from a composite node.
-func buildParallelNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo) (agent.Agent, error) {
+// isLastInLoop is forwarded to ALL children: since parallel branches run
+// concurrently, any branch may reach the completion condition and signal exit.
+func buildParallelNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, isLastInLoop bool) (agent.Agent, error) {
 	if len(node.Children) == 0 {
 		return nil, fmt.Errorf("node %q: parallel node has no children", node.ID)
 	}
@@ -189,7 +204,7 @@ func buildParallelNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo)
 			stepIndex:    i,
 			stepCount:    len(node.Children),
 		}
-		child, err := buildNode(wbc, &node.Children[i], false, childCtx)
+		child, err := buildNode(wbc, &node.Children[i], isLastInLoop, childCtx)
 		if err != nil {
 			return nil, fmt.Errorf("node %q child %d: %w", node.ID, i, err)
 		}
@@ -304,8 +319,8 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 		wbc.ctx, foundAgent, wbc.userID, node.AgentID, wbc.threadID, agentCfg, inv,
 	)
 
-	// Build generate content config.
-	genCfg := buildGenerateContentConfig(wbc.modelCfg)
+	// Build generate content config (with per-request RunConfig overrides).
+	genCfg := buildGenerateContentConfig(wbc.modelCfg, wbc.req.Config)
 
 	agentName := wbc.uniqueName(foundAgent.Name())
 

@@ -30,4 +30,5 @@ func RegisterThreadEvents(r *es.DeserializerRegistry) {
 	r.Register("AuthGranted", func() es.Event { return &AuthGranted{} })
 	r.Register("AuthDenied", func() es.Event { return &AuthDenied{} })
 	r.Register("ToolCancelled", func() es.Event { return &ToolCancelled{} })
+	r.Register("StateChangeReported", func() es.Event { return &StateChangeReported{} })
 }

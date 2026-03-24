@@ -20,7 +20,6 @@ import (
 	a2atypes "github.com/a2aproject/a2a-go/v2/a2a"
 	"github.com/a2aproject/a2a-go/v2/a2aclient"
 	"github.com/a2aproject/a2a-go/v2/a2aclient/agentcard"
-	"github.com/a2aproject/a2a-go/v2/a2acompat/a2av0"
 )
 
 // --------------------------------------------------------------------------
@@ -328,7 +327,7 @@ func (s *Service) discoverAgentCard(ctx context.Context, connector *A2AConnector
 			time.Sleep(discoverRetryDelay)
 		}
 
-		resolver := &agentcard.Resolver{Client: s.httpClient, CardParser: a2av0.NewAgentCardParser()}
+		resolver := &agentcard.Resolver{Client: s.httpClient}
 		card, err := resolver.Resolve(ctx, connector.AgentURL, opts...)
 		if err != nil {
 			lastErr = err
@@ -683,21 +682,7 @@ func extractTextFromParts(parts []*a2atypes.Part) string {
 }
 
 func (s *Service) buildClientOptions(connector *A2AConnector) []a2aclient.FactoryOption {
-	opts := []a2aclient.FactoryOption{
-		// Register v0.x JSONRPC compat transport so agents advertising
-		// protocol version 0.2.x / 0.3 are handled correctly.
-		// Register v0.x JSONRPC compat transport. Use connector.AgentURL as the
-		// explicit transport URL so that any docker-rewrite applied at connector
-		// creation time is honoured — the card body may still advertise "localhost".
-		a2aclient.WithCompatTransport(
-			a2av0.Version,
-			a2atypes.TransportProtocolJSONRPC,
-			a2av0.NewJSONRPCTransportFactory(a2av0.JSONRPCTransportConfig{
-				Client: s.httpClient,
-				URL:    connector.AgentURL,
-			}),
-		),
-	}
+	var opts []a2aclient.FactoryOption
 
 	// Add auth interceptor if needed
 	if connector.AuthType != "none" && connector.AuthType != "" && connector.AuthToken != "" {
