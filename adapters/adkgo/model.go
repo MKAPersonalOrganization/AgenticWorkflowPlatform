@@ -453,8 +453,14 @@ func genaiSchemaToMap(s *genai.Schema) map[string]any {
 // surface in this single file.
 // ──────────────────────────────────────────────────────────────────────────────
 
-// buildGenerateContentConfig creates genai config from model settings.
-func buildGenerateContentConfig(cfg *fagent.ModelConfig) *genai.GenerateContentConfig {
+// buildGenerateContentConfig creates genai config from model settings,
+// with optional RunConfig overrides applied on top.
+//
+// Precedence (highest wins):
+//  1. runCfg non-zero values (per-request overrides from the frontend)
+//  2. modelCfg pointer values (user's saved model settings)
+//  3. ADK-Go defaults (zero values)
+func buildGenerateContentConfig(cfg *fagent.ModelConfig, runCfg *fagent.RunConfig) *genai.GenerateContentConfig {
 	gc := &genai.GenerateContentConfig{}
 
 	if cfg.Temperature != nil {
@@ -463,6 +469,20 @@ func buildGenerateContentConfig(cfg *fagent.ModelConfig) *genai.GenerateContentC
 	}
 	if cfg.MaxTokens != nil {
 		gc.MaxOutputTokens = int32(*cfg.MaxTokens)
+	}
+
+	// Apply RunConfig overrides (per-request, higher priority than model defaults).
+	if runCfg != nil {
+		if runCfg.Temperature > 0 {
+			t := float32(runCfg.Temperature)
+			gc.Temperature = &t
+		}
+		if runCfg.MaxTokens > 0 {
+			gc.MaxOutputTokens = int32(runCfg.MaxTokens)
+		}
+		if len(runCfg.StopSequences) > 0 {
+			gc.StopSequences = runCfg.StopSequences
+		}
 	}
 
 	return gc

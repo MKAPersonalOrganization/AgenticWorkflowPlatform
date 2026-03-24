@@ -1,14 +1,13 @@
 module school-with-ai
 
-go 1.24.4
-
-toolchain go1.24.11
+go 1.25.0
 
 tool github.com/a-h/templ/cmd/templ
 
 require (
 	github.com/Oudwins/tailwind-merge-go v0.2.1
 	github.com/a-h/templ v0.3.1001
+	github.com/a2aproject/a2a-go/v2 v2.0.0-20260313155851-b1f055ce0fbd
 	github.com/ag-ui-protocol/ag-ui/sdks/community/go v0.0.0-20251230070606-5ae00423dc91
 	github.com/alicebob/miniredis/v2 v2.36.1
 	github.com/ardanlabs/conf/v3 v3.10.0
@@ -25,7 +24,7 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.10.9
 	github.com/minio/minio-go/v7 v7.0.98
-	github.com/modelcontextprotocol/go-sdk v1.4.0
+	github.com/modelcontextprotocol/go-sdk v1.4.1
 	github.com/nats-io/nats.go v1.37.0
 	github.com/openai/openai-go/v3 v3.15.0
 	github.com/redis/go-redis/v9 v9.7.0
@@ -38,7 +37,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.40.0
 	golang.org/x/oauth2 v0.34.0
 	golang.org/x/text v0.33.0
-	google.golang.org/adk v0.6.0
+	google.golang.org/adk v1.0.0
 	google.golang.org/genai v1.43.0
 )
 
@@ -47,8 +46,6 @@ require (
 	cloud.google.com/go/auth v0.17.0 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	github.com/a-h/parse v0.0.0-20250122154542-74294addb73e // indirect
-	github.com/a2aproject/a2a-go v0.3.7 // indirect
-	github.com/a2aproject/a2a-go/v2 v2.0.0-20260313155851-b1f055ce0fbd // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
@@ -101,7 +98,7 @@ require (
 	github.com/robfig/cron/v3 v3.0.2-0.20210106135023-bc59245fe10e // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/segmentio/asm v1.1.3 // indirect
-	github.com/segmentio/encoding v0.5.3 // indirect
+	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
@@ -128,7 +125,7 @@ require (
 	golang.org/x/tools v0.41.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260128011058-8636f8732409 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260128011058-8636f8732409 // indirect
-	google.golang.org/grpc v1.78.0 // indirect
+	google.golang.org/grpc v1.79.3 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	rsc.io/omap v1.2.0 // indirect

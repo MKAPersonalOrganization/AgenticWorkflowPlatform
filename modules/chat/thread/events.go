@@ -318,6 +318,26 @@ func (e *A2AArtifactReceived) EventType() string         { return "A2AArtifactRe
 func (e *A2AArtifactReceived) EventTimestamp() time.Time { return e.Timestamp }
 func (e *A2AArtifactReceived) AggregateID() string       { return e.ThreadID }
 
+// StateChangeReported is emitted when an agent sets a value in session state
+// (e.g. via Config.OutputKey or a tool's StateDelta). This is a transient
+// event — NOT persisted to the event store — used to notify the frontend of
+// state accumulation across workflow steps so it can display intermediate
+// results or pass data between UI components.
+//
+// Only user-visible keys are reported (internal keys prefixed "__" and
+// ADK-Go ephemeral "temp:" keys are suppressed).
+type StateChangeReported struct {
+	ThreadID  string    `json:"threadId"`
+	AgentName string    `json:"agentName,omitempty"`
+	Key       string    `json:"key"`
+	Value     any       `json:"value"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+func (e *StateChangeReported) EventType() string         { return "StateChangeReported" }
+func (e *StateChangeReported) EventTimestamp() time.Time { return e.Timestamp }
+func (e *StateChangeReported) AggregateID() string       { return e.ThreadID }
+
 // FileAttachmentReceived is emitted when a remote A2A agent produces a file
 // attachment (URL or inline data). This is a transient event — NOT persisted.
 type FileAttachmentReceived struct {

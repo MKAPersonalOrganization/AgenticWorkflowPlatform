@@ -2,6 +2,7 @@ package adkgo
 
 import (
 	"encoding/json"
+ 	"strings"
 	"time"
 
 	"google.golang.org/adk/session"
@@ -203,33 +204,46 @@ func translateStateDelta(evt *session.Event, ctx EventContext) []thread.Event {
 		return nil
 	}
 
-	artifactRaw, ok := evt.Actions.StateDelta["__a2a_artifact__"]
-	if !ok {
-		return nil
-	}
-	artifactJSON, ok := artifactRaw.(string)
-	if !ok || artifactJSON == "" {
+	if artifactRaw, ok := evt.Actions.StateDelta["__a2a_artifact__"]; ok {
+		if artifactJSON, ok := artifactRaw.(string); ok && artifactJSON != "" {
+			var info struct {
+				ArtifactID string `json:"artifactId"`
+				Title      string `json:"title"`
+				Content    string `json:"content"`
+			}
+			if err := json.Unmarshal([]byte(artifactJSON), &info); err == nil && info.Content != "" {
+				return []thread.Event{&thread.A2AArtifactReceived{
+					ThreadID:   ctx.ThreadID,
+					MessageID:  evt.ID,
+					AgentName:  ctx.AgentName,
+					ArtifactID: info.ArtifactID,
+					Title:      info.Title,
+					Content:    info.Content,
+					Timestamp:  coalesceTime(evt.Timestamp),
+				}}
+			}
+		}
 		return nil
 	}
 
-	var info struct {
-		ArtifactID string `json:"artifactId"`
-		Title      string `json:"title"`
-		Content    string `json:"content"`
+	// Emit StateChangeReported for user-visible state mutations.
+	// Suppressed: internal markers ("__" prefix) and ADK-Go ephemeral scope ("temp:" prefix).
+	// Reported: session-scoped, app-scoped ("app:"), and user-scoped ("user:") keys.
+	var events []thread.Event
+	now := coalesceTime(evt.Timestamp)
+	for k, v := range evt.Actions.StateDelta {
+		if strings.HasPrefix(k, "__") || strings.HasPrefix(k, "temp:") {
+			continue
+		}
+		events = append(events, &thread.StateChangeReported{
+			ThreadID:  ctx.ThreadID,
+			AgentName: ctx.AgentName,
+			Key:       k,
+			Value:     v,
+			Timestamp: now,
+		})
 	}
-	if err := json.Unmarshal([]byte(artifactJSON), &info); err != nil || info.Content == "" {
-		return nil
-	}
-
-	return []thread.Event{&thread.A2AArtifactReceived{
-		ThreadID:   ctx.ThreadID,
-		MessageID:  evt.ID,
-		AgentName:  ctx.AgentName,
-		ArtifactID: info.ArtifactID,
-		Title:      info.Title,
-		Content:    info.Content,
-		Timestamp:  coalesceTime(evt.Timestamp),
-	}}
+	return events
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
