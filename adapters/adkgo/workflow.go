@@ -336,12 +336,14 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 		}
 	}
 
-	// Build native ADK tool callbacks for this workflow sub-agent:
+	// Build native ADK tool and model callbacks for this workflow sub-agent:
 	// the same logging + enforcement pipeline as regular agents.
+	var beforeModelCBs []llmagent.BeforeModelCallback
+	var afterModelCBs []llmagent.AfterModelCallback
 	var beforeToolCBs []llmagent.BeforeToolCallback
 	var afterToolCBs []llmagent.AfterToolCallback
 
-	// 1. Tool logging — native Before/After callbacks.
+	// 1. Tool + model logging — native Before/After callbacks.
 	var onToolErrorCBs []llmagent.OnToolErrorCallback
 	if wbc.adapter.log != nil {
 		logBefore, logAfter := toolLoggingCallbacks(wbc.adapter.log, agentName, wbc.threadID, wbc.userID)
@@ -350,6 +352,10 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 		// OnToolErrorCallback handles ErrConfirmationRequired/ErrConfirmationRejected
 		// (ADK-Go v1.0.0 sentinels) and logs unexpected native tool errors.
 		onToolErrorCBs = append(onToolErrorCBs, toolErrorCallback(wbc.adapter.log, agentName, wbc.threadID))
+		// Model logging — records timing and token usage at the model level.
+		modelBefore, modelAfter := modelLoggingCallbacks(wbc.adapter.log, agentName, wbc.threadID)
+		beforeModelCBs = append(beforeModelCBs, modelBefore)
+		afterModelCBs = append(afterModelCBs, modelAfter)
 	}
 
 	// 2. Block and confirmation enforcement — before-only.
@@ -371,6 +377,8 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 		tools:                adkTools,
 		prompt:               systemPrompt,
 		beforeAgentCallbacks: buildBeforeRunHooks(precomputedRules),
+		beforeModelCallbacks: beforeModelCBs,
+		afterModelCallbacks:  afterModelCBs,
 		beforeToolCallbacks:  beforeToolCBs,
 		afterToolCallbacks:   afterToolCBs,
 		onToolErrorCallbacks: onToolErrorCBs,

@@ -10,6 +10,8 @@ import (
 
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
+	"google.golang.org/adk/plugin"
+	"google.golang.org/adk/plugin/retryandreflect"
 	adkrunner "google.golang.org/adk/runner"
 	"google.golang.org/adk/session"
 	adktool "google.golang.org/adk/tool"
@@ -252,11 +254,13 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 
 			genCfg := buildGenerateContentConfig(modelCfg, req.Config)
 
-			// Build native ADK tool callbacks: logging + enforcement.
+			// Build native ADK tool and model callbacks: logging + enforcement.
+			var beforeModelCBs []llmagent.BeforeModelCallback
+			var afterModelCBs []llmagent.AfterModelCallback
 			var beforeToolCBs []llmagent.BeforeToolCallback
 			var afterToolCBs []llmagent.AfterToolCallback
 
-			// 1. Tool logging — native Before/After callbacks.
+			// 1. Tool + model logging — native Before/After callbacks.
 			var onToolErrorCBs []llmagent.OnToolErrorCallback
 			if r.log != nil {
 				logBefore, logAfter := toolLoggingCallbacks(r.log, agentName, req.SessionID, req.UserID)
@@ -265,6 +269,10 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 				// OnToolErrorCallback handles ErrConfirmationRequired/ErrConfirmationRejected
 				// (ADK-Go v1.0.0 sentinels) and logs unexpected native tool errors.
 				onToolErrorCBs = append(onToolErrorCBs, toolErrorCallback(r.log, agentName, req.SessionID))
+				// Model logging — records timing and token usage at the model level.
+				modelBefore, modelAfter := modelLoggingCallbacks(r.log, agentName, req.SessionID)
+				beforeModelCBs = append(beforeModelCBs, modelBefore)
+				afterModelCBs = append(afterModelCBs, modelAfter)
 			}
 
 			// 2. Block and confirmation enforcement — before-only foundation
@@ -288,6 +296,8 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 				tools:                adkTools,
 				prompt:               systemPrompt,
 				beforeAgentCallbacks: buildBeforeRunHooks(precomputedRules),
+				beforeModelCallbacks: beforeModelCBs,
+				afterModelCallbacks:  afterModelCBs,
 				beforeToolCallbacks:  beforeToolCBs,
 				afterToolCallbacks:   afterToolCBs,
 				onToolErrorCallbacks: onToolErrorCBs,
@@ -298,12 +308,26 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			}
 		}
 
-		// 11. Build adk-go runner.
+		// 11. Build adk-go runner with RetryAndReflect plugin.
+		// RetryAndReflect (ADK-Go v1.0.0) intercepts tool errors and injects a
+		// structured reflection prompt into the LLM context, guiding the model
+		// to diagnose and retry with corrected arguments. Up to 3 retries are
+		// allowed per invocation; on exhaustion the plugin tells the model to
+		// stop using the failing tool rather than returning a raw error.
 		adkRunner, rErr := adkrunner.New(adkrunner.Config{
 			AppName:           appName,
 			Agent:             adkAgent,
 			SessionService:    sessionSvc,
 			AutoCreateSession: true, // defensive: session is pre-built, but allow fallback
+			PluginConfig: adkrunner.PluginConfig{
+				Plugins: []*plugin.Plugin{
+					retryandreflect.MustNew(
+						retryandreflect.WithMaxRetries(3),
+						retryandreflect.WithTrackingScope(retryandreflect.Invocation),
+						retryandreflect.WithErrorIfRetryExceeded(false),
+					),
+				},
+			},
 		})
 		if rErr != nil {
 			yield(nil, fmt.Errorf("creating adk-go runner: %w", rErr))

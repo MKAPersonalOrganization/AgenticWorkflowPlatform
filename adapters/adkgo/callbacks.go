@@ -7,7 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
+	"google.golang.org/adk/model"
 	adktool "google.golang.org/adk/tool"
 
 	fagent "school-with-ai/foundation/agent"
@@ -140,6 +142,76 @@ type adkToolBridge struct {
 func (t *adkToolBridge) Name() string           { return t.name }
 func (t *adkToolBridge) Description() string    { return t.desc }
 func (t *adkToolBridge) Schema() *fagent.Schema { return nil }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Model Logging Callbacks
+//
+// modelLoggingCallbacks returns a pair of native ADK-Go model callbacks that
+// log every model invocation with token usage and wall-clock duration.
+//
+// The before callback records the start time keyed by invocation ID.
+// The after callback logs the full model response including token counts,
+// making it easy to correlate latency and cost with specific agent calls.
+// ──────────────────────────────────────────────────────────────────────────────
+
+// modelLoggingCallbacks returns Before/After model callbacks for timing + token
+// usage logging. The AfterModelCallback is the ideal place to log this data
+// because the final token counts are only available in the full model response.
+func modelLoggingCallbacks(
+	log *logger.Logger,
+	agentName, sessionID string,
+) (llmagent.BeforeModelCallback, llmagent.AfterModelCallback) {
+	var startTimes sync.Map // invocationID → time.Time
+
+	before := func(ctx agent.CallbackContext, req *model.LLMRequest) (*model.LLMResponse, error) {
+		startTimes.Store(ctx.InvocationID(), time.Now())
+		log.Info(ctx, "model call started",
+			"agent", agentName,
+			"thread_id", sessionID,
+			"tool_count", len(req.Tools),
+		)
+		return nil, nil // nil = proceed with the actual model call
+	}
+
+	after := func(ctx agent.CallbackContext, resp *model.LLMResponse, respErr error) (*model.LLMResponse, error) {
+		start := time.Now()
+		if v, ok := startTimes.LoadAndDelete(ctx.InvocationID()); ok {
+			start = v.(time.Time)
+		}
+		duration := time.Since(start)
+
+		if respErr != nil {
+			log.Error(ctx, "model call failed",
+				"agent", agentName,
+				"thread_id", sessionID,
+				"duration", duration,
+				"error", respErr,
+			)
+			return nil, nil // nil = propagate the original error
+		}
+
+		if resp != nil && resp.UsageMetadata != nil {
+			u := resp.UsageMetadata
+			log.Info(ctx, "model call completed",
+				"agent", agentName,
+				"thread_id", sessionID,
+				"duration", duration,
+				"prompt_tokens", u.PromptTokenCount,
+				"completion_tokens", u.CandidatesTokenCount,
+				"total_tokens", u.TotalTokenCount,
+			)
+		} else {
+			log.Info(ctx, "model call completed",
+				"agent", agentName,
+				"thread_id", sessionID,
+				"duration", duration,
+			)
+		}
+		return nil, nil // nil = use the original response unchanged
+	}
+
+	return before, after
+}
 
 // ──────────────────────────────────────────────────────────────────────────────
 // OnToolErrorCallback
