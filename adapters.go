@@ -326,6 +326,7 @@ func (p *userAwareAgentProvider) agentFromDefinition(def *agentstore.AgentDefini
 		GlobalInstruction: def.GlobalInstruction,
 		InputSchema:       parseAgentSchema(def.InputSchemaJSON),
 		OutputSchema:      parseAgentSchema(def.OutputSchemaJSON),
+		ModelConfig:       toAgentModelConfig(def.ModelConfig),
 	}
 	a := newConfigAgent(cfg)
 
@@ -391,6 +392,22 @@ func parseAgentSchema(jsonStr string) *agent.Schema {
 		return nil
 	}
 	return &s
+}
+
+// toAgentModelConfig converts the agentstore model config to the foundation type.
+// Returns nil when no per-agent config is set (falls back to user global settings).
+func toAgentModelConfig(src *agentstore.AgentModelConfig) *agent.AgentModelConfig {
+	if src == nil {
+		return nil
+	}
+	dst := &agent.AgentModelConfig{
+		Temperature:     src.Temperature,
+		TopP:            src.TopP,
+		TopK:            src.TopK,
+		MaxOutputTokens: src.MaxOutputTokens,
+		StopSequences:   src.StopSequences,
+	}
+	return dst
 }
 
 // convertCompositionNode recursively maps agentstore.CompositionNode to agent.WorkflowNodeInfo.

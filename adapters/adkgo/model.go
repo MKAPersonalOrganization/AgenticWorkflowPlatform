@@ -453,16 +453,22 @@ func genaiSchemaToMap(s *genai.Schema) map[string]any {
 // surface in this single file.
 // ──────────────────────────────────────────────────────────────────────────────
 
-// buildGenerateContentConfig creates genai config from model settings,
-// with optional RunConfig overrides applied on top.
+// buildGenerateContentConfig creates a genai config from model settings, with
+// optional per-agent and per-request overrides applied in priority order.
 //
 // Precedence (highest wins):
-//  1. runCfg non-zero values (per-request overrides from the frontend)
-//  2. modelCfg pointer values (user's saved model settings)
-//  3. ADK-Go defaults (zero values)
-func buildGenerateContentConfig(cfg *fagent.ModelConfig, runCfg *fagent.RunConfig) *genai.GenerateContentConfig {
+//  1. runCfg non-zero values  — per-request overrides (e.g. from the frontend send button)
+//  2. agentCfg non-nil values — per-agent saved preferences (Gap 1)
+//  3. modelCfg pointer values — user global model settings (from aisettings)
+//  4. ADK-Go defaults         — zero values
+func buildGenerateContentConfig(
+	cfg *fagent.ModelConfig,
+	agentCfg *fagent.AgentModelConfig,
+	runCfg *fagent.RunConfig,
+) *genai.GenerateContentConfig {
 	gc := &genai.GenerateContentConfig{}
 
+	// Layer 3: user global model settings.
 	if cfg.Temperature != nil {
 		t := float32(*cfg.Temperature)
 		gc.Temperature = &t
@@ -471,7 +477,29 @@ func buildGenerateContentConfig(cfg *fagent.ModelConfig, runCfg *fagent.RunConfi
 		gc.MaxOutputTokens = int32(*cfg.MaxTokens)
 	}
 
-	// Apply RunConfig overrides (per-request, higher priority than model defaults).
+	// Layer 2: per-agent saved preferences (override user global).
+	if agentCfg != nil {
+		if agentCfg.Temperature != nil {
+			t := float32(*agentCfg.Temperature)
+			gc.Temperature = &t
+		}
+		if agentCfg.TopP != nil {
+			p := float32(*agentCfg.TopP)
+			gc.TopP = &p
+		}
+		if agentCfg.TopK != nil {
+			k := *agentCfg.TopK
+			gc.TopK = &k
+		}
+		if agentCfg.MaxOutputTokens != nil {
+			gc.MaxOutputTokens = *agentCfg.MaxOutputTokens
+		}
+		if len(agentCfg.StopSequences) > 0 {
+			gc.StopSequences = agentCfg.StopSequences
+		}
+	}
+
+	// Layer 1: per-request RunConfig (highest priority, overrides everything).
 	if runCfg != nil {
 		if runCfg.Temperature > 0 {
 			t := float32(runCfg.Temperature)

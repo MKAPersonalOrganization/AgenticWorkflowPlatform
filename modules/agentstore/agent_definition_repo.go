@@ -20,12 +20,13 @@ func nullIfEmpty(s string) sql.NullString {
 }
 
 // agentSelectColumns is the standard column set for agent queries.
-// graph is included so composed agents are fully loaded.
+// graph and model_config are included so composed and configured agents are fully loaded.
 const agentSelectColumns = `id, user_id, name, description, system_prompt, icon, source_catalog_id,
     disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
     global_instruction, COALESCE(input_schema::text, '') as input_schema,
     COALESCE(output_schema::text, '') as output_schema,
     COALESCE(graph::text, '') as graph,
+    COALESCE(model_config::text, '') as model_config,
     share_token, visibility,
     created_at, updated_at`
 
@@ -38,9 +39,10 @@ func newPostgresAgentDefinitionRepository(db *sqlx.DB) *postgresAgentDefinitionR
 	return &postgresAgentDefinitionRepository{db: db}
 }
 
-// hydrateAgent populates the Graph field from GraphJSON after scanning.
+// hydrateAgent populates Graph and ModelConfig from their JSON columns after scanning.
 func hydrateAgent(a *AgentDefinition) {
 	_ = a.UnmarshalGraph()
+	_ = a.UnmarshalModelConfig()
 }
 
 func (r *postgresAgentDefinitionRepository) Create(ctx context.Context, agent *AgentDefinition) error {
@@ -52,17 +54,20 @@ func (r *postgresAgentDefinitionRepository) Create(ctx context.Context, agent *A
 	agent.CreatedAt = now
 	agent.UpdatedAt = now
 
-	// Marshal composition graph to JSON for storage.
+	// Marshal composition graph and model config to JSON for storage.
 	if err := agent.MarshalGraph(); err != nil {
+		return err
+	}
+	if err := agent.MarshalModelConfig(); err != nil {
 		return err
 	}
 
 	query := `
 INSERT INTO user_agents (id, user_id, name, description, system_prompt, icon, source_catalog_id,
     disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
-    global_instruction, input_schema, output_schema, graph,
+    global_instruction, input_schema, output_schema, graph, model_config,
     share_token, visibility, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`
 
 	_, err := r.db.ExecContext(ctx, query,
 		agent.ID,
@@ -80,6 +85,7 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $
 		nullIfEmpty(agent.InputSchemaJSON),
 		nullIfEmpty(agent.OutputSchemaJSON),
 		nullIfEmpty(agent.GraphJSON),
+		nullIfEmpty(agent.ModelConfigJSON),
 		agent.ShareToken,
 		coalesceVisibility(agent.Visibility),
 		agent.CreatedAt,
@@ -95,8 +101,11 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $
 func (r *postgresAgentDefinitionRepository) Update(ctx context.Context, agent *AgentDefinition) error {
 	agent.UpdatedAt = time.Now().UTC()
 
-	// Marshal composition graph to JSON for storage.
+	// Marshal composition graph and model config to JSON for storage.
 	if err := agent.MarshalGraph(); err != nil {
+		return err
+	}
+	if err := agent.MarshalModelConfig(); err != nil {
 		return err
 	}
 
@@ -106,8 +115,8 @@ SET name = $1, description = $2, system_prompt = $3,
     icon = $4, updated_at = $5,
     disallow_transfer_to_parent = $6, disallow_transfer_to_peers = $7,
     output_key = $8, include_contents = $9, global_instruction = $10,
-    input_schema = $11, output_schema = $12, graph = $13
-WHERE id = $14 AND user_id = $15`
+    input_schema = $11, output_schema = $12, graph = $13, model_config = $14
+WHERE id = $15 AND user_id = $16`
 
 	result, err := r.db.ExecContext(ctx, query,
 		agent.Name,
@@ -123,6 +132,7 @@ WHERE id = $14 AND user_id = $15`
 		nullIfEmpty(agent.InputSchemaJSON),
 		nullIfEmpty(agent.OutputSchemaJSON),
 		nullIfEmpty(agent.GraphJSON),
+		nullIfEmpty(agent.ModelConfigJSON),
 		agent.ID,
 		agent.UserID,
 	)

@@ -24,6 +24,33 @@ const (
 	IncludeContentsNone IncludeContents = "none"
 )
 
+// AgentModelConfig holds per-agent overrides for the LLM generation parameters.
+// All fields are optional pointers — nil means "fall back to the user's global
+// model settings". This is intentionally framework-agnostic: the adapter layer
+// converts these values to the provider-specific types (e.g. genai.GenerateContentConfig).
+//
+// Precedence when building the final generation config (highest wins):
+//  1. Per-request RunConfig overrides (e.g. from the frontend send button)
+//  2. AgentModelConfig (saved per-agent preferences, this struct)
+//  3. User global ModelConfig (from aisettings)
+//  4. Provider defaults
+type AgentModelConfig struct {
+	// Temperature controls randomness (0.0–2.0). Lower = more deterministic.
+	Temperature *float64
+
+	// TopP sets nucleus sampling probability (0.0–1.0).
+	TopP *float64
+
+	// TopK limits the token vocabulary at each step (genai uses float32 for this field).
+	TopK *float32
+
+	// MaxOutputTokens caps the response length.
+	MaxOutputTokens *int32
+
+	// StopSequences halts generation when any of these strings are encountered.
+	StopSequences []string
+}
+
 // Config defines the configuration for an agent.
 //
 // Config is the central description of an agent's identity, behaviour, and
@@ -106,6 +133,9 @@ type Config struct {
 	// conforming to this schema. When set, tool use is disabled.
 	OutputSchema *Schema
 
+	// ModelConfig holds per-agent LLM generation parameter overrides.
+	// nil means use the user's global model settings.
+	ModelConfig *AgentModelConfig
 }
 
 // DefaultConfig returns a Config with sensible defaults.
