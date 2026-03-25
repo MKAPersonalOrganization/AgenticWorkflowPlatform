@@ -285,6 +285,9 @@ export function createStreamingMethods() {
                 return;
             }
 
+            // Log all events
+            this.__addEvent(event, threadId);
+
             if (LIFECYCLE_EVENT_TYPES.includes(event.type)) {
                 this.__addLifecycleMessage(event, threadId);
             }
