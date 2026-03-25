@@ -107,6 +107,11 @@ type AgentDefinition struct {
 	ModelConfig     *AgentModelConfig `json:"model_config,omitempty" db:"-"`
 	ModelConfigJSON string            `json:"-" db:"model_config"`
 
+	// ModelOverride selects a specific provider+model for this agent.
+	// nil means use the user's global AI provider/model.
+	ModelOverride     *AgentModelOverride `json:"model_override,omitempty" db:"-"`
+	ModelOverrideJSON string              `json:"-" db:"model_override"`
+
 	// ── Sharing ──
 	// ShareToken is a unique token that enables sharing this agent with other users.
 	// Empty means the agent is private. Generate via the share endpoint.
@@ -177,6 +182,66 @@ func (a *AgentDefinition) UnmarshalModelConfig() error {
 		return fmt.Errorf("unmarshalling model config: %w", err)
 	}
 	a.ModelConfig = &mc
+	return nil
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// AgentModelOverride — per-agent provider + model selection
+//
+// Stored as JSONB in user_agents.model_override. When set, overrides the user's
+// global AI provider and model for this agent. The API key is resolved at
+// runtime from the user's saved provider credentials (aisettings module).
+// Mirrors foundation/agent.AgentModelOverride.
+// ──────────────────────────────────────────────────────────────────────────────
+
+// AgentModelOverride selects a specific LLM provider and model for one agent.
+type AgentModelOverride struct {
+	// Provider is the LLM provider (e.g. "gemini", "openai", "anthropic").
+	Provider string `json:"provider"`
+
+	// ModelName is the model identifier within that provider.
+	ModelName string `json:"modelName"`
+}
+
+// Validate checks that Provider and ModelName are both non-empty.
+func (o *AgentModelOverride) Validate() error {
+	if o == nil {
+		return nil
+	}
+	if o.Provider == "" {
+		return fmt.Errorf("model override provider is required")
+	}
+	if o.ModelName == "" {
+		return fmt.Errorf("model override modelName is required")
+	}
+	return nil
+}
+
+// MarshalModelOverride serializes ModelOverride to ModelOverrideJSON for storage.
+func (a *AgentDefinition) MarshalModelOverride() error {
+	if a.ModelOverride == nil {
+		a.ModelOverrideJSON = ""
+		return nil
+	}
+	b, err := json.Marshal(a.ModelOverride)
+	if err != nil {
+		return fmt.Errorf("marshalling model override: %w", err)
+	}
+	a.ModelOverrideJSON = string(b)
+	return nil
+}
+
+// UnmarshalModelOverride deserializes ModelOverrideJSON into ModelOverride.
+func (a *AgentDefinition) UnmarshalModelOverride() error {
+	if a.ModelOverrideJSON == "" || a.ModelOverrideJSON == "null" {
+		a.ModelOverride = nil
+		return nil
+	}
+	var mo AgentModelOverride
+	if err := json.Unmarshal([]byte(a.ModelOverrideJSON), &mo); err != nil {
+		return fmt.Errorf("unmarshalling model override: %w", err)
+	}
+	a.ModelOverride = &mo
 	return nil
 }
 

@@ -620,6 +620,8 @@ templ agentNodeForm() {
 			@orchestrationFields()
 		</div>
 	</div>
+	<!-- Model Override -->
+	@modelOverrideSection()
 	<!-- Model Settings -->
 	@modelSettingsSection()
 	<!-- Tools, KBs, Filesystems (edit mode only) -->
@@ -780,6 +782,75 @@ templ toggleSwitch(model string, labelText string, helpText string) {
 			></span>
 		</button>
 	</label>
+}
+
+// modelOverrideSection renders a collapsible panel for selecting a specific
+// provider + model for this agent, overriding the user's global AI settings.
+templ modelOverrideSection() {
+	<div class="border border-border rounded-lg">
+		<button
+			type="button"
+			@click="showModelOverride = !showModelOverride"
+			class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
+		>
+			<span class="flex items-center gap-2">
+				@icon.Cpu(icon.Props{Class: "size-4 text-muted-foreground"})
+				{ i18n.T(ctx, "Model Override") }
+				<span
+					class="text-[10px] text-muted-foreground"
+					x-show="form.modelOverride.provider && form.modelOverride.modelName"
+					x-text="form.modelOverride.provider + ' / ' + form.modelOverride.modelName"
+				></span>
+			</span>
+			<span class="transition-transform duration-200" :class="showModelOverride ? 'rotate-180' : ''">
+				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+			</span>
+		</button>
+		<div x-show="showModelOverride" x-collapse class="px-3 pb-3 border-t border-border pt-3 space-y-3">
+			<p class="text-[11px] text-muted-foreground">
+				{ i18n.T(ctx, "Use a specific provider and model for this agent instead of your global default. The API key must already be configured in Settings › AI.") }
+			</p>
+			<!-- Provider -->
+			<div class="space-y-1.5">
+				<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Provider") }</span>
+				<select
+					class="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+					x-model="form.modelOverride.provider"
+					@change="form.modelOverride.modelName = ''; fetchModelsForProvider($event.target.value)"
+				>
+					<option value="">{ i18n.T(ctx, "— use global default —") }</option>
+					<option value="gemini">Gemini (Google)</option>
+					<option value="openai">OpenAI</option>
+					<option value="anthropic">Anthropic</option>
+				</select>
+			</div>
+			<!-- Model -->
+			<div class="space-y-1.5" x-show="form.modelOverride.provider">
+				<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Model") }</span>
+				<div x-show="providerModelsLoading" class="text-xs text-muted-foreground py-2">{ i18n.T(ctx, "Loading models…") }</div>
+				<div x-show="providerModelsError && !providerModelsLoading" class="text-xs text-destructive py-1" x-text="providerModelsError"></div>
+				<select
+					x-show="!providerModelsLoading"
+					class="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+					x-model="form.modelOverride.modelName"
+				>
+					<option value="">{ i18n.T(ctx, "— select a model —") }</option>
+					<template x-for="m in providerModelOptions" :key="m.id">
+						<option :value="m.id" x-text="m.displayName"></option>
+					</template>
+				</select>
+			</div>
+			<!-- Clear -->
+			<button
+				type="button"
+				x-show="form.modelOverride.provider || form.modelOverride.modelName"
+				@click="form.modelOverride = { provider: '', modelName: '' }; providerModelOptions = []; providerModelsError = ''"
+				class="text-[11px] text-muted-foreground hover:text-destructive transition-colors"
+			>
+				{ i18n.T(ctx, "Clear override (use global default)") }
+			</button>
+		</div>
+	</div>
 }
 
 // modelSettingsSection renders a collapsible panel for per-agent model generation overrides.

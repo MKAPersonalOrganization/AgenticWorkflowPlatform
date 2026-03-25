@@ -33,6 +33,13 @@ type ModelConfigResolver interface {
 	GetModelConfigForUser(ctx context.Context, userID string) (*agent.ModelConfig, error)
 }
 
+// APIKeyResolver resolves the API key for a specific provider for a user.
+// Used when a per-agent model override selects a provider different from
+// the user's global default.
+type APIKeyResolver interface {
+	GetAPIKeyForProvider(ctx context.Context, userID, provider string) (string, error)
+}
+
 // AgentProvider retrieves agent definitions for a user.
 type AgentProvider interface {
 	GetForUser(ctx context.Context, name, userID string) (agent.Agent, error)

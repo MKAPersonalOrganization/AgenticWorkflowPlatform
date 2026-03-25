@@ -319,12 +319,29 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 		wbc.ctx, foundAgent, wbc.userID, node.AgentID, wbc.threadID, agentCfg, inv,
 	)
 
+	// Apply per-leaf model override: if this leaf has a different provider/model,
+	// resolve its API key, swap modelCfg, and create a dedicated LLM instance.
+	leafModelCfg := wbc.modelCfg
+	leafLLM := wbc.llm
+	if agentCfg != nil && agentCfg.ModelOverride != nil {
+		overridden, ovErr := wbc.adapter.applyModelOverride(wbc.ctx, wbc.userID, wbc.modelCfg, agentCfg.ModelOverride)
+		if ovErr != nil {
+			return nil, ovErr
+		}
+		leafModelCfg = overridden
+		overrideLLM, llmErr := NewModel(wbc.ctx, leafModelCfg.Provider, leafModelCfg.Model, leafModelCfg.APIKey)
+		if llmErr != nil {
+			return nil, fmt.Errorf("creating LLM for model override (provider %q, model %q): %w", leafModelCfg.Provider, leafModelCfg.Model, llmErr)
+		}
+		leafLLM = overrideLLM
+	}
+
 	// Build generate content config (per-agent overrides → per-request RunConfig overrides).
 	var agentModelCfg *fagent.AgentModelConfig
 	if agentCfg != nil {
 		agentModelCfg = agentCfg.ModelConfig
 	}
-	genCfg := buildGenerateContentConfig(wbc.modelCfg, agentModelCfg, wbc.req.Config)
+	genCfg := buildGenerateContentConfig(leafModelCfg, agentModelCfg, wbc.req.Config)
 
 	agentName := wbc.uniqueName(foundAgent.Name())
 
@@ -376,7 +393,7 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 		name:                 agentName,
 		foundAgent:           foundAgent,
 		agentCfg:             agentCfg,
-		llm:                  wbc.llm,
+		llm:                  leafLLM,
 		genCfg:               genCfg,
 		tools:                adkTools,
 		prompt:               systemPrompt,

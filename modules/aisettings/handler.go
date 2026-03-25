@@ -219,6 +219,31 @@ return string(p)
 }
 }
 
+// listProviderModels handles GET /api/ai-settings/providers/{provider}/models
+// It proxies the call to the provider's model-listing API using the user's stored key.
+func (h *handler) listProviderModels(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
+		return
+	}
+
+	provider := chi.URLParam(r, "provider")
+	models, err := h.svc.listModelsFromProvider(r.Context(), user.ID, provider)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to list provider models", "error", err, "provider", provider)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if models == nil {
+		models = []ProviderModel{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(models)
+}
+
 // getTTSVoices handles GET /api/ai-settings/tts-voices?model=...
 func (h *handler) getTTSVoices(w http.ResponseWriter, r *http.Request) {
 model := r.URL.Query().Get("model")

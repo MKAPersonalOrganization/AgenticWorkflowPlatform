@@ -51,6 +51,7 @@ func New(log *logger.Logger, db *sqlx.DB) *Module {
 // RegisterRoutes mounts all AI-settings HTTP routes onto the given chi.Router.
 func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 	r.Get("/api/ai-settings/providers", authMW.RequireAuthFunc(m.handler.listProviders))
+	r.Get("/api/ai-settings/providers/{provider}/models", authMW.RequireAuthFunc(m.handler.listProviderModels))
 	r.Get("/api/ai-settings/tts-voices", authMW.RequireAuthFunc(m.handler.getTTSVoices))
 	r.Get("/api/ai-settings", authMW.RequireAuthFunc(m.handler.getSettings))
 	r.Put("/api/ai-settings", authMW.RequireAuthFunc(m.handler.saveSettings))
@@ -82,4 +83,12 @@ func (m *Module) GetTTSConfigForUserFlat(ctx context.Context, userID string) (ap
 // Used by the knowledge handler for workspace creation.
 func (m *Module) GetEmbeddingConfigForUser(ctx context.Context, userID string) (*EmbeddingConfig, error) {
 	return m.svc.getEmbeddingConfigForUser(ctx, userID)
+}
+
+// GetAPIKeyForProvider returns the stored API key for a specific provider.
+// Satisfies the adkgo.APIKeyResolver interface used by the runner adapter
+// to resolve credentials when a per-agent model override selects a provider
+// different from the user's global default.
+func (m *Module) GetAPIKeyForProvider(ctx context.Context, userID, provider string) (string, error) {
+	return m.svc.getAPIKeyForProvider(ctx, userID, provider)
 }

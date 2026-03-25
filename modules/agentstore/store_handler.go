@@ -33,36 +33,45 @@ type agentModelConfigRequest struct {
 	StopSequences   []string `json:"stopSequences,omitempty"`
 }
 
+// agentModelOverrideRequest is the JSON shape for selecting a specific
+// provider + model for an agent, overriding the user's global AI settings.
+type agentModelOverrideRequest struct {
+	Provider  string `json:"provider"`
+	ModelName string `json:"modelName"`
+}
+
 type createRequest struct {
-	Name                     string                   `json:"name"`
-	Description              string                   `json:"description"`
-	SystemPrompt             string                   `json:"systemPrompt"`
-	Icon                     string                   `json:"icon"`
-	Graph                    *CompositionNode         `json:"graph,omitempty"`
-	DisallowTransferToParent bool                     `json:"disallowTransferToParent"`
-	DisallowTransferToPeers  bool                     `json:"disallowTransferToPeers"`
-	OutputKey                string                   `json:"outputKey"`
-	IncludeContents          string                   `json:"includeContents"`
-	GlobalInstruction        string                   `json:"globalInstruction"`
-	InputSchema              string                   `json:"inputSchema"`
-	OutputSchema             string                   `json:"outputSchema"`
-	ModelConfig              *agentModelConfigRequest `json:"modelConfig,omitempty"`
+	Name                     string                     `json:"name"`
+	Description              string                     `json:"description"`
+	SystemPrompt             string                     `json:"systemPrompt"`
+	Icon                     string                     `json:"icon"`
+	Graph                    *CompositionNode           `json:"graph,omitempty"`
+	DisallowTransferToParent bool                       `json:"disallowTransferToParent"`
+	DisallowTransferToPeers  bool                       `json:"disallowTransferToPeers"`
+	OutputKey                string                     `json:"outputKey"`
+	IncludeContents          string                     `json:"includeContents"`
+	GlobalInstruction        string                     `json:"globalInstruction"`
+	InputSchema              string                     `json:"inputSchema"`
+	OutputSchema             string                     `json:"outputSchema"`
+	ModelConfig              *agentModelConfigRequest   `json:"modelConfig,omitempty"`
+	ModelOverride            *agentModelOverrideRequest `json:"modelOverride,omitempty"`
 }
 
 type updateRequest struct {
-	Name                     string                   `json:"name"`
-	Description              string                   `json:"description"`
-	SystemPrompt             string                   `json:"systemPrompt"`
-	Icon                     string                   `json:"icon"`
-	Graph                    *CompositionNode         `json:"graph"`
-	DisallowTransferToParent bool                     `json:"disallowTransferToParent"`
-	DisallowTransferToPeers  bool                     `json:"disallowTransferToPeers"`
-	OutputKey                string                   `json:"outputKey"`
-	IncludeContents          string                   `json:"includeContents"`
-	GlobalInstruction        string                   `json:"globalInstruction"`
-	InputSchema              string                   `json:"inputSchema"`
-	OutputSchema             string                   `json:"outputSchema"`
-	ModelConfig              *agentModelConfigRequest `json:"modelConfig,omitempty"`
+	Name                     string                     `json:"name"`
+	Description              string                     `json:"description"`
+	SystemPrompt             string                     `json:"systemPrompt"`
+	Icon                     string                     `json:"icon"`
+	Graph                    *CompositionNode           `json:"graph"`
+	DisallowTransferToParent bool                       `json:"disallowTransferToParent"`
+	DisallowTransferToPeers  bool                       `json:"disallowTransferToPeers"`
+	OutputKey                string                     `json:"outputKey"`
+	IncludeContents          string                     `json:"includeContents"`
+	GlobalInstruction        string                     `json:"globalInstruction"`
+	InputSchema              string                     `json:"inputSchema"`
+	OutputSchema             string                     `json:"outputSchema"`
+	ModelConfig              *agentModelConfigRequest   `json:"modelConfig,omitempty"`
+	ModelOverride            *agentModelOverrideRequest `json:"modelOverride,omitempty"`
 }
 
 type agentResponse struct {
@@ -82,6 +91,7 @@ type agentResponse struct {
 	InputSchema              string                   `json:"inputSchema,omitempty"`
 	OutputSchema             string                   `json:"outputSchema,omitempty"`
 	ModelConfig              *AgentModelConfig        `json:"modelConfig,omitempty"`
+	ModelOverride            *AgentModelOverride      `json:"modelOverride,omitempty"`
 	ShareToken               string                   `json:"shareToken,omitempty"`
 	Visibility               string                   `json:"visibility,omitempty"`
 	CreatedAt                string                   `json:"createdAt"`
@@ -117,6 +127,18 @@ func toModelConfig(req *agentModelConfigRequest) *AgentModelConfig {
 	}
 }
 
+// toModelOverride converts a request model override to the domain type.
+// Returns nil when both provider and modelName are empty (no override requested).
+func toModelOverride(req *agentModelOverrideRequest) *AgentModelOverride {
+	if req == nil || (req.Provider == "" && req.ModelName == "") {
+		return nil
+	}
+	return &AgentModelOverride{
+		Provider:  req.Provider,
+		ModelName: req.ModelName,
+	}
+}
+
 func toAgentResponse(a *AgentDefinition) agentResponse {
 	return agentResponse{
 		ID:                       a.ID,
@@ -135,6 +157,7 @@ func toAgentResponse(a *AgentDefinition) agentResponse {
 		InputSchema:              a.InputSchemaJSON,
 		OutputSchema:             a.OutputSchemaJSON,
 		ModelConfig:              a.ModelConfig,
+		ModelOverride:            a.ModelOverride,
 		ShareToken:               a.ShareToken,
 		Visibility:               a.Visibility,
 		CreatedAt:                a.CreatedAt.Format("2006-01-02T15:04:05Z"),
@@ -178,6 +201,7 @@ func (h *storeHandler) create(w http.ResponseWriter, r *http.Request) {
 		InputSchemaJSON:          req.InputSchema,
 		OutputSchemaJSON:         req.OutputSchema,
 		ModelConfig:              toModelConfig(req.ModelConfig),
+		ModelOverride:            toModelOverride(req.ModelOverride),
 	}
 
 	if err := h.svc.create(r.Context(), agent); err != nil {
@@ -246,6 +270,7 @@ func (h *storeHandler) update(w http.ResponseWriter, r *http.Request) {
 		InputSchemaJSON:          req.InputSchema,
 		OutputSchemaJSON:         req.OutputSchema,
 		ModelConfig:              toModelConfig(req.ModelConfig),
+		ModelOverride:            toModelOverride(req.ModelOverride),
 	}
 
 	if err := h.svc.update(r.Context(), agent); err != nil {

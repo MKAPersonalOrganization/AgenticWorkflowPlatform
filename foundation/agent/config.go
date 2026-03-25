@@ -136,6 +136,23 @@ type Config struct {
 	// ModelConfig holds per-agent LLM generation parameter overrides.
 	// nil means use the user's global model settings.
 	ModelConfig *AgentModelConfig
+
+	// ModelOverride selects a specific provider and model for this agent,
+	// replacing the user's global default. nil means use the global default.
+	ModelOverride *AgentModelOverride
+}
+
+// AgentModelOverride selects a specific LLM provider and model for one agent,
+// overriding the user's global AI settings. Only the provider and model name
+// are stored here; the API key is resolved at runtime from the user's saved
+// provider credentials (modules/aisettings).
+type AgentModelOverride struct {
+	// Provider is the LLM provider (e.g. "gemini", "openai", "anthropic").
+	Provider string
+
+	// ModelName is the model identifier within that provider
+	// (e.g. "gemini-2.0-flash", "gpt-4o", "claude-opus-4-5-20251001").
+	ModelName string
 }
 
 // DefaultConfig returns a Config with sensible defaults.
