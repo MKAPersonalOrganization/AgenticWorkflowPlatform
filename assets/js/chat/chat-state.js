@@ -27,6 +27,7 @@ export function createEmptyThreadState() {
         messages: [],
         isStreaming: false,
         eventSource: null,
+        events: [],
         toolCalls: {},
         pendingToolCallAgents: {},
         currentInteractionId: null,
@@ -112,6 +113,8 @@ export function createInitialState() {
         sessionsLoading: false,
         sidebarOpen: false,
         showDebugPanel: false,
+        showEventLog: false,
+        eventLogCopied: false,
         showKeyboardShortcuts: false,
         showSettings: false,
         profile: {

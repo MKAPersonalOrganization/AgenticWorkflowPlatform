@@ -9,6 +9,7 @@ import (
 	"school-with-ai/components/copybutton"
 	"school-with-ai/components/dialog"
 	"school-with-ai/components/dropdown"
+	"school-with-ai/components/eventlog"
 	"school-with-ai/components/footer"
 	"school-with-ai/components/icon"
 	"school-with-ai/components/input"
@@ -194,6 +195,7 @@ templ ChatInputScreen(user *shared.User) {
 							<div x-show="!hasMessages && !isStreaming" x-cloak>
 								@footer.Footer()
 							</div>
+							@eventlog.EventLog()
 							</main>
 						<!-- Side Panel (inside layout to push content) -->
 						@sidepanel.SidePanel()
