@@ -436,6 +436,7 @@ func convertCompositionNode(n *agentstore.CompositionNode) agent.WorkflowNodeInf
 		A2AConnectorID:           n.A2AConnectorID,
 		OutputKey:                n.OutputKey,
 		MaxIterations:            n.MaxIterations,
+		AllowEarlyExit:           n.AllowEarlyExit,
 		DisallowTransferToParent: n.DisallowTransferToParent,
 		DisallowTransferToPeers:  n.DisallowTransferToPeers,
 		IncludeContents:          n.IncludeContents,

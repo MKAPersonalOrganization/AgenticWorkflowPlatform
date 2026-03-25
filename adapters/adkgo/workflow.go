@@ -220,8 +220,9 @@ func buildParallelNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo,
 }
 
 // buildLoopNode creates an ADK-Go loopagent from a composite node.
-// The exit_loop tool is automatically added to the last child agent
-// (if it's a leaf) so the LLM can break out of the loop.
+// When AllowEarlyExit is true the exit_loop tool is added to the last child
+// agent so the LLM can break out before MaxIterations. When false (default)
+// the loop always runs exactly MaxIterations times.
 func buildLoopNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo) (agent.Agent, error) {
 	if len(node.Children) == 0 {
 		return nil, fmt.Errorf("node %q: loop node has no children", node.ID)
@@ -249,8 +250,9 @@ func buildLoopNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo) (ag
 			stepCount:     len(node.Children),
 			maxIterations: maxIter,
 		}
-		// Mark the last child so buildLeafAgent adds the exit_loop tool.
-		child, err := buildNode(wbc, &node.Children[i], i == lastIdx, childCtx)
+		// Mark the last child so buildLeafAgent adds the exit_loop tool,
+		// but only when early exit is explicitly enabled for this loop node.
+		child, err := buildNode(wbc, &node.Children[i], node.AllowEarlyExit && i == lastIdx, childCtx)
 		if err != nil {
 			return nil, fmt.Errorf("node %q child %d: %w", node.ID, i, err)
 		}

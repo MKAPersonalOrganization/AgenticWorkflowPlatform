@@ -311,8 +311,12 @@ type CompositionNode struct {
 	IncludeContents          string `json:"include_contents,omitempty"`
 
 	// ── Composite-node fields ──
-	Children      []CompositionNode `json:"children,omitempty"`
-	MaxIterations int               `json:"max_iterations,omitempty"`
+	Children       []CompositionNode `json:"children,omitempty"`
+	MaxIterations  int               `json:"max_iterations,omitempty"`
+	// AllowEarlyExit controls whether the exit_loop tool is injected into the
+	// last child of this loop node. When true the LLM may break out early;
+	// when false (default) the loop always runs MaxIterations times.
+	AllowEarlyExit bool              `json:"allow_early_exit,omitempty"`
 }
 
 // CollectAgentIDs returns all agent IDs referenced in the tree.
