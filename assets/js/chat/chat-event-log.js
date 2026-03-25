@@ -15,6 +15,49 @@
  */
 export function createEventLogMethods() {
     return {
+        // Drag state for the floating button
+        eventLogX: parseInt(localStorage.getItem('eventLogX')) || (window.innerWidth - 64),
+        eventLogY: parseInt(localStorage.getItem('eventLogY')) || (window.innerHeight - 64),
+        eventLogDragging: false,
+        eventLogDragMoved: false,
+        _elDragOX: 0,
+        _elDragOY: 0,
+
+        /**
+         * Begin dragging the event log button via pointer capture.
+         */
+        startEventLogDrag(e) {
+            this.eventLogDragging = true;
+            this.eventLogDragMoved = false;
+            this._elDragOX = e.clientX - this.eventLogX;
+            this._elDragOY = e.clientY - this.eventLogY;
+            e.currentTarget.setPointerCapture(e.pointerId);
+        },
+
+        /**
+         * Update position while dragging, clamped to viewport.
+         */
+        onEventLogMove(e) {
+            if (!this.eventLogDragging) return;
+            const nx = e.clientX - this._elDragOX;
+            const ny = e.clientY - this._elDragOY;
+            if (Math.abs(nx - this.eventLogX) > 3 || Math.abs(ny - this.eventLogY) > 3) {
+                this.eventLogDragMoved = true;
+            }
+            this.eventLogX = Math.max(0, Math.min(window.innerWidth - 48, nx));
+            this.eventLogY = Math.max(0, Math.min(window.innerHeight - 48, ny));
+        },
+
+        /**
+         * End drag and persist position.
+         */
+        stopEventLogDrag() {
+            if (!this.eventLogDragging) return;
+            this.eventLogDragging = false;
+            localStorage.setItem('eventLogX', this.eventLogX);
+            localStorage.setItem('eventLogY', this.eventLogY);
+        },
+
         /**
          * Add event to log
          * @param {Object} event - Event to add
