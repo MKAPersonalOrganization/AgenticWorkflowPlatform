@@ -105,8 +105,10 @@ export function workflowTreeBuilder() {
             if (isComposite && node.children && node.children.length > 0) {
                 html += `<div class="space-y-2 mt-1">`;
                 for (let i = 0; i < node.children.length; i++) {
-                    // Last direct child of a loop gets exit_loop indicator
-                    const lastInLoop = node.type === 'loop' && i === node.children.length - 1;
+                    // Last direct child of a loop gets exit_loop indicator only when early exit is enabled.
+                    const lastInLoop = node.type === 'loop'
+                        && i === node.children.length - 1
+                        && !!node.allow_early_exit;
                     html += this.renderCompositionNode(
                         node.children[i], `${path}.${i}`, depth + 1,
                         node.children.length > 1, lastInLoop,
@@ -158,11 +160,11 @@ export function workflowTreeBuilder() {
             html += `value="${this._esc(node.output_key || '')}" `;
             html += `oninput="const n=Alpine.closestDataStack(this).find(d=>d._getNodeByPath)?._getNodeByPath('${path}');if(n)n.output_key=this.value">`;
 
-            // exit_loop indicator — ADK-Go auto-injects exit_loop tool on last child of loop
+            // exit_loop indicator — shown when this agent will receive the exit_loop tool
             if (isLastInLoop) {
                 html += `<div class="flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-purple-500/10 border border-purple-500/20">`;
                 html += `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5 text-purple-600 dark:text-purple-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>`;
-                html += `<span class="text-[10px] text-purple-600 dark:text-purple-400">ADK-Go auto-injects the <strong>exit_loop</strong> tool into this agent (last child of loop). The LLM can call it to break out early.</span>`;
+                html += `<span class="text-[10px] text-purple-600 dark:text-purple-400">The <strong>exit_loop</strong> tool is active on this agent. The LLM can call it to break out before max iterations.</span>`;
                 html += `</div>`;
             }
 
@@ -244,13 +246,30 @@ export function workflowTreeBuilder() {
         // ══════════════════════════════════════════════════════════════════
 
         _renderLoopFields(node, path) {
-            let html = `<div class="flex items-center gap-2">`;
-            html += `<span class="text-[11px] text-muted-foreground whitespace-nowrap">MaxIterations:</span>`;
+            const earlyExit = !!node.allow_early_exit;
+
+            let html = `<div class="space-y-2">`;
+
+            // Max iterations row
+            html += `<div class="flex items-center gap-2">`;
+            html += `<span class="text-[11px] text-muted-foreground whitespace-nowrap">Max iterations:</span>`;
             html += `<input type="number" min="1" max="100" `;
             html += `class="w-20 h-7 rounded-md border border-border bg-background px-2 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring" `;
             html += `value="${node.max_iterations || 3}" `;
             html += `oninput="const n=Alpine.closestDataStack(this).find(d=>d._getNodeByPath)?._getNodeByPath('${path}');if(n)n.max_iterations=parseInt(this.value)||3">`;
-            html += `<span class="text-[10px] text-muted-foreground">→ loopagent.Config.MaxIterations (0 = run until exit_loop)</span>`;
+            html += `</div>`;
+
+            // Allow early exit toggle row
+            const toggleBg = earlyExit ? 'bg-purple-500' : 'bg-input';
+            const toggleThumb = earlyExit ? 'translate-x-3' : 'translate-x-0';
+            html += `<div class="flex items-center gap-2">`;
+            html += `<button type="button" role="switch" aria-checked="${earlyExit}" `;
+            html += `class="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${toggleBg}" `;
+            html += `onclick="const n=Alpine.closestDataStack(this).find(d=>d._getNodeByPath)?._getNodeByPath('${path}');if(n){n.allow_early_exit=!n.allow_early_exit;this.closest('[data-workflow-tree]')?.dispatchEvent(new Event('workflow-changed'))}"`;
+            html += `><span class="pointer-events-none inline-block size-3 rounded-full bg-background shadow ring-0 transition-transform duration-200 ${toggleThumb}"></span></button>`;
+            html += `<span class="text-[11px] text-muted-foreground">Allow early exit (injects <code class="text-[10px]">exit_loop</code> tool into last child)</span>`;
+            html += `</div>`;
+
             html += `</div>`;
             return html;
         },

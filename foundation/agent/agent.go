@@ -74,6 +74,11 @@ type WorkflowNodeInfo struct {
 	// MaxIterations limits loop repetitions (only for Type="loop").
 	MaxIterations int
 
+	// AllowEarlyExit controls whether the exit_loop tool is injected into the
+	// last child agent of a loop node. When false (the default) the loop runs
+	// exactly MaxIterations times. Set to true to let the LLM break out early.
+	AllowEarlyExit bool
+
 	// DisallowTransferToParent overrides the agent's transfer policy
 	// within this workflow context.
 	DisallowTransferToParent *bool
