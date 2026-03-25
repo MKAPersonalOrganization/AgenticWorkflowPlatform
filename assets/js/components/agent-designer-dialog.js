@@ -56,11 +56,19 @@ export const agentDesigner = () => ({
         globalInstruction: '',
         inputSchema: '',
         outputSchema: '',
+        modelConfig: {
+            temperature: null,
+            topP: null,
+            topK: null,
+            maxOutputTokens: null,
+            stopSequences: [],
+        },
     },
 
     // UI state
     expanded: false,
     showOrchestration: false,
+    showModelSettings: false,
 
     // Tools & KB state
     showTools: false,
@@ -238,11 +246,19 @@ export const agentDesigner = () => ({
             globalInstruction: '',
             inputSchema: '',
             outputSchema: '',
+            modelConfig: {
+                temperature: null,
+                topP: null,
+                topK: null,
+                maxOutputTokens: null,
+                stopSequences: [],
+            },
         };
         this.showTools = false;
         this.showKnowledgeBases = false;
         this.showFilesystems = false;
         this.showOrchestration = false;
+        this.showModelSettings = false;
         this.showRequirementsPanel = false;
         this.agentPlugins = [];
         this.agentWorkspaces = [];
@@ -252,6 +268,7 @@ export const agentDesigner = () => ({
 
     showEditNodeForm(agent) {
         this.editingAgent = agent;
+        const mc = agent.modelConfig || {};
         this.form = {
             name: agent.name || '',
             description: agent.description || '',
@@ -264,11 +281,19 @@ export const agentDesigner = () => ({
             globalInstruction: agent.globalInstruction || '',
             inputSchema: agent.inputSchema || '',
             outputSchema: agent.outputSchema || '',
+            modelConfig: {
+                temperature: mc.temperature ?? null,
+                topP: mc.topP ?? null,
+                topK: mc.topK ?? null,
+                maxOutputTokens: mc.maxOutputTokens ?? null,
+                stopSequences: mc.stopSequences ? [...mc.stopSequences] : [],
+            },
         };
         this.showTools = false;
         this.showKnowledgeBases = false;
         this.showFilesystems = false;
         this.showOrchestration = false;
+        this.showModelSettings = false;
         this.showRequirementsPanel = false;
         this.nodeView = 'form';
 
@@ -282,6 +307,14 @@ export const agentDesigner = () => ({
         if (!this.form.name.trim()) return;
         this.saving = true;
         try {
+            const mc = this.form.modelConfig;
+            const modelConfig = {};
+            if (mc.temperature !== null && mc.temperature !== '') modelConfig.temperature = Number(mc.temperature);
+            if (mc.topP !== null && mc.topP !== '') modelConfig.topP = Number(mc.topP);
+            if (mc.topK !== null && mc.topK !== '') modelConfig.topK = Number(mc.topK);
+            if (mc.maxOutputTokens !== null && mc.maxOutputTokens !== '') modelConfig.maxOutputTokens = Number(mc.maxOutputTokens);
+            if (mc.stopSequences && mc.stopSequences.length > 0) modelConfig.stopSequences = mc.stopSequences;
+
             const payload = {
                 name: this.form.name.trim(),
                 description: this.form.description.trim(),
@@ -294,6 +327,7 @@ export const agentDesigner = () => ({
                 globalInstruction: this.form.globalInstruction.trim(),
                 inputSchema: this.form.inputSchema.trim(),
                 outputSchema: this.form.outputSchema.trim(),
+                modelConfig: Object.keys(modelConfig).length > 0 ? modelConfig : null,
             };
 
             if (this.editingAgent && this.editingAgent.icon) {

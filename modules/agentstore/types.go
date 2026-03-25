@@ -8,6 +8,53 @@ import (
 )
 
 // ──────────────────────────────────────────────────────────────────────────────
+// AgentModelConfig — per-agent LLM generation parameters
+//
+// Stored as JSONB in user_agents.model_config. All fields are optional
+// (pointer types); nil means "use the user's global AI settings".
+// Mirrors foundation/agent.AgentModelConfig but is defined here to keep
+// the agentstore module free of foundation imports.
+// ──────────────────────────────────────────────────────────────────────────────
+
+// AgentModelConfig holds per-agent overrides for LLM generation parameters.
+type AgentModelConfig struct {
+	// Temperature controls randomness (0.0–2.0). nil = user global default.
+	Temperature *float64 `json:"temperature,omitempty"`
+
+	// TopP sets nucleus sampling probability (0.0–1.0). nil = user global default.
+	TopP *float64 `json:"topP,omitempty"`
+
+	// TopK limits the token vocabulary at each sampling step (stored as float32 matching genai). nil = provider default.
+	TopK *float32 `json:"topK,omitempty"`
+
+	// MaxOutputTokens caps the response length. nil = user global default.
+	MaxOutputTokens *int32 `json:"maxOutputTokens,omitempty"`
+
+	// StopSequences halts generation on any of these strings. Empty = no custom stops.
+	StopSequences []string `json:"stopSequences,omitempty"`
+}
+
+// Validate checks that all non-nil fields are within acceptable ranges.
+func (c *AgentModelConfig) Validate() error {
+	if c == nil {
+		return nil
+	}
+	if c.Temperature != nil && (*c.Temperature < 0.0 || *c.Temperature > 2.0) {
+		return fmt.Errorf("temperature must be between 0.0 and 2.0, got %g", *c.Temperature)
+	}
+	if c.TopP != nil && (*c.TopP < 0.0 || *c.TopP > 1.0) {
+		return fmt.Errorf("topP must be between 0.0 and 1.0, got %g", *c.TopP)
+	}
+	if c.TopK != nil && *c.TopK < 1 {
+		return fmt.Errorf("topK must be at least 1, got %g", *c.TopK)
+	}
+	if c.MaxOutputTokens != nil && (*c.MaxOutputTokens < 1 || *c.MaxOutputTokens > 65536) {
+		return fmt.Errorf("maxOutputTokens must be between 1 and 65536, got %d", *c.MaxOutputTokens)
+	}
+	return nil
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // AgentDefinition — the universal building block
 //
 // Every agent in the system — whether a simple LLM agent or a composed
@@ -54,6 +101,12 @@ type AgentDefinition struct {
 	InputSchemaJSON          string `json:"input_schema,omitempty" db:"input_schema"`
 	OutputSchemaJSON         string `json:"output_schema,omitempty" db:"output_schema"`
 
+	// ── Model Configuration ──
+	// ModelConfig holds per-agent LLM generation parameter overrides.
+	// nil means the user's global AI settings apply.
+	ModelConfig     *AgentModelConfig `json:"model_config,omitempty" db:"-"`
+	ModelConfigJSON string            `json:"-" db:"model_config"`
+
 	// ── Sharing ──
 	// ShareToken is a unique token that enables sharing this agent with other users.
 	// Empty means the agent is private. Generate via the share endpoint.
@@ -96,6 +149,34 @@ func (a *AgentDefinition) UnmarshalGraph() error {
 		return fmt.Errorf("unmarshalling composition graph: %w", err)
 	}
 	a.Graph = &g
+	return nil
+}
+
+// MarshalModelConfig serializes ModelConfig to ModelConfigJSON for storage.
+func (a *AgentDefinition) MarshalModelConfig() error {
+	if a.ModelConfig == nil {
+		a.ModelConfigJSON = ""
+		return nil
+	}
+	b, err := json.Marshal(a.ModelConfig)
+	if err != nil {
+		return fmt.Errorf("marshalling model config: %w", err)
+	}
+	a.ModelConfigJSON = string(b)
+	return nil
+}
+
+// UnmarshalModelConfig deserializes ModelConfigJSON into ModelConfig.
+func (a *AgentDefinition) UnmarshalModelConfig() error {
+	if a.ModelConfigJSON == "" || a.ModelConfigJSON == "null" {
+		a.ModelConfig = nil
+		return nil
+	}
+	var mc AgentModelConfig
+	if err := json.Unmarshal([]byte(a.ModelConfigJSON), &mc); err != nil {
+		return fmt.Errorf("unmarshalling model config: %w", err)
+	}
+	a.ModelConfig = &mc
 	return nil
 }
 

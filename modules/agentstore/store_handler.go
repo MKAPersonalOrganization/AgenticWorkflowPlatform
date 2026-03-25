@@ -22,56 +22,70 @@ func newStoreHandler(log *logger.Logger, svc *service) *storeHandler {
 // ── Request / Response Types ──
 // These use camelCase JSON tags for the frontend.
 
+// agentModelConfigRequest is the JSON shape for per-agent model settings in
+// create/update requests. All fields are optional; omitted fields are treated
+// as "use global default".
+type agentModelConfigRequest struct {
+	Temperature     *float64 `json:"temperature,omitempty"`
+	TopP            *float64 `json:"topP,omitempty"`
+	TopK            *float32 `json:"topK,omitempty"`
+	MaxOutputTokens *int32   `json:"maxOutputTokens,omitempty"`
+	StopSequences   []string `json:"stopSequences,omitempty"`
+}
+
 type createRequest struct {
-	Name                     string           `json:"name"`
-	Description              string           `json:"description"`
-	SystemPrompt             string           `json:"systemPrompt"`
-	Icon                     string           `json:"icon"`
-	Graph                    *CompositionNode `json:"graph,omitempty"`
-	DisallowTransferToParent bool             `json:"disallowTransferToParent"`
-	DisallowTransferToPeers  bool             `json:"disallowTransferToPeers"`
-	OutputKey                string           `json:"outputKey"`
-	IncludeContents          string           `json:"includeContents"`
-	GlobalInstruction        string           `json:"globalInstruction"`
-	InputSchema              string           `json:"inputSchema"`
-	OutputSchema             string           `json:"outputSchema"`
+	Name                     string                   `json:"name"`
+	Description              string                   `json:"description"`
+	SystemPrompt             string                   `json:"systemPrompt"`
+	Icon                     string                   `json:"icon"`
+	Graph                    *CompositionNode         `json:"graph,omitempty"`
+	DisallowTransferToParent bool                     `json:"disallowTransferToParent"`
+	DisallowTransferToPeers  bool                     `json:"disallowTransferToPeers"`
+	OutputKey                string                   `json:"outputKey"`
+	IncludeContents          string                   `json:"includeContents"`
+	GlobalInstruction        string                   `json:"globalInstruction"`
+	InputSchema              string                   `json:"inputSchema"`
+	OutputSchema             string                   `json:"outputSchema"`
+	ModelConfig              *agentModelConfigRequest `json:"modelConfig,omitempty"`
 }
 
 type updateRequest struct {
-	Name                     string           `json:"name"`
-	Description              string           `json:"description"`
-	SystemPrompt             string           `json:"systemPrompt"`
-	Icon                     string           `json:"icon"`
-	Graph                    *CompositionNode `json:"graph"`
-	DisallowTransferToParent bool             `json:"disallowTransferToParent"`
-	DisallowTransferToPeers  bool             `json:"disallowTransferToPeers"`
-	OutputKey                string           `json:"outputKey"`
-	IncludeContents          string           `json:"includeContents"`
-	GlobalInstruction        string           `json:"globalInstruction"`
-	InputSchema              string           `json:"inputSchema"`
-	OutputSchema             string           `json:"outputSchema"`
+	Name                     string                   `json:"name"`
+	Description              string                   `json:"description"`
+	SystemPrompt             string                   `json:"systemPrompt"`
+	Icon                     string                   `json:"icon"`
+	Graph                    *CompositionNode         `json:"graph"`
+	DisallowTransferToParent bool                     `json:"disallowTransferToParent"`
+	DisallowTransferToPeers  bool                     `json:"disallowTransferToPeers"`
+	OutputKey                string                   `json:"outputKey"`
+	IncludeContents          string                   `json:"includeContents"`
+	GlobalInstruction        string                   `json:"globalInstruction"`
+	InputSchema              string                   `json:"inputSchema"`
+	OutputSchema             string                   `json:"outputSchema"`
+	ModelConfig              *agentModelConfigRequest `json:"modelConfig,omitempty"`
 }
 
 type agentResponse struct {
-	ID                       string           `json:"id"`
-	Name                     string           `json:"name"`
-	Description              string           `json:"description"`
-	SystemPrompt             string           `json:"systemPrompt"`
-	Icon                     string           `json:"icon"`
-	SourceCatalogID          string           `json:"sourceCatalogId,omitempty"`
-	Graph                    *CompositionNode `json:"graph,omitempty"`
-	IsComposed               bool             `json:"isComposed"`
-	DisallowTransferToParent bool             `json:"disallowTransferToParent"`
-	DisallowTransferToPeers  bool             `json:"disallowTransferToPeers"`
-	OutputKey                string           `json:"outputKey,omitempty"`
-	IncludeContents          string           `json:"includeContents,omitempty"`
-	GlobalInstruction        string           `json:"globalInstruction,omitempty"`
-	InputSchema              string           `json:"inputSchema,omitempty"`
-	OutputSchema             string           `json:"outputSchema,omitempty"`
-	ShareToken               string           `json:"shareToken,omitempty"`
-	Visibility               string           `json:"visibility,omitempty"`
-	CreatedAt                string           `json:"createdAt"`
-	UpdatedAt                string           `json:"updatedAt"`
+	ID                       string                   `json:"id"`
+	Name                     string                   `json:"name"`
+	Description              string                   `json:"description"`
+	SystemPrompt             string                   `json:"systemPrompt"`
+	Icon                     string                   `json:"icon"`
+	SourceCatalogID          string                   `json:"sourceCatalogId,omitempty"`
+	Graph                    *CompositionNode         `json:"graph,omitempty"`
+	IsComposed               bool                     `json:"isComposed"`
+	DisallowTransferToParent bool                     `json:"disallowTransferToParent"`
+	DisallowTransferToPeers  bool                     `json:"disallowTransferToPeers"`
+	OutputKey                string                   `json:"outputKey,omitempty"`
+	IncludeContents          string                   `json:"includeContents,omitempty"`
+	GlobalInstruction        string                   `json:"globalInstruction,omitempty"`
+	InputSchema              string                   `json:"inputSchema,omitempty"`
+	OutputSchema             string                   `json:"outputSchema,omitempty"`
+	ModelConfig              *AgentModelConfig        `json:"modelConfig,omitempty"`
+	ShareToken               string                   `json:"shareToken,omitempty"`
+	Visibility               string                   `json:"visibility,omitempty"`
+	CreatedAt                string                   `json:"createdAt"`
+	UpdatedAt                string                   `json:"updatedAt"`
 }
 
 type listResponse struct {
@@ -86,6 +100,21 @@ func agentIconOrDefault(icon string) string {
 		return icon
 	}
 	return defaultAgentIconSVG
+}
+
+// toModelConfig converts a request model config to the domain type.
+// Returns nil when the request carries no model config.
+func toModelConfig(req *agentModelConfigRequest) *AgentModelConfig {
+	if req == nil {
+		return nil
+	}
+	return &AgentModelConfig{
+		Temperature:     req.Temperature,
+		TopP:            req.TopP,
+		TopK:            req.TopK,
+		MaxOutputTokens: req.MaxOutputTokens,
+		StopSequences:   req.StopSequences,
+	}
 }
 
 func toAgentResponse(a *AgentDefinition) agentResponse {
@@ -105,6 +134,7 @@ func toAgentResponse(a *AgentDefinition) agentResponse {
 		GlobalInstruction:        a.GlobalInstruction,
 		InputSchema:              a.InputSchemaJSON,
 		OutputSchema:             a.OutputSchemaJSON,
+		ModelConfig:              a.ModelConfig,
 		ShareToken:               a.ShareToken,
 		Visibility:               a.Visibility,
 		CreatedAt:                a.CreatedAt.Format("2006-01-02T15:04:05Z"),
@@ -147,6 +177,7 @@ func (h *storeHandler) create(w http.ResponseWriter, r *http.Request) {
 		GlobalInstruction:        req.GlobalInstruction,
 		InputSchemaJSON:          req.InputSchema,
 		OutputSchemaJSON:         req.OutputSchema,
+		ModelConfig:              toModelConfig(req.ModelConfig),
 	}
 
 	if err := h.svc.create(r.Context(), agent); err != nil {
@@ -214,6 +245,7 @@ func (h *storeHandler) update(w http.ResponseWriter, r *http.Request) {
 		GlobalInstruction:        req.GlobalInstruction,
 		InputSchemaJSON:          req.InputSchema,
 		OutputSchemaJSON:         req.OutputSchema,
+		ModelConfig:              toModelConfig(req.ModelConfig),
 	}
 
 	if err := h.svc.update(r.Context(), agent); err != nil {

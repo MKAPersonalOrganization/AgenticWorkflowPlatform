@@ -173,7 +173,7 @@ func TestUniqueName(t *testing.T) {
 func TestBuildGenerateContentConfig(t *testing.T) {
 	t.Run("nil fields", func(t *testing.T) {
 		cfg := &fagent.ModelConfig{}
-		gc := buildGenerateContentConfig(cfg, nil)
+		gc := buildGenerateContentConfig(cfg, nil, nil)
 		if gc == nil {
 			t.Fatal("expected non-nil GenerateContentConfig")
 		}
@@ -186,7 +186,7 @@ func TestBuildGenerateContentConfig(t *testing.T) {
 		temp := 0.7
 		maxTok := 4096
 		cfg := &fagent.ModelConfig{Temperature: &temp, MaxTokens: &maxTok}
-		gc := buildGenerateContentConfig(cfg, nil)
+		gc := buildGenerateContentConfig(cfg, nil, nil)
 		if gc == nil {
 			t.Fatal("expected non-nil GenerateContentConfig")
 		}

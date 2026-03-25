@@ -993,3 +993,9 @@ CREATE TABLE IF NOT EXISTS a2a_discovered_skills (
 );
 
 CREATE INDEX IF NOT EXISTS idx_a2a_skills_connector ON a2a_discovered_skills(connector_id);
+
+-- Version: 1.68
+-- Description: Add per-agent model configuration (Gap 1).
+-- Stores optional LLM generation parameter overrides (temperature, topP, topK,
+-- maxOutputTokens, stopSequences) as JSONB. NULL means "use user global settings".
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS model_config JSONB;

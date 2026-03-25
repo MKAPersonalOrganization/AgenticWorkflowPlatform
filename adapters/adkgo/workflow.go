@@ -319,8 +319,12 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 		wbc.ctx, foundAgent, wbc.userID, node.AgentID, wbc.threadID, agentCfg, inv,
 	)
 
-	// Build generate content config (with per-request RunConfig overrides).
-	genCfg := buildGenerateContentConfig(wbc.modelCfg, wbc.req.Config)
+	// Build generate content config (per-agent overrides → per-request RunConfig overrides).
+	var agentModelCfg *fagent.AgentModelConfig
+	if agentCfg != nil {
+		agentModelCfg = agentCfg.ModelConfig
+	}
+	genCfg := buildGenerateContentConfig(wbc.modelCfg, agentModelCfg, wbc.req.Config)
 
 	agentName := wbc.uniqueName(foundAgent.Name())
 
