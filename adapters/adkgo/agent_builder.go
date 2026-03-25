@@ -71,11 +71,13 @@ type llmAgentParams struct {
 	prompt string
 
 	// Callbacks (from middleware bridge and requirements)
-	beforeAgentCallbacks []agent.BeforeAgentCallback
-	afterAgentCallbacks  []agent.AfterAgentCallback
-	beforeToolCallbacks  []llmagent.BeforeToolCallback
-	afterToolCallbacks   []llmagent.AfterToolCallback
-	onToolErrorCallbacks []llmagent.OnToolErrorCallback
+	beforeAgentCallbacks  []agent.BeforeAgentCallback
+	afterAgentCallbacks   []agent.AfterAgentCallback
+	beforeModelCallbacks  []llmagent.BeforeModelCallback
+	afterModelCallbacks   []llmagent.AfterModelCallback
+	beforeToolCallbacks   []llmagent.BeforeToolCallback
+	afterToolCallbacks    []llmagent.AfterToolCallback
+	onToolErrorCallbacks  []llmagent.OnToolErrorCallback
 
 	// Optional workflow node overrides (nil for regular agents)
 	nodeOverride *fagent.WorkflowNodeInfo
@@ -94,6 +96,8 @@ func buildLLMAgent(p llmAgentParams) (agent.Agent, error) {
 		GenerateContentConfig: p.genCfg,
 		BeforeAgentCallbacks:  p.beforeAgentCallbacks,
 		AfterAgentCallbacks:   p.afterAgentCallbacks,
+		BeforeModelCallbacks:  p.beforeModelCallbacks,
+		AfterModelCallbacks:   p.afterModelCallbacks,
 		BeforeToolCallbacks:   p.beforeToolCallbacks,
 		AfterToolCallbacks:    p.afterToolCallbacks,
 		OnToolErrorCallbacks:  p.onToolErrorCallbacks,
