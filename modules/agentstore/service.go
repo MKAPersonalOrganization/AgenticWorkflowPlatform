@@ -39,6 +39,11 @@ func (s *service) create(ctx context.Context, agent *AgentDefinition) error {
 		return fmt.Errorf("invalid model config: %w", err)
 	}
 
+	// Validate model override if present.
+	if err := agent.ModelOverride.Validate(); err != nil {
+		return fmt.Errorf("invalid model override: %w", err)
+	}
+
 	// Validate composition graph if present.
 	if agent.Graph != nil {
 		if err := s.validateGraph(ctx, agent.Graph, agent.UserID); err != nil {
@@ -73,6 +78,11 @@ func (s *service) update(ctx context.Context, agent *AgentDefinition) error {
 	// Validate model config if present.
 	if err := agent.ModelConfig.Validate(); err != nil {
 		return fmt.Errorf("invalid model config: %w", err)
+	}
+
+	// Validate model override if present.
+	if err := agent.ModelOverride.Validate(); err != nil {
+		return fmt.Errorf("invalid model override: %w", err)
 	}
 
 	// Validate composition graph if present.

@@ -40,6 +40,7 @@ type RunnerAdapter struct {
 	agentProvider          AgentProvider
 	threadMgr              ThreadManager
 	configResolver         ModelConfigResolver
+	apiKeyResolver         APIKeyResolver
 	pluginSettingsResolver PluginSettingsResolver
 	profileProvider        UserContextProvider
 	toolReqs               ToolRequirementsService
@@ -59,6 +60,7 @@ type RunnerAdapterConfig struct {
 	ThreadMgr              ThreadManager
 	AgentProvider          AgentProvider
 	ConfigResolver         ModelConfigResolver
+	APIKeyResolver         APIKeyResolver
 	PluginSettingsResolver PluginSettingsResolver
 	ProfileProvider        UserContextProvider
 	ToolReqs               ToolRequirementsService
@@ -82,6 +84,7 @@ func NewRunnerAdapter(cfg RunnerAdapterConfig) (*RunnerAdapter, error) {
 		threadMgr:              cfg.ThreadMgr,
 		agentProvider:          cfg.AgentProvider,
 		configResolver:         cfg.ConfigResolver,
+		apiKeyResolver:         cfg.APIKeyResolver,
 		pluginSettingsResolver: cfg.PluginSettingsResolver,
 		profileProvider:        cfg.ProfileProvider,
 		toolReqs:               cfg.ToolReqs,
@@ -166,6 +169,16 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 
 		// 3. Extract full agent config for requirements, middlewares, tools.
 		agentCfg := extractAgentConfig(foundAgent)
+
+		// 3b. Apply per-agent model override — swaps provider/model/apiKey when set.
+		if agentCfg != nil && agentCfg.ModelOverride != nil {
+			overridden, ovErr := r.applyModelOverride(ctx, req.UserID, modelCfg, agentCfg.ModelOverride)
+			if ovErr != nil {
+				yield(nil, ovErr)
+				return
+			}
+			modelCfg = overridden
+		}
 
 		// 4. Build in-memory session from thread history.
 		//
@@ -899,4 +912,25 @@ func extractAgentConfig(a fagent.Agent) *fagent.Config {
 		return &cfg
 	}
 	return nil
+}
+
+// applyModelOverride returns a new ModelConfig with provider/model/apiKey replaced
+// by the per-agent override. Generation parameters (Temperature, MaxTokens, etc.)
+// are carried over from the user's global config so Gap-1 overrides still apply.
+func (r *RunnerAdapter) applyModelOverride(ctx context.Context, userID string, base *fagent.ModelConfig, ov *fagent.AgentModelOverride) (*fagent.ModelConfig, error) {
+	if r.apiKeyResolver == nil {
+		return nil, fmt.Errorf("agent %q has a model override for provider %q but no API key resolver is configured", ov.ModelName, ov.Provider)
+	}
+	apiKey, err := r.apiKeyResolver.GetAPIKeyForProvider(ctx, userID, ov.Provider)
+	if err != nil {
+		return nil, fmt.Errorf("resolving API key for model override (provider %q): %w", ov.Provider, err)
+	}
+	return &fagent.ModelConfig{
+		Provider:      ov.Provider,
+		Model:         ov.ModelName,
+		APIKey:        apiKey,
+		Temperature:   base.Temperature,
+		MaxTokens:     base.MaxTokens,
+		MaxIterations: base.MaxIterations,
+	}, nil
 }

@@ -327,6 +327,7 @@ func (p *userAwareAgentProvider) agentFromDefinition(def *agentstore.AgentDefini
 		InputSchema:       parseAgentSchema(def.InputSchemaJSON),
 		OutputSchema:      parseAgentSchema(def.OutputSchemaJSON),
 		ModelConfig:       toAgentModelConfig(def.ModelConfig),
+		ModelOverride:     toAgentModelOverride(def.ModelOverride),
 	}
 	a := newConfigAgent(cfg)
 
@@ -408,6 +409,18 @@ func toAgentModelConfig(src *agentstore.AgentModelConfig) *agent.AgentModelConfi
 		StopSequences:   src.StopSequences,
 	}
 	return dst
+}
+
+// toAgentModelOverride converts the agentstore model override to the foundation type.
+// Returns nil when no override is set (falls back to user global provider/model).
+func toAgentModelOverride(src *agentstore.AgentModelOverride) *agent.AgentModelOverride {
+	if src == nil {
+		return nil
+	}
+	return &agent.AgentModelOverride{
+		Provider:  src.Provider,
+		ModelName: src.ModelName,
+	}
 }
 
 // convertCompositionNode recursively maps agentstore.CompositionNode to agent.WorkflowNodeInfo.

@@ -599,6 +599,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		ThreadMgr:              chatModule.Orchestrator().GetThreadManagement(),
 		AgentProvider:          agentProvider,
 		ConfigResolver:         aiSettingsModule,
+		APIKeyResolver:         aiSettingsModule,
 		PluginSettingsResolver: pluginSettingsModule,
 		ProfileProvider:        &adkgoProfileAdapter{repo: userProfileRepo},
 		ToolReqs:               toolReqsService,

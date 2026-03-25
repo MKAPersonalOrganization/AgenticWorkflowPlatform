@@ -167,6 +167,40 @@ func (s *service) getModelConfigForUser(ctx context.Context, userID string) (*ag
 	return cfg, nil
 }
 
+// getAPIKeyForProvider returns the stored API key for a specific provider.
+// Used when a per-agent model override selects a different provider than the user's default.
+func (s *service) getAPIKeyForProvider(ctx context.Context, userID, provider string) (string, error) {
+	settings, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return "", fmt.Errorf("getting user settings: %w", err)
+	}
+	for _, st := range settings {
+		if string(st.Provider) == provider && st.APIKey != "" {
+			return st.APIKey, nil
+		}
+	}
+	return "", fmt.Errorf("provider %q is not configured or missing API key — add it in Settings › AI", provider)
+}
+
+// listModelsFromProvider fetches the available chat models for the given provider
+// by calling the provider's model-listing API with the user's stored API key.
+func (s *service) listModelsFromProvider(ctx context.Context, userID, provider string) ([]ProviderModel, error) {
+	apiKey, err := s.getAPIKeyForProvider(ctx, userID, provider)
+	if err != nil {
+		return nil, err
+	}
+	switch AIProvider(provider) {
+	case AIProviderGemini:
+		return fetchGeminiModels(ctx, apiKey)
+	case AIProviderOpenAI:
+		return fetchOpenAIModels(ctx, apiKey)
+	case AIProviderAnthropic:
+		return fetchAnthropicModels(ctx, apiKey)
+	default:
+		return nil, fmt.Errorf("unsupported provider: %s", provider)
+	}
+}
+
 // EmbeddingConfig holds the resolved embedding provider/model/dimension for a user.
 type EmbeddingConfig struct {
 	Provider  string

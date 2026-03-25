@@ -63,12 +63,18 @@ export const agentDesigner = () => ({
             maxOutputTokens: null,
             stopSequences: [],
         },
+        modelOverride: { provider: '', modelName: '' },
     },
 
     // UI state
     expanded: false,
     showOrchestration: false,
     showModelSettings: false,
+    showModelOverride: false,
+
+    providerModelOptions: [],  // populated dynamically when a provider is selected
+    providerModelsLoading: false,
+    providerModelsError: '',
 
     // Tools & KB state
     showTools: false,
@@ -253,22 +259,27 @@ export const agentDesigner = () => ({
                 maxOutputTokens: null,
                 stopSequences: [],
             },
+            modelOverride: { provider: '', modelName: '' },
         };
         this.showTools = false;
         this.showKnowledgeBases = false;
         this.showFilesystems = false;
         this.showOrchestration = false;
         this.showModelSettings = false;
+        this.showModelOverride = false;
         this.showRequirementsPanel = false;
         this.agentPlugins = [];
         this.agentWorkspaces = [];
         this.agentFilesystems = [];
+        this.providerModelOptions = [];
+        this.providerModelsError = '';
         this.nodeView = 'form';
     },
 
     showEditNodeForm(agent) {
         this.editingAgent = agent;
         const mc = agent.modelConfig || {};
+        const mo = agent.modelOverride || {};
         this.form = {
             name: agent.name || '',
             description: agent.description || '',
@@ -288,19 +299,31 @@ export const agentDesigner = () => ({
                 maxOutputTokens: mc.maxOutputTokens ?? null,
                 stopSequences: mc.stopSequences ? [...mc.stopSequences] : [],
             },
+            modelOverride: {
+                provider: mo.provider || '',
+                modelName: mo.modelName || '',
+            },
         };
         this.showTools = false;
         this.showKnowledgeBases = false;
         this.showFilesystems = false;
         this.showOrchestration = false;
         this.showModelSettings = false;
+        this.showModelOverride = false;
         this.showRequirementsPanel = false;
+        this.providerModelOptions = [];
+        this.providerModelsError = '';
         this.nodeView = 'form';
 
         // Load tool/KB/FS data
         this.fetchAgentPlugins(agent.id);
         this.fetchAgentWorkspaces(agent.id);
         this.fetchAgentFilesystems(agent.id);
+
+        // Pre-load model list if this agent already has a provider override saved
+        if (mo.provider) {
+            this.fetchModelsForProvider(mo.provider);
+        }
     },
 
     async saveNode() {
@@ -315,6 +338,11 @@ export const agentDesigner = () => ({
             if (mc.maxOutputTokens !== null && mc.maxOutputTokens !== '') modelConfig.maxOutputTokens = Number(mc.maxOutputTokens);
             if (mc.stopSequences && mc.stopSequences.length > 0) modelConfig.stopSequences = mc.stopSequences;
 
+            const mo = this.form.modelOverride;
+            const modelOverride = (mo.provider && mo.modelName)
+                ? { provider: mo.provider, modelName: mo.modelName }
+                : null;
+
             const payload = {
                 name: this.form.name.trim(),
                 description: this.form.description.trim(),
@@ -328,6 +356,7 @@ export const agentDesigner = () => ({
                 inputSchema: this.form.inputSchema.trim(),
                 outputSchema: this.form.outputSchema.trim(),
                 modelConfig: Object.keys(modelConfig).length > 0 ? modelConfig : null,
+                modelOverride,
             };
 
             if (this.editingAgent && this.editingAgent.icon) {
@@ -428,6 +457,29 @@ export const agentDesigner = () => ({
         if (this.form.inputSchema) flags.push('in-schema');
         if (this.form.outputSchema) flags.push('out-schema');
         return flags.length ? flags.join(' · ') : '';
+    },
+
+    async fetchModelsForProvider(provider) {
+        if (!provider) {
+            this.providerModelOptions = [];
+            this.providerModelsError = '';
+            return;
+        }
+        this.providerModelsLoading = true;
+        this.providerModelsError = '';
+        this.providerModelOptions = [];
+        try {
+            const resp = await fetch(`/api/ai-settings/providers/${encodeURIComponent(provider)}/models`);
+            if (!resp.ok) {
+                const text = await resp.text();
+                throw new Error(text || `Failed to load models (${resp.status})`);
+            }
+            this.providerModelOptions = await resp.json();
+        } catch (e) {
+            this.providerModelsError = e.message;
+        } finally {
+            this.providerModelsLoading = false;
+        }
     },
 
     async fetchAgentPlugins(agentId) {

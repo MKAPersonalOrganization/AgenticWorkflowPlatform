@@ -999,3 +999,9 @@ CREATE INDEX IF NOT EXISTS idx_a2a_skills_connector ON a2a_discovered_skills(con
 -- Stores optional LLM generation parameter overrides (temperature, topP, topK,
 -- maxOutputTokens, stopSequences) as JSONB. NULL means "use user global settings".
 ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS model_config JSONB;
+
+-- Version: 1.69
+-- Description: Add per-agent model override (Gap 2).
+-- Stores optional provider + model name override as JSONB.
+-- NULL means "use user's global AI provider/model".
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS model_override JSONB;
