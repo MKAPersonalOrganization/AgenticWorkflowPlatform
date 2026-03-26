@@ -14,6 +14,7 @@ import { mcpConnectors } from './components/mcp-connectors.js';
 import { a2aConnectors } from './components/a2a-connectors.js';
 import { workflowTreeBuilder } from './components/workflow-tree-builder.js';
 import { workflowTreeVisualizer } from './components/workflow-tree-visualizer.js';
+import { workflowGraphPanel } from './components/workflow-graph-panel.js';
 import { renderMarkdown } from './chat/markdown-renderer.js';
 
 // Expose markdown renderer globally so Alpine expressions in any scope can use it
@@ -35,4 +36,5 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('a2aConnectors', a2aConnectors);
     Alpine.data('workflowTreeBuilder', workflowTreeBuilder);
     Alpine.data('workflowTreeVisualizer', workflowTreeVisualizer);
+    Alpine.data('workflowGraphPanel', workflowGraphPanel);
 });

@@ -55,6 +55,10 @@ func (h *TaskManagementHandler) ListAgents(w http.ResponseWriter, r *http.Reques
 			Description: a.Description(),
 			Icon:        resolveAgentIcon(a),
 		}
+		if wa, ok := a.(agent.WorkflowAgent); ok {
+			g := wa.WorkflowGraph()
+			meta.Graph = &g
+		}
 		response.Agents = append(response.Agents, meta)
 	}
 
@@ -99,6 +103,10 @@ func (h *TaskManagementHandler) GetAgent(w http.ResponseWriter, r *http.Request)
 		Name:        a.Name(),
 		Description: a.Description(),
 		Icon:        resolveAgentIcon(a),
+	}
+	if wa, ok := a.(agent.WorkflowAgent); ok {
+		g := wa.WorkflowGraph()
+		meta.Graph = &g
 	}
 
 	w.Header().Set("Content-Type", "application/json")

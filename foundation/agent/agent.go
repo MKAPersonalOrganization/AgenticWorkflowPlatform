@@ -53,54 +53,55 @@ type WorkflowAgent interface {
 // Remote nodes (remote) delegate to an external A2A connector.
 type WorkflowNodeInfo struct {
 	// ID is a unique identifier within this tree.
-	ID string
+	ID string `json:"id"`
 
 	// Type is "agent", "sequential", "parallel", "loop", or "remote".
-	Type string
+	Type string `json:"type"`
 
 	// Label is an optional display name for this node.
-	Label string
+	Label string `json:"label,omitempty"`
 
 	// AgentID is the ID of the AgentDefinition (only for Type="agent").
-	AgentID string
+	AgentID string `json:"agent_id,omitempty"`
 
 	// A2AConnectorID references an A2A connector (only for Type="remote").
 	// The connector is looked up at runtime and delegated to via the A2A protocol.
-	A2AConnectorID string
+	A2AConnectorID string `json:"a2a_connector_id,omitempty"`
 
 	// OutputKey optionally stores this node's output in session state.
-	OutputKey string
+	OutputKey string `json:"output_key,omitempty"`
 
 	// MaxIterations limits loop repetitions (only for Type="loop").
-	MaxIterations int
+	MaxIterations int `json:"max_iterations,omitempty"`
 
 	// AllowEarlyExit controls whether the exit_loop tool is injected into the
 	// last child agent of a loop node. When false (the default) the loop runs
 	// exactly MaxIterations times. Set to true to let the LLM break out early.
-	AllowEarlyExit bool
+	AllowEarlyExit bool `json:"allow_early_exit,omitempty"`
 
 	// DisallowTransferToParent overrides the agent's transfer policy
 	// within this workflow context.
-	DisallowTransferToParent *bool
+	DisallowTransferToParent *bool `json:"disallow_transfer_to_parent,omitempty"`
 
 	// DisallowTransferToPeers overrides the agent's transfer policy
 	// within this workflow context.
-	DisallowTransferToPeers *bool
+	DisallowTransferToPeers *bool `json:"disallow_transfer_to_peers,omitempty"`
 
 	// IncludeContents overrides content forwarding for this node.
 	// "default" or "none".
-	IncludeContents string
+	IncludeContents string `json:"include_contents,omitempty"`
 
 	// Children are the sub-nodes (only for composite types).
-	Children []WorkflowNodeInfo
+	Children []WorkflowNodeInfo `json:"children,omitempty"`
 }
 
 // AgentMetadata represents metadata for an agent exposed via the API.
 type AgentMetadata struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Icon        string `json:"icon"`
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Icon        string            `json:"icon"`
+	Graph       *WorkflowNodeInfo `json:"graph,omitempty"`
 }
 
 // AgentListResponse represents the response containing a list of agents.

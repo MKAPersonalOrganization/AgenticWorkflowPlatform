@@ -44,6 +44,10 @@ export function createEmptyThreadState() {
         humanInputToastId: null,
         // Token usage tracking
         tokenUsage: null,
+        // Workflow execution state
+        activeAgentName: null,
+        activeWorkflowContext: null,
+        lastWorkflowContext: null,
         // Parallel message coalescing — maps multiple SSE message IDs
         // from the same parallel branch agent into a single UI message.
         // parallelAgentMessages: { [agentName]: messageId } — canonical msg per agent

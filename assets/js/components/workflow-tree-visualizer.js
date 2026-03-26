@@ -157,6 +157,22 @@ export function workflowTreeVisualizer() {
                             0 8px 24px -4px oklch(0 0 0 / 25%);
             }
 
+            /* ── Active Node Highlight ── */
+            .wf-node.is-active {
+                border-color: var(--node-accent);
+                box-shadow: 0 0 0 2px var(--node-accent), 0 0 16px oklch(from var(--node-accent) l c h / 40%);
+                transform: translateY(-2px);
+                animation: wfPulseActive 2.5s infinite;
+            }
+            .dark .wf-node.is-active {
+                box-shadow: 0 0 0 2px var(--node-accent), 0 0 16px oklch(from var(--node-accent) l c h / 40%);
+            }
+            @keyframes wfPulseActive {
+                0% { box-shadow: 0 0 0 2px var(--node-accent), 0 0 16px oklch(from var(--node-accent) l c h / 20%); }
+                50% { box-shadow: 0 0 0 2px var(--node-accent), 0 0 24px oklch(from var(--node-accent) l c h / 60%); }
+                100% { box-shadow: 0 0 0 2px var(--node-accent), 0 0 16px oklch(from var(--node-accent) l c h / 20%); }
+            }
+
             /* ── Accent stripe on the left edge ── */
             .wf-node::before {
                 content: '';
@@ -320,21 +336,24 @@ export function workflowTreeVisualizer() {
 
     // ── Node renderers ──────────────────────────────────────────────
 
-    function renderPipelineNode(node, agentMap, depth) {
+    function renderPipelineNode(node, agentMap, depth, activeAgentName) {
         if (!node) return '';
         const m = META[node.type] || META.agent;
 
         switch (node.type) {
-            case 'agent': return renderAgentNode(node, agentMap, m);
-            case 'sequential': return renderSequentialNode(node, agentMap, m, depth);
-            case 'parallel': return renderParallelNode(node, agentMap, m, depth);
-            case 'loop': return renderLoopNode(node, agentMap, m, depth);
-            default: return renderAgentNode(node, agentMap, m);
+            case 'agent': return renderAgentNode(node, agentMap, m, activeAgentName);
+            case 'sequential': return renderSequentialNode(node, agentMap, m, depth, activeAgentName);
+            case 'parallel': return renderParallelNode(node, agentMap, m, depth, activeAgentName);
+            case 'loop': return renderLoopNode(node, agentMap, m, depth, activeAgentName);
+            default: return renderAgentNode(node, agentMap, m, activeAgentName);
         }
     }
 
-    function renderAgentNode(node, agentMap, m) {
+    function renderAgentNode(node, agentMap, m, activeAgentName) {
         const name = node.agent_id ? (agentMap[node.agent_id] || 'Unknown Agent') : 'No agent selected';
+        const isActive = activeAgentName && ((name === activeAgentName) || (node.label === activeAgentName));
+        const nodeClass = isActive ? 'wf-node is-active' : 'wf-node';
+
         const outputKey = node.output_key
             ? `<span class="wf-agent-desc">→ <code style="font-size:10px;padding:0 3px;border-radius:3px;background:var(--muted);font-family:var(--font-mono);">${esc(node.output_key)}</code></span>`
             : '';
@@ -353,7 +372,7 @@ export function workflowTreeVisualizer() {
         const badgesHtml = badges ? `<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:2px;">${badges}</div>` : '';
 
         return `
-            <div class="wf-node" style="--node-accent:${m.accent};--node-border:${m.accentMuted};--node-bg:${m.accentMuted};">
+            <div class="${nodeClass}" style="--node-accent:${m.accent};--node-border:${m.accentMuted};--node-bg:${m.accentMuted};">
                 <div style="display:flex;align-items:center;gap:8px;">
                     <div class="wf-badge" style="--badge-bg:${m.accentMuted};--badge-fg:${m.accentFg};">
                         ${m.icon}
@@ -376,13 +395,16 @@ export function workflowTreeVisualizer() {
             </div>`;
     }
 
-    function renderSequentialNode(node, agentMap, m, depth) {
+    function renderSequentialNode(node, agentMap, m, depth, activeAgentName) {
         const kids = node.children || [];
         if (kids.length === 0) return renderEmptyNode(m, 'Empty sequence');
+        
+        const isActive = activeAgentName && (node.label === activeAgentName);
+        const nodeClass = isActive ? 'wf-node is-active' : 'wf-node';
 
         let body = '';
         for (let i = 0; i < kids.length; i++) {
-            body += renderPipelineNode(kids[i], agentMap, depth + 1);
+            body += renderPipelineNode(kids[i], agentMap, depth + 1, activeAgentName);
             if (i < kids.length - 1) {
                 body += connector(m.accent, i * 0.4);
             }
@@ -402,9 +424,9 @@ export function workflowTreeVisualizer() {
 
         return `
             <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
-                <div class="wf-node" style="--node-accent:${m.accent};--node-border:${m.accentMuted};--node-bg:${m.accentMuted};max-width:unset;">
+                <div class="${nodeClass}" style="--node-accent:${m.accent};--node-border:${m.accentMuted};--node-bg:${m.accentMuted};max-width:unset;">
                     <div class="wf-badge" style="--badge-bg:${m.accentMuted};--badge-fg:${m.accentFg};">
-                        ${m.icon}&nbsp;${m.label}
+                        ${m.icon}&nbsp;${esc(node.label || m.label)}
                     </div>
                     <div style="display:flex;flex-direction:column;align-items:center;width:100%;padding-top:8px;">
                         ${body}
@@ -413,7 +435,7 @@ export function workflowTreeVisualizer() {
             </div>`;
     }
 
-    function renderParallelNode(node, agentMap, m, depth) {
+    function renderParallelNode(node, agentMap, m, depth, activeAgentName) {
         const kids = node.children || [];
         if (kids.length === 0) return renderEmptyNode(m, 'Empty parallel');
 
@@ -422,7 +444,7 @@ export function workflowTreeVisualizer() {
             branches += `
                 <div class="wf-branch">
                     <div class="wf-branch-connector" style="--connector-color:${m.accent};"></div>
-                    ${renderPipelineNode(child, agentMap, depth + 1)}
+                    ${renderPipelineNode(child, agentMap, depth + 1, activeAgentName)}
                     <div class="wf-branch-connector" style="--connector-color:${m.accent};"></div>
                 </div>`;
         }
@@ -430,7 +452,7 @@ export function workflowTreeVisualizer() {
         return `
             <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
                 <div class="wf-badge" style="--badge-bg:${m.accentMuted};--badge-fg:${m.accentFg};">
-                    ${m.icon}&nbsp;${m.label}
+                    ${m.icon}&nbsp;${esc(node.label || m.label)}
                 </div>
                 <div class="wf-fork-join" style="--connector-color:${m.accent};">
                     <div class="wf-fork-join-center" style="--connector-color:${m.accent};"></div>
@@ -444,7 +466,7 @@ export function workflowTreeVisualizer() {
             </div>`;
     }
 
-    function renderLoopNode(node, agentMap, m, depth) {
+    function renderLoopNode(node, agentMap, m, depth, activeAgentName) {
         const kids = node.children || [];
         const maxIter = node.max_iterations || 3;
 
@@ -453,7 +475,7 @@ export function workflowTreeVisualizer() {
             body = renderEmptyNode(m, 'Empty loop');
         } else {
             for (let i = 0; i < kids.length; i++) {
-                body += renderPipelineNode(kids[i], agentMap, depth + 1);
+                body += renderPipelineNode(kids[i], agentMap, depth + 1, activeAgentName);
                 if (i < kids.length - 1) {
                     body += connector(m.accent, i * 0.3);
                 }
@@ -473,7 +495,7 @@ export function workflowTreeVisualizer() {
             <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
                 <div class="wf-loop-wrap" style="--node-accent:${m.accent};">
                     <div class="wf-loop-badge" style="--node-accent:${m.accent};--badge-fg:${m.accentFg};">
-                        ${m.icon}&nbsp;×${maxIter}
+                        ${m.icon}&nbsp;${esc(node.label || m.label)} (×${maxIter})
                     </div>
                     <div style="display:flex;flex-direction:column;align-items:center;width:100%;padding-top:2px;">
                         ${body}
@@ -496,7 +518,7 @@ export function workflowTreeVisualizer() {
             injectStyles();
         },
 
-        renderTree(graph, agentsList) {
+        renderTree(graph, agentsList, activeAgentName) {
             if (!graph) {
                 return '<div class="wf-empty">Add nodes to see the pipeline preview</div>';
             }
@@ -512,7 +534,7 @@ export function workflowTreeVisualizer() {
                 <div class="wf-viz">
                     <div class="wf-pipeline-canvas" style="padding:20px 14px;">
                         <div style="display:flex;flex-direction:column;align-items:center;">
-                            ${renderPipelineNode(graph, agentMap, 0)}
+                            ${renderPipelineNode(graph, agentMap, 0, activeAgentName)}
                         </div>
                     </div>
                 </div>`;
