@@ -252,6 +252,14 @@ document.addEventListener('alpine:init', () => {
             get isStreaming() {
                 return this.__currentState.isStreaming;
             },
+            
+            get activeAgentName() {
+                return this.__currentState.activeAgentName || null;
+            },
+            
+            get activeWorkflowContext() {
+                return this.__currentState.activeWorkflowContext || null;
+            },
 
             get events() {
                 return this.__currentState.events;

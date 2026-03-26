@@ -91,8 +91,18 @@ export function createEventHandlerMethods() {
             console.log(`[Workflow] Agent transfer: ${fromAgent} → ${toAgent} (${workflowType || 'direct'}, step ${(stepIndex || 0) + 1}/${stepCount || '?'})`);
 
             state.activeAgentName = toAgent;
+
+            let orchestratorId = state.activeWorkflowContext?.orchestratorId;
+            if (workflowType) {
+                if (!orchestratorId) {
+                    orchestratorId = fromAgent;
+                }
+            } else {
+                orchestratorId = null;
+            }
+
             state.activeWorkflowContext = workflowType
-                ? { workflowType, parentAgent, stepIndex, stepCount, iteration, maxIterations }
+                ? { workflowType, parentAgent, stepIndex, stepCount, iteration, maxIterations, orchestratorId }
                 : null;
 
             // Reset parallel coalesce maps when leaving a parallel section
