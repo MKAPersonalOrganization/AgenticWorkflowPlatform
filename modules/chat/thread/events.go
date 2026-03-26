@@ -354,6 +354,22 @@ func (e *FileAttachmentReceived) EventType() string         { return "FileAttach
 func (e *FileAttachmentReceived) EventTimestamp() time.Time { return e.Timestamp }
 func (e *FileAttachmentReceived) AggregateID() string       { return e.ThreadID }
 
+// WorkflowNodeCompleted is emitted when a workflow sub-agent finishes executing.
+// Outcome is "success" or "error". DurationMs is the wall-clock time the node
+// spent running (from when it received control to when it handed off).
+// This is a transient event — NOT persisted to the event store.
+type WorkflowNodeCompleted struct {
+	ThreadID   string    `json:"threadId"`
+	AgentName  string    `json:"agentName"`
+	DurationMs int64     `json:"durationMs"`
+	Outcome    string    `json:"outcome"` // "success" | "error"
+	Timestamp  time.Time `json:"timestamp"`
+}
+
+func (e *WorkflowNodeCompleted) EventType() string         { return "WorkflowNodeCompleted" }
+func (e *WorkflowNodeCompleted) EventTimestamp() time.Time { return e.Timestamp }
+func (e *WorkflowNodeCompleted) AggregateID() string       { return e.ThreadID }
+
 // RunStarted signals the start of an agent run.
 type RunStarted struct {
 	ThreadID    string    `json:"threadId"`              // ID of the conversation thread

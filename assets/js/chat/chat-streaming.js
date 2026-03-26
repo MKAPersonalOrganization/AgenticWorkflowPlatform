@@ -391,6 +391,12 @@ export function createStreamingMethods() {
                 case 'AGENT_TRANSFER_STARTED':
                     this.__handleAgentTransferStarted(event.value, state, threadId);
                     break;
+                case 'WORKFLOW_NODE_COMPLETED':
+                    this.__handleWorkflowNodeCompleted(event.value, state);
+                    break;
+                case 'STATE_CHANGE_REPORTED':
+                    this.__handleStateChangeReported(event.value, state);
+                    break;
                 case 'ARTIFACT':
                     this.__handleArtifact(event.value, state, threadId);
                     break;

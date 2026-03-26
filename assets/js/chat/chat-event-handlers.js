@@ -86,9 +86,35 @@ export function createEventHandlerMethods() {
          * messages get tagged with step/branch/iteration info.
          * Injects visual section markers for parallel and loop boundaries.
          */
+        __handleWorkflowNodeCompleted(value, state) {
+            const { agentName, durationMs, outcome } = value;
+            if (outcome === 'error') {
+                if (!state.failedNodes) state.failedNodes = {};
+                state.failedNodes = { ...state.failedNodes, [agentName]: { timestamp: value.timestamp } };
+            } else {
+                if (!state.completedNodes) state.completedNodes = {};
+                state.completedNodes = { ...state.completedNodes, [agentName]: { durationMs, timestamp: value.timestamp } };
+            }
+        },
+
+        __handleStateChangeReported(value, state) {
+            const { agentName, key, value: val } = value;
+            if (!state.workflowOutputs) state.workflowOutputs = {};
+            state.workflowOutputs = { ...state.workflowOutputs, [key]: { agentName, value: val } };
+        },
+
         __handleAgentTransferStarted(value, state, threadId) {
             const { fromAgent, toAgent, workflowType, parentAgent, stepIndex, stepCount, iteration, maxIterations } = value;
             console.log(`[Workflow] Agent transfer: ${fromAgent} → ${toAgent} (${workflowType || 'direct'}, step ${(stepIndex || 0) + 1}/${stepCount || '?'})`);
+
+            // Reset node completion tracking when a new workflow run begins.
+            // activeWorkflowContext being null means no prior workflow context existed
+            // in this thread state — i.e. this is the first transfer of a fresh run.
+            if (!state.activeWorkflowContext && workflowType) {
+                state.completedNodes = {};
+                state.failedNodes = {};
+                state.workflowOutputs = {};
+            }
 
             state.activeAgentName = toAgent;
 

@@ -68,6 +68,13 @@ export function workflowTreeVisualizer() {
                 --wf-emerald: oklch(0.7 0.17 165);
                 --wf-emerald-muted: oklch(0.7 0.17 165 / 12%);
                 --wf-emerald-fg: oklch(0.6 0.19 165);
+                /* Done / success green */
+                --wf-done:        oklch(0.52 0.17 160);
+                --wf-done-muted:  oklch(0.52 0.17 160 / 14%);
+                --wf-done-fg:     oklch(0.48 0.19 160);
+                /* Running blue */
+                --wf-live:        oklch(0.55 0.20 260);
+                --wf-live-muted:  oklch(0.55 0.20 260 / 14%);
             }
             .dark .wf-viz {
                 --wf-blue: oklch(0.7 0.14 250);
@@ -82,6 +89,11 @@ export function workflowTreeVisualizer() {
                 --wf-emerald: oklch(0.78 0.14 165);
                 --wf-emerald-muted: oklch(0.78 0.14 165 / 14%);
                 --wf-emerald-fg: oklch(0.84 0.12 165);
+                --wf-done:        oklch(0.72 0.15 160);
+                --wf-done-muted:  oklch(0.72 0.15 160 / 16%);
+                --wf-done-fg:     oklch(0.78 0.13 160);
+                --wf-live:        oklch(0.72 0.17 260);
+                --wf-live-muted:  oklch(0.72 0.17 260 / 16%);
             }
 
             /* ── Pipeline connector ── */
@@ -159,18 +171,102 @@ export function workflowTreeVisualizer() {
 
             /* ── Active Node Highlight ── */
             .wf-node.is-active {
-                border-color: var(--node-accent);
-                box-shadow: 0 0 0 2px var(--node-accent), 0 0 16px oklch(from var(--node-accent) l c h / 40%);
+                --node-accent: var(--wf-live);
+                --node-border: var(--wf-live-muted);
+                --node-bg: var(--wf-live-muted);
+                border-color: var(--wf-live);
+                box-shadow: 0 0 0 2px var(--wf-live), 0 0 20px oklch(from var(--wf-live) l c h / 35%);
                 transform: translateY(-2px);
-                animation: wfPulseActive 2.5s infinite;
-            }
-            .dark .wf-node.is-active {
-                box-shadow: 0 0 0 2px var(--node-accent), 0 0 16px oklch(from var(--node-accent) l c h / 40%);
+                animation: wfPulseActive 2.5s ease-in-out infinite;
             }
             @keyframes wfPulseActive {
-                0% { box-shadow: 0 0 0 2px var(--node-accent), 0 0 16px oklch(from var(--node-accent) l c h / 20%); }
-                50% { box-shadow: 0 0 0 2px var(--node-accent), 0 0 24px oklch(from var(--node-accent) l c h / 60%); }
-                100% { box-shadow: 0 0 0 2px var(--node-accent), 0 0 16px oklch(from var(--node-accent) l c h / 20%); }
+                0%   { box-shadow: 0 0 0 2px var(--wf-live), 0 0 12px oklch(from var(--wf-live) l c h / 20%); }
+                50%  { box-shadow: 0 0 0 2px var(--wf-live), 0 0 28px oklch(from var(--wf-live) l c h / 55%); }
+                100% { box-shadow: 0 0 0 2px var(--wf-live), 0 0 12px oklch(from var(--wf-live) l c h / 20%); }
+            }
+            /* Spinning indicator inside icon badge when active */
+            .wf-node.is-active .wf-badge {
+                position: relative;
+                overflow: hidden;
+            }
+            .wf-node.is-active .wf-badge::after {
+                content: '';
+                position: absolute;
+                inset: -1px;
+                border-radius: inherit;
+                border: 2px solid transparent;
+                border-top-color: var(--wf-live);
+                animation: wfSpinBadge 1s linear infinite;
+            }
+            @keyframes wfSpinBadge {
+                to { transform: rotate(360deg); }
+            }
+            /* Shimmer sweep on active node */
+            .wf-node.is-active::after {
+                content: '';
+                position: absolute;
+                inset: 0;
+                border-radius: inherit;
+                background: linear-gradient(105deg, transparent 30%, oklch(from var(--wf-live) l c h / 10%) 50%, transparent 70%);
+                background-size: 200% 100%;
+                animation: wfActiveShimmer 2s ease-in-out infinite;
+                pointer-events: none;
+            }
+            @keyframes wfActiveShimmer {
+                0%   { background-position: 200% 0; }
+                100% { background-position: -200% 0; }
+            }
+
+            /* ── Completed Node — green success state ── */
+            .wf-node.is-completed {
+                --node-accent: var(--wf-done);
+                --node-border: var(--wf-done-muted);
+                --node-bg: var(--wf-done-muted);
+                border-color: var(--wf-done-muted);
+            }
+            .wf-node.is-completed::before {
+                background: var(--wf-done);
+                opacity: 1;
+            }
+            .wf-node-done-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 3px;
+                font-size: 10px;
+                font-weight: 700;
+                padding: 2px 7px;
+                border-radius: 999px;
+                background: var(--wf-done-muted);
+                color: var(--wf-done-fg, var(--wf-done));
+                border: 1px solid oklch(from var(--wf-done) l c h / 30%);
+                flex-shrink: 0;
+                white-space: nowrap;
+            }
+
+            /* ── Failed Node ── */
+            .wf-node.is-failed {
+                --node-accent: var(--destructive);
+                --node-border: oklch(from var(--destructive) l c h / 30%);
+                --node-bg: oklch(from var(--destructive) l c h / 10%);
+                border-color: oklch(from var(--destructive) l c h / 45%);
+            }
+            .wf-node.is-failed::before {
+                background: var(--destructive);
+                opacity: 1;
+            }
+            .wf-node-failed-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 3px;
+                font-size: 10px;
+                font-weight: 700;
+                padding: 2px 7px;
+                border-radius: 999px;
+                background: oklch(from var(--destructive) l c h / 12%);
+                color: var(--destructive);
+                border: 1px solid oklch(from var(--destructive) l c h / 30%);
+                flex-shrink: 0;
+                white-space: nowrap;
             }
 
             /* ── Accent stripe on the left edge ── */
@@ -336,23 +432,44 @@ export function workflowTreeVisualizer() {
 
     // ── Node renderers ──────────────────────────────────────────────
 
-    function renderPipelineNode(node, agentMap, depth, activeAgentName) {
+    function renderPipelineNode(node, agentMap, depth, activeAgentName, completedNodes, failedNodes) {
         if (!node) return '';
         const m = META[node.type] || META.agent;
 
         switch (node.type) {
-            case 'agent': return renderAgentNode(node, agentMap, m, activeAgentName);
-            case 'sequential': return renderSequentialNode(node, agentMap, m, depth, activeAgentName);
-            case 'parallel': return renderParallelNode(node, agentMap, m, depth, activeAgentName);
-            case 'loop': return renderLoopNode(node, agentMap, m, depth, activeAgentName);
-            default: return renderAgentNode(node, agentMap, m, activeAgentName);
+            case 'agent': return renderAgentNode(node, agentMap, m, activeAgentName, completedNodes, failedNodes);
+            case 'sequential': return renderSequentialNode(node, agentMap, m, depth, activeAgentName, completedNodes, failedNodes);
+            case 'parallel': return renderParallelNode(node, agentMap, m, depth, activeAgentName, completedNodes, failedNodes);
+            case 'loop': return renderLoopNode(node, agentMap, m, depth, activeAgentName, completedNodes, failedNodes);
+            default: return renderAgentNode(node, agentMap, m, activeAgentName, completedNodes, failedNodes);
         }
     }
 
-    function renderAgentNode(node, agentMap, m, activeAgentName) {
+    function renderAgentNode(node, agentMap, m, activeAgentName, completedNodes, failedNodes) {
         const name = node.agent_id ? (agentMap[node.agent_id] || 'Unknown Agent') : 'No agent selected';
-        const isActive = activeAgentName && ((name === activeAgentName) || (node.label === activeAgentName));
-        const nodeClass = isActive ? 'wf-node is-active' : 'wf-node';
+        const completedInfo = completedNodes?.[name];
+        const isFailed    = !!failedNodes?.[name];
+        const isCompleted = !!completedInfo && !isFailed;
+        const isActive    = !isCompleted && !isFailed &&
+                            activeAgentName && ((name === activeAgentName) || (node.label === activeAgentName));
+
+        let nodeClass = 'wf-node';
+        if (isActive)    nodeClass += ' is-active';
+        else if (isCompleted) nodeClass += ' is-completed';
+        else if (isFailed)    nodeClass += ' is-failed';
+
+        // Duration badge for completed nodes, error badge for failed
+        const checkSvg = `<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+        const xSvg     = `<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+        let statusBadge = '';
+        if (isCompleted) {
+            const secs = completedInfo.durationMs != null
+                ? (completedInfo.durationMs / 1000).toFixed(1) + 's'
+                : 'done';
+            statusBadge = `<span class="wf-node-done-badge">${checkSvg} ${secs}</span>`;
+        } else if (isFailed) {
+            statusBadge = `<span class="wf-node-failed-badge">${xSvg} error</span>`;
+        }
 
         const outputKey = node.output_key
             ? `<span class="wf-agent-desc">→ <code style="font-size:10px;padding:0 3px;border-radius:3px;background:var(--muted);font-family:var(--font-mono);">${esc(node.output_key)}</code></span>`
@@ -371,17 +488,21 @@ export function workflowTreeVisualizer() {
         }
         const badgesHtml = badges ? `<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:2px;">${badges}</div>` : '';
 
+        const nameFontStyle = isActive ? 'font-weight:700;' : '';
+        const accentOverride = isCompleted ? '' : isFailed ? '' : `--node-accent:${m.accent};--node-border:${m.accentMuted};--node-bg:${m.accentMuted};`;
+
         return `
-            <div class="${nodeClass}" style="--node-accent:${m.accent};--node-border:${m.accentMuted};--node-bg:${m.accentMuted};">
+            <div class="${nodeClass}" style="${accentOverride}">
                 <div style="display:flex;align-items:center;gap:8px;">
                     <div class="wf-badge" style="--badge-bg:${m.accentMuted};--badge-fg:${m.accentFg};">
                         ${m.icon}
                     </div>
                     <div style="flex:1;min-width:0;">
-                        <div class="wf-agent-name">${esc(name)}</div>
+                        <div class="wf-agent-name" style="${nameFontStyle}">${esc(name)}</div>
                         ${outputKey}
                         ${badgesHtml}
                     </div>
+                    ${statusBadge}
                 </div>
             </div>`;
     }
@@ -395,7 +516,7 @@ export function workflowTreeVisualizer() {
             </div>`;
     }
 
-    function renderSequentialNode(node, agentMap, m, depth, activeAgentName) {
+    function renderSequentialNode(node, agentMap, m, depth, activeAgentName, completedNodes, failedNodes) {
         const kids = node.children || [];
         if (kids.length === 0) return renderEmptyNode(m, 'Empty sequence');
         
@@ -404,7 +525,7 @@ export function workflowTreeVisualizer() {
 
         let body = '';
         for (let i = 0; i < kids.length; i++) {
-            body += renderPipelineNode(kids[i], agentMap, depth + 1, activeAgentName);
+            body += renderPipelineNode(kids[i], agentMap, depth + 1, activeAgentName, completedNodes, failedNodes);
             if (i < kids.length - 1) {
                 body += connector(m.accent, i * 0.4);
             }
@@ -435,7 +556,7 @@ export function workflowTreeVisualizer() {
             </div>`;
     }
 
-    function renderParallelNode(node, agentMap, m, depth, activeAgentName) {
+    function renderParallelNode(node, agentMap, m, depth, activeAgentName, completedNodes, failedNodes) {
         const kids = node.children || [];
         if (kids.length === 0) return renderEmptyNode(m, 'Empty parallel');
 
@@ -444,7 +565,7 @@ export function workflowTreeVisualizer() {
             branches += `
                 <div class="wf-branch">
                     <div class="wf-branch-connector" style="--connector-color:${m.accent};"></div>
-                    ${renderPipelineNode(child, agentMap, depth + 1, activeAgentName)}
+                    ${renderPipelineNode(child, agentMap, depth + 1, activeAgentName, completedNodes, failedNodes)}
                     <div class="wf-branch-connector" style="--connector-color:${m.accent};"></div>
                 </div>`;
         }
@@ -466,7 +587,7 @@ export function workflowTreeVisualizer() {
             </div>`;
     }
 
-    function renderLoopNode(node, agentMap, m, depth, activeAgentName) {
+    function renderLoopNode(node, agentMap, m, depth, activeAgentName, completedNodes, failedNodes) {
         const kids = node.children || [];
         const maxIter = node.max_iterations || 3;
 
@@ -475,7 +596,7 @@ export function workflowTreeVisualizer() {
             body = renderEmptyNode(m, 'Empty loop');
         } else {
             for (let i = 0; i < kids.length; i++) {
-                body += renderPipelineNode(kids[i], agentMap, depth + 1, activeAgentName);
+                body += renderPipelineNode(kids[i], agentMap, depth + 1, activeAgentName, completedNodes, failedNodes);
                 if (i < kids.length - 1) {
                     body += connector(m.accent, i * 0.3);
                 }
@@ -518,7 +639,7 @@ export function workflowTreeVisualizer() {
             injectStyles();
         },
 
-        renderTree(graph, agentsList, activeAgentName) {
+        renderTree(graph, agentsList, activeAgentName, completedNodes, failedNodes) {
             if (!graph) {
                 return '<div class="wf-empty">Add nodes to see the pipeline preview</div>';
             }
@@ -534,7 +655,7 @@ export function workflowTreeVisualizer() {
                 <div class="wf-viz">
                     <div class="wf-pipeline-canvas" style="padding:20px 14px;">
                         <div style="display:flex;flex-direction:column;align-items:center;">
-                            ${renderPipelineNode(graph, agentMap, 0, activeAgentName)}
+                            ${renderPipelineNode(graph, agentMap, 0, activeAgentName, completedNodes, failedNodes)}
                         </div>
                     </div>
                 </div>`;

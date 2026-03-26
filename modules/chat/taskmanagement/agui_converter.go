@@ -214,6 +214,28 @@ func toAguiEventsInternal(event any) []any {
 			}),
 		)}
 
+	case *thread.WorkflowNodeCompleted:
+		return []any{aguievents.NewCustomEvent(
+			"WORKFLOW_NODE_COMPLETED",
+			aguievents.WithValue(map[string]any{
+				"agentName":  evt.AgentName,
+				"durationMs": evt.DurationMs,
+				"outcome":    evt.Outcome,
+				"timestamp":  evt.Timestamp,
+			}),
+		)}
+
+	case *thread.StateChangeReported:
+		return []any{aguievents.NewCustomEvent(
+			"STATE_CHANGE_REPORTED",
+			aguievents.WithValue(map[string]any{
+				"agentName": evt.AgentName,
+				"key":       evt.Key,
+				"value":     evt.Value,
+				"timestamp": evt.Timestamp,
+			}),
+		)}
+
 	case *thread.UserMessageAdded, *thread.AssistantMessageAdded, *thread.ThreadCreated:
 		// These are handled by the frontend locally or via snapshots, no need to stream
 		return []any{}

@@ -394,6 +394,10 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 		// should display. Key = parent loop agent name, value = current iteration.
 		loopIterations := map[string]int{}
 
+		// Track when the current workflow node started so we can report duration
+		// in WorkflowNodeCompleted events. Reset on every agent transition.
+		nodeStartedAt := time.Now()
+
 		// Build run options. WithStateDelta (ADK-Go v1.0.0) injects per-invocation
 		// state at run start using the "temp:" prefix so it is never persisted or
 		// surfaced as a StateChangeReported event (translateStateDelta filters temp: keys).
@@ -408,6 +412,19 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			StreamingMode: agent.StreamingModeSSE,
 		}, runOpts...) {
 			if adkErr != nil {
+				// Emit node failure for the currently-active workflow sub-agent.
+				if _, isWorkflowNode := agentPositions[currentAuthor]; isWorkflowNode {
+					if !yield(&thread.WorkflowNodeCompleted{
+						ThreadID:   evtCtx.ThreadID,
+						AgentName:  currentAuthor,
+						DurationMs: time.Since(nodeStartedAt).Milliseconds(),
+						Outcome:    "error",
+						Timestamp:  time.Now(),
+					}, nil) {
+						return
+					}
+					nodeStartedAt = time.Now()
+				}
 				// Close the streaming message before surfacing the error.
 				if streamingMsgID != "" {
 					if !yield(&thread.AssistantMessageCompleted{
@@ -481,6 +498,21 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 						transferEvt.Iteration = loopIterations[pos.ParentName]
 					}
 				}
+
+				// Emit WorkflowNodeCompleted for the agent that just handed off.
+				// Only for tracked sub-agents (agentPositions excludes the root orchestrator).
+				if _, isWorkflowNode := agentPositions[fromAgent]; isWorkflowNode {
+					if !yield(&thread.WorkflowNodeCompleted{
+						ThreadID:   evtCtx.ThreadID,
+						AgentName:  fromAgent,
+						DurationMs: time.Since(nodeStartedAt).Milliseconds(),
+						Outcome:    "success",
+						Timestamp:  time.Now(),
+					}, nil) {
+						return
+					}
+				}
+				nodeStartedAt = time.Now()
 
 				if !yield(transferEvt, nil) {
 					return
@@ -571,6 +603,17 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 					}
 				}
 			}
+		}
+
+		// Emit WorkflowNodeCompleted for the last agent if it's a workflow sub-agent.
+		if _, isWorkflowNode := agentPositions[currentAuthor]; isWorkflowNode {
+			yield(&thread.WorkflowNodeCompleted{
+				ThreadID:   evtCtx.ThreadID,
+				AgentName:  currentAuthor,
+				DurationMs: time.Since(nodeStartedAt).Milliseconds(),
+				Outcome:    "success",
+				Timestamp:  time.Now(),
+			}, nil)
 		}
 
 		// If the loop ended while still streaming (no final non-partial event),
