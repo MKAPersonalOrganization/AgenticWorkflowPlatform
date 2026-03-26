@@ -30,6 +30,20 @@ templ EventLog() {
 					<span class="text-xs text-muted-foreground" x-text="`(${events.length})`"></span>
 				</div>
 				<div class="flex items-center gap-2">
+					<!-- Enable / disable logging -->
+					<button
+						@click="toggleEventLogEnabled()"
+						class="p-1 hover:bg-muted rounded text-xs transition-colors flex items-center gap-1"
+						:class="eventLogEnabled ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
+						:title="eventLogEnabled ? 'Disable logging' : 'Enable logging'"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<circle cx="12" cy="12" r="10"></circle>
+							<line x1="10" y1="15" x2="10" y2="9"></line>
+							<line x1="14" y1="15" x2="14" y2="9"></line>
+						</svg>
+						<span class="text-[10px]" x-text="eventLogEnabled ? 'on' : 'off'"></span>
+					</button>
 					<button
 						@click="copy()"
 						class="p-1 hover:bg-muted rounded text-xs transition-all"
@@ -111,12 +125,18 @@ templ EventLog() {
 			@pointerup="stopEventLogDrag($event)"
 			@click="if (!eventLogDragMoved) toggleEventLog()"
 			:style="eventLogDragging ? 'cursor: grabbing' : 'cursor: grab'"
-			class="p-3 rounded-full shadow-lg hover:shadow-xl bg-primary text-primary-foreground hover:bg-primary/90 select-none touch-none"
-			title="Toggle Event Log (drag to reposition)"
+			class="relative p-3 rounded-full shadow-lg hover:shadow-xl bg-primary text-primary-foreground hover:bg-primary/90 select-none touch-none"
+			:title="eventLogEnabled ? 'Event Log — logging on (drag to reposition)' : 'Event Log — logging off (drag to reposition)'"
 		>
 			<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 				<path d="M4 6h16M4 12h16M4 18h16"></path>
 			</svg>
+			<!-- Red dot indicator when logging is disabled -->
+			<span
+				x-show="!eventLogEnabled"
+				x-cloak
+				class="absolute top-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-destructive border-2 border-primary-foreground"
+			></span>
 		</button>
 	</div>
 }

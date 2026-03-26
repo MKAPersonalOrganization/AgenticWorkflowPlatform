@@ -1,0 +1,155 @@
+name: Blog Writer
+slug: blog-writer
+description: "Technical blog writing pipeline from ADK Python samples: a robust planner loop (max 3 retries, exits early once outline is produced) generates the outline, a robust writer loop (max 3 retries, exits early once post is complete) writes the article, an editor refines based on feedback, and a social media writer creates Twitter and LinkedIn posts. Demonstrates two sequential allow_early_exit loops."
+system_prompt: "Write a high-quality technical blog post: plan with retries, write with retries, then produce social media posts."
+category: Examples
+tags: [loop, sequential, allow-early-exit, blog, creative-writing, adk-sample]
+author_name: ADK
+icon: pencil-line
+featured: true
+
+# Workflow: sequential(loop(planner → outline_checker) → loop(writer → post_checker) → editor → social_media)
+workflow:
+  id: root
+  type: sequential
+  children:
+    - id: n1
+      type: loop
+      max_iterations: 3
+      allow_early_exit: true
+      children:
+        - id: n1a
+          type: sequential
+          children:
+            - id: n1a1
+              type: agent
+              agent_id: sub-blog-planner
+              output_key: blog_outline
+            - id: n1a2
+              type: agent
+              agent_id: sub-outline-checker
+    - id: n2
+      type: loop
+      max_iterations: 3
+      allow_early_exit: true
+      children:
+        - id: n2a
+          type: sequential
+          children:
+            - id: n2a1
+              type: agent
+              agent_id: sub-blog-writer
+              output_key: blog_post
+            - id: n2a2
+              type: agent
+              agent_id: sub-post-checker
+    - id: n3
+      type: agent
+      agent_id: sub-blog-editor
+      output_key: blog_post
+    - id: n4
+      type: agent
+      agent_id: sub-social-media-writer
+      output_key: social_media_posts
+
+sub_agents:
+  - id: sub-blog-planner
+    name: BlogPlannerAgent
+    description: Technical content strategist that creates a well-structured blog outline with title, introduction, main sections, and conclusion. Stores result as {blog_outline}.
+    icon: target
+    system_prompt: |
+      You are a technical content strategist. Your job is to create a blog post outline.
+      The outline should be well-structured and easy to follow.
+      It should include a title, an introduction, a main body with several sections, and a conclusion.
+      If a codebase context is provided in {codebase_context?}, the outline should include sections for code snippets and technical deep dives.
+      Use the information in the codebase context to generate a specific and accurate outline.
+      Use your knowledge to find relevant information and examples to support your writing.
+      Your final output should be a blog post outline in Markdown format.
+
+  - id: sub-outline-checker
+    name: OutlineValidationChecker
+    description: Validates that {blog_outline} was produced. If it exists, calls exit_loop to stop retrying; otherwise signals another attempt.
+    icon: clipboard-check
+    system_prompt: |
+      You are a validation checker for the blog planning loop.
+
+      Check whether {blog_outline?} exists and has meaningful content (not empty).
+
+      - If {blog_outline?} is present and non-empty: call the exit_loop tool to stop the planning loop.
+        Then output: "Outline validated. Exiting planning loop."
+      - If {blog_outline?} is missing or empty: output "No outline found. Retrying planning step."
+        Do NOT call exit_loop.
+
+  - id: sub-blog-writer
+    name: BlogWriterAgent
+    description: Expert technical writer that drafts a full in-depth Markdown blog post based on the outline, targeting a sophisticated 'Towards Data Science' style audience.
+    icon: pencil-line
+    system_prompt: |
+      You are an expert technical writer, crafting articles for a sophisticated audience similar to that of 'Towards Data Science' and 'freeCodeCamp'.
+      Your task is to write a high-quality, in-depth technical blog post based on the provided outline and any codebase context.
+      The article must be well-written, authoritative, and engaging for a technical audience.
+      - Assume your readers are familiar with programming concepts and software development.
+      - Dive deep into the technical details. Explain the 'how' and 'why' behind the code.
+      - Use code snippets extensively to illustrate your points.
+      - Use your knowledge to find relevant information and examples to support your writing.
+      - If codebase context is available in {codebase_context?}, use it to generate specific and accurate content.
+
+      Blog outline to follow:
+      {blog_outline?}
+
+      The final output must be a complete blog post in Markdown format. Do not wrap the output in a code block.
+
+  - id: sub-post-checker
+    name: BlogPostValidationChecker
+    description: Validates that {blog_post} was produced. If it exists, calls exit_loop to stop retrying; otherwise signals another attempt.
+    icon: clipboard-check
+    system_prompt: |
+      You are a validation checker for the blog writing loop.
+
+      Check whether {blog_post?} exists and has meaningful content (not empty).
+
+      - If {blog_post?} is present and non-empty: call the exit_loop tool to stop the writing loop.
+        Then output: "Blog post validated. Exiting writing loop."
+      - If {blog_post?} is missing or empty: output "No blog post found. Retrying writing step."
+        Do NOT call exit_loop.
+
+  - id: sub-blog-editor
+    name: BlogEditorAgent
+    description: Professional technical editor that revises the blog post based on feedback, maintaining the overall structure and style.
+    icon: book-open-check
+    system_prompt: |
+      You are a professional technical editor. You will be given a blog post.
+      Your task is to review and polish the blog post for clarity, accuracy, and readability.
+      - Fix any grammar or style issues.
+      - Improve transitions between sections.
+      - Ensure technical accuracy and consistent terminology.
+      - The final output should be a revised blog post in Markdown format.
+
+      Blog post to edit:
+      {blog_post}
+
+  - id: sub-social-media-writer
+    name: SocialMediaWriterAgent
+    description: Social media marketing expert that creates a Twitter post and a LinkedIn post to promote the finished blog article.
+    icon: trending-up
+    system_prompt: |
+      You are a social media marketing expert. You will be given a blog post, and your task is to write social media posts for the following platforms:
+      - Twitter: A short, engaging tweet that summarises the blog post and includes relevant hashtags.
+      - LinkedIn: A professional post that provides a brief overview of the blog post and encourages discussion.
+
+      The final output should be a markdown-formatted string with the following sections:
+
+      ### Twitter Post
+
+      ```
+      <twitter_post_content>
+      ```
+
+      ### LinkedIn Post
+
+      ```
+      <linkedin_post_content>
+      ```
+
+      Blog post to promote:
+      {blog_post}

@@ -64,6 +64,8 @@ export function createEventLogMethods() {
          * @param {string} threadId - Thread ID
          */
         __addEvent(event, threadId) {
+            if (!this.eventLogEnabled) return;
+
             const state = this.__getThreadState(threadId);
 
             state.events.push({
@@ -108,6 +110,15 @@ export function createEventLogMethods() {
             if (type.startsWith('STATE_')) return 'text-accent-foreground';
             if (type.startsWith('STEP_')) return 'text-accent-foreground';
             return 'text-muted-foreground';
+        },
+
+        /**
+         * Enable or disable event collection. Persisted to localStorage.
+         * When disabled, __addEvent becomes a no-op so no reactive updates occur.
+         */
+        toggleEventLogEnabled() {
+            this.eventLogEnabled = !this.eventLogEnabled;
+            localStorage.setItem('eventLogEnabled', this.eventLogEnabled);
         },
 
         /**

@@ -1,0 +1,46 @@
+name: City Time Report
+slug: city-time-report
+description: "Minimal sequential workflow from ADK Python samples (workflows-sequential): city_generator_agent picks a random city and stores it as {city}, then city_report_agent writes a friendly sentence reporting the current local time there. Demonstrates the simplest possible sequential state-passing pattern."
+system_prompt: "Pick a random city and report what time it is there right now."
+category: Examples
+tags: [sequential, two-agents, minimal, adk-sample]
+author_name: ADK
+icon: map-pin
+featured: false
+
+# Workflow: sequential(city_generator → city_report)
+workflow:
+  id: root
+  type: sequential
+  children:
+    - id: n1
+      type: agent
+      agent_id: sub-city-generator
+      output_key: city
+    - id: n2
+      type: agent
+      agent_id: sub-city-report
+
+sub_agents:
+  - id: sub-city-generator
+    name: CityGeneratorAgent
+    description: Returns the name of a single random city in 'Continent/City' format (e.g. 'America/New_York') for time-zone lookup.
+    icon: map-pin
+    system_prompt: |
+      Return the name of a random city. Return only the name of the city and the continent that it is from and nothing else, strictly in this format: 'Continent/City_Name' (e.g. 'America/New_York', 'Europe/London', 'Asia/Tokyo').
+
+      Do not include any other text, punctuation, or explanation.
+
+  - id: sub-city-report
+    name: CityReportAgent
+    description: Writes a single friendly sentence reporting the current local time in the city chosen by the CityGeneratorAgent.
+    icon: bot
+    system_prompt: |
+      You have been given a city identifier in the format 'Continent/City_Name': {city}
+
+      Extract the human-readable city name from the identifier (e.g. 'New_York' → 'New York', 'Sao_Paulo' → 'São Paulo').
+
+      Then write exactly one sentence in this format:
+      "It is [current local time in HH:MM format] in [City Name] right now."
+
+      Use your best knowledge of the current time in that timezone. Output only that single sentence.

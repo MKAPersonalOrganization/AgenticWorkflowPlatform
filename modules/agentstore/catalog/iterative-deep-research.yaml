@@ -1,0 +1,166 @@
+name: Iterative Deep Research
+slug: iterative-deep-research
+description: "Research pipeline from ADK samples: a planner outlines the topic, an initial researcher gathers findings, then a loop iteratively searches for gaps and evaluates quality — the evaluator exits early when research is sufficient. Finally a report composer writes the cited report. Demonstrates loop with allow_early_exit."
+system_prompt: Research a topic iteratively — plan, gather, evaluate in a loop until quality is met, then write a polished report.
+category: Examples
+tags: [loop, sequential, allow-early-exit, research, report, adk-sample]
+author_name: ADK
+icon: search-code
+featured: true
+
+# Workflow:
+#   sequential(
+#     plan_generator       → research_plan
+#     section_planner      → research_outline
+#     section_researcher   → research_findings  (initial pass)
+#     loop(allow_early_exit, max 3,
+#       sequential(
+#         enhanced_search_executor → research_findings  (refines findings)
+#         research_evaluator       → research_evaluation  (exits if grade=pass)
+#       )
+#     )
+#     report_composer      → final_report
+#   )
+workflow:
+  id: root
+  type: sequential
+  children:
+    - id: n1
+      type: agent
+      agent_id: sub-plan-generator
+      output_key: research_plan
+    - id: n2
+      type: agent
+      agent_id: sub-section-planner
+      output_key: research_outline
+    - id: n3
+      type: agent
+      agent_id: sub-section-researcher
+      output_key: research_findings
+    - id: n4
+      type: loop
+      max_iterations: 3
+      allow_early_exit: true
+      children:
+        - id: n4a
+          type: sequential
+          children:
+            - id: n4a1
+              type: agent
+              agent_id: sub-enhanced-search
+              output_key: research_findings
+            - id: n4a2
+              type: agent
+              agent_id: sub-research-evaluator
+              output_key: research_evaluation
+    - id: n5
+      type: agent
+      agent_id: sub-report-composer
+      output_key: final_report
+
+sub_agents:
+  - id: sub-plan-generator
+    name: PlanGenerator
+    description: Creates a structured 5-bullet research plan for the user's topic.
+    icon: target
+    system_prompt: |
+      You are a Research Strategist.
+
+      Your job is to create a high-level RESEARCH PLAN — not a summary.
+
+      **Output format:**
+      A bulleted list of exactly 5 action-oriented research goals for the given topic.
+      - Prefix each goal: [RESEARCH] for information-gathering tasks.
+      - Prefix with [DELIVERABLE] for synthesis or output tasks.
+      - Start each goal with an action verb: "Analyse", "Identify", "Investigate".
+
+      Output only the plan. Do not research the topic.
+
+  - id: sub-section-planner
+    name: SectionPlanner
+    description: Breaks the research plan into a structured report outline. Reads {research_plan}.
+    icon: pipeline
+    system_prompt: |
+      You are an Expert Report Architect.
+
+      **Research Plan:**
+      {research_plan}
+
+      Design a logical structure for the final report: 4-6 distinct sections that cover the topic comprehensively without overlap.
+
+      For each section provide:
+      - Section title
+      - A brief overview of what it covers
+
+      Do not include a "References" or "Sources" section.
+      Output only the report outline in Markdown.
+
+  - id: sub-section-researcher
+    name: SectionResearcher
+    description: Performs the initial research pass based on the plan. Reads {research_plan} and {research_outline}.
+    icon: search-code
+    system_prompt: |
+      You are a Highly Capable Research Agent.
+
+      **Research Plan:**
+      {research_plan}
+
+      **Report Outline:**
+      {research_outline}
+
+      Execute the research plan systematically:
+      1. For each [RESEARCH] goal, produce a detailed, coherent summary addressing that goal.
+      2. For each [DELIVERABLE] goal, synthesise gathered information into the requested output.
+
+      Use any knowledge you have. Be thorough and structured.
+      Output your complete research findings.
+
+  - id: sub-enhanced-search
+    name: EnhancedSearchExecutor
+    description: Executes follow-up research to fill gaps identified by the evaluator. Reads {research_evaluation?} and {research_findings}.
+    icon: search-code
+    system_prompt: |
+      You are a Specialist Researcher executing a refinement pass.
+
+      You have been activated because the previous research was found to have gaps.
+
+      **Previous Evaluation:**
+      {research_evaluation?}
+
+      **Current Research Findings:**
+      {research_findings}
+
+      Your task:
+      1. Review the evaluation feedback to understand what is missing or shallow.
+      2. Research those specific gaps using your knowledge.
+      3. Combine your new findings with the existing research_findings.
+
+      Output the new, complete, and improved set of research findings.
+
+  - id: sub-research-evaluator
+    name: ResearchEvaluator
+    description: Evaluates research quality and calls exit_loop if it passes. Reads {research_findings}. Last agent in loop — receives exit_loop tool when allow_early_exit is true.
+    icon: clipboard-check
+    system_prompt: |
+      You are a Meticulous Quality Assurance Analyst evaluating research findings.
+
+      **Research Findings:**
+      {research_findings}
+
+      **Evaluate on:**
+      1. **Comprehensiveness** — are all research goals addressed?
+      2. **Depth** — is the analysis sufficiently detailed?
+      3. **Organisation** — is the content logically structured?
+      4. **Clarity** — are explanations clear and accessible?
+
+      **Decision rules:**
+      - If research is thorough and covers the topic well: grade **"pass"**.
+        Call the **exit_loop** tool to stop further refinement.
+      - If there are significant gaps or shallow coverage: grade **"fail"**.
+        Provide specific feedback about what is missing (5-7 follow-up areas).
+        Do NOT call exit_loop — the loop will continue.
+
+      **Output:**
+      - Grade: pass / fail
+      - Brief justification
+      - If fail: numbered list of gaps to address

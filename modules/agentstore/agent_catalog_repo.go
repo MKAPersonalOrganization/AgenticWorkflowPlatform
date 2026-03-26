@@ -182,15 +182,24 @@ func (r *postgresAgentCatalogRepository) IncrementAddCount(ctx context.Context, 
 }
 
 func (r *postgresAgentCatalogRepository) Seed(ctx context.Context, entries []AgentCatalogEntry) error {
-	// Use ON CONFLICT to be idempotent: inserts new entries, skips existing.
-	// This allows adding new catalog entries (e.g., workflow templates) to
-	// a database that already has the original single-agent entries.
-	// Uses ON CONFLICT (name) because the unique index on name is always present,
-	// while older entries may have had random UUIDs (not matching our deterministic IDs).
+	// ON CONFLICT (name) DO UPDATE: every field is overwritten so that editing a
+	// YAML catalog file and redeploying immediately reflects the change in the DB.
+	// add_count and created_at are preserved to avoid resetting popularity counters.
 	query := `
 INSERT INTO agent_store_catalog (id, name, description, system_prompt, category, tags, author_name, icon, featured, add_count, workflow_graph, sub_agents, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, $10, $11, $12, $12)
-ON CONFLICT (name) DO NOTHING
+ON CONFLICT (name) DO UPDATE SET
+  id             = EXCLUDED.id,
+  description    = EXCLUDED.description,
+  system_prompt  = EXCLUDED.system_prompt,
+  category       = EXCLUDED.category,
+  tags           = EXCLUDED.tags,
+  author_name    = EXCLUDED.author_name,
+  icon           = EXCLUDED.icon,
+  featured       = EXCLUDED.featured,
+  workflow_graph = EXCLUDED.workflow_graph,
+  sub_agents     = EXCLUDED.sub_agents,
+  updated_at     = EXCLUDED.updated_at
 `
 	now := time.Now()
 	for _, e := range entries {
@@ -213,6 +222,17 @@ ON CONFLICT (name) DO NOTHING
 		if err != nil {
 			return fmt.Errorf("seeding catalog entry %q: %w", e.Name, err)
 		}
+	}
+	return nil
+}
+
+func (r *postgresAgentCatalogRepository) DeleteNotIn(ctx context.Context, names []string) error {
+	_, err := r.db.ExecContext(ctx,
+		`DELETE FROM agent_store_catalog WHERE name != ALL($1)`,
+		pq.Array(names),
+	)
+	if err != nil {
+		return fmt.Errorf("deleting stale catalog entries: %w", err)
 	}
 	return nil
 }
