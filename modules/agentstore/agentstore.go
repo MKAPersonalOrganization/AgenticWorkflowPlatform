@@ -77,11 +77,19 @@ func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 	r.Delete("/v1/workflows/{id}", authMW.RequireAuthFunc(m.storeHandler.delete))
 }
 
-// SeedCatalog populates the agent catalog with initial entries if the table
-// is empty. Should be called once during application startup.
+// SeedCatalog syncs the agent catalog with the embedded YAML files.
+// It upserts all current entries and removes any entries whose YAML file has
+// been deleted, keeping the DB in sync with the catalog directory.
 func (m *Module) SeedCatalog(ctx context.Context) error {
 	entries := seedCatalog()
-	return m.catalogRepo.Seed(ctx, entries)
+	if err := m.catalogRepo.Seed(ctx, entries); err != nil {
+		return err
+	}
+	names := make([]string, len(entries))
+	for i, e := range entries {
+		names[i] = e.Name
+	}
+	return m.catalogRepo.DeleteNotIn(ctx, names)
 }
 
 // AgentDefinitionRepo returns the agent definition repository for cross-module access.

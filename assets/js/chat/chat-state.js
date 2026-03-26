@@ -114,6 +114,7 @@ export function createInitialState() {
         sidebarOpen: false,
         showDebugPanel: false,
         showEventLog: false,
+        eventLogEnabled: localStorage.getItem('eventLogEnabled') !== 'false',
         eventLogCopied: false,
         showKeyboardShortcuts: false,
         showSettings: false,

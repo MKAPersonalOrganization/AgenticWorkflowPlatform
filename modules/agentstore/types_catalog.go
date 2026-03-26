@@ -69,6 +69,10 @@ type AgentCatalogRepository interface {
 	// IncrementAddCount atomically increments the add_count for a catalog entry.
 	IncrementAddCount(ctx context.Context, id string) error
 
-	// Seed inserts initial catalog entries if the table is empty.
+	// Seed upserts catalog entries (insert or update on name conflict).
 	Seed(ctx context.Context, entries []AgentCatalogEntry) error
+
+	// DeleteNotIn removes catalog entries whose name is not in the provided list.
+	// Used after Seed to purge entries whose YAML files have been deleted.
+	DeleteNotIn(ctx context.Context, names []string) error
 }

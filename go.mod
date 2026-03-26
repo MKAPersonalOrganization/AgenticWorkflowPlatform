@@ -39,6 +39,7 @@ require (
 	golang.org/x/text v0.33.0
 	google.golang.org/adk v1.0.0
 	google.golang.org/genai v1.43.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -127,7 +128,6 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260128011058-8636f8732409 // indirect
 	google.golang.org/grpc v1.79.3 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	rsc.io/omap v1.2.0 // indirect
 	rsc.io/ordered v1.1.1 // indirect
 )
