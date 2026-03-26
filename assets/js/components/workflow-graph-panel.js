@@ -72,6 +72,12 @@ export function workflowGraphPanel() {
         isMinimized: false,
         /** Tracks which agent id we last loaded so we don't reload on each effect run */
         _loadedForId: null,
+        /** Synced from chat state — passed through to the visualizer */
+        completedNodes: {},
+        failedNodes: {},
+        /** { [key]: { agentName, value } } — collected from STATE_CHANGE_REPORTED */
+        workflowOutputs: {},
+        outputsExpanded: false,
 
         init() {
             injectPanelStyles();
@@ -87,13 +93,21 @@ export function workflowGraphPanel() {
          * @param {Object|null} currentAgentData  — full agent metadata (includes .graph)
          * @param {Object|null} workflowContext   — activeWorkflowContext from chat state
          * @param {Array}       availableAgents   — AVAILABLE_AGENTS from parent chat scope
+         * @param {Object}      completedNodes    — { [agentName]: { durationMs } }
+         * @param {Object}      failedNodes       — { [agentName]: { timestamp } }
+         * @param {Object}      workflowOutputs   — { [key]: { agentName, value } }
          */
-        async handleWorkflowChange(isStreaming, orchestratorId, selectedAgent, currentAgentData, workflowContext, availableAgents) {
+        async handleWorkflowChange(isStreaming, orchestratorId, selectedAgent, currentAgentData, workflowContext, availableAgents, completedNodes, failedNodes, workflowOutputs) {
             // Always sync the full agents list from the parent scope so the visualizer
             // can resolve every agent_id → name (prevents "Unknown Agent" nodes).
             if (availableAgents && availableAgents.length > 0) {
                 this.agentsList = availableAgents;
             }
+
+            // Sync completion state — visualizer reads these to render ✓ / ✗ on nodes.
+            this.completedNodes = completedNodes || {};
+            this.failedNodes = failedNodes || {};
+            this.workflowOutputs = workflowOutputs || {};
 
             if (isStreaming) {
                 this.executionStatus = 'running';
@@ -149,6 +163,28 @@ export function workflowGraphPanel() {
             this.orchestratorName = '';
             this._loadedForId = null;
             this.isMinimized = false;
+            this.workflowOutputs = {};
+            this.outputsExpanded = false;
+        },
+
+        // ── Helpers ──────────────────────────────────────────────────────────────
+
+        /** Returns workflowOutputs as a sorted array of { key, agentName, value } */
+        outputEntries() {
+            return Object.entries(this.workflowOutputs)
+                .map(([key, v]) => ({ key, agentName: v.agentName, value: v.value }))
+                .sort((a, b) => a.key.localeCompare(b.key));
+        },
+
+        /** Format a value for compact display (truncate long strings / objects) */
+        formatOutputValue(val) {
+            if (val === null || val === undefined) return '—';
+            if (typeof val === 'object') {
+                const json = JSON.stringify(val);
+                return json.length > 60 ? json.slice(0, 57) + '…' : json;
+            }
+            const s = String(val);
+            return s.length > 80 ? s.slice(0, 77) + '…' : s;
         },
 
         // ── Data fetching ────────────────────────────────────────────────────────

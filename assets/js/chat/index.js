@@ -261,6 +261,18 @@ document.addEventListener('alpine:init', () => {
                 return this.__currentState.activeWorkflowContext || null;
             },
 
+            get completedNodes() {
+                return this.__currentState.completedNodes || {};
+            },
+
+            get failedNodes() {
+                return this.__currentState.failedNodes || {};
+            },
+
+            get workflowOutputs() {
+                return this.__currentState.workflowOutputs || {};
+            },
+
             get events() {
                 return this.__currentState.events;
             },

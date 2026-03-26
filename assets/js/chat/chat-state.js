@@ -48,6 +48,10 @@ export function createEmptyThreadState() {
         activeAgentName: null,
         activeWorkflowContext: null,
         lastWorkflowContext: null,
+        // Workflow node completion tracking — reset at the start of each new run
+        completedNodes: {},   // { [agentName]: { durationMs, timestamp } }
+        failedNodes: {},      // { [agentName]: { timestamp } }
+        workflowOutputs: {},  // { [key]: { agentName, value } }
         // Parallel message coalescing — maps multiple SSE message IDs
         // from the same parallel branch agent into a single UI message.
         // parallelAgentMessages: { [agentName]: messageId } — canonical msg per agent
