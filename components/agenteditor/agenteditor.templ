@@ -443,6 +443,19 @@ templ AgentDesignerDialog() {
 											</span>
 										</template>
 									</div>
+									<!-- Open visual canvas -->
+									@button.Button(button.Props{
+										Size:    button.SizeSm,
+										Variant: button.VariantOutline,
+										Class:   "h-7 px-2.5 text-xs gap-1.5",
+										Attributes: templ.Attributes{
+											"@click": "openFlowView()",
+											"title":  i18n.T(ctx, "Open visual canvas editor"),
+										},
+									}) {
+										@icon.Workflow(icon.Props{Class: "size-3.5"})
+										{ i18n.T(ctx, "Canvas") }
+									}
 								</div>
 								<!-- Split panel: left = config, right = tree -->
 								<div class="flex-1 overflow-hidden flex" :class="expanded ? '' : ''">
@@ -518,6 +531,466 @@ templ AgentDesignerDialog() {
 								</div>
 							</div>
 						</template>
+					<!-- ═══════════════════════════════════════════ -->
+					<!-- ALPINEFLOW CANVAS VIEW                      -->
+					<!-- ═══════════════════════════════════════════ -->
+					<template x-if="pipelineView === 'flow'">
+						<div class="flex flex-col flex-1 overflow-hidden" :class="expanded ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[calc(90vh-8rem)]'">
+							<!-- Flow Header -->
+							<div class="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/50 shrink-0">
+								@button.Button(button.Props{
+									Size:    button.SizeIcon,
+									Variant: button.VariantGhost,
+									Class:   "size-8",
+									Attributes: templ.Attributes{
+										"@click": "closeFlowView()",
+										"title":  i18n.T(ctx, "Back to tree editor"),
+									},
+								}) {
+									@icon.ArrowLeft(icon.Props{Class: "size-4"})
+								}
+								<h3 class="text-sm font-semibold" x-text="(editingPipeline ? 'Edit' : 'New') + ' — ' + (pipelineName || 'Workflow Agent')"></h3>
+								<div class="flex-1"></div>
+								<button
+									@click="$store.flow.undo()"
+									:disabled="!$store.flow.canUndo()"
+									title="Undo (Ctrl+Z)"
+									class="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+								>
+									@icon.Undo2(icon.Props{Class: "size-3.5"})
+								</button>
+								<button
+									@click="$store.flow.autoLayout()"
+									title="Auto-arrange layout"
+									class="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+								>
+									@icon.LayoutGrid(icon.Props{Class: "size-3.5"})
+									{ i18n.T(ctx, "Auto") }
+								</button>
+								<div class="flex items-center gap-1">
+									<template x-if="isPipelineValid">
+										<span class="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
+											@icon.CircleCheck(icon.Props{Class: "size-3.5"})
+											{ i18n.T(ctx, "Valid") }
+										</span>
+									</template>
+									<template x-if="!isPipelineValid">
+										<span class="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400">
+											@icon.TriangleAlert(icon.Props{Class: "size-3.5"})
+											<span x-text="pipelineErrors.length + ' issue' + (pipelineErrors.length !== 1 ? 's' : '')"></span>
+										</span>
+									</template>
+								</div>
+								@button.Button(button.Props{
+									Variant: button.VariantDefault,
+									Class:   "h-8 px-4 text-xs gap-1.5",
+									Attributes: templ.Attributes{
+										"@click":    "saveFromFlowView()",
+										":disabled": "pipelineSaving || !pipelineName.trim()",
+									},
+								}) {
+									<span x-show="!pipelineSaving" x-text="editingPipeline ? 'Save' : 'Create'"></span>
+									<span x-show="pipelineSaving" class="flex items-center gap-1.5">
+										<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
+									</span>
+								}
+							</div>
+							<!-- Pipeline name + description bar -->
+							<div class="flex items-center gap-2 px-3 py-1.5 border-b border-border/50 bg-muted/20 shrink-0">
+								<span class="text-[10px] text-muted-foreground shrink-0">{ i18n.T(ctx, "Name") }</span>
+								<input
+									x-model="pipelineName"
+									type="text"
+									placeholder="Workflow Agent name..."
+									class="flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
+								/>
+								<span class="text-[10px] text-muted-foreground shrink-0 border-l border-border/50 pl-2">{ i18n.T(ctx, "Desc") }</span>
+								<input
+									x-model="pipelineDescription"
+									type="text"
+									placeholder="Optional description..."
+									class="flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
+								/>
+							</div>
+							<!-- Three-panel layout: Palette | Canvas | Property Panel -->
+							<div class="flex flex-1 overflow-hidden">
+								<!-- LEFT: Palette -->
+								<div
+									x-data="alpineflowPalette"
+									class="w-52 shrink-0 border-r border-border/60 flex flex-col overflow-hidden"
+									style="background:#0f1117;"
+								>
+									<!-- Search -->
+									<div class="p-2.5 border-b border-border/40">
+										<input
+											x-model="search"
+											type="search"
+											placeholder="Search agents..."
+											class="w-full text-xs rounded-lg px-2.5 py-1.5 text-gray-200 placeholder:text-gray-600 outline-none focus:ring-1 focus:ring-indigo-500/50"
+											style="background:#1a1f2e; border:1px solid rgba(255,255,255,0.07);"
+										/>
+									</div>
+									<!-- Container types -->
+									<div class="p-2.5 border-b border-border/40 space-y-0.5">
+										<p class="text-[8px] uppercase tracking-widest text-gray-600 font-semibold mb-2 px-1">{ i18n.T(ctx, "Containers") }</p>
+										<template x-for="t in compositeTypes" :key="t.type">
+											<div
+												draggable="true"
+												@dragstart="onDragStartType($event, t.type)"
+												class="flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-grab active:cursor-grabbing select-none transition-colors"
+												style="&amp;:hover { background:rgba(255,255,255,0.04); }"
+												:style="`&amp;:hover { background:rgba(255,255,255,0.04); }`"
+												onmouseenter="this.style.background='rgba(255,255,255,0.04)'"
+												onmouseleave="this.style.background='transparent'"
+											>
+												<div class="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold" :style="`background:${t.color}18; color:${t.color}`" x-text="t.char"></div>
+												<div class="min-w-0">
+													<div class="text-[11px] font-medium text-gray-200" x-text="t.label"></div>
+													<div class="text-[9px] text-gray-600 truncate" x-text="t.desc"></div>
+												</div>
+											</div>
+										</template>
+									</div>
+									<!-- LLM Agents -->
+									<div class="flex-1 overflow-y-auto p-2.5 space-y-0.5 scrollbar-thin">
+										<p class="text-[8px] uppercase tracking-widest text-gray-600 font-semibold mb-2 px-1">{ i18n.T(ctx, "LLM Agents") }</p>
+										<template x-if="filteredAgents.length === 0">
+											<p class="text-[10px] text-gray-600 px-1 italic py-2">{ i18n.T(ctx, "No agents") }</p>
+										</template>
+										<template x-for="agent in filteredAgents" :key="agent.id">
+											<div
+												draggable="true"
+												@dragstart="onDragStartAgent($event, agent)"
+												class="flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-grab active:cursor-grabbing select-none transition-colors"
+												onmouseenter="this.style.background='rgba(5,150,105,0.08)'"
+												onmouseleave="this.style.background='transparent'"
+											>
+												<div class="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold" style="background:#05966918; color:#059669;">A</div>
+												<div class="min-w-0">
+													<div class="text-[11px] font-medium text-gray-200 truncate" x-text="agent.name"></div>
+													<div class="text-[9px] text-gray-600 truncate" x-text="agent.description || 'LLM Agent'"></div>
+												</div>
+											</div>
+										</template>
+										<!-- Remote connectors -->
+										<template x-if="connectors.length > 0">
+											<div class="mt-3 space-y-0.5">
+												<p class="text-[8px] uppercase tracking-widest text-gray-600 font-semibold mb-2 px-1">{ i18n.T(ctx, "Remote A2A") }</p>
+												<template x-for="conn in connectors" :key="conn.id">
+													<div
+														draggable="true"
+														@dragstart="onDragStartConnector($event, conn)"
+														class="flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-grab active:cursor-grabbing select-none transition-colors"
+														onmouseenter="this.style.background='rgba(190,18,60,0.08)'"
+														onmouseleave="this.style.background='transparent'"
+													>
+														<div class="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold" style="background:#be123c18; color:#be123c;">R</div>
+														<div class="min-w-0">
+															<div class="text-[11px] font-medium text-gray-200 truncate" x-text="conn.name || conn.id"></div>
+															<div class="text-[9px] text-gray-600">Remote A2A</div>
+														</div>
+													</div>
+												</template>
+											</div>
+										</template>
+									</div>
+									<div class="p-2.5 border-t border-border/40">
+										<p class="text-[8px] text-gray-700 leading-relaxed font-mono">{ i18n.T(ctx, "Drag items onto the canvas to add them") }</p>
+									</div>
+								</div>
+								<!-- CENTER: Canvas -->
+								<div
+									x-data="alpineflowCanvas"
+									data-flow-canvas
+									class="flex-1 relative overflow-hidden select-none"
+									:style="'background-color:#0d1117;' + gridBg"
+									@wheel.prevent="onWheel"
+									@mousedown="onMouseDown"
+									@dragover.prevent="onDragOver"
+									@drop="onDrop"
+									x-effect="Alpine.store('flow').canvasEl = $el"
+								>
+									<!-- Dot-grid overlay -->
+									<div
+										class="pointer-events-none absolute inset-0"
+										style="background-image:radial-gradient(circle,rgba(255,255,255,.07) 1px,transparent 1px);background-size:28px 28px;"
+										:style="'background-position:' + (($store.flow.panX % 28 + 28) % 28) + 'px ' + (($store.flow.panY % 28 + 28) % 28) + 'px'"
+									></div>
+									<!-- Transform group -->
+									<div
+										class="absolute top-0 left-0 pointer-events-none"
+										style="width:6000px;height:6000px;transform-origin:0 0;"
+										:style="'transform:' + transform"
+									>
+										<!-- SVG edge layer — rendered via x-html to avoid <template> inside SVG namespace -->
+										<svg
+											class="absolute inset-0 overflow-visible"
+											style="width:6000px;height:6000px;pointer-events:none;"
+											x-html="edgesSvgContent"
+										></svg>
+										<!-- Node layer -->
+										<template x-for="flatNode in $store.flow.flatNodes" :key="flatNode.id">
+											<div
+												x-data="alpineflowNode(flatNode.id)"
+												:style="nodeStyle"
+												class="absolute pointer-events-auto"
+											>
+												<!-- Input port (hidden for root) -->
+												<div
+													class="absolute left-1/2 -translate-x-1/2 -top-3.5 z-20 w-7 h-7 flex items-center justify-center"
+													x-show="!isRoot"
+												>
+													<div
+														class="w-3.5 h-3.5 rounded-full border-2 cursor-crosshair transition-all duration-200 hover:scale-125"
+														:style="`background:#0d1117; border-color:${$store.flow.connecting ? '#818cf8' : typeColor};` + ($store.flow.connecting ? 'box-shadow:0 0 0 3px ' + typeColor + '30;' : '')"
+														@mouseup.stop="onInputPortMouseUp"
+													></div>
+												</div>
+												<!-- Node card -->
+												<div
+													class="rounded-2xl overflow-hidden cursor-pointer transition-all duration-150 hover:brightness-110"
+													:style="'background:#13171f;' + cardStyle"
+													@mousedown.stop="onHeaderMouseDown"
+												>
+													<!-- Top colour accent bar -->
+													<div class="h-[3px] w-full" :style="'background:' + typeColor + ';' + (isSelected ? 'opacity:1;' : 'opacity:0.6;')"></div>
+													<!-- Header row -->
+													<div class="flex items-center gap-2 px-3 pt-2.5 pb-2 cursor-grab active:cursor-grabbing">
+														<!-- Type icon badge -->
+														<div
+															class="shrink-0 w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold select-none"
+															:style="'background:' + typeColor + '1a; color:' + typeColor"
+															x-text="typeChar"
+														></div>
+														<!-- Node name -->
+														<span class="text-[11px] font-semibold text-gray-100 truncate flex-1 leading-tight" x-text="displayLabel"></span>
+														<!-- Type chip -->
+														<span
+															class="shrink-0 text-[8px] uppercase tracking-widest font-semibold px-1.5 py-0.5 rounded-full"
+															:style="'background:' + typeColor + '18; color:' + typeColor"
+															x-text="typeLabel"
+														></span>
+														<!-- Collapse toggle (composite only) -->
+														<button
+															x-show="isComposite"
+															@click.stop="toggleCollapse()"
+															:title="n.collapsed ? 'Expand' : 'Collapse'"
+															class="ml-1 opacity-30 hover:opacity-80 transition-opacity text-gray-400"
+														>
+															<svg class="size-3" viewBox="0 0 10 10" fill="currentColor">
+																<path x-show="!n.collapsed" d="M5 7L1 3h8z"/>
+																<path x-show="n.collapsed" d="M7 5L3 1v8z"/>
+															</svg>
+														</button>
+													</div>
+													<!-- Body -->
+													<div class="px-3 pb-3 space-y-1">
+														<!-- Unconfigured warning -->
+														<div x-show="isUnconfigured" class="flex items-center gap-1.5 text-amber-400/80">
+															<span class="text-[9px]">⚠</span>
+															<span class="text-[10px]">Not configured</span>
+														</div>
+														<!-- Body text -->
+														<p x-show="!isUnconfigured && bodyText" class="text-[11px] text-gray-400 truncate leading-snug" x-text="bodyText"></p>
+														<!-- Output key badge -->
+														<p x-show="outputKeyBadge" class="font-mono text-[9px] text-indigo-400/60 truncate" x-text="outputKeyBadge"></p>
+													</div>
+													<!-- Quick-add strip (composite, not collapsed) -->
+													<template x-if="isComposite && !n.collapsed">
+														<div class="flex gap-1 flex-wrap px-2.5 py-2 border-t border-white/[0.05] bg-white/[0.02]">
+															<button @click.stop="addChildNode('agent')"      class="text-[8px] px-2 py-0.5 rounded-full bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-400/70 hover:text-emerald-300 transition-colors font-medium">+ Agent</button>
+															<button @click.stop="addChildNode('sequential')" class="text-[8px] px-2 py-0.5 rounded-full bg-violet-500/10  hover:bg-violet-500/25  text-violet-400/70  hover:text-violet-300  transition-colors font-medium">+ Seq</button>
+															<button @click.stop="addChildNode('parallel')"   class="text-[8px] px-2 py-0.5 rounded-full bg-sky-500/10    hover:bg-sky-500/25    text-sky-400/70    hover:text-sky-300    transition-colors font-medium">+ Par</button>
+															<button @click.stop="addChildNode('loop')"       class="text-[8px] px-2 py-0.5 rounded-full bg-amber-500/10  hover:bg-amber-500/25  text-amber-400/70  hover:text-amber-300  transition-colors font-medium">+ Loop</button>
+														</div>
+													</template>
+												</div>
+												<!-- Output port -->
+												<div class="absolute left-1/2 -translate-x-1/2 -bottom-3.5 z-20 w-7 h-7 flex items-center justify-center">
+													<div
+														class="w-3.5 h-3.5 rounded-full border-2 cursor-crosshair transition-all duration-200 hover:scale-125"
+														:style="`border-color:${typeColor}; background:${$store.flow.connecting?.sourceId===nodeId ? typeColor : '#0d1117'};` + ($store.flow.connecting?.sourceId===nodeId ? 'box-shadow:0 0 8px ' + typeColor + '80;' : '')"
+														@mousedown.stop="onOutputPortMouseDown"
+													></div>
+												</div>
+											</div>
+										</template>
+									</div>
+									<!-- Zoom + fit controls -->
+									<div class="absolute bottom-4 right-4 flex items-center gap-1 z-20">
+										<button @click="zoomOut()" title="Zoom out" class="w-7 h-7 flex items-center justify-center rounded-lg bg-[#1e2533]/90 border border-white/10 text-gray-300 text-sm hover:bg-[#252d3d] hover:text-white transition-colors backdrop-blur-sm">−</button>
+										<button @click="zoomReset()" title="Reset zoom" class="h-7 px-2 min-w-[3rem] flex items-center justify-center rounded-lg bg-[#1e2533]/90 border border-white/10 text-gray-300 text-[10px] font-mono hover:bg-[#252d3d] hover:text-white transition-colors backdrop-blur-sm" x-text="zoomLabel"></button>
+										<button @click="zoomIn()" title="Zoom in" class="w-7 h-7 flex items-center justify-center rounded-lg bg-[#1e2533]/90 border border-white/10 text-gray-300 text-sm hover:bg-[#252d3d] hover:text-white transition-colors backdrop-blur-sm">+</button>
+										<div class="w-px h-5 bg-white/10 mx-0.5"></div>
+										<button @click="fitAll()" title="Auto-layout &amp; fit" class="w-7 h-7 flex items-center justify-center rounded-lg bg-[#1e2533]/90 border border-white/10 text-gray-300 text-sm hover:bg-[#252d3d] hover:text-white transition-colors backdrop-blur-sm">⊞</button>
+									</div>
+									<!-- Keyboard hint -->
+									<div class="absolute bottom-4 left-4 text-[9px] text-gray-700 z-20 select-none pointer-events-none font-mono tracking-wide">
+										{ i18n.T(ctx, "Click to select · Drag to move · Pull port to connect · Scroll = zoom · Space+drag = pan · Del = delete") }
+									</div>
+								</div>
+								<!-- RIGHT: Property Panel -->
+								<div
+									x-data="alpineflowPropertyPanel"
+									class="w-64 shrink-0 border-l overflow-y-auto scrollbar-thin flex flex-col"
+									style="background:#0c0f16; border-color:rgba(255,255,255,0.07);"
+								>
+									<template x-if="!node">
+										<div class="flex flex-col h-full">
+											<div class="flex flex-col items-center justify-center flex-1 px-4 py-10 text-center space-y-2">
+												<div class="w-10 h-10 rounded-full flex items-center justify-center mb-1" style="background:rgba(255,255,255,0.04);">
+													<svg class="size-5 text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+												</div>
+												<p class="text-[11px] text-gray-600 leading-relaxed">{ i18n.T(ctx, "Click a node to inspect and edit its properties.") }</p>
+											</div>
+											<div class="border-t p-3 space-y-2" style="border-color:rgba(255,255,255,0.06);">
+												<p class="text-[8px] uppercase tracking-widest text-gray-600 font-semibold">{ i18n.T(ctx, "Pipeline System Prompt") }</p>
+												<textarea
+													x-model="$store.flow.systemPrompt"
+													rows="6"
+													placeholder="Global instruction for the root orchestrator..."
+													class="w-full text-[11px] rounded-lg px-2.5 py-2 text-gray-300 placeholder:text-gray-700 outline-none resize-none focus:ring-1 focus:ring-indigo-500/40"
+													style="background:#131720; border:1px solid rgba(255,255,255,0.07);"
+												></textarea>
+											</div>
+										</div>
+									</template>
+									<template x-if="node">
+										<div class="flex flex-col h-full">
+											<div class="flex items-center gap-2 px-3 py-2.5 border-b shrink-0" style="border-color:rgba(255,255,255,0.07);">
+												<div
+													class="shrink-0 w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold"
+													:style="'background:' + nodeTypeColor + '18; color:' + nodeTypeColor"
+													x-text="nodeTypeChar"
+												></div>
+												<span class="text-[11px] font-semibold text-gray-200 capitalize flex-1 truncate" x-text="node.type"></span>
+												<div class="flex items-center gap-0.5">
+													<button @click="moveUp()" :disabled="!canMoveUp" title="Move up" class="w-6 h-6 flex items-center justify-center rounded hover:bg-white/5 text-gray-600 hover:text-gray-300 disabled:opacity-20 disabled:cursor-not-allowed transition-colors text-sm">↑</button>
+													<button @click="moveDown()" :disabled="!canMoveDown" title="Move down" class="w-6 h-6 flex items-center justify-center rounded hover:bg-white/5 text-gray-600 hover:text-gray-300 disabled:opacity-20 disabled:cursor-not-allowed transition-colors text-sm">↓</button>
+													<button x-show="!isRoot" @click="deleteNode()" title="Delete node" class="w-6 h-6 flex items-center justify-center rounded hover:bg-red-500/10 text-gray-600 hover:text-red-400 transition-colors text-sm">✕</button>
+												</div>
+											</div>
+											<div class="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-thin">
+												<div>
+													<label class="block text-[8px] uppercase tracking-widest text-gray-600 font-semibold mb-1.5">{ i18n.T(ctx, "Label") }</label>
+													<input :value="node.label" @input="set('label', $event.target.value)" type="text" placeholder="Display name..." class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-gray-200 placeholder:text-gray-700 outline-none focus:ring-1 focus:ring-indigo-500/40" style="background:#131720; border:1px solid rgba(255,255,255,0.07);"/>
+												</div>
+												<template x-if="node.type === 'agent'">
+													<div class="space-y-3">
+														<div>
+															<label class="block text-[8px] uppercase tracking-widest text-gray-600 font-semibold mb-1.5">{ i18n.T(ctx, "LLM Agent") } <span class="text-rose-500">*</span></label>
+															<select :value="node.agent_id" @change="set('agent_id', $event.target.value)" class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-gray-200 outline-none focus:ring-1 focus:ring-indigo-500/40" style="background:#131720; border:1px solid rgba(255,255,255,0.07);">
+																<option value="">— select agent —</option>
+																<template x-for="ag in agents" :key="ag.id">
+																	<option :value="ag.id" x-text="ag.name"></option>
+																</template>
+															</select>
+														</div>
+														<template x-if="selectedAgent">
+															<div class="rounded-lg overflow-hidden" style="background:#131720; border:1px solid rgba(255,255,255,0.08);">
+																<div class="flex items-center justify-between px-2.5 py-2" style="background:rgba(255,255,255,0.03); border-bottom:1px solid rgba(255,255,255,0.06);">
+																	<span class="text-[10px] font-semibold text-gray-200 truncate" x-text="selectedAgent.name"></span>
+																	<button @click="editAgent()" title="Edit agent" class="shrink-0 ml-2 px-2 py-0.5 text-[9px] rounded-md font-medium transition-colors" style="background:rgba(99,102,241,0.15); color:#818cf8;" onmouseenter="this.style.background='rgba(99,102,241,0.25)'" onmouseleave="this.style.background='rgba(99,102,241,0.15)'">Edit ↗</button>
+																</div>
+																<template x-if="selectedAgent.modelOverride && selectedAgent.modelOverride.modelName">
+																	<div class="px-2.5 py-1.5" style="border-bottom:1px solid rgba(255,255,255,0.05);">
+																		<span class="text-[9px] font-mono rounded px-1.5 py-0.5 text-gray-500" style="background:rgba(255,255,255,0.05);" x-text="(selectedAgent.modelOverride.provider ? selectedAgent.modelOverride.provider + '/' : '') + selectedAgent.modelOverride.modelName"></span>
+																	</div>
+																</template>
+																<template x-if="selectedAgent.description">
+																	<div class="px-2.5 py-2" style="border-bottom:1px solid rgba(255,255,255,0.05);">
+																		<p class="text-[10px] text-gray-500 leading-relaxed line-clamp-3" x-text="selectedAgent.description"></p>
+																	</div>
+																</template>
+																<template x-if="selectedAgent.systemPrompt">
+																	<div class="px-2.5 py-2">
+																		<p class="text-[8px] uppercase tracking-widest text-gray-700 font-semibold mb-1.5">System Prompt</p>
+																		<p class="text-[10px] text-gray-500 font-mono leading-relaxed line-clamp-5 whitespace-pre-wrap break-words" x-text="selectedAgent.systemPrompt"></p>
+																	</div>
+																</template>
+																<template x-if="!selectedAgent.systemPrompt && !selectedAgent.description && !(selectedAgent.modelOverride && selectedAgent.modelOverride.modelName)">
+																	<div class="px-2.5 py-2">
+																		<p class="text-[10px] text-gray-700 italic">No configuration — click Edit ↗ to configure.</p>
+																	</div>
+																</template>
+															</div>
+														</template>
+														<div>
+															<label class="block text-[8px] uppercase tracking-widest text-gray-600 font-semibold mb-1.5">{ i18n.T(ctx, "Output Key") }</label>
+															<input :value="node.output_key" @input="set('output_key', $event.target.value)" type="text" placeholder="e.g. result" class="w-full text-[11px] font-mono rounded-lg px-2.5 py-1.5 text-gray-200 placeholder:text-gray-700 outline-none focus:ring-1 focus:ring-indigo-500/40" style="background:#131720; border:1px solid rgba(255,255,255,0.07);"/>
+														</div>
+														<div>
+															<label class="block text-[8px] uppercase tracking-widest text-gray-600 font-semibold mb-1.5">{ i18n.T(ctx, "Context Forwarding") }</label>
+															<select :value="node.include_contents||'default'" @change="set('include_contents', $event.target.value)" class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-gray-200 outline-none focus:ring-1 focus:ring-indigo-500/40" style="background:#131720; border:1px solid rgba(255,255,255,0.07);">
+																<option value="default">default</option>
+																<option value="none">none (fresh context)</option>
+															</select>
+														</div>
+														<div class="space-y-2 pt-1">
+															<label class="flex items-center gap-2.5 cursor-pointer group">
+																<input type="checkbox" :checked="node.disallow_transfer_to_parent" @change="set('disallow_transfer_to_parent', $event.target.checked)" class="rounded accent-indigo-500"/>
+																<span class="text-[10px] text-gray-500 group-hover:text-gray-400 transition-colors">{ i18n.T(ctx, "Block transfer to parent") }</span>
+															</label>
+															<label class="flex items-center gap-2.5 cursor-pointer group">
+																<input type="checkbox" :checked="node.disallow_transfer_to_peers" @change="set('disallow_transfer_to_peers', $event.target.checked)" class="rounded accent-indigo-500"/>
+																<span class="text-[10px] text-gray-500 group-hover:text-gray-400 transition-colors">{ i18n.T(ctx, "Block transfer to peers") }</span>
+															</label>
+														</div>
+													</div>
+												</template>
+												<template x-if="node.type === 'remote'">
+													<div class="space-y-3">
+														<div>
+															<label class="block text-[8px] uppercase tracking-widest text-gray-600 font-semibold mb-1.5">{ i18n.T(ctx, "A2A Connector") } <span class="text-rose-500">*</span></label>
+															<select :value="node.a2a_connector_id" @change="set('a2a_connector_id', $event.target.value)" class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-gray-200 outline-none focus:ring-1 focus:ring-indigo-500/40" style="background:#131720; border:1px solid rgba(255,255,255,0.07);">
+																<option value="">— select connector —</option>
+																<template x-for="conn in connectors" :key="conn.id">
+																	<option :value="conn.id" x-text="conn.name || conn.id"></option>
+																</template>
+															</select>
+														</div>
+														<div>
+															<label class="block text-[8px] uppercase tracking-widest text-gray-600 font-semibold mb-1.5">{ i18n.T(ctx, "Output Key") }</label>
+															<input :value="node.output_key" @input="set('output_key', $event.target.value)" type="text" placeholder="e.g. result" class="w-full text-[11px] font-mono rounded-lg px-2.5 py-1.5 text-gray-200 placeholder:text-gray-700 outline-none focus:ring-1 focus:ring-indigo-500/40" style="background:#131720; border:1px solid rgba(255,255,255,0.07);"/>
+														</div>
+													</div>
+												</template>
+												<template x-if="node.type === 'loop'">
+													<div class="space-y-3">
+														<div>
+															<label class="block text-[8px] uppercase tracking-widest text-gray-600 font-semibold mb-1.5">{ i18n.T(ctx, "Max Iterations") }</label>
+															<input :value="node.max_iterations||3" @input="set('max_iterations', parseInt($event.target.value)||1)" type="number" min="1" max="100" class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-gray-200 outline-none focus:ring-1 focus:ring-indigo-500/40" style="background:#131720; border:1px solid rgba(255,255,255,0.07);"/>
+														</div>
+														<label class="flex items-center gap-2.5 cursor-pointer group">
+															<input type="checkbox" :checked="node.allow_early_exit" @change="set('allow_early_exit', $event.target.checked)" class="rounded accent-indigo-500"/>
+															<span class="text-[10px] text-gray-500 group-hover:text-gray-400 transition-colors">{ i18n.T(ctx, "Allow early exit") }</span>
+														</label>
+													</div>
+												</template>
+											</div>
+											<div class="px-3 py-2 border-t shrink-0" style="border-color:rgba(255,255,255,0.06);">
+												<p class="text-[9px] text-gray-700 font-mono truncate" x-text="'id: ' + node.id"></p>
+											</div>
+										</div>
+									</template>
+								</div>
+							</div>
+							<!-- Validation errors footer -->
+							<template x-if="pipelineErrors.length > 0">
+								<div class="shrink-0 px-4 py-2 border-t border-amber-500/20 bg-amber-500/5 flex items-start gap-2">
+									@icon.TriangleAlert(icon.Props{Class: "size-3.5 text-amber-500 shrink-0 mt-0.5"})
+									<div class="flex-1 min-w-0">
+										<template x-for="(err, idx) in pipelineErrors.slice(0,3)" :key="idx">
+											<p class="text-[10px] text-amber-600 dark:text-amber-400 truncate" x-text="err"></p>
+										</template>
+										<template x-if="pipelineErrors.length > 3">
+											<p class="text-[10px] text-amber-500/70" x-text="'+ ' + (pipelineErrors.length - 3) + ' more'"></p>
+										</template>
+									</div>
+								</div>
+							</template>
+						</div>
+					</template>
 						<!-- Pipeline Delete Confirmation -->
 						<template x-if="pipelineView === 'delete'">
 							@deleteConfirmation("pipelineView = 'canvas'", "deletePipeline()")

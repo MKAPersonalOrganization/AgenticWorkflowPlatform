@@ -304,19 +304,29 @@ type CompositionNode struct {
 
 	// ── Remote-node fields (Type = "remote") ──
 	// A2AConnectorID references a registered A2A connector for remote delegation.
-	A2AConnectorID string `json:"a2a_connector_id,omitempty"`
+	A2AConnectorID           string `json:"a2a_connector_id,omitempty"`
 	OutputKey                string `json:"output_key,omitempty"`
 	DisallowTransferToParent *bool  `json:"disallow_transfer_to_parent,omitempty"`
 	DisallowTransferToPeers  *bool  `json:"disallow_transfer_to_peers,omitempty"`
 	IncludeContents          string `json:"include_contents,omitempty"`
 
 	// ── Composite-node fields ──
-	Children       []CompositionNode `json:"children,omitempty"`
-	MaxIterations  int               `json:"max_iterations,omitempty"`
+	Children []CompositionNode `json:"children,omitempty"`
+	MaxIterations int          `json:"max_iterations,omitempty"`
 	// AllowEarlyExit controls whether the exit_loop tool is injected into the
 	// last child of this loop node. When true the LLM may break out early;
 	// when false (default) the loop always runs MaxIterations times.
-	AllowEarlyExit bool              `json:"allow_early_exit,omitempty"`
+	AllowEarlyExit bool `json:"allow_early_exit,omitempty"`
+
+	// ── Visual layout (AlpineFlow canvas — ignored by ADK-Go runtime) ──
+	// X and Y store the node's position on the flow canvas (pixels).
+	// W and H store optional explicit width/height (0 = auto-size).
+	// Collapsed hides children of composite nodes on the canvas.
+	X         float64 `json:"x,omitempty"`
+	Y         float64 `json:"y,omitempty"`
+	W         float64 `json:"w,omitempty"`
+	H         float64 `json:"h,omitempty"`
+	Collapsed bool    `json:"collapsed,omitempty"`
 }
 
 // CollectAgentIDs returns all agent IDs referenced in the tree.

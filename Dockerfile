@@ -8,9 +8,9 @@ RUN apk add --no-cache nodejs npm
 
 WORKDIR /app
 
-# Cache Go module downloads
+# Copy module files + pre-vendored dependencies (no network needed at build time)
 COPY go.mod go.sum ./
-RUN go mod download
+COPY vendor ./vendor
 
 # Copy all source
 COPY . .
@@ -29,6 +29,7 @@ RUN npx @tailwindcss/cli \
 
 # Compile binary — inject build tag "production"
 RUN CGO_ENABLED=0 GOOS=linux go build \
+    -mod=vendor \
     -ldflags="-s -w -X main.build=production" \
     -o /bin/ai-chat-platform .
 

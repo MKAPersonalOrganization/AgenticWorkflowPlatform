@@ -16,13 +16,27 @@ import { workflowTreeBuilder } from './components/workflow-tree-builder.js';
 import { workflowTreeVisualizer } from './components/workflow-tree-visualizer.js';
 import { workflowGraphPanel } from './components/workflow-graph-panel.js';
 import { renderMarkdown } from './chat/markdown-renderer.js';
+import {
+    initFlowStore,
+    alpineflowCanvas,
+    alpineflowNode,
+    alpineflowPalette,
+    alpineflowPropertyPanel,
+    createFlowNode,
+} from './components/alpineflow.js';
 
 // Expose markdown renderer globally so Alpine expressions in any scope can use it
 window.renderMarkdown = renderMarkdown;
 window.renderToolDescription = (description) => description ? renderMarkdown(description) : '';
 
+// Expose createFlowNode globally so Alpine inline expressions can call it
+window.createFlowNode = createFlowNode;
+
 document.addEventListener('alpine:init', () => {
     Alpine.plugin(themePlugin);
+
+    // Register AlpineFlow store first (other components may reference it)
+    initFlowStore();
 
     // Register components
     Alpine.data('pdfViewer', pdfViewer);
@@ -37,4 +51,10 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('workflowTreeBuilder', workflowTreeBuilder);
     Alpine.data('workflowTreeVisualizer', workflowTreeVisualizer);
     Alpine.data('workflowGraphPanel', workflowGraphPanel);
+
+    // AlpineFlow canvas components
+    Alpine.data('alpineflowCanvas',        alpineflowCanvas);
+    Alpine.data('alpineflowNode',          alpineflowNode);
+    Alpine.data('alpineflowPalette',       alpineflowPalette);
+    Alpine.data('alpineflowPropertyPanel', alpineflowPropertyPanel);
 });

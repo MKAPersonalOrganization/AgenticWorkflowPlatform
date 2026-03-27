@@ -770,6 +770,8 @@ export const agentDesigner = () => ({
         };
         this.selectedNodePath = null;
         this.pipelineView = 'form';
+        // Open directly in the visual canvas
+        this.$nextTick(() => this.openFlowView());
     },
 
     showEditPipelineForm(pipeline) {
@@ -806,6 +808,8 @@ export const agentDesigner = () => ({
         };
         this.selectedNodePath = null;
         this.pipelineView = 'form';
+        // Open directly in the visual canvas
+        this.$nextTick(() => this.openFlowView());
     },
 
     async savePipeline() {
@@ -1132,6 +1136,74 @@ export const agentDesigner = () => ({
 
     get isPipelineValid() {
         return this.pipelineErrors.length === 0;
+    },
+
+    // ══════════════════════════════════════════
+    // AlpineFlow Canvas Integration
+    // ══════════════════════════════════════════
+
+    /**
+     * Switch the pipeline editor to the visual flow canvas.
+     * Loads the current pipelineGraph into Alpine.store('flow') and switches view.
+     */
+    async openFlowView() {
+        const store = Alpine.store('flow');
+        if (!store) return;
+
+        // The /v1/agent-definitions list excludes sub-agents that are already
+        // embedded inside a pipeline graph (via excludeSubAgents on the backend).
+        // We must fetch those missing agents individually so the canvas can display
+        // their names, system prompts, and other config.
+        const graphAgentIds = [];
+        const collectIds = (node) => {
+            if (!node) return;
+            if (node.type === 'agent' && node.agent_id) graphAgentIds.push(node.agent_id);
+            (node.children || []).forEach(collectIds);
+        };
+        collectIds(this.pipelineGraph);
+
+        const knownIds = new Set([...(this.agents || []), ...(this.pipelines || [])].map(a => a.id));
+        const missingIds = [...new Set(graphAgentIds.filter(id => id && !knownIds.has(id)))];
+
+        const fetched = await Promise.all(
+            missingIds.map(id =>
+                fetch(`/v1/agent-definitions/${id}`)
+                    .then(r => r.ok ? r.json() : null)
+                    .catch(() => null)
+            )
+        );
+
+        // Merge: palette agents (non-composed) + sub-agents fetched on demand
+        const allAgents = [...this.agents, ...fetched.filter(Boolean)];
+
+        store.load(this.pipelineGraph, allAgents, this.connectors, this.pipelineSystemPrompt);
+        this.pipelineView = 'flow';
+    },
+
+    /**
+     * Switch back from flow canvas to the form-based tree editor.
+     * Syncs the modified graph back from the store into pipelineGraph.
+     */
+    closeFlowView() {
+        this._syncGraphFromStore();
+        this.pipelineView = 'form';
+    },
+
+    /**
+     * Save from the flow canvas view — syncs graph from store then calls savePipeline().
+     */
+    async saveFromFlowView() {
+        this._syncGraphFromStore();
+        await this.savePipeline();
+    },
+
+    /** Copy graph and systemPrompt from Alpine.store('flow') back into component state. */
+    _syncGraphFromStore() {
+        const store = Alpine.store('flow');
+        if (!store) return;
+        const g = store.export();
+        if (g) this.pipelineGraph = g;
+        this.pipelineSystemPrompt = store.systemPrompt || this.pipelineSystemPrompt;
     },
 
     // ══════════════════════════════════════════
