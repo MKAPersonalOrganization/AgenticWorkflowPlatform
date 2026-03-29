@@ -73,9 +73,11 @@ export const editableWorkflowTree = () => {
                 position: relative;
                 background-image: radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px);
                 background-size: 28px 28px;
-                border-radius: 0.75rem;
-                min-height: 200px;
-                padding: 20px 14px;
+                border-radius: 0;
+                min-height: 100%;
+                padding: 0;
+                width: 100%;
+                box-sizing: border-box;
             }
 
             /* ── Connector ── */
@@ -117,7 +119,7 @@ export const editableWorkflowTree = () => {
                 padding-top: 15px; /* space for top accent */
                 transition: all 0.15s ease;
                 width: 100%;
-                max-width: 280px;
+                max-width: 400px;
                 overflow: hidden;
             }
             .ewt-node:hover {
@@ -218,7 +220,7 @@ export const editableWorkflowTree = () => {
             .ewt-branch {
                 flex: 1;
                 min-width: 0;
-                max-width: 280px;
+                max-width: 400px;
                 display: flex;
                 flex-direction: column;
                 align-items: center;
