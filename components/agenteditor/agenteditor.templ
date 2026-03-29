@@ -851,18 +851,20 @@ templ AgentDesignerDialog() {
 											</div>
 										</template>
 									</div>
-									<!-- Zoom + fit controls -->
-									<div class="absolute bottom-4 right-4 flex items-center gap-1 z-20">
-										<button @click="zoomOut()" title="Zoom out" class="w-7 h-7 flex items-center justify-center rounded-lg bg-[#1e2533]/90 border border-white/10 text-gray-300 text-sm hover:bg-[#252d3d] hover:text-white transition-colors backdrop-blur-sm">−</button>
-										<button @click="zoomReset()" title="Reset zoom" class="h-7 px-2 min-w-[3rem] flex items-center justify-center rounded-lg bg-[#1e2533]/90 border border-white/10 text-gray-300 text-[10px] font-mono hover:bg-[#252d3d] hover:text-white transition-colors backdrop-blur-sm" x-text="zoomLabel"></button>
-										<button @click="zoomIn()" title="Zoom in" class="w-7 h-7 flex items-center justify-center rounded-lg bg-[#1e2533]/90 border border-white/10 text-gray-300 text-sm hover:bg-[#252d3d] hover:text-white transition-colors backdrop-blur-sm">+</button>
-										<div class="w-px h-5 bg-white/10 mx-0.5"></div>
-										<button @click="fitAll()" title="Auto-layout &amp; fit" class="w-7 h-7 flex items-center justify-center rounded-lg bg-[#1e2533]/90 border border-white/10 text-gray-300 text-sm hover:bg-[#252d3d] hover:text-white transition-colors backdrop-blur-sm">⊞</button>
-									</div>
-									<!-- Keyboard hint -->
-									<div class="absolute bottom-4 left-4 text-[9px] text-gray-700 z-20 select-none pointer-events-none font-mono tracking-wide">
-										{ i18n.T(ctx, "Click to select · Drag to move · Pull port to connect · Scroll = zoom · Space+drag = pan · Del = delete") }
-									</div>
+								<!-- Zoom + fit controls -->
+								<div class="absolute bottom-4 right-4 flex items-center gap-1 z-20">
+									<button @click="zoomOut()" title="Zoom out" class="w-7 h-7 flex items-center justify-center rounded-lg bg-[#1e2533]/90 border border-white/10 text-gray-300 text-sm hover:bg-[#252d3d] hover:text-white transition-colors backdrop-blur-sm">−</button>
+									<button @click="zoomReset()" title="Reset zoom" class="h-7 px-2 min-w-[3rem] flex items-center justify-center rounded-lg bg-[#1e2533]/90 border border-white/10 text-gray-300 text-[10px] font-mono hover:bg-[#252d3d] hover:text-white transition-colors backdrop-blur-sm" x-text="zoomLabel"></button>
+									<button @click="zoomIn()" title="Zoom in" class="w-7 h-7 flex items-center justify-center rounded-lg bg-[#1e2533]/90 border border-white/10 text-gray-300 text-sm hover:bg-[#252d3d] hover:text-white transition-colors backdrop-blur-sm">+</button>
+									<div class="w-px h-5 bg-white/10 mx-0.5"></div>
+									<button @click="centerGraph()" title="Center graph" class="w-7 h-7 flex items-center justify-center rounded-lg bg-[#1e2533]/90 border border-white/10 text-gray-300 text-sm hover:bg-[#252d3d] hover:text-white transition-colors backdrop-blur-sm">⊕</button>
+									<button @click="fitToView()" title="Fit to view" class="w-7 h-7 flex items-center justify-center rounded-lg bg-[#1e2533]/90 border border-white/10 text-gray-300 text-sm hover:bg-[#252d3d] hover:text-white transition-colors backdrop-blur-sm">⊡</button>
+									<button @click="fitAll()" title="Auto-layout &amp; fit" class="w-7 h-7 flex items-center justify-center rounded-lg bg-[#1e2533]/90 border border-white/10 text-gray-300 text-sm hover:bg-[#252d3d] hover:text-white transition-colors backdrop-blur-sm">⊞</button>
+								</div>
+								<!-- Keyboard hint -->
+								<div class="absolute bottom-4 left-4 text-[9px] text-gray-700 z-20 select-none pointer-events-none font-mono tracking-wide">
+									{ i18n.T(ctx, "Click to select · Drag to move · Pull port to connect · Scroll = zoom · Space+drag = pan · Del = delete · F = fit · C = center") }
+								</div>
 								</div>
 								<!-- RIGHT: Property Panel -->
 								<div
