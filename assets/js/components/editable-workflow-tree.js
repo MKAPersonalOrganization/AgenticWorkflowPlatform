@@ -71,8 +71,8 @@ export const editableWorkflowTree = () => {
             }
             .ewt-pipeline-canvas {
                 position: relative;
-                background-image: radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
-                background-size: 14px 14px;
+                background-image: radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px);
+                background-size: 28px 28px;
                 border-radius: 0.75rem;
                 min-height: 200px;
                 padding: 20px 14px;
@@ -93,10 +93,10 @@ export const editableWorkflowTree = () => {
                 left: 50%;
                 top: 0;
                 bottom: 0;
-                width: 2px;
+                width: 1.5px;
                 background: var(--ewt-color, rgba(255,255,255,0.15));
                 transform: translateX(-50%);
-                opacity: 0.6;
+                opacity: 0.5;
             }
             .ewt-connector-dot {
                 position: relative;
@@ -110,17 +110,20 @@ export const editableWorkflowTree = () => {
             /* ── Node card ── */
             .ewt-node {
                 position: relative;
-                border-radius: 0.625rem;
+                border-radius: 0.75rem;
                 border: 1px solid rgba(255,255,255,0.08);
                 background: #13171f;
-                padding: 10px 12px;
+                padding: 12px 14px;
+                padding-top: 15px; /* space for top accent */
                 transition: all 0.15s ease;
                 width: 100%;
                 max-width: 280px;
+                overflow: hidden;
             }
             .ewt-node:hover {
                 border-color: rgba(255,255,255,0.15);
                 box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                transform: translateY(-1px);
             }
             .ewt-node.selected {
                 border-color: var(--ewt-color, #818cf8);
@@ -131,16 +134,16 @@ export const editableWorkflowTree = () => {
                 box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3);
             }
 
-            /* ── Accent stripe ── */
-            .ewt-node::before {
+            /* ── Top accent bar ── */
+            .ewt-node::after {
                 content: '';
                 position: absolute;
                 left: 0;
-                top: 8px;
-                bottom: 8px;
-                width: 3px;
-                border-radius: 0 3px 3px 0;
+                top: 0;
+                right: 0;
+                height: 3px;
                 background: var(--ewt-color, rgba(255,255,255,0.3));
+                border-radius: 0.75rem 0.75rem 0 0;
             }
 
             /* ── Type badge ── */
@@ -187,7 +190,7 @@ export const editableWorkflowTree = () => {
                 left: 8%;
                 right: 8%;
                 top: 50%;
-                height: 2px;
+                height: 1.5px;
                 background: var(--ewt-color, rgba(255,255,255,0.15));
                 transform: translateY(-50%);
                 opacity: 0.5;
@@ -197,7 +200,7 @@ export const editableWorkflowTree = () => {
                 left: 50%;
                 top: 50%;
                 transform: translate(-50%, -50%);
-                width: 2px;
+                width: 1.5px;
                 height: 100%;
                 background: var(--ewt-color, rgba(255,255,255,0.15));
                 opacity: 0.5;
@@ -222,7 +225,7 @@ export const editableWorkflowTree = () => {
             }
             .ewt-branch-connector {
                 height: 12px;
-                width: 2px;
+                width: 1.5px;
                 background: var(--ewt-color, rgba(255,255,255,0.15));
                 opacity: 0.5;
             }
@@ -230,7 +233,7 @@ export const editableWorkflowTree = () => {
             /* ── Loop wrapper ── */
             .ewt-loop-wrap {
                 position: relative;
-                border-radius: 0.625rem;
+                border-radius: 0.75rem;
                 border: 1.5px dashed var(--ewt-color-muted, rgba(255,255,255,0.15));
                 padding: 12px 10px 16px;
                 background: rgba(217, 119, 6, 0.03);
@@ -305,7 +308,7 @@ export const editableWorkflowTree = () => {
                 padding: 8px;
                 border-top: 1px solid rgba(255,255,255,0.05);
                 background: rgba(255,255,255,0.02);
-                border-radius: 0 0 0.625rem 0.625rem;
+                border-radius: 0 0 0.75rem 0.75rem;
             }
             .ewt-add-btn {
                 font-size: 10px;
@@ -394,7 +397,7 @@ export const editableWorkflowTree = () => {
             /* ── Drop zone indicator ── */
             .ewt-drop-zone {
                 border: 2px dashed rgba(34, 197, 94, 0.4);
-                border-radius: 0.625rem;
+                border-radius: 0.75rem;
                 padding: 20px;
                 text-align: center;
                 color: #22c55e;
@@ -468,6 +471,12 @@ export const editableWorkflowTree = () => {
             .ewt-settings-input:focus {
                 border-color: rgba(129, 140, 248, 0.5);
             }
+            .ewt-node, .ewt-loop-wrap {
+                cursor: grab;
+            }
+            .ewt-node:active, .ewt-loop-wrap:active {
+                cursor: grabbing;
+            }
         `;
         document.head.appendChild(style);
     }
@@ -513,7 +522,8 @@ export const editableWorkflowTree = () => {
             <div class="ewt-node ${isSelected ? 'selected' : ''}" 
                  style="--ewt-color:${m.color};--ewt-color-muted:${m.colorMuted};--ewt-color-fg:${m.colorFg};"
                  data-node-id="${nodeId}"
-                 data-node-type="agent">
+                 data-node-type="agent"
+                 draggable="true">
                 <div style="display:flex;align-items:flex-start;gap:8px;">
                     <div class="ewt-badge" style="background:${m.colorMuted};color:${m.colorFg};">
                         ${m.icon}
@@ -551,7 +561,8 @@ export const editableWorkflowTree = () => {
             <div class="ewt-node ${isSelected ? 'selected' : ''}" 
                  style="--ewt-color:${m.color};--ewt-color-muted:${m.colorMuted};--ewt-color-fg:${m.colorFg};"
                  data-node-id="${nodeId}"
-                 data-node-type="remote">
+                 data-node-type="remote"
+                 draggable="true">
                 <div style="display:flex;align-items:flex-start;gap:8px;">
                     <div class="ewt-badge" style="background:${m.colorMuted};color:${m.colorFg};">
                         ${m.icon}
@@ -619,7 +630,8 @@ export const editableWorkflowTree = () => {
                 <div class="ewt-node ${isSelected ? 'selected' : ''}" 
                      style="--ewt-color:${m.color};--ewt-color-muted:${m.colorMuted};--ewt-color-fg:${m.colorFg};max-width:unset;"
                      data-node-id="${nodeId}"
-                     data-node-type="sequential">
+                     data-node-type="sequential"
+                     draggable="true">
                     <div style="display:flex;align-items:center;gap:8px;">
                         <div class="ewt-badge" style="background:${m.colorMuted};color:${m.colorFg};">
                             ${m.icon}&nbsp;Sequential
@@ -676,7 +688,8 @@ export const editableWorkflowTree = () => {
                 <div class="ewt-node ${isSelected ? 'selected' : ''}" 
                      style="--ewt-color:${m.color};--ewt-color-muted:${m.colorMuted};--ewt-color-fg:${m.colorFg};max-width:unset;"
                      data-node-id="${nodeId}"
-                     data-node-type="parallel">
+                     data-node-type="parallel"
+                     draggable="true">
                     <div style="display:flex;align-items:center;gap:8px;">
                         <div class="ewt-badge" style="background:${m.colorMuted};color:${m.colorFg};">
                             ${m.icon}&nbsp;Parallel
@@ -743,7 +756,7 @@ export const editableWorkflowTree = () => {
 
         return `
             <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
-                <div class="ewt-loop-wrap" style="--ewt-color:${m.color};--ewt-color-muted:${m.colorMuted};--ewt-color-fg:${m.colorFg};">
+                <div class="ewt-loop-wrap" style="--ewt-color:${m.color};--ewt-color-muted:${m.colorMuted};--ewt-color-fg:${m.colorFg};" draggable="true">
                     <div class="ewt-loop-badge" style="background:#1a1a2e;color:${m.colorFg};border-color:${m.colorMuted};">
                         ${m.icon}&nbsp;Loop (×<input type="number" 
                                                     value="${maxIter}" 
@@ -847,6 +860,29 @@ export const editableWorkflowTree = () => {
         return true;
     }
 
+    function moveNode(graph, sourceId, targetParentId, targetIndex) {
+        // Remove source node from its parent
+        const sourceInfo = findParentAndIndex(graph, sourceId);
+        if (!sourceInfo || !sourceInfo.parent) return false;
+        const sourceParent = sourceInfo.parent;
+        const sourceIndex = sourceInfo.index;
+        const node = sourceParent.children[sourceIndex];
+        // Remove from source parent
+        sourceParent.children.splice(sourceIndex, 1);
+        // Find target parent
+        const targetParent = targetParentId ? findNodeById(graph, targetParentId) : null;
+        if (!targetParent) return false;
+        if (!targetParent.children) targetParent.children = [];
+        // Adjust targetIndex if moving within same parent and sourceIndex < targetIndex
+        let adjustedIndex = targetIndex;
+        if (sourceParent === targetParent && sourceIndex < targetIndex) {
+            adjustedIndex = targetIndex - 1;
+        }
+        // Insert at target index
+        targetParent.children.splice(adjustedIndex, 0, node);
+        return true;
+    }
+
     // ── Alpine component ────────────────────────────────────────────
 
     return {
@@ -929,6 +965,26 @@ export const editableWorkflowTree = () => {
             });
 
             // Drag and drop
+            this.$el.addEventListener('dragstart', (e) => {
+                const nodeEl = e.target.closest('[data-node-id]');
+                if (nodeEl) {
+                    e.dataTransfer.setData('ewt-reorder', nodeEl.dataset.nodeId);
+                    e.dataTransfer.effectAllowed = 'move';
+                    // Add dragging class for visual feedback
+                    nodeEl.style.opacity = '0.5';
+                }
+            });
+
+            this.$el.addEventListener('dragend', (e) => {
+                const nodeEl = e.target.closest('[data-node-id]');
+                if (nodeEl) {
+                    nodeEl.style.opacity = '';
+                }
+                // Remove drop-target class from any element
+                const dropTarget = this.$el.querySelector('.drop-target');
+                if (dropTarget) dropTarget.classList.remove('drop-target');
+            });
+
             this.$el.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 const dropZone = e.target.closest('.ewt-node, .ewt-loop-wrap, .ewt-drop-zone');
@@ -950,10 +1006,42 @@ export const editableWorkflowTree = () => {
                 const store = Alpine.store('flow');
                 if (dropZone && store && store.graph) {
                     dropZone.classList.remove('drop-target');
-                    const parentId = dropZone.dataset.nodeId;
+                    const targetId = dropZone.dataset.nodeId;
+                    const targetNode = findNodeById(store.graph, targetId);
+                    if (!targetNode) return;
+                    
+                    // Check if this is a reorder drop
+                    const sourceId = e.dataTransfer.getData('ewt-reorder');
+                    if (sourceId) {
+                        // Reorder: move source node to target parent
+                        // Determine target parent and index
+                        let targetParentId = targetId;
+                        let targetIndex = 0;
+                        // If target node is composite (has children), add as last child
+                        if (targetNode.children) {
+                            targetParentId = targetId;
+                            targetIndex = targetNode.children.length;
+                        } else {
+                            // Target is leaf: insert as sibling after target
+                            const targetInfo = findParentAndIndex(store.graph, targetId);
+                            if (targetInfo && targetInfo.parent) {
+                                targetParentId = targetInfo.parent.id;
+                                targetIndex = targetInfo.index + 1;
+                            } else {
+                                return; // cannot move root?
+                            }
+                        }
+                        if (moveNode(store.graph, sourceId, targetParentId, targetIndex)) {
+                            this.render();
+                            if (window.__ewtOnChange) window.__ewtOnChange(store.graph);
+                        }
+                        return;
+                    }
+                    
+                    // Palette drop: add new node as child
                     const nodeType = e.dataTransfer.getData('flowNodeType');
                     if (nodeType) {
-                        const parent = findNodeById(store.graph, parentId);
+                        const parent = targetNode;
                         if (parent && parent.children) {
                             const newNode = createNode(nodeType);
                             if (nodeType === 'agent') {
@@ -967,6 +1055,38 @@ export const editableWorkflowTree = () => {
                             if (window.__ewtOnChange) window.__ewtOnChange(store.graph);
                         }
                     }
+                }
+            });
+
+            // Keyboard shortcuts
+            this.$el.addEventListener('keydown', (e) => {
+                // Ignore if focus is on an input element
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+                const store = Alpine.store('flow');
+                if (!store) return;
+                const selectedId = store.selectedId;
+                
+                if (e.key === 'Delete' || e.key === 'Backspace') {
+                    if (selectedId) {
+                        e.preventDefault();
+                        window.ewtDeleteNode(selectedId);
+                    }
+                } else if (e.key === 'ArrowUp' && e.ctrlKey) {
+                    if (selectedId) {
+                        e.preventDefault();
+                        window.ewtMoveUp(selectedId);
+                    }
+                } else if (e.key === 'ArrowDown' && e.ctrlKey) {
+                    if (selectedId) {
+                        e.preventDefault();
+                        window.ewtMoveDown(selectedId);
+                    }
+                } else if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    store.undo();
+                } else if (e.key === 'y' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    // redo not yet implemented in store
                 }
             });
 
