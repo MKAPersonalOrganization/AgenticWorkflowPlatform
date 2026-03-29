@@ -567,20 +567,48 @@ templ AgentDesignerDialog() {
 									@icon.LayoutGrid(icon.Props{Class: "size-3.5"})
 									{ i18n.T(ctx, "Auto") }
 								</button>
-								<div class="flex items-center gap-1">
-									<template x-if="isPipelineValid">
-										<span class="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
-											@icon.CircleCheck(icon.Props{Class: "size-3.5"})
-											{ i18n.T(ctx, "Valid") }
-										</span>
-									</template>
-									<template x-if="!isPipelineValid">
-										<span class="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400">
-											@icon.TriangleAlert(icon.Props{Class: "size-3.5"})
-											<span x-text="pipelineErrors.length + ' issue' + (pipelineErrors.length !== 1 ? 's' : '')"></span>
-										</span>
-									</template>
-								</div>
+							<div class="flex items-center gap-1">
+								<template x-if="isPipelineValid">
+									<span class="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
+										@icon.CircleCheck(icon.Props{Class: "size-3.5"})
+										{ i18n.T(ctx, "Valid") }
+									</span>
+								</template>
+								<template x-if="!isPipelineValid">
+									<span class="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400">
+										@icon.TriangleAlert(icon.Props{Class: "size-3.5"})
+										<span x-text="pipelineErrors.length + ' issue' + (pipelineErrors.length !== 1 ? 's' : '')"></span>
+									</span>
+								</template>
+							</div>
+							<!-- Sidebar toggles -->
+							<div class="flex items-center gap-1 border-l border-border/30 pl-2 ml-2">
+								<button
+									@click="togglePalette()"
+									:title="paletteVisible ? 'Hide component palette (Ctrl+[)' : 'Show component palette (Ctrl+[)'"
+									class="flex items-center justify-center w-7 h-7 rounded text-xs transition-all duration-150"
+									:class="paletteVisible ? 'text-indigo-400 bg-indigo-500/15 hover:bg-indigo-500/25' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'"
+								>
+									@icon.PanelLeft(icon.Props{Class: "size-3.5"})
+								</button>
+								<button
+									@click="togglePropertyPanel()"
+									:title="propertyPanelVisible ? 'Hide property panel (Ctrl+])' : 'Show property panel (Ctrl+])'"
+									class="flex items-center justify-center w-7 h-7 rounded text-xs transition-all duration-150"
+									:class="propertyPanelVisible ? 'text-indigo-400 bg-indigo-500/15 hover:bg-indigo-500/25' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'"
+								>
+									@icon.PanelRight(icon.Props{Class: "size-3.5"})
+								</button>
+								<template x-if="!paletteVisible || !propertyPanelVisible">
+									<button
+										@click="paletteVisible = true; propertyPanelVisible = true"
+										title="Show all panels"
+										class="flex items-center justify-center w-7 h-7 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-150"
+									>
+										@icon.LayoutPanelLeft(icon.Props{Class: "size-3.5"})
+									</button>
+								</template>
+							</div>
 								@button.Button(button.Props{
 									Variant: button.VariantDefault,
 									Class:   "h-8 px-4 text-xs gap-1.5",
@@ -617,6 +645,13 @@ templ AgentDesignerDialog() {
 								<!-- LEFT: Palette -->
 								<div
 									x-data="alpineflowPalette"
+									x-show="paletteVisible"
+									x-transition:enter="transition-all duration-200 ease-out"
+									x-transition:enter-start="opacity-0 -translate-x-full"
+									x-transition:enter-end="opacity-100 translate-x-0"
+									x-transition:leave="transition-all duration-150 ease-in"
+									x-transition:leave-start="opacity-100 translate-x-0"
+									x-transition:leave-end="opacity-0 -translate-x-full"
 									class="w-52 shrink-0 border-r border-border/60 flex flex-col overflow-hidden"
 									style="background:#0f1117;"
 								>
@@ -832,6 +867,13 @@ templ AgentDesignerDialog() {
 								<!-- RIGHT: Property Panel -->
 								<div
 									x-data="alpineflowPropertyPanel"
+									x-show="propertyPanelVisible"
+									x-transition:enter="transition-all duration-200 ease-out"
+									x-transition:enter-start="opacity-0 translate-x-full"
+									x-transition:enter-end="opacity-100 translate-x-0"
+									x-transition:leave="transition-all duration-150 ease-in"
+									x-transition:leave-start="opacity-100 translate-x-0"
+									x-transition:leave-end="opacity-0 translate-x-full"
 									class="w-64 shrink-0 border-l overflow-y-auto scrollbar-thin flex flex-col"
 									style="background:#0c0f16; border-color:rgba(255,255,255,0.07);"
 								>

@@ -131,6 +131,10 @@ export const agentDesigner = () => ({
     selectedNodePath: null,
     dragState: null,
 
+    // Sidebar visibility (for flow canvas)
+    paletteVisible: true,
+    propertyPanelVisible: true,
+
     // ══════════════════════════════════════════
     // Lifecycle
     // ══════════════════════════════════════════
@@ -155,6 +159,14 @@ export const agentDesigner = () => ({
         if (mode === 'pipeline' && this.pipelines.length === 0) {
             this.filterPipelines();
         }
+    },
+
+    togglePalette() {
+        this.paletteVisible = !this.paletteVisible;
+    },
+
+    togglePropertyPanel() {
+        this.propertyPanelVisible = !this.propertyPanelVisible;
     },
 
     // ══════════════════════════════════════════
@@ -1178,6 +1190,23 @@ export const agentDesigner = () => ({
 
         store.load(this.pipelineGraph, allAgents, this.connectors, this.pipelineSystemPrompt);
         this.pipelineView = 'flow';
+
+        // Reset sidebar visibility when opening flow view
+        this.paletteVisible = true;
+        this.propertyPanelVisible = true;
+
+        // Add keyboard shortcuts for sidebar toggles
+        this._sidebarKeyHandler = (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === '[') {
+                e.preventDefault();
+                this.paletteVisible = !this.paletteVisible;
+            }
+            if ((e.metaKey || e.ctrlKey) && e.key === ']') {
+                e.preventDefault();
+                this.propertyPanelVisible = !this.propertyPanelVisible;
+            }
+        };
+        document.addEventListener('keydown', this._sidebarKeyHandler);
     },
 
     /**
@@ -1187,6 +1216,12 @@ export const agentDesigner = () => ({
     closeFlowView() {
         this._syncGraphFromStore();
         this.pipelineView = 'form';
+
+        // Clean up keyboard listener
+        if (this._sidebarKeyHandler) {
+            document.removeEventListener('keydown', this._sidebarKeyHandler);
+            this._sidebarKeyHandler = null;
+        }
     },
 
     /**
