@@ -35,6 +35,9 @@ export const agentDesigner = () => ({
     /** @type {'canvas' | 'form'} Pipeline sub-view */
     pipelineView: 'canvas',
 
+    /** @type {'canvas' | 'tree'} Flow editor view mode */
+    flowViewMode: 'tree',
+
     // Agent list
     agents: [],
     filteredAgents: [],
@@ -167,6 +170,10 @@ export const agentDesigner = () => ({
 
     togglePropertyPanel() {
         this.propertyPanelVisible = !this.propertyPanelVisible;
+    },
+
+    toggleFlowViewMode() {
+        this.flowViewMode = this.flowViewMode === 'canvas' ? 'tree' : 'canvas';
     },
 
     // ══════════════════════════════════════════
@@ -1194,6 +1201,21 @@ export const agentDesigner = () => ({
         // Reset sidebar visibility when opening flow view
         this.paletteVisible = true;
         this.propertyPanelVisible = true;
+
+        // Initialize the editable workflow tree component
+        this.$nextTick(() => {
+            const treeEl = this.$el.querySelector('[x-data="editableWorkflowTree()"]');
+            if (treeEl && treeEl.__x) {
+                treeEl.__x.$data.setGraph(this.pipelineGraph);
+                treeEl.__x.$data.setAgents(allAgents);
+                treeEl.__x.$data.setConnectors(this.connectors);
+                treeEl.__x.$data.onChange((graph) => {
+                    this.pipelineGraph = graph;
+                    // Also sync to flow store for canvas view
+                    store.load(graph, allAgents, this.connectors, this.pipelineSystemPrompt);
+                });
+            }
+        });
 
         // Add keyboard shortcuts for sidebar toggles
         this._sidebarKeyHandler = (e) => {
