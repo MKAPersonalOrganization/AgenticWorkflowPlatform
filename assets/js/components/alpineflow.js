@@ -331,6 +331,24 @@ export const alpineflowCanvas = () => ({
                 }
             }
         }
+        // Fit to view (F key)
+        if (e.key === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+            if (document.activeElement.tagName !== 'INPUT' &&
+                document.activeElement.tagName !== 'TEXTAREA' &&
+                document.activeElement.tagName !== 'SELECT') {
+                e.preventDefault();
+                this.fitToView();
+            }
+        }
+        // Center graph (C key)
+        if (e.key === 'c' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+            if (document.activeElement.tagName !== 'INPUT' &&
+                document.activeElement.tagName !== 'TEXTAREA' &&
+                document.activeElement.tagName !== 'SELECT') {
+                e.preventDefault();
+                this.centerGraph();
+            }
+        }
     },
     _keyUp(e) {
         if (e.code === 'Space') this._spaceHeld = false;
@@ -427,6 +445,99 @@ export const alpineflowCanvas = () => ({
     zoomOut()   { const s = Alpine.store('flow'); s.zoom = Math.max(0.12, +(s.zoom / 1.2).toFixed(2)); },
     zoomReset() { const s = Alpine.store('flow'); s.zoom = 1; s.panX = 60; s.panY = 60; },
     fitAll()    { Alpine.store('flow').autoLayout(); this.zoomReset(); },
+    fitToView() {
+        const s = Alpine.store('flow');
+        if (!s.graph) return;
+        
+        // Calculate bounding box of all nodes
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        const NODE_W = 220, NODE_H = 90;
+        
+        const walk = (node) => {
+            if (!node) return;
+            const x = node.x || 0;
+            const y = node.y || 0;
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x + NODE_W);
+            maxY = Math.max(maxY, y + NODE_H);
+            if (!node.collapsed && node.children) {
+                node.children.forEach(walk);
+            }
+        };
+        walk(s.graph);
+        
+        // If no nodes or invalid bounds, reset
+        if (minX === Infinity) { this.zoomReset(); return; }
+        
+        // Get canvas element dimensions
+        const canvasEl = s.canvasEl;
+        if (!canvasEl) return;
+        const rect = canvasEl.getBoundingClientRect();
+        const canvasW = rect.width;
+        const canvasH = rect.height;
+        
+        // Calculate graph dimensions with padding
+        const graphW = maxX - minX + 80;  // 40px padding each side
+        const graphH = maxY - minY + 80;
+        
+        // Calculate zoom to fit
+        const padding = 100; // Extra padding around the graph
+        const availableW = canvasW - padding * 2;
+        const availableH = canvasH - padding * 2;
+        const zoomX = availableW / graphW;
+        const zoomY = availableH / graphH;
+        let newZoom = Math.min(zoomX, zoomY, 2.0); // Cap at 2x zoom
+        newZoom = Math.max(0.12, newZoom); // Min zoom
+        
+        // Calculate center position
+        const graphCenterX = (minX + maxX) / 2;
+        const graphCenterY = (minY + maxY) / 2;
+        
+        // Pan to center the graph
+        s.zoom = newZoom;
+        s.panX = canvasW / 2 - graphCenterX * newZoom;
+        s.panY = canvasH / 2 - graphCenterY * newZoom;
+    },
+    centerGraph() {
+        const s = Alpine.store('flow');
+        if (!s.graph) return;
+        
+        // Calculate center of all nodes
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        const NODE_W = 220, NODE_H = 90;
+        
+        const walk = (node) => {
+            if (!node) return;
+            const x = node.x || 0;
+            const y = node.y || 0;
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x + NODE_W);
+            maxY = Math.max(maxY, y + NODE_H);
+            if (!node.collapsed && node.children) {
+                node.children.forEach(walk);
+            }
+        };
+        walk(s.graph);
+        
+        if (minX === Infinity) return;
+        
+        // Get canvas element dimensions
+        const canvasEl = s.canvasEl;
+        if (!canvasEl) return;
+        const rect = canvasEl.getBoundingClientRect();
+        const canvasW = rect.width;
+        const canvasH = rect.height;
+        
+        // Center point of graph
+        const graphCenterX = (minX + maxX) / 2;
+        const graphCenterY = (minY + maxY) / 2;
+        
+        // Pan to center (keeping current zoom)
+        s.panX = canvasW / 2 - graphCenterX * s.zoom;
+        s.panY = canvasH / 2 - graphCenterY * s.zoom;
+    },
 
     get zoomLabel() { return Math.round(Alpine.store('flow').zoom * 100) + '%'; },
     get canUndo()   { return Alpine.store('flow').canUndo(); },
