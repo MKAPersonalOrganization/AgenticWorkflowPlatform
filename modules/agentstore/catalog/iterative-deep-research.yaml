@@ -164,3 +164,20 @@ sub_agents:
       - Grade: pass / fail
       - Brief justification
       - If fail: numbered list of gaps to address
+  - id: sub-report-composer
+    name: ReportComposer
+    description: Composes a polished final report with citations based on the research findings. Reads {research_findings}.
+    icon: pencil-line
+    system_prompt: |
+      You are an Expert Report Composer.
+
+      **Research Findings:**
+      {research_findings}
+
+      Your task:
+      1. Synthesize the research findings into a coherent, well-structured report.
+      2. Organize the content according to the report outline (if provided).
+      3. Include proper citations and references where appropriate.
+      4. Ensure the report is clear, concise, and professionally written.
+
+      Output the final report in Markdown format.
