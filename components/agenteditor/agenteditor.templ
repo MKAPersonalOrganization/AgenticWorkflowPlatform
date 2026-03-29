@@ -584,6 +584,19 @@ templ AgentDesignerDialog() {
 							<!-- Sidebar toggles -->
 							<div class="flex items-center gap-1 border-l border-border/30 pl-2 ml-2">
 								<button
+									@click="toggleFlowViewMode()"
+									:title="flowViewMode === 'canvas' ? 'Switch to tree view' : 'Switch to canvas view'"
+									class="flex items-center justify-center w-7 h-7 rounded text-xs transition-all duration-150"
+									:class="flowViewMode === 'tree' ? 'text-indigo-400 bg-indigo-500/15 hover:bg-indigo-500/25' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'"
+								>
+									<template x-if="flowViewMode === 'tree'">
+										@icon.GitBranch(icon.Props{Class: "size-3.5"})
+									</template>
+									<template x-if="flowViewMode === 'canvas'">
+										@icon.Workflow(icon.Props{Class: "size-3.5"})
+									</template>
+								</button>
+								<button
 									@click="togglePalette()"
 									:title="paletteVisible ? 'Hide component palette (Ctrl+[)' : 'Show component palette (Ctrl+[)'"
 									class="flex items-center justify-center w-7 h-7 rounded text-xs transition-all duration-150"
@@ -733,18 +746,33 @@ templ AgentDesignerDialog() {
 										<p class="text-[8px] text-gray-700 leading-relaxed font-mono">{ i18n.T(ctx, "Drag items onto the canvas to add them") }</p>
 									</div>
 								</div>
-								<!-- CENTER: Canvas -->
-								<div
-									x-data="alpineflowCanvas"
-									data-flow-canvas
-									class="flex-1 relative overflow-hidden select-none"
-									:style="'background-color:#0d1117;' + gridBg"
-									@wheel.prevent="onWheel"
-									@mousedown="onMouseDown"
-									@dragover.prevent="onDragOver"
-									@drop="onDrop"
-									x-effect="Alpine.store('flow').canvasEl = $el"
-								>
+								<!-- CENTER: Canvas or Tree View -->
+								<!-- Tree View (default) -->
+								<template x-if="flowViewMode === 'tree'">
+									<div
+										x-data="editableWorkflowTree()"
+										x-init="init()"
+										class="flex-1 overflow-auto"
+										style="background:#0d1117;"
+									>
+										<div class="ewt-pipeline-canvas">
+											<!-- Tree will be rendered here -->
+										</div>
+									</div>
+								</template>
+								<!-- Canvas View -->
+								<template x-if="flowViewMode === 'canvas'">
+									<div
+										x-data="alpineflowCanvas"
+										data-flow-canvas
+										class="flex-1 relative overflow-hidden select-none"
+										:style="'background-color:#0d1117;' + gridBg"
+										@wheel.prevent="onWheel"
+										@mousedown="onMouseDown"
+										@dragover.prevent="onDragOver"
+										@drop="onDrop"
+										x-effect="Alpine.store('flow').canvasEl = $el"
+									>
 									<!-- Dot-grid overlay -->
 									<div
 										class="pointer-events-none absolute inset-0"
@@ -866,6 +894,7 @@ templ AgentDesignerDialog() {
 									{ i18n.T(ctx, "Click to select · Drag to move · Pull port to connect · Scroll = zoom · Space+drag = pan · Del = delete · F = fit · C = center") }
 								</div>
 								</div>
+								</template>
 								<!-- RIGHT: Property Panel -->
 								<div
 									x-data="alpineflowPropertyPanel"

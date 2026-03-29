@@ -15,6 +15,7 @@ import { a2aConnectors } from './components/a2a-connectors.js';
 import { workflowTreeBuilder } from './components/workflow-tree-builder.js';
 import { workflowTreeVisualizer } from './components/workflow-tree-visualizer.js';
 import { workflowGraphPanel } from './components/workflow-graph-panel.js';
+import { editableWorkflowTree } from './components/editable-workflow-tree.js';
 import { renderMarkdown } from './chat/markdown-renderer.js';
 import {
     initFlowStore,
@@ -51,6 +52,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('workflowTreeBuilder', workflowTreeBuilder);
     Alpine.data('workflowTreeVisualizer', workflowTreeVisualizer);
     Alpine.data('workflowGraphPanel', workflowGraphPanel);
+    Alpine.data('editableWorkflowTree', editableWorkflowTree);
 
     // AlpineFlow canvas components
     Alpine.data('alpineflowCanvas',        alpineflowCanvas);
