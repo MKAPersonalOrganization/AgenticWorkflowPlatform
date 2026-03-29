@@ -174,6 +174,14 @@ export const agentDesigner = () => ({
 
     toggleFlowViewMode() {
         this.flowViewMode = this.flowViewMode === 'canvas' ? 'tree' : 'canvas';
+        // Adjust panel visibility for tree view to maximize space
+        if (this.flowViewMode === 'tree') {
+            this.paletteVisible = false;
+            this.propertyPanelVisible = false;
+        } else {
+            this.paletteVisible = true;
+            this.propertyPanelVisible = true;
+        }
     },
 
     // ══════════════════════════════════════════
@@ -1199,8 +1207,13 @@ export const agentDesigner = () => ({
         this.pipelineView = 'flow';
 
         // Reset sidebar visibility when opening flow view
-        this.paletteVisible = true;
-        this.propertyPanelVisible = true;
+        if (this.flowViewMode === 'tree') {
+            this.paletteVisible = false;
+            this.propertyPanelVisible = false;
+        } else {
+            this.paletteVisible = true;
+            this.propertyPanelVisible = true;
+        }
 
         // Initialize the editable workflow tree component
         this.$nextTick(() => {
