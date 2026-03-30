@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -218,13 +219,9 @@ func InsertCitationMarkers(text string, citations []Citation) string {
 	// Sort citations by end index descending so insertions don't shift offsets.
 	sorted := make([]Citation, len(citations))
 	copy(sorted, citations)
-	for i := range len(sorted) {
-		for j := i + 1; j < len(sorted); j++ {
-			if sorted[j].EndIndex > sorted[i].EndIndex {
-				sorted[i], sorted[j] = sorted[j], sorted[i]
-			}
-		}
-	}
+	slices.SortFunc(sorted, func(a, b Citation) int {
+		return b.EndIndex - a.EndIndex // descending
+	})
 
 	runes := []rune(text)
 	for _, cit := range sorted {
