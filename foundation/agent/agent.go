@@ -48,9 +48,15 @@ type WorkflowAgent interface {
 }
 
 // WorkflowNodeInfo describes a single node in a multi-agent workflow tree.
-// Composite nodes (sequential, parallel, loop) contain children.
+// Composite nodes (sequential, parallel, loop, conditional) contain children.
 // Leaf nodes (agent) reference an AgentDefinition by ID.
 // Remote nodes (remote) delegate to an external A2A connector.
+//
+// Conditional routing:
+// When Type="conditional", Children[0] is the evaluator agent (always runs
+// first). Children[1:] are branches; only the branch whose Condition matches
+// the evaluator's output (read from session state via OutputKey) executes.
+// Use Condition="*" for a fallback/default branch.
 type WorkflowNodeInfo struct {
 	// ID is a unique identifier within this tree.
 	ID string `json:"id"`
@@ -93,6 +99,11 @@ type WorkflowNodeInfo struct {
 
 	// Children are the sub-nodes (only for composite types).
 	Children []WorkflowNodeInfo `json:"children,omitempty"`
+
+	// Condition specifies when this node should execute as a branch within
+	// a "conditional" parent. Matched against the evaluator agent's output
+	// (read from session state). Use "*" for fallback/default branch.
+	Condition string `json:"condition,omitempty"`
 }
 
 // AgentMetadata represents metadata for an agent exposed via the API.

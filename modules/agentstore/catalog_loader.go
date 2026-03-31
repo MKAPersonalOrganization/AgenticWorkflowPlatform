@@ -20,7 +20,7 @@ var catalogFS embed.FS
 // re-seeding always targets the same row.
 type yamlCatalogSpec struct {
 	Name         string            `yaml:"name"`
-	Slug         string            `yaml:"slug"`         // deterministic ID seed; defaults to Name
+	Slug         string            `yaml:"slug"` // deterministic ID seed; defaults to Name
 	Description  string            `yaml:"description"`
 	SystemPrompt string            `yaml:"system_prompt"` // non-empty for single-agent entries
 	Category     string            `yaml:"category"`
@@ -34,11 +34,12 @@ type yamlCatalogSpec struct {
 
 type yamlWorkflowNode struct {
 	ID             string             `yaml:"id"`
-	Type           string             `yaml:"type"` // agent | sequential | parallel | loop
+	Type           string             `yaml:"type"` // agent | sequential | parallel | loop | conditional
 	AgentID        string             `yaml:"agent_id,omitempty"`
 	OutputKey      string             `yaml:"output_key,omitempty"`
 	MaxIterations  int                `yaml:"max_iterations,omitempty"`
 	AllowEarlyExit bool               `yaml:"allow_early_exit,omitempty"`
+	Condition      string             `yaml:"condition,omitempty"` // for conditional routing branches
 	Children       []yamlWorkflowNode `yaml:"children,omitempty"`
 }
 
@@ -145,6 +146,9 @@ func (n *yamlWorkflowNode) toMap() map[string]interface{} {
 	}
 	if n.AllowEarlyExit {
 		m["allow_early_exit"] = true
+	}
+	if n.Condition != "" {
+		m["condition"] = n.Condition
 	}
 	if len(n.Children) > 0 {
 		children := make([]map[string]interface{}, len(n.Children))

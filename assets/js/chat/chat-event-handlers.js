@@ -152,7 +152,7 @@ export function createEventHandlerMethods() {
                 const isNewSection = !prev || prev.parentAgent !== parentAgent || prev.workflowType !== workflowType;
                 const isNewIteration = workflowType === 'loop' && prev?.parentAgent === parentAgent && iteration > (prev.iteration || 0);
 
-                if (isNewSection && (workflowType === 'parallel' || workflowType === 'loop')) {
+                if (isNewSection && (workflowType === 'parallel' || workflowType === 'loop' || workflowType === 'conditional')) {
                     state.messages.push({
                         id: `wf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
                         type: 'workflow_marker',

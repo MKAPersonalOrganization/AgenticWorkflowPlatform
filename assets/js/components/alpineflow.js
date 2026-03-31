@@ -25,11 +25,12 @@ function nextFlowId() {
 
 // ─── Type colour palette ──────────────────────────────────────────────────────
 const TYPE_COLORS = {
-    sequential: '#7c3aed',
-    parallel:   '#0284c7',
-    loop:       '#d97706',
-    agent:      '#059669',
-    remote:     '#be123c',
+    sequential:  '#7c3aed',
+    parallel:    '#0284c7',
+    loop:        '#d97706',
+    conditional: '#dc2626',
+    agent:       '#059669',
+    remote:      '#be123c',
 };
 function typeColor(type) { return TYPE_COLORS[type] || '#475569'; }
 
@@ -57,7 +58,7 @@ export function createFlowNode(type, opts = {}) {
             x: opts.x || 0, y: opts.y || 0,
         };
     }
-    // Composite: sequential | parallel | loop
+    // Composite: sequential | parallel | loop | conditional
     const node = {
         id, type,
         label: opts.label || '',
@@ -65,6 +66,8 @@ export function createFlowNode(type, opts = {}) {
         x: opts.x || 0, y: opts.y || 0,
     };
     if (type === 'loop') node.max_iterations = 3;
+    // Conditional nodes need an output_key on the evaluator (first child)
+    // which is added when the evaluator agent is attached.
     return node;
 }
 
@@ -562,7 +565,8 @@ export const alpineflowCanvas = () => ({
 
         const markerId = (srcType, selected) => {
             if (selected) return 'sel';
-            return { sequential:'seq', parallel:'par', loop:'loop', agent:'agent', remote:'rem' }[srcType] || 'def';
+            return { sequential:'seq', parallel:'par', loop:'loop', conditional:'def',
+                     agent:'agent', remote:'rem' }[srcType] || 'def';
         };
 
         for (const edge of s.edges) {
@@ -652,17 +656,17 @@ export const alpineflowNode = (nodeId) => ({
     get n()           { return Alpine.store('flow').nodeById(this.nodeId) || {}; },
     get isSelected()  { return Alpine.store('flow').selectedId === this.nodeId; },
     get isRoot()      { return Alpine.store('flow').graph?.id === this.nodeId; },
-    get isComposite() { return ['sequential','parallel','loop'].includes(this.n.type); },
+    get isComposite() { return ['sequential','parallel','loop','conditional'].includes(this.n.type); },
 
     // ── Computed style helpers ────────────────────────────────────────────────
     get typeColor() { return typeColor(this.n.type); },
 
     get typeChar() {
-        return { sequential:'S', parallel:'P', loop:'L', agent:'A', remote:'R' }[this.n.type] || '?';
+        return { sequential:'S', parallel:'P', loop:'L', conditional:'?', agent:'A', remote:'R' }[this.n.type] || '?';
     },
 
     get typeLabel() {
-        return { sequential:'Sequential', parallel:'Parallel', loop:'Loop',
+        return { sequential:'Sequential', parallel:'Parallel', loop:'Loop', conditional:'Conditional',
                  agent:'LLM Agent', remote:'Remote' }[this.n.type] || this.n.type;
     },
 
@@ -707,6 +711,8 @@ export const alpineflowNode = (nodeId) => ({
         const childCount = (n.children || []).length;
         if (n.type === 'loop')
             return `${childCount} step${childCount !== 1 ? 's' : ''} · max ${n.max_iterations || 3}×`;
+        if (n.type === 'conditional')
+            return `${Math.max(0, childCount - 1)} branch${childCount - 1 !== 1 ? 'es' : ''} + evaluator`;
         return `${childCount} step${childCount !== 1 ? 's' : ''}`;
     },
 
@@ -813,10 +819,11 @@ export const alpineflowPalette = () => ({
     get connectors() { return Alpine.store('flow').connectors || []; },
 
     compositeTypes: [
-        { type: 'sequential', char: 'S', color: '#7c3aed', label: 'Sequential', desc: 'Steps in order'     },
-        { type: 'parallel',   char: 'P', color: '#0284c7', label: 'Parallel',   desc: 'Run concurrently'  },
-        { type: 'loop',       char: 'L', color: '#d97706', label: 'Loop',       desc: 'Repeat with limit' },
-        { type: 'remote',     char: 'R', color: '#be123c', label: 'Remote A2A', desc: 'External agent'    },
+        { type: 'sequential',  char: 'S', color: '#7c3aed', label: 'Sequential',  desc: 'Steps in order'         },
+        { type: 'parallel',    char: 'P', color: '#0284c7', label: 'Parallel',    desc: 'Run concurrently'      },
+        { type: 'loop',        char: 'L', color: '#d97706', label: 'Loop',        desc: 'Repeat with limit'     },
+        { type: 'conditional', char: '?', color: '#dc2626', label: 'Conditional', desc: 'Route by condition'    },
+        { type: 'remote',      char: 'R', color: '#be123c', label: 'Remote A2A',  desc: 'External agent'        },
     ],
 
     onDragStartType(e, type) {
@@ -862,7 +869,7 @@ export const alpineflowPropertyPanel = () => ({
 
     get nodeTypeColor() { return typeColor(this.node?.type); },
     get nodeTypeChar() {
-        return { sequential:'S', parallel:'P', loop:'L', agent:'A', remote:'R' }[this.node?.type] || '?';
+        return { sequential:'S', parallel:'P', loop:'L', conditional:'?', agent:'A', remote:'R' }[this.node?.type] || '?';
     },
 
     get selectedAgent() {
@@ -914,4 +921,17 @@ export const alpineflowPropertyPanel = () => ({
 
     get canMoveUp()   { const i = this.parentInfo; return i && i.index > 0; },
     get canMoveDown() { const i = this.parentInfo; return i && i.index < i.parent.children.length - 1; },
+
+    // ── Conditional routing helpers ────────────────────────────────────────
+    get isConditionalChild() {
+        const info = this.parentInfo;
+        return info && info.parent.type === 'conditional';
+    },
+    get isEvaluator() {
+        // First child of a conditional parent is the evaluator
+        return this.isConditionalChild && this.parentInfo?.index === 0;
+    },
+    get isConditionalBranch() {
+        return this.isConditionalChild && this.parentInfo?.index > 0;
+    },
 });

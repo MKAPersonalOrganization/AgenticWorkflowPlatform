@@ -42,6 +42,13 @@ export function workflowTreeVisualizer() {
             accentMuted: 'var(--wf-emerald-muted)',
             accentFg: 'var(--wf-emerald-fg)',
         },
+        conditional: {
+            icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg>`,
+            label: 'Conditional',
+            accent: 'var(--wf-red, oklch(0.62 0.2 25))',
+            accentMuted: 'var(--wf-red-muted, oklch(0.62 0.2 25 / 12%))',
+            accentFg: 'var(--wf-red-fg, oklch(0.55 0.22 25))',
+        },
     };
 
     function esc(s) {
@@ -68,6 +75,9 @@ export function workflowTreeVisualizer() {
                 --wf-emerald: oklch(0.7 0.17 165);
                 --wf-emerald-muted: oklch(0.7 0.17 165 / 12%);
                 --wf-emerald-fg: oklch(0.6 0.19 165);
+                --wf-red: oklch(0.62 0.2 25);
+                --wf-red-muted: oklch(0.62 0.2 25 / 12%);
+                --wf-red-fg: oklch(0.55 0.22 25);
                 /* Done / success green */
                 --wf-done:        oklch(0.52 0.17 160);
                 --wf-done-muted:  oklch(0.52 0.17 160 / 14%);
@@ -89,6 +99,9 @@ export function workflowTreeVisualizer() {
                 --wf-emerald: oklch(0.78 0.14 165);
                 --wf-emerald-muted: oklch(0.78 0.14 165 / 14%);
                 --wf-emerald-fg: oklch(0.84 0.12 165);
+                --wf-red: oklch(0.68 0.2 25);
+                --wf-red-muted: oklch(0.68 0.2 25 / 14%);
+                --wf-red-fg: oklch(0.78 0.15 25);
                 --wf-done:        oklch(0.72 0.15 160);
                 --wf-done-muted:  oklch(0.72 0.15 160 / 16%);
                 --wf-done-fg:     oklch(0.78 0.13 160);
@@ -441,6 +454,7 @@ export function workflowTreeVisualizer() {
             case 'sequential': return renderSequentialNode(node, agentMap, m, depth, activeAgentName, completedNodes, failedNodes);
             case 'parallel': return renderParallelNode(node, agentMap, m, depth, activeAgentName, completedNodes, failedNodes);
             case 'loop': return renderLoopNode(node, agentMap, m, depth, activeAgentName, completedNodes, failedNodes);
+            case 'conditional': return renderConditionalNode(node, agentMap, m, depth, activeAgentName, completedNodes, failedNodes);
             default: return renderAgentNode(node, agentMap, m, activeAgentName, completedNodes, failedNodes);
         }
     }
@@ -622,6 +636,63 @@ export function workflowTreeVisualizer() {
                         ${body}
                     </div>
                     ${loopArrow}
+                </div>
+            </div>`;
+    }
+
+    function renderConditionalNode(node, agentMap, m, depth, activeAgentName, completedNodes, failedNodes) {
+        const kids = node.children || [];
+
+        // First child is the evaluator; remaining are branches
+        let evaluatorHtml = '';
+        let branchesHtml = '';
+
+        if (kids.length > 0) {
+            evaluatorHtml = `
+                <div style="display:flex;flex-direction:column;align-items:center;width:100%;max-width:280px;margin:0 auto;">
+                    <div style="font-size:9px;color:var(--wf-red-fg, #fca5a5);font-weight:600;margin-bottom:4px;opacity:0.8;">Evaluator</div>
+                    ${renderPipelineNode(kids[0], agentMap, depth + 1, activeAgentName, completedNodes, failedNodes)}
+                </div>`;
+        }
+
+        if (kids.length > 1) {
+            branchesHtml = '<div class="wf-branches">';
+            for (let i = 1; i < kids.length; i++) {
+                const branch = kids[i];
+                const condLabel = branch.condition || '???';
+                const isFallback = condLabel === '*';
+                branchesHtml += `
+                    <div class="wf-branch">
+                        <div class="wf-branch-connector" style="--connector-color:${m.accent};"></div>
+                        <div style="font-size:9px;color:${isFallback ? 'var(--muted-foreground)' : 'var(--wf-red-fg, #fca5a5)'};font-weight:600;margin-bottom:3px;">
+                            ${isFallback ? 'fallback' : esc(condLabel)}
+                        </div>
+                        ${renderPipelineNode(branch, agentMap, depth + 1, activeAgentName, completedNodes, failedNodes)}
+                        <div class="wf-branch-connector" style="--connector-color:${m.accent};"></div>
+                    </div>`;
+            }
+            branchesHtml += '</div>';
+        }
+
+        if (kids.length === 0) {
+            return renderEmptyNode(m, 'Empty conditional');
+        }
+
+        const forkJoin = kids.length > 1 ? `
+            <div class="wf-fork-join" style="--connector-color:${m.accent};">
+                <div class="wf-fork-join-center" style="--connector-color:${m.accent};"></div>
+            </div>` : '';
+
+        return `
+            <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
+                <div class="wf-badge" style="--badge-bg:${m.accentMuted};--badge-fg:${m.accentFg};">
+                    ${m.icon}&nbsp;${esc(node.label || m.label)}
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:center;width:100%;padding-top:6px;">
+                    ${evaluatorHtml}
+                    ${forkJoin}
+                    ${branchesHtml}
+                    ${forkJoin}
                 </div>
             </div>`;
     }
