@@ -22,6 +22,7 @@ templ docsWorkflowExamples() {
 				@docsTableRow("Parallel → Fan-in", "Independent work streams that merge for a final step", "Stock Analysis, Meeting Prep, Surprise Trip")
 				@docsTableRow("Map-Reduce", "Sequential → parallel fan-out → join", "Write a Book")
 				@docsTableRow("Loop (Self-Evaluation)", "Generate → evaluate → refine until quality target met", "Self-Evaluation Loop")
+				@docsTableRow("Conditional Routing", "Classify input then route to the best specialist branch", "Customer Support Triage, Content Router")
 			</tbody>
 		}
 		@docsInfoBox("State Passing") {
@@ -323,6 +324,80 @@ templ docsLoopExamples() {
 	}
 }
 
+// ─── Conditional Routing Examples ─────────────────────────────────────────────
+templ docsConditionalExamples() {
+	@docsSection("conditional-examples", "Conditional Routing Workflows", iconGitForkDoc, "text-red-500") {
+		<p>
+			<strong>Conditional routing</strong> evaluates input through a classifier agent, then routes to
+			<strong>exactly one matching branch</strong>. This is ideal for triage, content classification,
+			and role-based delegation — where different types of requests need different specialists.
+		</p>
+		<p>
+			A conditional node has an <strong>evaluator</strong> (first child) that outputs a classification
+			value to session state via <code>output_key</code>. The remaining children are <strong>branches</strong>,
+			each with a <code>condition</code> field. Only the branch whose condition matches the evaluator's
+			output executes. A branch with <code>condition: "*"</code> acts as a fallback.
+		</p>
+		@workflowDiagramConditional()
+		@conceptBadges([]string{"conditional node", "evaluator + branches", "output_key matching", "fallback (*)"})
+		@docsInfoBox("How Matching Works") {
+			<p>
+				The evaluator's output is read from session state using the <code>output_key</code> field.
+				Each branch's <code>condition</code> is matched against this value using <strong>case-insensitive exact string matching</strong>.
+				A branch with <code>condition: "*"</code> matches anything — use it as a default/fallback.
+				If no branch matches and there's no fallback, the workflow errors.
+			</p>
+		}
+		<!-- Customer Support Triage -->
+		<h3>Customer Support Triage</h3>
+		<p>
+			A classifier reads a customer message and outputs one of <code>technical</code>, <code>billing</code>,
+			or <code>general</code>. Three specialist agents handle the matching category; a fallback agent
+			catches anything unexpected. From the Agent Store catalog.
+		</p>
+		@workflowDiagramConditionalExample("ClassifierAgent", "category", []conditionalBranch{
+			{label: "TechSupportAgent", condition: "technical", color: "emerald"},
+			{label: "BillingAgent", condition: "billing", color: "amber"},
+			{label: "GeneralSupportAgent", condition: "*", color: "slate"},
+		})
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Agent</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Role</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Condition</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("ClassifierAgent", "Reads message, outputs category", "N/A — evaluator")
+				@docsTableRow("TechSupportAgent", "Handles bugs, errors, setup questions", "technical")
+				@docsTableRow("BillingAgent", "Handles invoices, refunds, subscriptions", "billing")
+				@docsTableRow("GeneralSupportAgent", "Handles everything else", "* (fallback)")
+			</tbody>
+		}
+		@conceptBadges([]string{"triage pattern", "3 branches + fallback", "classification"})
+		@docsInfoBox("Conditional vs. Parallel") {
+			<p>
+				<strong>Conditional</strong> runs <em>exactly one</em> branch based on the evaluator's output.
+				<strong>Parallel</strong> runs <em>all</em> branches simultaneously. Use conditional when only one
+				specialist should handle a request; use parallel when multiple perspectives are needed.
+			</p>
+		}
+		<h3>Nesting Conditional Inside Sequential</h3>
+		<p>
+			Conditional nodes can be nested inside any composition. A common pattern is
+			<strong>sequential → conditional → sequential</strong>: classify the request first, route to a
+			specialist, then continue with shared post-processing.
+		</p>
+		@workflowDiagram("sequential", []string{
+			"InputPreprocessor → cleaned_input",
+			"ConditionalRouter (classifier → 3 branches)",
+			"ResponseFormatter → final_response",
+		})
+		@conceptBadges([]string{"nested composition", "classify → route → format", "mixed patterns"})
+	}
+}
+
 // ─── Design Your Own ─────────────────────────────────────────────────────────
 templ docsDesignYourOwn() {
 	@docsSection("design-your-own", "Design Your Own Workflow", iconWandDoc, "text-pink-500") {
@@ -349,6 +424,7 @@ templ docsDesignYourOwn() {
 				@docsTableRow2("Have independent work then a merge step", "Parallel → Sequential (fan-in)")
 				@docsTableRow2("Need a plan step, then N workers, then a join step", "Map-Reduce (seq → par → seq)")
 				@docsTableRow2("Need iterative refinement with feedback", "Loop with exit_loop")
+				@docsTableRow2("Need to route input to the right specialist", "Conditional routing")
 			</tbody>
 		}
 		<h3>Step 3 — Define State Keys</h3>
@@ -493,6 +569,75 @@ templ workflowDiagramLoop() {
 				<div class="text-center text-muted-foreground select-none text-[10px] mt-1">
 					↩ loop back (if scores &lt; 8) · exit_loop (if all ≥ 8)
 				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// conditionalBranch describes a single branch in a conditional diagram.
+type conditionalBranch struct {
+	label     string
+	condition string
+	color     string
+}
+
+// workflowDiagramConditional renders the generic conditional routing pattern.
+templ workflowDiagramConditional() {
+	<div class="my-6 overflow-x-auto rounded-lg border border-border bg-muted/30 p-4">
+		<div class="flex items-center gap-1 mb-3">
+			@statusBadge("conditional", "bg-red-500")
+			@statusBadge("evaluator → branches", "bg-slate-600")
+		</div>
+		<div class="flex flex-wrap items-center gap-3 font-mono text-xs">
+			<div class="rounded-lg border border-red-500/40 bg-red-500/5 p-3 space-y-2">
+				<div class="rounded-md border border-border bg-background px-3 py-2 shadow-sm">
+					Evaluator — classify input
+				</div>
+				<div class="text-center text-muted-foreground select-none text-[10px]">
+					output_key → session state
+				</div>
+			</div>
+			<span class="text-muted-foreground select-none">→</span>
+			<div class="space-y-2">
+				<div class="rounded-md border border-emerald-500/40 bg-emerald-500/5 px-3 py-2 shadow-sm">
+					Branch A <span class="text-muted-foreground">(condition: value_a)</span>
+				</div>
+				<div class="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 shadow-sm">
+					Branch B <span class="text-muted-foreground">(condition: value_b)</span>
+				</div>
+				<div class="rounded-md border border-slate-500/40 bg-slate-500/5 px-3 py-2 shadow-sm">
+					Fallback <span class="text-muted-foreground">(condition: *)</span>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// workflowDiagramConditionalExample renders a specific conditional routing example.
+templ workflowDiagramConditionalExample(evaluator string, outputKey string, branches []conditionalBranch) {
+	<div class="my-6 overflow-x-auto rounded-lg border border-border bg-muted/30 p-4">
+		<div class="flex items-center gap-1 mb-3">
+			@statusBadge("conditional", "bg-red-500")
+			@statusBadge("output_key: " + outputKey, "bg-slate-600")
+		</div>
+		<div class="flex flex-wrap items-center gap-3 font-mono text-xs">
+			<div class="rounded-lg border border-red-500/40 bg-red-500/5 p-3 space-y-2">
+				<div class="rounded-md border border-border bg-background px-3 py-2 shadow-sm">
+					{ evaluator }
+				</div>
+				<div class="text-center text-muted-foreground select-none text-[10px]">
+					→ { outputKey }
+				</div>
+			</div>
+			<span class="text-muted-foreground select-none">→</span>
+			<div class="space-y-2">
+				for _, b := range branches {
+					<div class={ "rounded-md border px-3 py-2 shadow-sm",
+						"border-" + b.color + "-500/40 bg-" + b.color + "-500/5" }>
+						{ b.label }
+						<span class="text-muted-foreground">(condition: { b.condition })</span>
+					</div>
+				}
 			</div>
 		</div>
 	</div>

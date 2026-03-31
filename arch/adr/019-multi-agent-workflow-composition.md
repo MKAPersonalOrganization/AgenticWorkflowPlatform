@@ -16,6 +16,7 @@ Real-world tasks often benefit from **multi-agent workflows**: a pipeline where 
 | Multi-Perspective Analysis | Parallel | Economic, Social, Political analysts run concurrently |
 | Iterative Refinement | Loop | Drafter → Critic → Reviser, repeat until quality threshold |
 | Complex Pipeline | Nested | Sequential → [Researcher, Parallel → [Writer, Reviewer], Loop → [Editor, QA]] |
+| Conditional Routing | Conditional | Classifier → {Technical Support, Billing, General Inquiry} — only one branch executes |
 
 ADK-Go provides first-class workflow agent types (`sequentialagent`, `parallelagent`, `loopagent`) that handle orchestration. Crucially, ADK-Go's composition model is **recursive**: any agent can be a child of any other via the `SubAgents []Agent` field. This enables arbitrary nesting — a sequential agent can contain a parallel agent which contains a loop agent, etc.
 

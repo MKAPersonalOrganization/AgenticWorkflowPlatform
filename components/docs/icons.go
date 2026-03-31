@@ -47,6 +47,7 @@ var (
 	iconBookOpenCheckDoc = iconSized(icon.BookOpenCheck)
 	iconRepeatDoc        = iconSized(icon.Repeat)
 	iconWandDoc          = iconSized(icon.WandSparkles)
+	iconGitForkDoc       = iconSized(icon.GitFork)
 
 	// ── MCP section icon ──
 	iconMCPLogo = icon.MCPLogo("size-5")
