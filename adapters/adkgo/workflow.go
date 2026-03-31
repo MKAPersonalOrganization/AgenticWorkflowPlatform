@@ -16,6 +16,7 @@ import (
 	"google.golang.org/adk/session"
 	"google.golang.org/adk/tool/exitlooptool"
 	"google.golang.org/adk/tool/loadartifactstool"
+	"google.golang.org/adk/tool/loadmemorytool"
 	"google.golang.org/adk/tool/preloadmemorytool"
 	"google.golang.org/genai"
 
@@ -463,13 +464,10 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 		wbc.threadID, agentCfg, wbc.req, precomputedRules,
 	)
 
-	// Inject preload_memory tool for memory-enabled leaf agents.
-	if agentCfg != nil && agentCfg.MemoryEnabled {
-		adkTools = append(adkTools, preloadmemorytool.New())
+	// Inject ADK-native tools gated by plugin permissions.
+	if wbc.adapter.memoryService != nil && wbc.adapter.hasMemoryEnabled(wbc.ctx, wbc.userID, node.AgentID) {
+		adkTools = append(adkTools, preloadmemorytool.New(), loadmemorytool.New())
 	}
-
-	// Inject load_artifacts tool when artifact service is available
-	// and the plugin is enabled for this agent.
 	if wbc.adapter.artifactService != nil && wbc.adapter.hasArtifactsEnabled(wbc.ctx, wbc.userID, node.AgentID) {
 		adkTools = append(adkTools, loadartifactstool.New())
 	}

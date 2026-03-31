@@ -1042,3 +1042,9 @@ CREATE INDEX IF NOT EXISTS idx_memory_entries_fts
 -- Unique constraint to prevent duplicate event indexing within a session.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_memory_entries_session_event
     ON memory_entries(app_name, user_id, session_id, event_id);
+
+-- Version: 1.72
+-- Description: Drop legacy memory_enabled column from user_agents.
+-- Memory access is now controlled by plugin permissions (agentmemory toolset)
+-- rather than a per-agent boolean flag.
+ALTER TABLE user_agents DROP COLUMN IF EXISTS memory_enabled;

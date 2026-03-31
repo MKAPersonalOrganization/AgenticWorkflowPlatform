@@ -15,7 +15,7 @@ templ pluginSection() {
 					Built-in plugins for every <span class="text-primary">agentic scenario</span>
 				</h2>
 				<p class="mt-4 text-lg text-muted-foreground">
-					A rich set of built-in plugins — from calculation and code analysis to memory and voice — useful for many agentic scenarios. Toggle them per-agent for fine-grained control.
+					A rich set of built-in plugins — from calculation and code analysis to cross-session memory and versioned artifacts — useful for many agentic scenarios. Toggle them per-agent for fine-grained control.
 				</p>
 			</div>
 			<div class="mt-16 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -26,7 +26,8 @@ templ pluginSection() {
 				@pluginPill("❓", "Elicitation", "Smart follow-ups")
 				@pluginPill("📚", "Knowledge Base", "RAG queries")
 				@pluginPill("📖", "Library", "Reference materials")
-				@pluginPill("💾", "Memory", "Long-term recall")
+				@pluginPill("🧠", "Agent Memory", "Auto + on-demand recall")
+				@pluginPill("📁", "Artifacts", "Versioned file management")
 				@pluginPill("🔊", "Text-to-Speech", "Voice output")
 			</div>
 		</div>

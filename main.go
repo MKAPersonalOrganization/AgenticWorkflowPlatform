@@ -38,6 +38,7 @@ import (
 	"school-with-ai/modules/knowledge/edgequake"
 	"school-with-ai/platform/artifact"
 	"school-with-ai/platform/artifact/adkartifact"
+	"school-with-ai/plugins/agentmemory"
 	"school-with-ai/plugins/artifacts"
 	"school-with-ai/plugins/askuser"
 	"school-with-ai/plugins/calculator"
@@ -435,6 +436,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Create and initialize tool registry
 	toolRegistry := toolregistry.NewRegistry(log, toolregistry.NewPostgresToolRegistryRepository(db))
+	toolregistry.RegisterPlugin(&agentmemory.Provider{})
 	toolregistry.RegisterPlugin(&artifacts.Provider{})
 	toolregistry.RegisterPlugin(&calculator.Provider{})
 	toolregistry.RegisterPlugin(&codebase.Provider{})

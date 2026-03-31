@@ -1205,19 +1205,6 @@ templ orchestrationFields() {
 			@toggleSwitch("form.disallowTransferToPeers", i18n.T(ctx, "Block transfer to peers"), i18n.T(ctx, "Prevents this agent from delegating to sibling agents."))
 		</div>
 	</div>
-	<!-- Memory -->
-	<div class="space-y-2">
-		<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
-			@icon.Brain(icon.Props{Class: "size-3.5 text-muted-foreground"})
-			{ i18n.T(ctx, "Memory") }
-		</span>
-		<div class="space-y-2 ps-1">
-			@toggleSwitch("form.memoryEnabled", i18n.T(ctx, "Enable cross-session memory"), i18n.T(ctx, "Agent remembers context from past conversations and auto-loads relevant memories each turn."))
-		</div>
-		<p class="text-[10px] text-muted-foreground">
-			{ i18n.T(ctx, "→ Injects preload_memory tool. Sessions are persisted to the memory service after each run for future recall.") }
-		</p>
-	</div>
 	<!-- Output Key -->
 	<div class="space-y-2">
 		<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
