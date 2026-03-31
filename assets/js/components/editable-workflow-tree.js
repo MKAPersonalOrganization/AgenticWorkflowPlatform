@@ -52,6 +52,13 @@ export const editableWorkflowTree = () => {
             colorMuted: 'rgba(190, 18, 60, 0.12)',
             colorFg: '#fb7185',
         },
+        conditional: {
+            icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg>`,
+            label: 'Conditional',
+            color: '#dc2626',
+            colorMuted: 'rgba(220, 38, 38, 0.12)',
+            colorFg: '#f87171',
+        },
     };
 
     function esc(s) {
@@ -349,6 +356,13 @@ export const editableWorkflowTree = () => {
             .ewt-add-btn.loop:hover {
                 background: rgba(217, 119, 6, 0.25);
             }
+            .ewt-add-btn.conditional {
+                background: rgba(220, 38, 38, 0.15);
+                color: #f87171;
+            }
+            .ewt-add-btn.conditional:hover {
+                background: rgba(220, 38, 38, 0.25);
+            }
 
             /* ── Inline edit ── */
             .ewt-inline-edit {
@@ -541,6 +555,17 @@ export const editableWorkflowTree = () => {
                             <option value="">— Select agent —</option>
                             ${agentOptions}
                         </select>
+                        ${node.condition !== undefined ? `
+                            <div style="display:flex;align-items:center;gap:4px;margin-top:4px;">
+                                <span style="font-size:9px;color:#f87171;font-weight:600;">condition:</span>
+                                <input type="text" 
+                                       class="ewt-inline-edit" 
+                                       value="${esc(node.condition)}" 
+                                       placeholder="value or * for fallback"
+                                       style="font-size:10px;color:#fca5a5;"
+                                       data-field="condition"
+                                       data-node-id="${nodeId}" />
+                            </div>` : ''}
                         ${node.output_key ? `<div class="ewt-agent-desc">→ ${esc(node.output_key)}</div>` : ''}
                     </div>
                     <div class="ewt-actions">
@@ -612,6 +637,7 @@ export const editableWorkflowTree = () => {
                 <button class="ewt-add-btn sequential" onclick="window.ewtAddChild('${nodeId}', 'sequential')">+ Seq</button>
                 <button class="ewt-add-btn parallel" onclick="window.ewtAddChild('${nodeId}', 'parallel')">+ Par</button>
                 <button class="ewt-add-btn loop" onclick="window.ewtAddChild('${nodeId}', 'loop')">+ Loop</button>
+                <button class="ewt-add-btn conditional" onclick="window.ewtAddChild('${nodeId}', 'conditional')">+ Cond</button>
             </div>`;
 
         if (depth === 0) {
@@ -683,6 +709,7 @@ export const editableWorkflowTree = () => {
                 <button class="ewt-add-btn sequential" onclick="window.ewtAddChild('${nodeId}', 'sequential')">+ Seq</button>
                 <button class="ewt-add-btn parallel" onclick="window.ewtAddChild('${nodeId}', 'parallel')">+ Par</button>
                 <button class="ewt-add-btn loop" onclick="window.ewtAddChild('${nodeId}', 'loop')">+ Loop</button>
+                <button class="ewt-add-btn conditional" onclick="window.ewtAddChild('${nodeId}', 'conditional')">+ Cond</button>
             </div>`;
 
         return `
@@ -754,6 +781,7 @@ export const editableWorkflowTree = () => {
                 <button class="ewt-add-btn sequential" onclick="window.ewtAddChild('${nodeId}', 'sequential')">+ Seq</button>
                 <button class="ewt-add-btn parallel" onclick="window.ewtAddChild('${nodeId}', 'parallel')">+ Par</button>
                 <button class="ewt-add-btn loop" onclick="window.ewtAddChild('${nodeId}', 'loop')">+ Loop</button>
+                <button class="ewt-add-btn conditional" onclick="window.ewtAddChild('${nodeId}', 'conditional')">+ Cond</button>
             </div>`;
 
         return `
@@ -791,6 +819,95 @@ export const editableWorkflowTree = () => {
             </div>`;
     }
 
+    function renderConditionalNode(node, agents, connectors, depth, isSelected, nodeId, graph) {
+        const m = META.conditional;
+        const kids = node.children || [];
+
+        // First child is the evaluator; remaining are branches with conditions
+        let evaluatorHtml = '';
+        let branchesHtml = '';
+
+        if (kids.length > 0) {
+            const evaluator = kids[0];
+            evaluatorHtml = `
+                <div style="display:flex;flex-direction:column;align-items:center;width:100%;max-width:320px;margin:0 auto;">
+                    <div class="ewt-badge" style="background:rgba(220,38,38,0.08);color:#fca5a5;font-size:9px;margin-bottom:4px;">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                        &nbsp;Evaluator (first child must have output_key)
+                    </div>
+                    ${renderPipelineNode(evaluator, agents, connectors, depth + 1, graph)}
+                </div>`;
+        }
+
+        if (kids.length > 1) {
+            branchesHtml = '<div class="ewt-branches">';
+            for (let i = 1; i < kids.length; i++) {
+                const branch = kids[i];
+                const condLabel = branch.condition || '???';
+                const isFallback = condLabel === '*';
+                branchesHtml += `
+                    <div class="ewt-branch">
+                        <div class="ewt-branch-connector" style="background:${m.color};"></div>
+                        <div class="ewt-badge" style="background:rgba(220,38,38,0.08);color:${isFallback ? '#9ca3af' : '#fca5a5'};font-size:9px;margin-bottom:4px;">
+                            ${isFallback ? 'fallback' : 'condition: ' + esc(condLabel)}
+                        </div>
+                        ${renderPipelineNode(branch, agents, connectors, depth + 1, graph)}
+                        <div class="ewt-branch-connector" style="background:${m.color};"></div>
+                    </div>`;
+            }
+            branchesHtml += '</div>';
+        }
+
+        if (kids.length === 0) {
+            evaluatorHtml = '<div class="ewt-empty">Add an evaluator agent and branches</div>';
+        }
+
+        const forkJoin = kids.length > 1 ? `
+            <div class="ewt-fork-join" style="--ewt-color:${m.color};">
+                <div class="ewt-fork-join-center" style="background:${m.color};"></div>
+            </div>` : '';
+
+        const addButtons = `
+            <div class="ewt-add-children">
+                <button class="ewt-add-btn agent" onclick="window.ewtAddChild('${nodeId}', 'agent')">+ Branch</button>
+                <button class="ewt-add-btn conditional" onclick="window.ewtAddConditionalBranch('${nodeId}')">+ Conditional Branch</button>
+            </div>`;
+
+        return `
+            <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
+                <div class="ewt-node ${isSelected ? 'selected' : ''}" 
+                     style="--ewt-color:${m.color};--ewt-color-muted:${m.colorMuted};--ewt-color-fg:${m.colorFg};max-width:unset;"
+                     data-node-id="${nodeId}"
+                     data-node-type="conditional"
+                     draggable="true">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <div class="ewt-badge" style="background:${m.colorMuted};color:${m.colorFg};">
+                            ${m.icon}&nbsp;Conditional
+                        </div>
+                        <input type="text" 
+                               class="ewt-inline-edit" 
+                               value="${esc(node.label)}" 
+                               placeholder="Conditional label..."
+                               style="flex:1;"
+                               data-field="label"
+                               data-node-id="${nodeId}" />
+                        <div class="ewt-actions">
+                            <button class="ewt-action-btn" onclick="window.ewtMoveUp('${nodeId}')" title="Move up">↑</button>
+                            <button class="ewt-action-btn" onclick="window.ewtMoveDown('${nodeId}')" title="Move down">↓</button>
+                            <button class="ewt-action-btn danger" onclick="window.ewtDeleteNode('${nodeId}')" title="Delete">✕</button>
+                        </div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:center;width:100%;padding-top:8px;">
+                        ${evaluatorHtml}
+                        ${forkJoin}
+                        ${branchesHtml}
+                        ${forkJoin}
+                    </div>
+                    ${addButtons}
+                </div>
+            </div>`;
+    }
+
     function renderPipelineNode(node, agents, connectors, depth, graph) {
         if (!node) return '';
         const m = META[node.type] || META.agent;
@@ -802,6 +919,7 @@ export const editableWorkflowTree = () => {
             case 'sequential': return renderSequentialNode(node, agents, connectors, depth, isSelected, node.id, graph);
             case 'parallel': return renderParallelNode(node, agents, connectors, depth, isSelected, node.id, graph);
             case 'loop': return renderLoopNode(node, agents, connectors, depth, isSelected, node.id, graph);
+            case 'conditional': return renderConditionalNode(node, agents, connectors, depth, isSelected, node.id, graph);
             default: return renderAgentNode(node, agents, isSelected, node.id);
         }
     }
@@ -923,6 +1041,23 @@ export const editableWorkflowTree = () => {
                 if (store && store.graph && moveNodeDown(store.graph, id)) {
                     this.render();
                     if (window.__ewtOnChange) window.__ewtOnChange(store.graph);
+                }
+            };
+
+            window.ewtAddConditionalBranch = (parentId) => {
+                const condition = prompt('Enter condition value (use * for fallback):', '');
+                if (condition === null) return; // user cancelled
+                const store = Alpine.store('flow');
+                if (store && store.graph) {
+                    const parent = findNodeById(store.graph, parentId);
+                    if (parent) {
+                        if (!parent.children) parent.children = [];
+                        const newNode = createNode('agent');
+                        newNode.condition = condition || '*';
+                        parent.children.push(newNode);
+                        this.render();
+                        if (window.__ewtOnChange) window.__ewtOnChange(store.graph);
+                    }
                 }
             };
 

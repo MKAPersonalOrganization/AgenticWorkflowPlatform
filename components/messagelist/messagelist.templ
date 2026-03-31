@@ -292,6 +292,13 @@ templ WorkflowMarker() {
 				<span x-text="`Iteration ${message.iteration}/${message.maxIterations}`"></span>
 			</span>
 		</template>
+		<!-- Conditional routing -->
+		<template x-if="message.markerType === 'conditional'">
+			<span class="inline-flex items-center gap-1.5 text-[11px] font-medium text-red-500 dark:text-red-400 whitespace-nowrap">
+				<svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg>
+				<span x-text="`${message.parentAgent || 'Conditional'} routing`"></span>
+			</span>
+		</template>
 		<div class="flex-1 h-px bg-border"></div>
 	</div>
 }

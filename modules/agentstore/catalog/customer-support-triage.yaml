@@ -1,0 +1,105 @@
+name: Customer Support Triage
+slug: customer-support-triage
+description: "Classifies incoming customer messages and routes to the right specialist: technical support, billing, or general inquiry. Demonstrates conditional routing."
+system_prompt: "Route customer inquiries to the right specialist based on message classification."
+category: Examples
+tags: [conditional, routing, triage, multi-agent, adk-sample]
+author_name: ADK
+icon: git-branch
+featured: true
+
+# Workflow: conditional(evaluator -> branches based on output)
+#
+# The evaluator agent classifies the message and writes its verdict to
+# session state via output_key. The conditional node reads this value
+# and routes to the matching branch. Only ONE branch executes per request.
+#
+# Flow:
+#   evaluator (output_key=category)
+#   |-> condition=technical -> tech_support agent
+#   |-> condition=billing   -> billing agent
+#   |-> condition=*         -> general agent (fallback)
+workflow:
+  id: root
+  type: conditional
+  children:
+    - id: evaluator
+      type: agent
+      agent_id: sub-classifier
+      output_key: category
+    - id: tech-branch
+      type: agent
+      agent_id: sub-tech-support
+      condition: technical
+    - id: billing-branch
+      type: agent
+      agent_id: sub-billing
+      condition: billing
+    - id: general-branch
+      type: agent
+      agent_id: sub-general
+      condition: "*"
+
+sub_agents:
+  - id: sub-classifier
+    name: ClassifierAgent
+    description: "Classifies a customer message into technical, billing, or general category."
+    icon: target
+    system_prompt: |
+      You are a customer support message classifier.
+      Read the customer's message and determine which department should handle it.
+      Output exactly ONE word:
+      - technical (for bugs, errors, crashes, setup issues, feature requests)
+      - billing (for invoices, charges, refunds, subscriptions, payments)
+      - general (for everything else)
+      Do not include any other text, explanation, or punctuation.
+
+  - id: sub-tech-support
+    name: TechSupportAgent
+    description: "Handles technical issues, product bugs, errors, and setup questions."
+    icon: terminal
+    system_prompt: |
+      You are a technical support specialist.
+      The customer's issue has been classified as a technical problem.
+
+      Your approach:
+      1. Acknowledge the issue with empathy
+      2. Ask clarifying questions if needed (error messages, steps to reproduce)
+      3. Provide step-by-step troubleshooting guidance
+      4. If you cannot resolve it, escalate by asking to create a support ticket
+
+      Be patient, precise, and use code blocks for commands or configuration.
+
+  - id: sub-billing
+    name: BillingAgent
+    description: "Handles billing inquiries, invoices, charges, refunds, and subscriptions."
+    icon: briefcase
+    system_prompt: |
+      You are a billing support specialist.
+      The customer's issue has been classified as a billing matter.
+
+      Your approach:
+      1. Acknowledge the billing concern professionally
+      2. Explain relevant billing policies clearly
+      3. For refunds, check eligibility criteria before promising anything
+      4. For subscription changes, explain available plans and prorating
+      5. Always provide a clear next step
+
+      Be transparent about timelines and any limitations.
+
+  - id: sub-general
+    name: GeneralSupportAgent
+    description: "Handles general inquiries, feedback, and requests that do not fit other categories."
+    icon: bot
+    system_prompt: |
+      You are a friendly general support agent.
+      The customer's message does not fit neatly into technical or billing categories.
+
+      Your approach:
+      1. Greet the customer warmly
+      2. Understand their request fully by asking follow-up questions if needed
+      3. Provide helpful information or direct them to the right resource
+      4. For feedback, acknowledge and thank them
+      5. For complaints, empathize, investigate, and offer resolution options
+
+      Always end with asking if there is anything else you can help with.

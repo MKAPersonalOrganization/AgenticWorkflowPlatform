@@ -271,25 +271,27 @@ func (a *AgentDefinition) UnmarshalModelOverride() error {
 type NodeType string
 
 const (
-	NodeAgent      NodeType = "agent"
-	NodeSequential NodeType = "sequential"
-	NodeParallel   NodeType = "parallel"
-	NodeLoop       NodeType = "loop"
-	NodeRemote     NodeType = "remote"
+	NodeAgent       NodeType = "agent"
+	NodeSequential  NodeType = "sequential"
+	NodeParallel    NodeType = "parallel"
+	NodeLoop        NodeType = "loop"
+	NodeRemote      NodeType = "remote"
+	NodeConditional NodeType = "conditional"
 )
 
 // ValidNodeTypes is the set of supported node types.
 var ValidNodeTypes = map[NodeType]bool{
-	NodeAgent:      true,
-	NodeSequential: true,
-	NodeParallel:   true,
-	NodeLoop:       true,
-	NodeRemote:     true,
+	NodeAgent:       true,
+	NodeSequential:  true,
+	NodeParallel:    true,
+	NodeLoop:        true,
+	NodeRemote:      true,
+	NodeConditional: true,
 }
 
 // IsComposite returns true if the node type can contain children.
 func (nt NodeType) IsComposite() bool {
-	return nt == NodeSequential || nt == NodeParallel || nt == NodeLoop
+	return nt == NodeSequential || nt == NodeParallel || nt == NodeLoop || nt == NodeConditional
 }
 
 // CompositionNode is the recursive building block for agent composition.
@@ -311,12 +313,19 @@ type CompositionNode struct {
 	IncludeContents          string `json:"include_contents,omitempty"`
 
 	// ── Composite-node fields ──
-	Children []CompositionNode `json:"children,omitempty"`
-	MaxIterations int          `json:"max_iterations,omitempty"`
+	Children      []CompositionNode `json:"children,omitempty"`
+	MaxIterations int               `json:"max_iterations,omitempty"`
 	// AllowEarlyExit controls whether the exit_loop tool is injected into the
 	// last child of this loop node. When true the LLM may break out early;
 	// when false (default) the loop always runs MaxIterations times.
 	AllowEarlyExit bool `json:"allow_early_exit,omitempty"`
+
+	// ── Conditional routing fields ──
+	// Condition specifies when this node should execute as a branch within
+	// a "conditional" parent. The value is matched against the evaluator's
+	// output (read from session state via the evaluator's OutputKey).
+	// Use "*" for the fallback/default branch.
+	Condition string `json:"condition,omitempty"`
 
 	// ── Visual layout (AlpineFlow canvas — ignored by ADK-Go runtime) ──
 	// X and Y store the node's position on the flow canvas (pixels).

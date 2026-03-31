@@ -440,6 +440,7 @@ func convertCompositionNode(n *agentstore.CompositionNode) agent.WorkflowNodeInf
 		DisallowTransferToParent: n.DisallowTransferToParent,
 		DisallowTransferToPeers:  n.DisallowTransferToPeers,
 		IncludeContents:          n.IncludeContents,
+		Condition:                n.Condition,
 	}
 	if len(n.Children) > 0 {
 		info.Children = make([]agent.WorkflowNodeInfo, len(n.Children))
