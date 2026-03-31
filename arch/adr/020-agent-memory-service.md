@@ -74,14 +74,24 @@ Indexes:
 | `GIN(to_tsvector('english', content_text))` | Full-text search |
 | `UNIQUE(app_name, user_id, session_id, event_id)` | Deduplication |
 
-### Per-Agent Flag
+### Per-Agent Toggle via Plugin System
 
-A `memory_enabled` boolean column on `user_agents` (default false). When true:
+Memory is controlled through the standard plugin permission system
+(`plugins/agentmemory`) rather than a standalone `memory_enabled` flag. The
+plugin registers a `"memory-set"` tool set containing `"preload_memory"`. Users
+enable/disable it per agent in the agent designer like any other plugin.
+
+When the `memory-set` tool set is enabled for an agent:
 
 1. The `preloadmemorytool` is injected into the agent's tool list (both regular
    and workflow leaf agents).
 2. The `MemoryService` is passed to the ADK runner config so tools can search.
 3. After the run completes, the session is persisted via `AddSessionToMemory()`.
+
+The legacy `memory_enabled` boolean column on `user_agents` is superseded by
+the plugin permission (`user_tool_set_permissions` table). The runner checks
+`toolReqs.HasToolSetPermission(ctx, userID, agentName, "memory-set")` instead
+of reading `agentCfg.MemoryEnabled`.
 
 ### Dependency Injection
 

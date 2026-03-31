@@ -61,27 +61,53 @@ templ docsMemoryArtifacts() {
 	@docsSection("memory", "Memory & Artifacts", iconBrain, "text-cyan-500") {
 		<h3>Cross-Session Memory</h3>
 		<p>
-			When <strong>memory</strong> is enabled on an agent, it automatically recalls relevant context
-			from past conversations. Sessions are indexed after each run, and the preload_memory tool
-			injects matching context at the start of new turns.
-		</p>
-		<p>
-			Memory is stored in PostgreSQL with full-text search, providing persistent recall
-			across sessions that survives restarts and scales horizontally.
-		</p>
-		<h3>Artifacts</h3>
-		<p>
-			Agents can generate <strong>artifacts</strong> during conversations — downloadable files such as:
+			The <strong>Agent Memory</strong> plugin gives agents persistent recall across conversations.
+			When enabled, sessions are indexed after each run using PostgreSQL full-text search.
+			The plugin provides two complementary tools:
 		</p>
 		<ul class="space-y-2 my-4">
-			<li>• Code files and scripts</li>
-			<li>• Diagrams and visualizations</li>
-			<li>• Analysis reports</li>
-			<li>• Reference materials and summaries</li>
+			<li>
+				<strong><code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">preload_memory</code></strong>
+				— Runs automatically on every LLM turn. Searches past conversations using the user's
+				current query and injects matching context into the agent's instructions. The agent
+				doesn't need to do anything — memory just works.
+			</li>
+			<li>
+				<strong><code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">load_memory</code></strong>
+				— An on-demand tool the agent can call explicitly with a custom query. Useful when
+				the agent needs to search for something specific that differs from the user's current
+				message (e.g. "What did we discuss about the API redesign last week?").
+			</li>
 		</ul>
 		<p>
-			Artifacts are stored per-thread and can be listed and downloaded at any time. They're backed by
-			S3-compatible storage for reliable access.
+			Memory is managed as a standard plugin — enable or disable it per-agent in the agent designer's
+			tool configuration panel. You can also block <code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">load_memory</code>
+			individually if you only want automatic preloading.
+		</p>
+		<h3>Versioned Artifacts</h3>
+		<p>
+			The <strong>Artifact Management</strong> plugin enables agents to create, version, and load
+			persistent files during execution. Artifacts are versioned automatically — each save creates a
+			new version, and agents can load any previous version by name.
+		</p>
+		<p>
+			When enabled, the
+			<code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">load_artifacts</code> tool
+			informs the agent about available artifacts and loads them on demand. Other tools (document
+			generation, TTS, etc.) can save artifacts directly via the ADK artifact service.
+		</p>
+		<p>Use cases include:</p>
+		<ul class="space-y-2 my-4">
+			<li>• Reports and analysis documents that evolve across sessions</li>
+			<li>• CSV/data exports from data processing agents</li>
+			<li>• Generated images and visualizations</li>
+			<li>• Code files and scripts refined iteratively</li>
+			<li>• User-scoped files shared across all sessions (prefix with <code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">user:</code>)</li>
+		</ul>
+		<p>
+			Artifacts are backed by S3-compatible storage with a dedicated bucket, providing reliable
+			access and version history. The chat UI displays an
+			<strong>Artifact Version Saved</strong> card whenever an agent creates or updates an artifact.
 		</p>
 		<h3>Thread Management</h3>
 		<p>

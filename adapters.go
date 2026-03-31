@@ -328,7 +328,6 @@ func (p *userAwareAgentProvider) agentFromDefinition(def *agentstore.AgentDefini
 		OutputSchema:      parseAgentSchema(def.OutputSchemaJSON),
 		ModelConfig:       toAgentModelConfig(def.ModelConfig),
 		ModelOverride:     toAgentModelOverride(def.ModelOverride),
-		MemoryEnabled:     def.MemoryEnabled,
 	}
 	a := newConfigAgent(cfg)
 

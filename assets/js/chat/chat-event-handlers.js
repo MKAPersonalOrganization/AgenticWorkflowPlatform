@@ -687,6 +687,31 @@ export function createEventHandlerMethods() {
             }
         },
 
+        /**
+         * Handle ARTIFACT_VERSION_SAVED event — an agent saved or updated a versioned
+         * artifact via the ADK artifact service. Refresh the artifacts sidebar and
+         * push a lightweight notification message into the chat.
+         */
+        __handleArtifactVersionSaved(value, state, threadId) {
+            const { fileName, version, agentName } = value;
+
+            state.messages.push({
+                id: `artifact_saved_${fileName}_v${version}_${Date.now()}`,
+                type: 'artifact_saved',
+                fileName: fileName || '',
+                version: version || 1,
+                agentName: agentName || '',
+                timestamp: new Date().toISOString(),
+            });
+
+            // Refresh the artifacts sidebar panel.
+            window.dispatchEvent(new CustomEvent('artifacts-updated'));
+
+            if (threadId === this.__currentThreadId && !this.__abortScroll) {
+                this.$nextTick(() => this.__scrollToBottomStreaming());
+            }
+        },
+
         // ============================================
         // ============================================
         // Tool Call Message Helpers

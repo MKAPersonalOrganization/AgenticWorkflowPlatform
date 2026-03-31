@@ -18,11 +18,13 @@ import (
 	"google.golang.org/adk/session"
 	adktool "google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/loadartifactstool"
+	"google.golang.org/adk/tool/loadmemorytool"
 	"google.golang.org/adk/tool/preloadmemorytool"
 
 	fagent "school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/modules/chat/thread"
+	"school-with-ai/plugins/agentmemory"
 	"school-with-ai/plugins/artifacts"
 	"school-with-ai/shared"
 )
@@ -248,7 +250,8 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 		// 9. Build the ADK-Go agent — either a workflow agent or a regular LLM agent.
 		var adkAgent agent.Agent
 		var agentPositions map[string]AgentPosition
-		memoryEnabled := agentCfg != nil && agentCfg.MemoryEnabled
+		memoryEnabled := r.memoryService != nil && r.hasMemoryEnabled(ctx, req.UserID, agentName)
+		artifactsEnabled := r.artifactService != nil && r.hasArtifactsEnabled(ctx, req.UserID, agentName)
 
 		if wa, isWF := isWorkflowAgent(foundAgent); isWF {
 			// ── Workflow Agent Path ──
@@ -277,17 +280,11 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			// 6. Build tools from agent config + enabled tool sets + MCP.
 			adkTools := r.resolveTools(ctx, req.UserID, agentName, modelCfg, req.SessionID, agentCfg, req, precomputedRules)
 
-			// 6b. Inject preload_memory tool for memory-enabled agents.
-			// preloadmemorytool auto-searches memory each turn and injects relevant
-			// context into the system prompt — no explicit tool call needed.
+			// 6b. Inject ADK-native tools gated by plugin permissions.
 			if memoryEnabled {
-				adkTools = append(adkTools, preloadmemorytool.New())
+				adkTools = append(adkTools, preloadmemorytool.New(), loadmemorytool.New())
 			}
-
-			// 6c. Inject load_artifacts tool when artifact service is available
-			// and the plugin is enabled for this agent. Permission is gated by
-			// the "artifacts-set" tool set in the plugin registry.
-			if r.artifactService != nil && r.hasArtifactsEnabled(ctx, req.UserID, agentName) {
+			if artifactsEnabled {
 				adkTools = append(adkTools, loadartifactstool.New())
 			}
 
@@ -364,8 +361,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			AppName:           appName,
 			Agent:             adkAgent,
 			SessionService:    sessionSvc,
-			ArtifactService:   r.artifactService, // nil-safe: ADK runner skips artifacts when nil
-			AutoCreateSession: true,               // defensive: session is pre-built, but allow fallback
+			AutoCreateSession: true,
 			PluginConfig: adkrunner.PluginConfig{
 				Plugins: []*plugin.Plugin{
 					retryandreflect.MustNew(
@@ -378,6 +374,9 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 		}
 		if memoryEnabled {
 			runnerCfg.MemoryService = r.memoryService
+		}
+		if artifactsEnabled {
+			runnerCfg.ArtifactService = r.artifactService
 		}
 		adkRunner, rErr := adkrunner.New(runnerCfg)
 		if rErr != nil {
@@ -684,6 +683,15 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 // ──────────────────────────────────────────────────────────────────────────────
 // Internal helpers
 // ──────────────────────────────────────────────────────────────────────────────
+
+// hasMemoryEnabled checks whether the agent memory plugin is enabled for the
+// given user+agent via the tool requirements permission system.
+func (r *RunnerAdapter) hasMemoryEnabled(ctx context.Context, userID, agentName string) bool {
+	if r.toolReqs == nil {
+		return false
+	}
+	return r.toolReqs.HasToolSetPermission(ctx, userID, agentName, agentmemory.ToolSetID)
+}
 
 // hasArtifactsEnabled checks whether the artifacts plugin is enabled for the
 // given user+agent via the tool requirements permission system.

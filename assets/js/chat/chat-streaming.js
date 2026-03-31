@@ -403,6 +403,9 @@ export function createStreamingMethods() {
                 case 'FILE_ATTACHMENT':
                     this.__handleFileAttachment(event.value, state, threadId);
                     break;
+                case 'ARTIFACT_VERSION_SAVED':
+                    this.__handleArtifactVersionSaved(event.value, state, threadId);
+                    break;
                 default:
                     console.warn('[Streaming] Unknown custom event:', event.name);
             }
