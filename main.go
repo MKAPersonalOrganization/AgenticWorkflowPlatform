@@ -37,6 +37,8 @@ import (
 	"school-with-ai/modules/chat/thread"
 	"school-with-ai/modules/knowledge/edgequake"
 	"school-with-ai/platform/artifact"
+	"school-with-ai/platform/artifact/adkartifact"
+	"school-with-ai/plugins/artifacts"
 	"school-with-ai/plugins/askuser"
 	"school-with-ai/plugins/calculator"
 	"school-with-ai/plugins/codebase"
@@ -386,6 +388,22 @@ func run(ctx context.Context, log *logger.Logger) error {
 		return fmt.Errorf("initializing s3 artifact service: %w", err)
 	}
 
+	// Initialize ADK artifact service (versioned file management for agents).
+	// Separate from the platform artifact service because the ADK artifact interface
+	// supports versioning and genai.Part-based storage that the ADK runner wires
+	// into agent contexts automatically. Uses the same S3 backend with a dedicated bucket.
+	adkArtifactService, err := adkartifact.NewS3Service(ctx, adkartifact.S3Config{
+		Endpoint:        cfg.Artifacts.S3Endpoint,
+		AccessKeyID:     cfg.Artifacts.S3AccessKey,
+		SecretAccessKey: cfg.Artifacts.S3SecretKey,
+		UseSSL:          cfg.Artifacts.S3UseSSL,
+		BucketName:      cfg.Artifacts.S3Bucket + "-agent-artifacts",
+		Region:          cfg.Artifacts.S3Region,
+	})
+	if err != nil {
+		return fmt.Errorf("initializing adk artifact service: %w", err)
+	}
+
 	// Initialize resources module
 	resourcesModule := resourcesmod.New(db, artifactService)
 
@@ -417,6 +435,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Create and initialize tool registry
 	toolRegistry := toolregistry.NewRegistry(log, toolregistry.NewPostgresToolRegistryRepository(db))
+	toolregistry.RegisterPlugin(&artifacts.Provider{})
 	toolregistry.RegisterPlugin(&calculator.Provider{})
 	toolregistry.RegisterPlugin(&codebase.Provider{})
 	toolregistry.RegisterPlugin(&cognitive.Provider{})
@@ -606,6 +625,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		NewToolSetFactory:      newToolSetFactory,
 		PromptInjectors:        []adkgo.PromptInjector{kbPromptInjector},
 		MemoryService:          memdb.New(db),
+		ArtifactService:        adkArtifactService,
 		ExtraConfigFn:          extraConfigFn,
 	})
 	if err != nil {

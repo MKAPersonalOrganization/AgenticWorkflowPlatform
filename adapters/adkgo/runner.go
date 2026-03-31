@@ -10,17 +10,20 @@ import (
 
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
+	"google.golang.org/adk/artifact"
 	"google.golang.org/adk/memory"
 	"google.golang.org/adk/plugin"
 	"google.golang.org/adk/plugin/retryandreflect"
 	adkrunner "google.golang.org/adk/runner"
 	"google.golang.org/adk/session"
 	adktool "google.golang.org/adk/tool"
+	"google.golang.org/adk/tool/loadartifactstool"
 	"google.golang.org/adk/tool/preloadmemorytool"
 
 	fagent "school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/modules/chat/thread"
+	"school-with-ai/plugins/artifacts"
 	"school-with-ai/shared"
 )
 
@@ -54,6 +57,7 @@ type RunnerAdapter struct {
 	newToolSetFactory      NewToolSetFactoryFunc
 	promptInjectors        []PromptInjector
 	memoryService          memory.Service
+	artifactService        artifact.Service
 	extraConfigFn          ExtraConfigFunc
 }
 
@@ -74,7 +78,8 @@ type RunnerAdapterConfig struct {
 	A2ASubAgentProvider    A2ASubAgentProvider
 	NewToolSetFactory      NewToolSetFactoryFunc
 	PromptInjectors        []PromptInjector
-	MemoryService          memory.Service // required; inject memdb.New(db) for persistent storage
+	MemoryService          memory.Service   // required; inject memdb.New(db) for persistent storage
+	ArtifactService        artifact.Service // optional; inject for versioned file management
 	ExtraConfigFn          ExtraConfigFunc
 }
 
@@ -103,6 +108,7 @@ func NewRunnerAdapter(cfg RunnerAdapterConfig) (*RunnerAdapter, error) {
 		newToolSetFactory:      cfg.NewToolSetFactory,
 		promptInjectors:        cfg.PromptInjectors,
 		memoryService:          cfg.MemoryService,
+		artifactService:        cfg.ArtifactService,
 		extraConfigFn:          cfg.ExtraConfigFn,
 	}, nil
 }
@@ -278,6 +284,13 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 				adkTools = append(adkTools, preloadmemorytool.New())
 			}
 
+			// 6c. Inject load_artifacts tool when artifact service is available
+			// and the plugin is enabled for this agent. Permission is gated by
+			// the "artifacts-set" tool set in the plugin registry.
+			if r.artifactService != nil && r.hasArtifactsEnabled(ctx, req.UserID, agentName) {
+				adkTools = append(adkTools, loadartifactstool.New())
+			}
+
 			// 7. Build system prompt (agent config + requirements + workspace KB + skills + profile).
 			systemPrompt := r.buildSystemPrompt(ctx, foundAgent, req.UserID, agentName, req.SessionID, agentCfg, inv)
 
@@ -351,7 +364,8 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			AppName:           appName,
 			Agent:             adkAgent,
 			SessionService:    sessionSvc,
-			AutoCreateSession: true, // defensive: session is pre-built, but allow fallback
+			ArtifactService:   r.artifactService, // nil-safe: ADK runner skips artifacts when nil
+			AutoCreateSession: true,               // defensive: session is pre-built, but allow fallback
 			PluginConfig: adkrunner.PluginConfig{
 				Plugins: []*plugin.Plugin{
 					retryandreflect.MustNew(
@@ -670,6 +684,15 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 // ──────────────────────────────────────────────────────────────────────────────
 // Internal helpers
 // ──────────────────────────────────────────────────────────────────────────────
+
+// hasArtifactsEnabled checks whether the artifacts plugin is enabled for the
+// given user+agent via the tool requirements permission system.
+func (r *RunnerAdapter) hasArtifactsEnabled(ctx context.Context, userID, agentName string) bool {
+	if r.toolReqs == nil {
+		return false
+	}
+	return r.toolReqs.HasToolSetPermission(ctx, userID, agentName, artifacts.ToolSetID)
+}
 
 // threadHistoryToMessages translates thread aggregate messages into foundation
 // agent Messages so they can populate Invocation.History for Requirements.

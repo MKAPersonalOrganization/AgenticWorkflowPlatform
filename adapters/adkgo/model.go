@@ -389,15 +389,20 @@ func declarationParamsToOpenAI(fd *genai.FunctionDeclaration) openai.FunctionPar
 	return map[string]any{"type": "object", "properties": map[string]any{}}
 }
 
-// ensureObjectProperties walks a JSON-schema map and ensures every node with
-// "type":"object" has a "properties" key. OpenAI strictly requires this.
+// ensureObjectProperties walks a JSON-schema map, lowercases Gemini-style type
+// values (e.g. "OBJECT" → "object"), and ensures every "object" node has a
+// "properties" key. OpenAI strictly requires both.
 func ensureObjectProperties(m map[string]any) {
 	if m == nil {
 		return
 	}
-	if t, _ := m["type"].(string); t == "object" {
-		if _, ok := m["properties"]; !ok {
-			m["properties"] = map[string]any{}
+	if t, _ := m["type"].(string); t != "" {
+		lower := strings.ToLower(t)
+		m["type"] = lower
+		if lower == "object" {
+			if _, ok := m["properties"]; !ok {
+				m["properties"] = map[string]any{}
+			}
 		}
 	}
 	// Recurse into properties.
@@ -421,7 +426,7 @@ func genaiSchemaToMap(s *genai.Schema) map[string]any {
 	}
 	m := map[string]any{}
 	if s.Type != "" {
-		m["type"] = string(s.Type)
+		m["type"] = strings.ToLower(string(s.Type))
 	}
 	if s.Description != "" {
 		m["description"] = s.Description

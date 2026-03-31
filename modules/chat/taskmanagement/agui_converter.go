@@ -236,6 +236,17 @@ func toAguiEventsInternal(event any) []any {
 			}),
 		)}
 
+	case *thread.ArtifactVersionSaved:
+		return []any{aguievents.NewCustomEvent(
+			"ARTIFACT_VERSION_SAVED",
+			aguievents.WithValue(map[string]any{
+				"agentName": evt.AgentName,
+				"fileName":  evt.FileName,
+				"version":   evt.Version,
+				"timestamp": evt.Timestamp,
+			}),
+		)}
+
 	case *thread.UserMessageAdded, *thread.AssistantMessageAdded, *thread.ThreadCreated:
 		// These are handled by the frontend locally or via snapshots, no need to stream
 		return []any{}

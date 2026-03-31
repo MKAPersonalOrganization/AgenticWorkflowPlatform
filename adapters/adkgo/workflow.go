@@ -15,6 +15,7 @@ import (
 	adkmodel "google.golang.org/adk/model"
 	"google.golang.org/adk/session"
 	"google.golang.org/adk/tool/exitlooptool"
+	"google.golang.org/adk/tool/loadartifactstool"
 	"google.golang.org/adk/tool/preloadmemorytool"
 	"google.golang.org/genai"
 
@@ -465,6 +466,12 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 	// Inject preload_memory tool for memory-enabled leaf agents.
 	if agentCfg != nil && agentCfg.MemoryEnabled {
 		adkTools = append(adkTools, preloadmemorytool.New())
+	}
+
+	// Inject load_artifacts tool when artifact service is available
+	// and the plugin is enabled for this agent.
+	if wbc.adapter.artifactService != nil && wbc.adapter.hasArtifactsEnabled(wbc.ctx, wbc.userID, node.AgentID) {
+		adkTools = append(adkTools, loadartifactstool.New())
 	}
 
 	// For the last child in a loop, add the exit_loop tool.
