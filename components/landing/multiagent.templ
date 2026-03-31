@@ -17,12 +17,13 @@ templ multiAgentSection() {
 						Compose agents into
 						<span class="text-primary">intelligent teams</span>
 					</h2>
-					<p class="mt-4 text-lg text-muted-foreground">
-						Build complex AI workflows by combining specialized agents into teams. Sequential pipelines, parallel execution, loops with exit conditions, and free-form delegation — all from a visual tree builder.
-					</p>
-					<ul class="mt-8 space-y-4">
-						@checkListItem("Visual workflow tree builder — drag agents into sequential, parallel, or loop compositions")
-						@checkListItem("Transfer policies — control which agents can delegate to parents or peers")
+				<p class="mt-4 text-lg text-muted-foreground">
+					Build complex AI workflows by combining specialized agents into teams. Sequential pipelines, parallel execution, loops with exit conditions, conditional routing, and free-form delegation — all from a visual tree builder.
+				</p>
+				<ul class="mt-8 space-y-4">
+					@checkListItem("Visual workflow tree builder — drag agents into sequential, parallel, loop, or conditional compositions")
+					@checkListItem("Conditional routing — evaluate input and branch to the right agent based on content classification")
+					@checkListItem("Transfer policies — control which agents can delegate to parents or peers")
 						@checkListItem("Per-agent context control — choose between full history forwarding or fresh context per sub-agent")
 						@checkListItem("Output keys — store each agent's result in session state for downstream agents to reference")
 						@checkListItem("Global instructions — set a shared directive that applies across the entire agent tree")
@@ -65,13 +66,28 @@ templ multiAgentSection() {
 											}
 										</div>
 									}
-									<!-- Agent 3 -->
-									@orchNodeCard("agent", "📝 Report Writer", "output: final_report", "border-indigo-500/30", false) {
+							<!-- Agent 3 -->
+							@orchNodeCard("agent", "📝 Report Writer", "output: final_report", "border-indigo-500/30", false) {
+								<div class="flex gap-1.5 mt-1.5">
+									@orchBadge("bg-indigo-500/10 text-indigo-700 dark:text-indigo-400", "key: final_report")
+									@orchBadge("bg-amber-500/10 text-amber-700 dark:text-amber-400", "schema: JSON")
+								</div>
+							}
+							<!-- Conditional routing -->
+							@orchNodeCard("conditional", "🔀 Quality Router", "", "border-red-500/30", true) {
+								<div class="ml-6 mt-3 space-y-2 border-l-2 border-border/50 pl-4">
+									@orchNodeCard("agent", "🎯 Classifier", "output: category", "border-red-500/30", false) {
 										<div class="flex gap-1.5 mt-1.5">
-											@orchBadge("bg-indigo-500/10 text-indigo-700 dark:text-indigo-400", "key: final_report")
-											@orchBadge("bg-amber-500/10 text-amber-700 dark:text-amber-400", "schema: JSON")
+											@orchBadge("bg-red-500/10 text-red-700 dark:text-red-400", "evaluator")
 										</div>
 									}
+									<div class="flex gap-1.5 flex-wrap">
+										@orchBadge("bg-emerald-500/10 text-emerald-700 dark:text-emerald-400", "high → publish")
+										@orchBadge("bg-amber-500/10 text-amber-700 dark:text-amber-400", "medium → revise")
+										@orchBadge("bg-slate-500/10 text-slate-500", "* → fallback")
+									</div>
+								</div>
+							}
 								</div>
 							}
 						</div>
@@ -97,6 +113,8 @@ templ orchNodeCard(nodeType, name, subtitle, borderClass string, isContainer boo
 					@icon.Columns2(icon.Props{Class: "size-3.5 text-amber-500"})
 				case "loop":
 					@icon.RefreshCw(icon.Props{Class: "size-3.5 text-teal-500"})
+				case "conditional":
+					@icon.GitFork(icon.Props{Class: "size-3.5 text-red-500"})
 				default:
 					@icon.Bot(icon.Props{Class: "size-3.5 text-muted-foreground"})
 			}

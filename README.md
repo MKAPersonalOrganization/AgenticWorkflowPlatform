@@ -223,7 +223,7 @@ graph TB
 | **Memory Service** | `services/memory` | Long-term memory stored as `MEMORIES.md` in S3. Read/write via memory plugin tool. |
 | **Plugin Layer** | `plugins/*` | 9 self-contained plugins each implementing `PluginProvider`: calculator, codebase, cognitive, document, elicitation, knowledgebase, library, memory, tts. Each provides backend logic + Templ UI templates (ADR-008). |
 | **Agent SDK** | `foundation/agentsdk` | Framework-isolated agent engine with LLM iteration loop, tool execution, stream processing, and human-in-the-loop I/O. LLM adapters for OpenAI, Gemini, and Ollama (ADR-001, ADR-005). |
-| **Agent Framework** | `foundation/agent` | Framework-agnostic interfaces: `Agent`, `Runner`, `ExecutableTool`, `StreamingExecutor`, `AgentProvider`, `Middleware` (ADR-006). |
+| **Agent Framework** | `foundation/agent` | Framework-agnostic interfaces: `Agent`, `Runner`, `ExecutableTool`, `StreamingExecutor`, `AgentProvider`, `Middleware`. Supports workflow composition: sequential, parallel, loop, and conditional routing (ADR-006). |
 | **Event Router** | `foundation/event` | Dual-router event dispatch — persistence router (feeds projection updater) and transient router (feeds Redis broadcaster). |
 | **Unified Middleware** | `foundation/agent` | Echo-inspired middleware pipeline intercepting three operation kinds: Agent runs, Chat (LLM) calls, and Function (tool) calls (ADR-006). |
 | **PostgreSQL Event Store** | `infra/eventstore/postgres` | Append-only event log with optimistic concurrency and typed event deserialization. |
