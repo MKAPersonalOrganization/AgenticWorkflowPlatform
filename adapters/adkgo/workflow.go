@@ -15,6 +15,7 @@ import (
 	adkmodel "google.golang.org/adk/model"
 	"google.golang.org/adk/session"
 	"google.golang.org/adk/tool/exitlooptool"
+	"google.golang.org/adk/tool/preloadmemorytool"
 	"google.golang.org/genai"
 
 	fagent "school-with-ai/foundation/agent"
@@ -460,6 +461,11 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 		wbc.ctx, wbc.userID, node.AgentID, wbc.modelCfg,
 		wbc.threadID, agentCfg, wbc.req, precomputedRules,
 	)
+
+	// Inject preload_memory tool for memory-enabled leaf agents.
+	if agentCfg != nil && agentCfg.MemoryEnabled {
+		adkTools = append(adkTools, preloadmemorytool.New())
+	}
 
 	// For the last child in a loop, add the exit_loop tool.
 	if isLastInLoop {

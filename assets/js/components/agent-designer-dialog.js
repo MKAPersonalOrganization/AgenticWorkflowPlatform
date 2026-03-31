@@ -59,6 +59,7 @@ export const agentDesigner = () => ({
         globalInstruction: '',
         inputSchema: '',
         outputSchema: '',
+        memoryEnabled: false,
         modelConfig: {
             temperature: null,
             topP: null,
@@ -280,6 +281,7 @@ export const agentDesigner = () => ({
             globalInstruction: '',
             inputSchema: '',
             outputSchema: '',
+            memoryEnabled: false,
             modelConfig: {
                 temperature: null,
                 topP: null,
@@ -320,6 +322,7 @@ export const agentDesigner = () => ({
             globalInstruction: agent.globalInstruction || '',
             inputSchema: agent.inputSchema || '',
             outputSchema: agent.outputSchema || '',
+            memoryEnabled: agent.memoryEnabled || false,
             modelConfig: {
                 temperature: mc.temperature ?? null,
                 topP: mc.topP ?? null,
@@ -383,6 +386,7 @@ export const agentDesigner = () => ({
                 globalInstruction: this.form.globalInstruction.trim(),
                 inputSchema: this.form.inputSchema.trim(),
                 outputSchema: this.form.outputSchema.trim(),
+                memoryEnabled: this.form.memoryEnabled || false,
                 modelConfig: Object.keys(modelConfig).length > 0 ? modelConfig : null,
                 modelOverride,
             };

@@ -7,7 +7,7 @@
 //   - stream_handler.go    — StreamJobEvents, GetJobStatus, CancelJob
 //   - thread_handler.go    — DeleteThread, UpdateThreadTitle
 //   - agent_handler.go     — ListAgents, GetAgent
-//   - artifact_handler.go  — ListArtifacts, DownloadArtifact, UploadAttachment, GetMemory
+//   - artifact_handler.go  — ListArtifacts, DownloadArtifact, UploadAttachment
 //   - toolset_handler.go   — ListAgentToolSets
 //   - plugin_handler.go    — ListPlugins
 //   - document_handler.go  — ListDocuments, UploadDocument
@@ -21,7 +21,6 @@ import (
 	"school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
 	"school-with-ai/modules/chat/chatcontracts"
-	"school-with-ai/modules/chat/memory"
 	"school-with-ai/modules/chat/projection/agui"
 	"school-with-ai/modules/chat/taskmanagement"
 	"school-with-ai/modules/chat/threadmgmt"
@@ -72,7 +71,6 @@ type TaskManagementHandler struct {
 	broadcaster              agui.AguiBroadcaster
 	threadMgmt               *threadmgmt.Manager
 	artifactStore            artifact.Service
-	memoryStore              memory.Service
 	toolRegistry             *toolregistry.Registry
 	requirementConfigService chatcontracts.ToolRequirementConfigService
 	documentProvider         chatcontracts.DocumentProvider
@@ -92,7 +90,6 @@ func NewTaskManagementHandler(
 	broadcaster agui.AguiBroadcaster,
 	threadMgmt *threadmgmt.Manager,
 	artifactStore artifact.Service,
-	memoryStore memory.Service,
 	toolRegistry *toolregistry.Registry,
 	requirementConfigService chatcontracts.ToolRequirementConfigService,
 	documentProvider chatcontracts.DocumentProvider,
@@ -110,7 +107,6 @@ func NewTaskManagementHandler(
 		broadcaster:              broadcaster,
 		threadMgmt:               threadMgmt,
 		artifactStore:            artifactStore,
-		memoryStore:              memoryStore,
 		toolRegistry:             toolRegistry,
 		requirementConfigService: requirementConfigService,
 		documentProvider:         documentProvider,

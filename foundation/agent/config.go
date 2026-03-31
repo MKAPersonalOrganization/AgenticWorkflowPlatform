@@ -140,6 +140,11 @@ type Config struct {
 	// ModelOverride selects a specific provider and model for this agent,
 	// replacing the user's global default. nil means use the global default.
 	ModelOverride *AgentModelOverride
+
+	// MemoryEnabled enables cross-session memory for this agent.
+	// When true, the adapter injects the preload_memory tool and persists
+	// completed sessions to the memory service for future recall.
+	MemoryEnabled bool
 }
 
 // AgentModelOverride selects a specific LLM provider and model for one agent,

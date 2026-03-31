@@ -4,12 +4,25 @@ import (
 	"context"
 	"testing"
 
+	"google.golang.org/adk/memory"
+	"google.golang.org/adk/session"
+
 	fagent "school-with-ai/foundation/agent"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Test helpers: mock types for the narrow interfaces defined in ports.go.
 // ──────────────────────────────────────────────────────────────────────────────
+
+// mockMemoryService satisfies memory.Service for tests without a database.
+type mockMemoryService struct{}
+
+func (m *mockMemoryService) AddSessionToMemory(_ context.Context, _ session.Session) error {
+	return nil
+}
+func (m *mockMemoryService) SearchMemory(_ context.Context, _ *memory.SearchRequest) (*memory.SearchResponse, error) {
+	return &memory.SearchResponse{}, nil
+}
 
 type mockAgent struct {
 	id          fagent.ID
@@ -293,15 +306,27 @@ func TestNodeTypeMapping(t *testing.T) {
 
 func TestRunnerAdapterConstructor(t *testing.T) {
 	t.Run("nil config resolver returns error", func(t *testing.T) {
-		_, err := NewRunnerAdapter(RunnerAdapterConfig{})
+		_, err := NewRunnerAdapter(RunnerAdapterConfig{
+			MemoryService: &mockMemoryService{},
+		})
 		if err == nil {
 			t.Error("expected error for nil ConfigResolver")
+		}
+	})
+
+	t.Run("nil memory service returns error", func(t *testing.T) {
+		_, err := NewRunnerAdapter(RunnerAdapterConfig{
+			ConfigResolver: &mockModelConfigResolver{},
+		})
+		if err == nil {
+			t.Error("expected error for nil MemoryService")
 		}
 	})
 
 	t.Run("with config resolver succeeds", func(t *testing.T) {
 		adapter, err := NewRunnerAdapter(RunnerAdapterConfig{
 			ConfigResolver: &mockModelConfigResolver{},
+			MemoryService:  &mockMemoryService{},
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -316,6 +341,7 @@ func TestRunnerAdapterConstructor(t *testing.T) {
 		adapter, err := NewRunnerAdapter(RunnerAdapterConfig{
 			ConfigResolver: &mockModelConfigResolver{},
 			AgentProvider:  provider,
+			MemoryService:  &mockMemoryService{},
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)

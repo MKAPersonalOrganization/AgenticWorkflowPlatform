@@ -14,7 +14,7 @@ var readOnlyTools = []string{
 	"read_file", "list_directory", "glob", "grep_search",
 	"web_search", "web_fetch",
 	"think",
-	"query_knowledge_base", "list_memories",
+	"query_knowledge_base",
 	"write_todos",
 	"ask_user",
 }
@@ -25,7 +25,7 @@ var enterPlanModeSchema = &agent.Schema{
 
 CRITICAL RULES WHILE IN PLAN MODE:
 • You may ONLY use read-only tools: search, read, think, query, list, ask_user, write_todos
-• You MUST NOT use any tools that create, modify, or delete content (no create_markdown, no update_markdown, no save_memory, etc.)
+• You MUST NOT use any tools that create, modify, or delete content (no create_markdown, no update_markdown, etc.)
 • You MUST NOT attempt to produce a final answer — your goal is to research and plan
 • When your research is complete, call exit_plan_mode with your structured plan
 

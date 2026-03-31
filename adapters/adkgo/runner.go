@@ -10,11 +10,13 @@ import (
 
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
+	"google.golang.org/adk/memory"
 	"google.golang.org/adk/plugin"
 	"google.golang.org/adk/plugin/retryandreflect"
 	adkrunner "google.golang.org/adk/runner"
 	"google.golang.org/adk/session"
 	adktool "google.golang.org/adk/tool"
+	"google.golang.org/adk/tool/preloadmemorytool"
 
 	fagent "school-with-ai/foundation/agent"
 	"school-with-ai/foundation/logger"
@@ -51,6 +53,7 @@ type RunnerAdapter struct {
 	a2aSubAgentProvider    A2ASubAgentProvider
 	newToolSetFactory      NewToolSetFactoryFunc
 	promptInjectors        []PromptInjector
+	memoryService          memory.Service
 	extraConfigFn          ExtraConfigFunc
 }
 
@@ -71,6 +74,7 @@ type RunnerAdapterConfig struct {
 	A2ASubAgentProvider    A2ASubAgentProvider
 	NewToolSetFactory      NewToolSetFactoryFunc
 	PromptInjectors        []PromptInjector
+	MemoryService          memory.Service // required; inject memdb.New(db) for persistent storage
 	ExtraConfigFn          ExtraConfigFunc
 }
 
@@ -78,6 +82,9 @@ type RunnerAdapterConfig struct {
 func NewRunnerAdapter(cfg RunnerAdapterConfig) (*RunnerAdapter, error) {
 	if cfg.ConfigResolver == nil {
 		return nil, fmt.Errorf("model config resolver is required")
+	}
+	if cfg.MemoryService == nil {
+		return nil, fmt.Errorf("memory service is required")
 	}
 	return &RunnerAdapter{
 		log:                    cfg.Log,
@@ -95,6 +102,7 @@ func NewRunnerAdapter(cfg RunnerAdapterConfig) (*RunnerAdapter, error) {
 		a2aSubAgentProvider:    cfg.A2ASubAgentProvider,
 		newToolSetFactory:      cfg.NewToolSetFactory,
 		promptInjectors:        cfg.PromptInjectors,
+		memoryService:          cfg.MemoryService,
 		extraConfigFn:          cfg.ExtraConfigFn,
 	}, nil
 }
@@ -234,6 +242,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 		// 9. Build the ADK-Go agent — either a workflow agent or a regular LLM agent.
 		var adkAgent agent.Agent
 		var agentPositions map[string]AgentPosition
+		memoryEnabled := agentCfg != nil && agentCfg.MemoryEnabled
 
 		if wa, isWF := isWorkflowAgent(foundAgent); isWF {
 			// ── Workflow Agent Path ──
@@ -262,14 +271,21 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			// 6. Build tools from agent config + enabled tool sets + MCP.
 			adkTools := r.resolveTools(ctx, req.UserID, agentName, modelCfg, req.SessionID, agentCfg, req, precomputedRules)
 
+			// 6b. Inject preload_memory tool for memory-enabled agents.
+			// preloadmemorytool auto-searches memory each turn and injects relevant
+			// context into the system prompt — no explicit tool call needed.
+			if memoryEnabled {
+				adkTools = append(adkTools, preloadmemorytool.New())
+			}
+
 			// 7. Build system prompt (agent config + requirements + workspace KB + skills + profile).
 			systemPrompt := r.buildSystemPrompt(ctx, foundAgent, req.UserID, agentName, req.SessionID, agentCfg, inv)
 
 			var agentModelCfg *fagent.AgentModelConfig
-		if agentCfg != nil {
-			agentModelCfg = agentCfg.ModelConfig
-		}
-		genCfg := buildGenerateContentConfig(modelCfg, agentModelCfg, req.Config)
+			if agentCfg != nil {
+				agentModelCfg = agentCfg.ModelConfig
+			}
+			genCfg := buildGenerateContentConfig(modelCfg, agentModelCfg, req.Config)
 
 			// Build native ADK tool and model callbacks: logging + enforcement.
 			var beforeModelCBs []llmagent.BeforeModelCallback
@@ -331,7 +347,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 		// to diagnose and retry with corrected arguments. Up to 3 retries are
 		// allowed per invocation; on exhaustion the plugin tells the model to
 		// stop using the failing tool rather than returning a raw error.
-		adkRunner, rErr := adkrunner.New(adkrunner.Config{
+		runnerCfg := adkrunner.Config{
 			AppName:           appName,
 			Agent:             adkAgent,
 			SessionService:    sessionSvc,
@@ -345,7 +361,11 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 					),
 				},
 			},
-		})
+		}
+		if memoryEnabled {
+			runnerCfg.MemoryService = r.memoryService
+		}
+		adkRunner, rErr := adkrunner.New(runnerCfg)
 		if rErr != nil {
 			yield(nil, fmt.Errorf("creating adk-go runner: %w", rErr))
 			return
@@ -624,6 +644,25 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 				MessageID: streamingMsgID,
 				Timestamp: time.Now(),
 			}, nil)
+		}
+
+		// 16. Persist session to memory for future cross-session recall.
+		// The session now contains all events from this run. Adding it to the
+		// memory service indexes its content for keyword-based search, so the
+		// preload_memory tool can retrieve relevant context in future runs.
+		if memoryEnabled {
+			getResp, getErr := sessionSvc.Get(ctx, &session.GetRequest{
+				AppName:   appName,
+				UserID:    req.UserID,
+				SessionID: sess.ID(),
+			})
+			if getErr == nil && getResp != nil {
+				if addErr := r.memoryService.AddSessionToMemory(ctx, getResp.Session); addErr != nil {
+					if r.log != nil {
+						r.log.Error(ctx, "failed to persist session to memory", "error", addErr, "userID", req.UserID, "sessionID", sess.ID())
+					}
+				}
+			}
 		}
 	}
 }

@@ -9,7 +9,6 @@ import (
 	"school-with-ai/platform/toolregistry"
 	"school-with-ai/platform/toolregistry/mocks"
 	"school-with-ai/plugins/calculator"
-	"school-with-ai/plugins/memory"
 )
 
 func TestToolSetFunctionality(t *testing.T) {
@@ -18,7 +17,6 @@ func TestToolSetFunctionality(t *testing.T) {
 
 	// Register required plugins for the test
 	toolregistry.RegisterPlugin(&calculator.Provider{})
-	toolregistry.RegisterPlugin(&memory.Provider{})
 
 	// Create in-memory repository and registry
 	repo := mocks.NewInMemoryRepository()
@@ -42,7 +40,7 @@ func TestToolSetFunctionality(t *testing.T) {
 	t.Logf("Found %d tool sets", len(toolSets))
 
 	// Test: Verify specific tool sets exist
-	expectedToolSets := []string{"calculator-set", "memory-set"}
+	expectedToolSets := []string{"calculator-set"}
 	for _, expectedID := range expectedToolSets {
 		toolSet, err := registry.GetToolSet(ctx, expectedID)
 		if err != nil {

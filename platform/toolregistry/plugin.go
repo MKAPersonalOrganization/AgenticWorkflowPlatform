@@ -12,14 +12,6 @@ import (
 	"github.com/a-h/templ"
 )
 
-// MemoryService defines the interface for managing long-term memory storage.
-// This local definition mirrors modules/chat/memory.Service so that the
-// toolregistry package does not import the chat module directly.
-type MemoryService interface {
-	Load(ctx context.Context, userID string) (string, error)
-	Save(ctx context.Context, userID string, content string) error
-}
-
 // ToolUIContext provides the data required for a plugin to render its UI.
 type ToolUIContext struct {
 	MessageID    string
@@ -63,9 +55,8 @@ type SettingsField struct {
 //	knowledgebase → EdgequakeBaseURL, OpenAIAPIKey, ModelID, PluginSettings, AllowedKBNamespaces
 //	tts           → ArtifactStore, OpenAIAPIKey, TTSConfig, PluginSettings
 //	document      → ArtifactStore
-//	memory        → MemoryService
 //	websearch     → PluginSettings
-//	askuser, calculator, codebase, cognitive, fsplugin, library, planmode, skills, todos, tracker → (none)
+//	askuser, calculator, codebase, cognitive, fsplugin, library, planmode, todos, tracker → (none)
 //
 // The interface is intentionally kept as a single composite rather than split
 // into narrow per-concern interfaces. With only 8 methods and 15 plugins, the
@@ -87,11 +78,6 @@ type FactoryDeps interface {
 	// ModelID returns the user's configured LLM model ID.
 	// Used by: knowledgebase.
 	ModelID() string
-
-	// MemoryService returns a memory service backed by the artifact store.
-	// Constructed lazily on first call to avoid allocation when unused.
-	// Used by: memory.
-	MemoryService() MemoryService
 
 	// TTSConfig returns the TTS API key, model, and voice.
 	// Falls back to OpenAIAPIKey for the API key if no dedicated TTS key is set.

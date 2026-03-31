@@ -100,6 +100,7 @@ type AgentDefinition struct {
 	GlobalInstruction        string `json:"global_instruction,omitempty" db:"global_instruction"`
 	InputSchemaJSON          string `json:"input_schema,omitempty" db:"input_schema"`
 	OutputSchemaJSON         string `json:"output_schema,omitempty" db:"output_schema"`
+	MemoryEnabled            bool   `json:"memory_enabled" db:"memory_enabled"`
 
 	// ── Model Configuration ──
 	// ModelConfig holds per-agent LLM generation parameter overrides.

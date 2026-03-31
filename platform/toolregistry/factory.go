@@ -22,7 +22,6 @@ type ExecutableToolFactory struct {
 	ttsVoice            string
 	pluginSettings      map[string]map[string]string // plugin_id → key → value
 	allowedKBNamespaces []string                     // workspace IDs the agent may query
-	memoryFactory       func(artifact.Service) MemoryService
 }
 
 // NewExecutableToolFactory creates a new tool factory.
@@ -30,14 +29,6 @@ func NewExecutableToolFactory(artifactStore artifact.Service) *ExecutableToolFac
 	return &ExecutableToolFactory{
 		artifactStore: artifactStore,
 	}
-}
-
-// SetMemoryFactory injects a factory function that creates a MemoryService
-// from an artifact store. This keeps toolregistry independent of modules/chat/memory.
-func (f *ExecutableToolFactory) SetMemoryFactory(fn func(artifact.Service) MemoryService) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.memoryFactory = fn
 }
 
 // SetEdgequakeConfig sets the edgequake base URL and LLM config for knowledge base tools.
@@ -142,9 +133,7 @@ func (f *ExecutableToolFactory) CreateExecutableTool(ctx context.Context, tool *
 // depResolver implements FactoryDeps using lazy, typed getters.
 // Dependencies are read from the factory under RLock to ensure thread safety.
 type depResolver struct {
-	factory     *ExecutableToolFactory
-	memoryOnce  sync.Once
-	memoryCache MemoryService
+	factory *ExecutableToolFactory
 }
 
 func (r *depResolver) ArtifactStore() artifact.Service {
@@ -169,19 +158,6 @@ func (r *depResolver) ModelID() string {
 	r.factory.mu.RLock()
 	defer r.factory.mu.RUnlock()
 	return r.factory.modelID
-}
-
-func (r *depResolver) MemoryService() MemoryService {
-	r.memoryOnce.Do(func() {
-		r.factory.mu.RLock()
-		store := r.factory.artifactStore
-		fn := r.factory.memoryFactory
-		r.factory.mu.RUnlock()
-		if fn != nil {
-			r.memoryCache = fn(store)
-		}
-	})
-	return r.memoryCache
 }
 
 func (r *depResolver) TTSConfig() (apiKey, model, voice string) {

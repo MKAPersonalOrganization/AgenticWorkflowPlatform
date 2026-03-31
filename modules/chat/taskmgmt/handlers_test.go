@@ -28,7 +28,7 @@ func (m *mockAuthService) IsAuthenticated(ctx context.Context) bool            {
 func TestSSECORSOrigin(t *testing.T) {
 	t.Parallel()
 	const appURL = "https://school.example.com"
-	handler := taskmgmthandlers.NewTaskManagementHandler(newTestLogger(), nil, nil, &mockAuthService{}, nil, nil, nil, nil, nil, nil, nil, nil, nil, "", appURL, taskmgmthandlers.DefaultSSEConfig())
+	handler := taskmgmthandlers.NewTaskManagementHandler(newTestLogger(), nil, nil, &mockAuthService{}, nil, nil, nil, nil, nil, nil, nil, nil, "", appURL, taskmgmthandlers.DefaultSSEConfig())
 	req := httptest.NewRequest(http.MethodGet, "/v1/tasks/test-job:subscribe", nil)
 	rec := httptest.NewRecorder()
 	handler.StreamJobEvents(rec, req)
@@ -43,7 +43,7 @@ func TestSSECORSOrigin(t *testing.T) {
 
 func TestSSECORSOriginNotWildcard(t *testing.T) {
 	t.Parallel()
-	handler := taskmgmthandlers.NewTaskManagementHandler(newTestLogger(), nil, nil, &mockAuthService{}, nil, nil, nil, nil, nil, nil, nil, nil, nil, "", "", taskmgmthandlers.DefaultSSEConfig())
+	handler := taskmgmthandlers.NewTaskManagementHandler(newTestLogger(), nil, nil, &mockAuthService{}, nil, nil, nil, nil, nil, nil, nil, nil, "", "", taskmgmthandlers.DefaultSSEConfig())
 	req := httptest.NewRequest(http.MethodGet, "/v1/tasks/test-job:subscribe", nil)
 	rec := httptest.NewRecorder()
 	handler.StreamJobEvents(rec, req)
@@ -55,7 +55,7 @@ func TestSSECORSOriginNotWildcard(t *testing.T) {
 
 func TestErrorResponsesDoNotLeakInternals(t *testing.T) {
 	t.Parallel()
-	handler := taskmgmthandlers.NewTaskManagementHandler(newTestLogger(), nil, nil, &mockAuthService{}, nil, nil, nil, nil, nil, nil, nil, nil, nil, "", "", taskmgmthandlers.DefaultSSEConfig())
+	handler := taskmgmthandlers.NewTaskManagementHandler(newTestLogger(), nil, nil, &mockAuthService{}, nil, nil, nil, nil, nil, nil, nil, nil, "", "", taskmgmthandlers.DefaultSSEConfig())
 	req := httptest.NewRequest(http.MethodPost, "/v1/message:send", nil)
 	rec := httptest.NewRecorder()
 	handler.SendMessage(rec, req)
