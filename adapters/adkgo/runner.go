@@ -196,11 +196,16 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			modelCfg = overridden
 		}
 
-		// 4. Build in-memory session from thread history.
+		// 4. Build in-memory session from thread history (if any).
 		//
-		// Must happen before Invocation is constructed so inv.State reflects
-		// any values accumulated by prior agents (e.g. via Config.OutputKey).
-		// InstructionFunc and Requirements read inv.State.
+		// When there is existing conversation history, we replay it into an
+		// adk-go session so the LLM agent sees prior context. For fresh
+		// conversations (no history), we skip this — the runner's
+		// AutoCreateSession will create the session on the first Run call.
+		//
+		// Session state from history must be available before Invocation is
+		// constructed so inv.State reflects values accumulated by prior agents
+		// (e.g. via Config.OutputKey).
 		sessionSvc := session.InMemoryService()
 		var sess session.Session
 		if agg != nil && len(agg.Messages) > 0 {
@@ -209,24 +214,13 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 				yield(nil, fmt.Errorf("building session from thread: %w", err))
 				return
 			}
-		} else {
-			threadID := req.SessionID
-			if threadID == "" {
-				threadID = generateID()
-			}
-			createResp, cErr := sessionSvc.Create(ctx, &session.CreateRequest{
-				AppName:   appName,
-				UserID:    req.UserID,
-				SessionID: threadID,
-			})
-			if cErr != nil {
-				yield(nil, fmt.Errorf("creating session: %w", cErr))
-				return
-			}
-			sess = createResp.Session
 		}
 
 		// 5. Build invocation with history and live session state for Requirements.
+		var state fagent.ReadonlyState
+		if sess != nil {
+			state = &adkSessionState{state: sess.State()}
+		}
 		inv := &fagent.Invocation{
 			ID:        req.InvocationID,
 			SessionID: req.SessionID,
@@ -234,7 +228,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			Message:   req.Message,
 			Config:    req.Config,
 			Context:   req.Context,
-			State:     &adkSessionState{state: sess.State()},
+			State:     state,
 		}
 		if agg != nil {
 			inv.History = threadHistoryToMessages(agg.Messages)
@@ -441,7 +435,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			}))
 		}
 
-		for adkEvt, adkErr := range adkRunner.Run(ctx, req.UserID, sess.ID(), userMsg, agent.RunConfig{
+		for adkEvt, adkErr := range adkRunner.Run(ctx, req.UserID, req.SessionID, userMsg, agent.RunConfig{
 			StreamingMode: agent.StreamingModeSSE,
 		}, runOpts...) {
 			if adkErr != nil {
@@ -667,12 +661,12 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			getResp, getErr := sessionSvc.Get(ctx, &session.GetRequest{
 				AppName:   appName,
 				UserID:    req.UserID,
-				SessionID: sess.ID(),
+				SessionID: req.SessionID,
 			})
 			if getErr == nil && getResp != nil {
 				if addErr := r.memoryService.AddSessionToMemory(ctx, getResp.Session); addErr != nil {
 					if r.log != nil {
-						r.log.Error(ctx, "failed to persist session to memory", "error", addErr, "userID", req.UserID, "sessionID", sess.ID())
+						r.log.Error(ctx, "failed to persist session to memory", "error", addErr, "userID", req.UserID, "sessionID", req.SessionID)
 					}
 				}
 			}
