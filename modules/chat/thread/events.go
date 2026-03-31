@@ -318,6 +318,22 @@ func (e *A2AArtifactReceived) EventType() string         { return "A2AArtifactRe
 func (e *A2AArtifactReceived) EventTimestamp() time.Time { return e.Timestamp }
 func (e *A2AArtifactReceived) AggregateID() string       { return e.ThreadID }
 
+// ArtifactVersionSaved is emitted when an agent creates or updates an artifact
+// via the ADK artifact service. The frontend uses this to display artifact
+// cards with download/preview links and version history.
+// This is a transient event — NOT persisted to the event store.
+type ArtifactVersionSaved struct {
+	ThreadID  string    `json:"threadId"`
+	AgentName string    `json:"agentName,omitempty"`
+	FileName  string    `json:"fileName"`
+	Version   int64     `json:"version"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+func (e *ArtifactVersionSaved) EventType() string         { return "ArtifactVersionSaved" }
+func (e *ArtifactVersionSaved) EventTimestamp() time.Time { return e.Timestamp }
+func (e *ArtifactVersionSaved) AggregateID() string       { return e.ThreadID }
+
 // StateChangeReported is emitted when an agent sets a value in session state
 // (e.g. via Config.OutputKey or a tool's StateDelta). This is a transient
 // event — NOT persisted to the event store — used to notify the frontend of

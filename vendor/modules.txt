@@ -707,6 +707,7 @@ google.golang.org/adk/session
 google.golang.org/adk/tool
 google.golang.org/adk/tool/exitlooptool
 google.golang.org/adk/tool/functiontool
+google.golang.org/adk/tool/loadartifactstool
 google.golang.org/adk/tool/preloadmemorytool
 google.golang.org/adk/tool/toolconfirmation
 # google.golang.org/genai v1.43.0

@@ -59,6 +59,9 @@ func TranslateEvent(evt *session.Event, ctx EventContext) []thread.Event {
 	// Extract state delta events (ADK-Go EventActions.StateDelta).
 	events = append(events, translateStateDelta(evt, ctx)...)
 
+	// Extract artifact delta events (ADK-Go EventActions.ArtifactDelta).
+	events = append(events, translateArtifactDelta(evt, ctx)...)
+
 	// Extract tool confirmation events (ADK-Go HITL).
 	events = append(events, translateToolConfirmations(evt, ctx)...)
 
@@ -241,6 +244,34 @@ func translateStateDelta(evt *session.Event, ctx EventContext) []thread.Event {
 			AgentName: ctx.AgentName,
 			Key:       k,
 			Value:     v,
+			Timestamp: now,
+		})
+	}
+	return events
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Artifact Delta Translation
+//
+// ADK-Go tracks artifact saves in EventActions.ArtifactDelta (map[string]int64).
+// Each entry maps an artifact filename to the version that was saved during this
+// event. We translate these to ArtifactVersionSaved domain events so the
+// frontend can display artifact cards with version info.
+// ──────────────────────────────────────────────────────────────────────────────
+
+func translateArtifactDelta(evt *session.Event, ctx EventContext) []thread.Event {
+	if evt == nil || len(evt.Actions.ArtifactDelta) == 0 {
+		return nil
+	}
+
+	var events []thread.Event
+	now := coalesceTime(evt.Timestamp)
+	for fileName, version := range evt.Actions.ArtifactDelta {
+		events = append(events, &thread.ArtifactVersionSaved{
+			ThreadID:  ctx.ThreadID,
+			AgentName: ctx.AgentName,
+			FileName:  fileName,
+			Version:   version,
 			Timestamp: now,
 		})
 	}
