@@ -283,25 +283,3 @@ func (h *TaskManagementHandler) UploadAttachment(w http.ResponseWriter, r *http.
 		"fileName": fileName,
 	})
 }
-
-// GetMemory retrieves the user's long-term memory.
-// GET /v1/memory
-func (h *TaskManagementHandler) GetMemory(w http.ResponseWriter, r *http.Request) {
-	user := h.authService.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	content, err := h.memoryStore.Load(r.Context(), user.ID)
-	if err != nil {
-		h.log.Error(r.Context(), "failed to load memory", "error", err, "userID", user.ID)
-		http.Error(w, "Failed to load memory", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]string{"content": content}); err != nil {
-		h.log.Error(r.Context(), "failed to encode memory response", "error", err)
-	}
-}

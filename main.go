@@ -30,10 +30,10 @@ import (
 	"school-with-ai/foundation/middleware"
 	"school-with-ai/infra/githubauth"
 	"school-with-ai/infra/googleauth"
+	"school-with-ai/infra/memdb"
 	"school-with-ai/infra/projection/subscriber"
 	"school-with-ai/infra/sqldb"
 	"school-with-ai/infra/sqldb/migrate"
-	chatmemory "school-with-ai/modules/chat/memory"
 	"school-with-ai/modules/chat/thread"
 	"school-with-ai/modules/knowledge/edgequake"
 	"school-with-ai/platform/artifact"
@@ -61,7 +61,6 @@ import (
 	projectionStats "school-with-ai/modules/analytics/statistics"
 
 	"school-with-ai/plugins/fsplugin"
-	memoryplugin "school-with-ai/plugins/memory"
 
 	healthhandlers "school-with-ai/foundation/health"
 	a2amod "school-with-ai/modules/a2a"
@@ -425,7 +424,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	toolregistry.RegisterPlugin(&askuser.Provider{})
 	toolregistry.RegisterPlugin(&knowledgebase.Provider{})
 	toolregistry.RegisterPlugin(&library.Provider{})
-	toolregistry.RegisterPlugin(&memoryplugin.Provider{})
 	toolregistry.RegisterPlugin(&planmode.Provider{})
 	toolregistry.RegisterPlugin(&todos.Provider{})
 	toolregistry.RegisterPlugin(&tracker.Provider{})
@@ -553,9 +551,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	newToolSetFactory := adkgo.NewToolSetFactoryFunc(func(cfg adkgo.ToolFactoryConfig) adkgo.ToolSetFactory {
 		f := toolregistry.NewExecutableToolFactory(artifactService)
 		f.SetToolRegistry(toolRegistry)
-		f.SetMemoryFactory(func(store artifact.Service) toolregistry.MemoryService {
-			return chatmemory.NewArtifactMemoryService(store)
-		})
 		// Read tool-specific config from the generic Extra map.
 		if url := cfg.Extra["edgequake_base_url"]; url != "" {
 			f.SetEdgequakeConfig(url, cfg.ModelAPIKey, cfg.ModelID)
@@ -610,6 +605,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		A2ASubAgentProvider:    &a2aSubAgentAdapter{svc: a2aModule.Service()},
 		NewToolSetFactory:      newToolSetFactory,
 		PromptInjectors:        []adkgo.PromptInjector{kbPromptInjector},
+		MemoryService:          memdb.New(db),
 		ExtraConfigFn:          extraConfigFn,
 	})
 	if err != nil {

@@ -1005,3 +1005,40 @@ ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS model_config JSONB;
 -- Stores optional provider + model name override as JSONB.
 -- NULL means "use user's global AI provider/model".
 ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS model_override JSONB;
+
+-- Version: 1.70
+-- Description: Add per-agent memory toggle.
+-- When true, the adapter injects preloadmemorytool and persists sessions
+-- to the memory service after each run, enabling cross-session recall.
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS memory_enabled BOOLEAN NOT NULL DEFAULT false;
+
+-- Version: 1.71
+-- Description: Persistent memory store for cross-session agent recall.
+-- Stores indexed session events with PostgreSQL full-text search support.
+-- Replaces the in-memory singleton so memories survive process restarts
+-- and are accessible across horizontally-scaled instances.
+CREATE TABLE IF NOT EXISTS memory_entries (
+    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    app_name       TEXT        NOT NULL DEFAULT '',
+    user_id        TEXT        NOT NULL,
+    session_id     TEXT        NOT NULL,
+    event_id       TEXT        NOT NULL,
+    author         TEXT        NOT NULL DEFAULT '',
+    content        JSONB,
+    content_text   TEXT        NOT NULL DEFAULT '',
+    custom_metadata JSONB,
+    event_timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Composite index for per-user scoped lookups (used by both Add and Search).
+CREATE INDEX IF NOT EXISTS idx_memory_entries_user
+    ON memory_entries(app_name, user_id);
+
+-- GIN index on the extracted text column for full-text search.
+CREATE INDEX IF NOT EXISTS idx_memory_entries_fts
+    ON memory_entries USING GIN(to_tsvector('english', content_text));
+
+-- Unique constraint to prevent duplicate event indexing within a session.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_memory_entries_session_event
+    ON memory_entries(app_name, user_id, session_id, event_id);

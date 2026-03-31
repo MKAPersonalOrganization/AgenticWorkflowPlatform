@@ -10,7 +10,6 @@ import (
 	"school-with-ai/components/selectbox"
 	switchcomp "school-with-ai/components/switch"
 	"school-with-ai/components/tabs"
-	"school-with-ai/plugins/memory"
 )
 
 // Settings renders the settings dialog
@@ -657,16 +656,6 @@ templ Settings() {
 							<!-- Data Tab -->
 							@tabs.Content(tabs.ContentProps{Value: "data", Class: "space-y-4 animate-in fade-in duration-200"}) {
 								<div
-									class="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-accent transition-colors group cursor-pointer"
-									@click="$dispatch('open-memory-dialog')"
-								>
-									<div class="space-y-0.5">
-										<div class="text-foreground font-medium">{ i18n.T(ctx, "Long-Term Memory") }</div>
-										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "View what the AI remembers about you.") }</p>
-									</div>
-									@icon.Brain(icon.Props{Class: "size-4 text-muted-foreground group-hover:text-foreground"})
-								</div>
-								<div
 									class="flex items-center justify-between p-3 rounded-xl border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 transition-colors group cursor-pointer"
 									@click={ fmt.Sprintf("if(confirm('%s')) { sessions = []; showSettings = false; }", i18n.T(ctx, "Are you sure you want to clear all conversations?")) }
 								>
@@ -1140,7 +1129,6 @@ templ Settings() {
 			</div>
 		}
 	</div>
-	@memory.MemoryDialog()
 	@profileDialog()
 	@pricingDialog()
 	@checkoutDialog()

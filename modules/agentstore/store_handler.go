@@ -53,6 +53,7 @@ type createRequest struct {
 	GlobalInstruction        string                     `json:"globalInstruction"`
 	InputSchema              string                     `json:"inputSchema"`
 	OutputSchema             string                     `json:"outputSchema"`
+	MemoryEnabled            bool                       `json:"memoryEnabled"`
 	ModelConfig              *agentModelConfigRequest   `json:"modelConfig,omitempty"`
 	ModelOverride            *agentModelOverrideRequest `json:"modelOverride,omitempty"`
 }
@@ -70,6 +71,7 @@ type updateRequest struct {
 	GlobalInstruction        string                     `json:"globalInstruction"`
 	InputSchema              string                     `json:"inputSchema"`
 	OutputSchema             string                     `json:"outputSchema"`
+	MemoryEnabled            bool                       `json:"memoryEnabled"`
 	ModelConfig              *agentModelConfigRequest   `json:"modelConfig,omitempty"`
 	ModelOverride            *agentModelOverrideRequest `json:"modelOverride,omitempty"`
 }
@@ -90,6 +92,7 @@ type agentResponse struct {
 	GlobalInstruction        string                   `json:"globalInstruction,omitempty"`
 	InputSchema              string                   `json:"inputSchema,omitempty"`
 	OutputSchema             string                   `json:"outputSchema,omitempty"`
+	MemoryEnabled            bool                     `json:"memoryEnabled"`
 	ModelConfig              *AgentModelConfig        `json:"modelConfig,omitempty"`
 	ModelOverride            *AgentModelOverride      `json:"modelOverride,omitempty"`
 	ShareToken               string                   `json:"shareToken,omitempty"`
@@ -156,6 +159,7 @@ func toAgentResponse(a *AgentDefinition) agentResponse {
 		GlobalInstruction:        a.GlobalInstruction,
 		InputSchema:              a.InputSchemaJSON,
 		OutputSchema:             a.OutputSchemaJSON,
+		MemoryEnabled:            a.MemoryEnabled,
 		ModelConfig:              a.ModelConfig,
 		ModelOverride:            a.ModelOverride,
 		ShareToken:               a.ShareToken,
@@ -200,6 +204,7 @@ func (h *storeHandler) create(w http.ResponseWriter, r *http.Request) {
 		GlobalInstruction:        req.GlobalInstruction,
 		InputSchemaJSON:          req.InputSchema,
 		OutputSchemaJSON:         req.OutputSchema,
+		MemoryEnabled:            req.MemoryEnabled,
 		ModelConfig:              toModelConfig(req.ModelConfig),
 		ModelOverride:            toModelOverride(req.ModelOverride),
 	}
@@ -269,6 +274,7 @@ func (h *storeHandler) update(w http.ResponseWriter, r *http.Request) {
 		GlobalInstruction:        req.GlobalInstruction,
 		InputSchemaJSON:          req.InputSchema,
 		OutputSchemaJSON:         req.OutputSchema,
+		MemoryEnabled:            req.MemoryEnabled,
 		ModelConfig:              toModelConfig(req.ModelConfig),
 		ModelOverride:            toModelOverride(req.ModelOverride),
 	}
@@ -481,6 +487,7 @@ func (h *storeHandler) getSharedAgent(w http.ResponseWriter, r *http.Request) {
 		OutputKey:                agent.OutputKey,
 		IncludeContents:          agent.IncludeContents,
 		GlobalInstruction:        agent.GlobalInstruction,
+		MemoryEnabled:            agent.MemoryEnabled,
 		CreatedAt:                agent.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt:                agent.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}

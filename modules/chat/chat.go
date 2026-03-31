@@ -29,7 +29,6 @@ import (
 	"school-with-ai/foundation/middleware"
 	"school-with-ai/modules/chat/agentorchestrator"
 	"school-with-ai/modules/chat/chatcontracts"
-	"school-with-ai/modules/chat/memory"
 	"school-with-ai/modules/chat/projection/agui"
 	"school-with-ai/modules/chat/projection/llmcontext"
 	"school-with-ai/modules/chat/projections"
@@ -92,7 +91,6 @@ type Module struct {
 	threadQuery    chatcontracts.ThreadQueryService
 	chatHandler    *taskmgmthandlers.TaskManagementHandler
 	aguiHandler    *aguihandlers.AguiProjectionHandler
-	memoryService  *memory.ArtifactMemoryService
 
 	// Stored for two-phase construction (SetRunner creates task manager + handlers).
 	deps Dependencies
@@ -113,9 +111,6 @@ func New(deps Dependencies) *Module {
 	threadRepo := thread.NewThreadRepository(threadmgmt.NewEventStoreAdapter(deps.EventStore), deps.SnapshotStore)
 	threadMgmtSvc := threadmgmt.New(log, threadRepo)
 
-	// Memory service (artifact-backed)
-	memorySvc := memory.NewArtifactMemoryService(deps.ArtifactService)
-
 	// Thread query service (wraps AGUI projection for UI queries)
 	threadQuerySvc := projections.NewUIProjectionService(aguiProjection)
 
@@ -134,7 +129,6 @@ func New(deps Dependencies) *Module {
 		aguiProjection: aguiProjection,
 		llmProjection:  llmProjection,
 		threadQuery:    threadQuerySvc,
-		memoryService:  memorySvc,
 		deps:           deps,
 	}
 }
@@ -167,7 +161,6 @@ func (m *Module) SetRunner(runner agentorchestrator.Runner) {
 		m.deps.Broadcaster,
 		m.threadMgmt,
 		m.deps.ArtifactService,
-		m.memoryService,
 		m.deps.ToolRegistry,
 		m.deps.RequirementConfigService,
 		m.deps.DocumentProvider,
@@ -225,9 +218,6 @@ func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 	// Artifacts
 	r.Get("/v1/threads/{threadId}/artifacts", authMW.RequireAuthFunc(h.ListArtifacts))
 	r.Get("/v1/threads/{threadId}/artifacts/{fileName}", authMW.RequireAuthFunc(h.DownloadArtifact))
-
-	// Memory
-	r.Get("/v1/memory", authMW.RequireAuthFunc(h.GetMemory))
 
 	// Tool sets (per-agent)
 	r.Get("/v1/agents/{agentId}/toolsets", authMW.RequireAuthFunc(h.ListAgentToolSets))

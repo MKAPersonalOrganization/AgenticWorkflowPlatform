@@ -229,6 +229,7 @@ func (s *service) forkShared(ctx context.Context, token, targetUserID string) (*
 		GlobalInstruction:        source.GlobalInstruction,
 		InputSchemaJSON:          source.InputSchemaJSON,
 		OutputSchemaJSON:         source.OutputSchemaJSON,
+		MemoryEnabled:            source.MemoryEnabled,
 	}
 
 	// For composed agents, fork all referenced sub-agents and remap IDs.
