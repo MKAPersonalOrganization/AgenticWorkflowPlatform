@@ -545,15 +545,17 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 		afterModelCBs = append(afterModelCBs, modelAfter)
 	}
 
-	// 2. Block and confirmation enforcement — before-only.
+	// 2. Block enforcement — before-only.
 	var enforcerMWs []fagent.Middleware
 	if wbc.adapter.blockEnforcer != nil {
 		enforcerMWs = append(enforcerMWs, wbc.adapter.blockEnforcer.BlockMiddleware(node.AgentID))
 	}
-	if wbc.adapter.confirmEnforcer != nil {
-		enforcerMWs = append(enforcerMWs, wbc.adapter.confirmEnforcer.ConfirmationMiddleware(node.AgentID))
-	}
 	beforeToolCBs = append(beforeToolCBs, buildBeforeOnlyCallbacks(agentName, wbc.threadID, wbc.userID, enforcerMWs...)...)
+
+	// 2b. Confirmation enforcement — ADK-native HITL protocol.
+	if wbc.adapter.confirmChecker != nil {
+		beforeToolCBs = append(beforeToolCBs, buildConfirmationCallback(wbc.adapter.confirmChecker, agentName, wbc.userID, ""))
+	}
 
 	return buildLLMAgent(llmAgentParams{
 		name:                 agentName,

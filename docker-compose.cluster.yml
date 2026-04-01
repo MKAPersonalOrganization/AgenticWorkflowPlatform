@@ -429,7 +429,7 @@ services:
     networks:
       - intranet
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U appuser"]
+      test: ["CMD-SHELL", "pg_isready -U appuser -d projections"]
       interval: 10s
       timeout: 5s
       retries: 5

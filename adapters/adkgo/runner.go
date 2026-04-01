@@ -63,7 +63,7 @@ type RunnerAdapter struct {
 	profileProvider        UserContextProvider
 	toolReqs               ToolRequirementsService
 	blockEnforcer          BlockEnforcer
-	confirmEnforcer        ConfirmationEnforcer
+	confirmChecker         ConfirmationChecker
 	mcpResolver            MCPToolResolver
 	a2aResolver            A2AToolResolver
 	a2aSubAgentProvider    A2ASubAgentProvider
@@ -85,7 +85,7 @@ type RunnerAdapterConfig struct {
 	ProfileProvider        UserContextProvider
 	ToolReqs               ToolRequirementsService
 	BlockEnforcer          BlockEnforcer
-	ConfirmEnforcer        ConfirmationEnforcer
+	ConfirmChecker         ConfirmationChecker
 	MCPResolver            MCPToolResolver
 	A2AResolver            A2AToolResolver
 	A2ASubAgentProvider    A2ASubAgentProvider
@@ -114,7 +114,7 @@ func NewRunnerAdapter(cfg RunnerAdapterConfig) (*RunnerAdapter, error) {
 		profileProvider:        cfg.ProfileProvider,
 		toolReqs:               cfg.ToolReqs,
 		blockEnforcer:          cfg.BlockEnforcer,
-		confirmEnforcer:        cfg.ConfirmEnforcer,
+		confirmChecker:         cfg.ConfirmChecker,
 		mcpResolver:            cfg.MCPResolver,
 		a2aResolver:            cfg.A2AResolver,
 		a2aSubAgentProvider:    cfg.A2ASubAgentProvider,
@@ -323,16 +323,19 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 				afterModelCBs = append(afterModelCBs, modelAfter)
 			}
 
-			// 2. Block and confirmation enforcement — before-only foundation
-			//    middlewares converted to a single native BeforeToolCallback.
+			// 2. Block enforcement — before-only foundation
+			//    middleware converted to a native BeforeToolCallback.
 			var enforcerMWs []fagent.Middleware
 			if r.blockEnforcer != nil {
 				enforcerMWs = append(enforcerMWs, r.blockEnforcer.BlockMiddleware(agentName))
 			}
-			if r.confirmEnforcer != nil {
-				enforcerMWs = append(enforcerMWs, r.confirmEnforcer.ConfirmationMiddleware(agentName))
-			}
 			beforeToolCBs = append(beforeToolCBs, buildBeforeOnlyCallbacks(agentName, req.SessionID, req.UserID, enforcerMWs...)...)
+
+			// 2b. Confirmation enforcement — ADK-native HITL protocol.
+			//    Uses ctx.RequestConfirmation() instead of legacy io.Confirm().
+			if r.confirmChecker != nil {
+				beforeToolCBs = append(beforeToolCBs, buildConfirmationCallback(r.confirmChecker, agentName, req.UserID, ""))
+			}
 
 			var aErr error
 			adkAgent, aErr = buildLLMAgent(llmAgentParams{

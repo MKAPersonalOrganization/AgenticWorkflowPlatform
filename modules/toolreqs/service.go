@@ -29,8 +29,8 @@ import (
 //   - [ConfirmationRequirement]: user approval policies (ADK-Go style)
 //   - Any additional [ToolRequirement]s registered at startup or runtime
 //
-// It also exposes the [ConfirmationMiddleware] for the adapter layer to
-// integrate into the tool execution pipeline.
+// It also exposes the [CheckConfirmation] method for the adapter layer to
+// build ADK-native confirmation callbacks.
 type Service struct {
 	log        *logger.Logger
 	evaluator  *Evaluator
@@ -136,14 +136,14 @@ func (s *Service) Confirmation() *ConfirmationRequirement {
 	return s.confirmReq
 }
 
-// ConfirmationMiddleware returns a [agent.Middleware] scoped to the given agent
-// that enforces user confirmation at tool execution time.
+// CheckConfirmation determines whether a tool call needs user confirmation
+// for the given user/agent/tool combination. Checks both per-user DB config
+// and admin-level global policies.
 //
-// The middleware reads per-user requirement configs from the DB (via this
-// service) and also checks admin-level global policies. This ensures per-user
-// isolation — user A's confirmation settings don't affect user B.
-func (s *Service) ConfirmationMiddleware(agentID string) agent.Middleware {
-	return ConfirmationMiddleware(s, s.confirmReq, agentID)
+// Returns (needsConfirmation, hint). Used by the adapter layer to build
+// ADK-native BeforeToolCallbacks that use ctx.RequestConfirmation().
+func (s *Service) CheckConfirmation(ctx context.Context, userID, agentID, toolSetID, toolName string, args map[string]any) (bool, string) {
+	return CheckConfirmation(ctx, s, s.confirmReq, userID, agentID, toolSetID, toolName, args)
 }
 
 // BlockMiddleware returns a [agent.Middleware] scoped to the given agent that

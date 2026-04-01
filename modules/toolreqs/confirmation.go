@@ -43,7 +43,8 @@ type ConfirmationPolicy struct {
 //
 // This follows the ADK-Go pattern:
 //   - Resolution phase: [Evaluate] returns ActionConfirm (tool is available but needs approval).
-//   - Execution phase: [Middleware] intercepts the call and invokes io.Confirm().
+//   - Execution phase: [CheckConfirmation] determines if confirmation is needed,
+//     then the adapter uses ADK's native RequestConfirmation() protocol.
 type ConfirmationRequirement struct {
 	mu sync.RWMutex
 
@@ -132,8 +133,8 @@ func (r *ConfirmationRequirement) RemoveAgentPolicy(agentID, toolName string) {
 // =============================================================================
 
 // RequiresConfirmation checks whether a tool requires user confirmation.
-// This is used at execution time (in the middleware) to decide whether
-// to invoke io.Confirm().
+// This is used at execution time (by CheckConfirmation) to determine
+// whether the tool needs HITL approval via ADK's RequestConfirmation protocol.
 func (r *ConfirmationRequirement) RequiresConfirmation(agentID, toolName string, args map[string]any) bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

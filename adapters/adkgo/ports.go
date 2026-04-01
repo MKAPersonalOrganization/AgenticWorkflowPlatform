@@ -96,13 +96,11 @@ type BlockEnforcer interface {
 	BlockMiddleware(agentID string) agent.Middleware
 }
 
-// ConfirmationEnforcer provides runtime enforcement for user confirmation.
-// It reads per-user requirement configs from the database at execution time,
-// ensuring per-user isolation.
-type ConfirmationEnforcer interface {
-	// ConfirmationMiddleware returns middleware that triggers user confirmation
-	// for tools configured with require_confirmation action.
-	ConfirmationMiddleware(agentID string) agent.Middleware
+// ConfirmationChecker determines whether a tool call needs user confirmation.
+// It checks per-user DB config and admin-level global policies.
+// Implemented by toolreqs.Service.
+type ConfirmationChecker interface {
+	CheckConfirmation(ctx context.Context, userID, agentID, toolSetID, toolName string, args map[string]any) (bool, string)
 }
 
 // MCPToolResolver resolves MCP-based tools for a user.
