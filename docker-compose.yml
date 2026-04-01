@@ -65,7 +65,7 @@ services:
       minio:
         condition: service_healthy
 
-  # Redis for Asynq task queue — no host port in base (only in override for dev)
+  # Redis for rate limiting and permission caching
   redis:
     image: redis:7-alpine
     # No host port binding — only reachable inside intranet network

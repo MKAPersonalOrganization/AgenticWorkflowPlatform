@@ -21,7 +21,7 @@ import { LIFECYCLE_EVENT_TYPES } from './constants.js';
 export function createStreamingMethods() {
     return {
         /**
-         * Start SSE streaming for a message
+         * Start SSE streaming for a message using single POST + SSE flow
          * @param {string} message - User message
          * @param {string} threadId - Thread ID
          * @param {string} agentName - Optional agent name to target
@@ -43,7 +43,7 @@ export function createStreamingMethods() {
             state.errorMessage = null;
 
             try {
-                // Step 1: Enqueue the task (A2A compliant)
+                // Build request body
                 const body = {
                     contextId: threadId,
                     message: message,
@@ -60,12 +60,14 @@ export function createStreamingMethods() {
                 // Attach files as pre-uploaded artifact references (compact, no base64).
                 if (attachedFiles && attachedFiles.length > 0) {
                     body.attachments = attachedFiles.map(f => ({
-                        url: f.url,        // artifact URL (e.g. /v1/threads/.../artifacts/file.wav)
-                        mimeType: f.type,  // e.g. 'image/png', 'audio/wav'
-                        fileName: f.name,  // original filename
+                        url: f.url,
+                        mimeType: f.type,
+                        fileName: f.name,
                     }));
                 }
 
+                // Single POST request that returns SSE stream inline
+                // The response is a text/event-stream with AG-UI events
                 const response = await fetch('/v1/message:send', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -73,21 +75,18 @@ export function createStreamingMethods() {
                 });
 
                 if (!response.ok) {
-                    throw new Error(`${window.i18n.t('Failed to enqueue task')}: ${response.statusText}`);
+                    const errorText = await response.text();
+                    throw new Error(`${window.i18n.t('Failed to send message')}: ${response.statusText} - ${errorText}`);
                 }
 
-                const task = await response.json();
-                const taskId = task.id;
-                const streamUrl = task.metadata?.streamUrl || `/v1/tasks/${taskId}:subscribe`;
+                // Get the content-type to verify it's an SSE stream
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('text/event-stream')) {
+                    throw new Error('Unexpected response content-type: ' + contentType);
+                }
 
-                console.log('Task created:', taskId);
-                console.log('State:', task.status.state);
-                console.log('Stream URL:', streamUrl);
-
-                state.currentJobId = taskId;
-
-                // Step 2: Connect to SSE stream
-                this.__connectToJobStream(taskId, threadId);
+                // Process the SSE stream directly from the response body
+                this.__processSSEStream(response.body, threadId);
 
             } catch (error) {
                 console.error('Failed to start stream:', error);
@@ -103,150 +102,67 @@ export function createStreamingMethods() {
         },
 
         /**
-         * Connect to job SSE stream
-         * @param {string} jobId - Job ID
+         * Process SSE stream directly from response body (no EventSource)
+         * @param {ReadableStream} stream - Response body stream
          * @param {string} threadId - Thread ID
          */
-        __connectToJobStream(jobId, threadId) {
+        __processSSEStream(stream, threadId) {
             const state = this.__getThreadState(threadId);
+            const decoder = new TextDecoder('utf-8');
+            let buffer = '';
+            let eventId = '';
 
-            // Prevent duplicate connections
-            if (state.activeJobStreams.has(jobId)) {
-                console.log('Already streaming job:', jobId);
-                return;
-            }
+            // Use ReadableStream default reader to process the stream
+            const reader = stream.getReader();
 
-            state.activeJobStreams.add(jobId);
+            const processChunk = () => {
+                reader.read().then(({ done, value }) => {
+                    if (done) {
+                        console.log('[SSE] Stream completed');
+                        state.isStreaming = false;
+                        state.showTypingIndicator = false;
+                        return;
+                    }
 
-            // Pass the last received event ID so the server can replay any
-            // events missed while the connection was down. The ID is a Redis
-            // Stream entry ID (e.g. "1717000000000-0") stored in jobSeqIdMap.
-            if (!state.jobSeqIdMap) state.jobSeqIdMap = new Map();
-            const lastSeqId = state.jobSeqIdMap.get(jobId);
-            const streamUrl = lastSeqId
-                ? `/v1/tasks/${jobId}:subscribe?lastEventId=${encodeURIComponent(lastSeqId)}`
-                : `/v1/tasks/${jobId}:subscribe`;
+                    // Decode the chunk and append to buffer
+                    buffer += decoder.decode(value, { stream: true });
 
-            const eventSource = new EventSource(streamUrl);
+                    // Process complete SSE events (double newline)
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
-            state.eventSource = eventSource;
-
-            eventSource.onmessage = (event) => {
-                state.jobRetryMap.delete(jobId);
-
-                // Track the last SSE id: value so we can resume from here on
-                // reconnect. event.lastEventId is set automatically by the
-                // browser from the most recent "id:" line in the stream.
-                if (event.lastEventId) {
-                    if (!state.jobSeqIdMap) state.jobSeqIdMap = new Map();
-                    state.jobSeqIdMap.set(jobId, event.lastEventId);
-                }
-
-                const data = this.__tryCatch('parse SSE event', { threadId, jobId }, () => {
-                    return JSON.parse(event.data);
-                });
-
-                if (data) {
-                    this.__handleEvent(data, eventSource, threadId);
-                }
-            };
-
-            eventSource.onerror = (error) => {
-                const wasConnected = eventSource.readyState === EventSource.OPEN;
-                eventSource.close();
-                state.eventSource = null;
-                state.activeJobStreams.delete(jobId);
-
-                // When the run is paused for user interaction (ask_user /
-                // authorization), the backend intentionally closes the SSE
-                // stream without a RUN_FINISHED event. Detect this and
-                // clean up gracefully instead of retrying.
-                const isAwaitingInteraction = state.messages?.some(m =>
-                    m.type === 'tool_call' && (m.status === 'awaiting_input' || m.status === 'awaiting_auth')
-                );
-
-                if (isAwaitingInteraction) {
-                    console.log('[SSE] Stream ended — run paused for user interaction');
-                    state.activeJobStreams.clear();
-                    state.jobRetryMap.clear();
-                    state.jobSeqIdMap?.clear();
-                    state.currentJobId = null;
-                    state.isStreaming = false;
-                    state.showTypingIndicator = false;
-                    state.retryCount = 0;
-                    return;
-                }
-
-                console.error('SSE error for job:', jobId, error);
-                this.__perfMetrics.errors++;
-
-                state.isStreaming = state.activeJobStreams.size > 0;
-                state.showTypingIndicator = state.isStreaming;
-
-                // Retry with exponential backoff. The next __connectToJobStream
-                // call will include ?lastEventId= so the server replays any
-                // events the client missed while disconnected.
-                if (wasConnected || eventSource.readyState === EventSource.CONNECTING) {
-                    const currentRetry = state.jobRetryMap.get(jobId) || 0;
-                    state.jobRetryMap.set(jobId, currentRetry + 1);
-
-                    const backoffDelay = Math.min(1000 * Math.pow(2, currentRetry), 16000);
-                    console.log(`Retrying job ${jobId} in ${backoffDelay}ms (attempt ${currentRetry + 1}/5)`);
-
-                    setTimeout(() => {
-                        if (!state.activeJobStreams.has(jobId)) {
-                            this.__connectToJobStream(jobId, threadId);
+                    for (const line of lines) {
+                        if (line.startsWith('id:')) {
+                            eventId = line.slice(3).trim();
+                        } else if (line.startsWith('data:')) {
+                            const data = line.slice(5).trim();
+                            if (data) {
+                                try {
+                                    const event = JSON.parse(data);
+                                    // Track last event ID for potential resume
+                                    if (eventId) {
+                                        state.lastEventId = eventId;
+                                        eventId = '';
+                                    }
+                                    this.__handleEvent(event, null, threadId);
+                                } catch (e) {
+                                    console.error('[SSE] Failed to parse event:', e);
+                                }
+                            }
                         }
-                    }, backoffDelay);
-                } else {
-                    console.warn('Job stream not available:', jobId);
-                    state.jobRetryMap.delete(jobId);
-                }
-            };
-        },
-
-
-        /**
-         * Cancel the current job
-         */
-        async cancelJob() {
-            return this.__tryCatchAsync('cancel job', {}, async () => {
-                const state = this.__getThreadState();
-
-                if (!state.currentJobId) {
-                    console.warn('No active job to cancel');
-                    return;
-                }
-
-                const jobId = state.currentJobId;
-                console.log('Cancelling job:', jobId);
-
-                try {
-                    const response = await fetch(`/v1/tasks/${jobId}:cancel`, {
-                        method: 'POST',
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`${window.i18n.t('Failed to cancel job')}: ${response.statusText}`);
                     }
 
-                    if (state.eventSource) {
-                        state.eventSource.close();
-                        state.eventSource = null;
-                    }
-
-                    state.activeJobStreams.clear();
-                    state.jobRetryMap.clear();
-                    state.currentJobId = null;
+                    // Continue reading
+                    processChunk();
+                }).catch(error => {
+                    console.error('[SSE] Stream error:', error);
+                    this.__perfMetrics.errors++;
                     state.isStreaming = false;
                     state.showTypingIndicator = false;
+                });
+            };
 
-                    console.log('Job cancelled successfully');
-                } catch (error) {
-                    console.error('Failed to cancel job:', error);
-                    this.__showError(window.i18n.t('Failed to cancel job'), this.__currentThreadId);
-                }
-            });
+            processChunk();
         },
 
         /**
@@ -270,7 +186,7 @@ export function createStreamingMethods() {
         /**
          * Handle incoming AG-UI event
          * @param {Object} event - Event object
-         * @param {EventSource} eventSource - Event source
+         * @param {EventSource|null} eventSource - Event source (can be null for direct stream)
          * @param {string} threadId - Thread ID
          */
         __handleEvent(event, eventSource, threadId) {
@@ -293,6 +209,14 @@ export function createStreamingMethods() {
             }
 
             switch (event.type) {
+                case 'SESSION_START':
+                    // Store the threadId from SESSION_START if we didn't have one
+                    if (event.contextId && !state.threadId) {
+                        state.threadId = event.contextId;
+                        console.log('[SSE] Session started with threadId:', event.contextId);
+                    }
+                    break;
+
                 case 'RUN_STARTED':
                 case 'STEP_STARTED':
                 case 'STEP_FINISHED':
@@ -316,7 +240,6 @@ export function createStreamingMethods() {
                 case 'CUSTOM':
                     this.__handleCustomEvent(event, state, threadId);
                     break;
-
 
                 case 'TEXT_MESSAGE_START':
                     this.__handleTextMessageStart(event, state, threadId);
@@ -357,7 +280,6 @@ export function createStreamingMethods() {
                 case 'TOKEN_USAGE_REPORTED':
                     this.__handleTokenUsageReported(event.value, state);
                     break;
-                // New specific tool lifecycle events
                 case 'TOOL_START':
                     this.__handleToolStart(event.value, state);
                     break;

@@ -54,7 +54,6 @@ import (
 	"school-with-ai/plugins/websearch"
 	"school-with-ai/shared"
 
-	"school-with-ai/modules/chat/taskmanagement"
 	"school-with-ai/modules/knowledge/rag/users"
 	permworkspace "school-with-ai/modules/permissions/workspace"
 	"school-with-ai/platform/toolregistry"
@@ -159,16 +158,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 			Addr     string `conf:"default:localhost:6379"`
 			Password string `conf:"mask"`
 		}
-		NATS struct {
-			URL      string `conf:"default:nats://localhost:4222"`
-			Password string `conf:"mask"`
-			Replicas int    `conf:"default:1"`
-		}
-		Orchestration struct {
-			Concurrency         int           `conf:"default:5"`
-			ShutdownTimeout     time.Duration `conf:"default:10s"`
-			HealthCheckInterval time.Duration `conf:"default:15s"`
-		}
+
 
 		Artifacts struct {
 			S3Endpoint  string `conf:"default:localhost:9100"`
@@ -309,22 +299,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// persistenceRouter is used by the ProjectionUpdater exclusively to update Read Models (Projections).
 	persistenceRouter := event.NewRouter()
 
-	// transientRouter is used by the orchestrator for non-persistent events (streaming deltas, etc.)
-	transientRouter := event.NewRouter()
-
-	// Initialize NATS JetStream broadcaster for cross-pod event fan-out and replay
-	natsCfg := subscriber.DefaultNATSBroadcasterConfig()
-	natsCfg.StreamReplicas = cfg.NATS.Replicas
-	broadcaster, err := subscriber.NewNATSBroadcaster(log, cfg.NATS.URL, cfg.NATS.Password, eventRegistry, natsCfg)
-	if err != nil {
-		return fmt.Errorf("NATS broadcaster: %w", err)
-	}
-	defer func() {
-		if closeErr := broadcaster.Close(); closeErr != nil {
-			log.Error(ctx, "shutdown", "status", "failed to close NATS broadcaster", "ERROR", closeErr)
-		}
-	}()
-
 	// Initialize Redis client for distributed rate limiting (shared across pods)
 	rateLimitRedis := goredis.NewClient(&goredis.Options{Addr: cfg.Redis.Addr, Password: cfg.Redis.Password})
 	defer func() {
@@ -334,10 +308,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}()
 	log.Info(ctx, "startup", "status", "rate-limit Redis client initialized", "addr", cfg.Redis.Addr)
 
-	// Register Redis broadcaster ONLY to transientRouter.
-	// The orchestrator directly dispatches all events (Durable and Transient) to transientRouter.
-	// persistenceRouter is strictly for updating Read Models (Projections) and should not re-broadcast.
-	transientRouter.RegisterAny(broadcaster.Broadcast)
 
 	// Use the Postgres event store directly as the write model
 	eventLog := baseEventStore
@@ -526,7 +496,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 		SnapshotStore:            snapshotStore,
 		ArtifactService:          artifactService,
 		UserProfileRepo:          &chatProfileAdapter{repo: userProfileRepo},
-		Emitter:                  transientRouter,
 		AgentProvider:            agentProvider,
 		AuthService:              authSvc,
 		ToolRegistry:             toolRegistry,
@@ -535,14 +504,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 		TenantID:                 cfg.Edgequake.TenantID,
 		AllowedOrigin:            cfg.Auth.AppURL,
 		SSE:                      taskmgmthandlers.DefaultSSEConfig(),
-		Broadcaster:              broadcaster,
-		AsynqConfig: taskmanagement.AsynqConfig{
-			RedisAddr:           cfg.Redis.Addr,
-			RedisPassword:       cfg.Redis.Password,
-			Concurrency:         cfg.Orchestration.Concurrency,
-			ShutdownTimeout:     cfg.Orchestration.ShutdownTimeout,
-			HealthCheckInterval: cfg.Orchestration.HealthCheckInterval,
-		},
 	})
 
 	// Register chat projections (AGUI + LLM context) before starting the updater.
@@ -634,11 +595,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 		return fmt.Errorf("creating adk-go runner: %w", err)
 	}
 	chatModule.SetRunner(adkRunner)
-	defer chatModule.Shutdown()
 
-	log.Info(ctx, "startup", "status", "chat module initialized",
-		"redis", cfg.Redis.Addr,
-		"concurrency", cfg.Orchestration.Concurrency)
+	log.Info(ctx, "startup", "status", "chat module initialized")
 
 	// -------------------------------------------------------------------------
 	// Start Debug Service

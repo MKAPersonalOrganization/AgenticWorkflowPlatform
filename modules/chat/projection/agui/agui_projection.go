@@ -4,14 +4,10 @@ import (
 	"context"
 	"time"
 
-	es "school-with-ai/foundation/eventsourcing"
 	"school-with-ai/modules/chat/thread"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )
-
-// EventEmitter is a function that emits real-time events to connected clients.
-type EventEmitter func(threadID string, event any) error
 
 // AguiProjection is a read model optimized for the AG-UI protocol.
 type AguiProjection interface {
@@ -23,33 +19,6 @@ type AguiProjection interface {
 
 	// ListThreads returns paginated threads for a user.
 	ListThreads(ctx context.Context, req ThreadListRequest) (*ThreadListResponse, error)
-}
-
-// Subscription provides a pull-based interface for receiving real-time events.
-// The broadcaster has no per-subscriber state — when a subscriber stops calling
-// Ready/Recv, nothing leaks. This eliminates the need for cleanup functions.
-type Subscription interface {
-	// Ready returns a channel that is closed when new events may be available.
-	// Use in a select statement. After Ready fires, call Recv to read events.
-	Ready() <-chan struct{}
-
-	// Recv returns new events since the last call. Returns (events, true) on
-	// success. Returns (nil, false) if the subscriber has fallen behind the
-	// ring buffer — the caller should end the SSE connection so the client
-	// reconnects with ?lastEventId= for lossless replay via Redis Streams.
-	Recv() ([]es.BroadcastEnvelope, bool)
-}
-
-// AguiBroadcaster is an interface for subscribing to real-time events.
-type AguiBroadcaster interface {
-	// Subscribe returns a Subscription for real-time events on threadID.
-	// No cleanup is required — simply stop calling Ready/Recv when done.
-	Subscribe(threadID string) Subscription
-
-	// Replay returns buffered events for threadID that arrived after afterSeqID.
-	// afterSeqID is a UnixNano timestamp (e.g. "1717000000000000000").
-	// Returns an empty slice when no events are available or on error.
-	Replay(threadID string, afterSeqID string) []es.BroadcastEnvelope
 }
 
 // AguiThreadState represents the complete UI state for a thread.

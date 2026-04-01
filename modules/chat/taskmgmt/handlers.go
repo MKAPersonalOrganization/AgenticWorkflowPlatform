@@ -3,15 +3,13 @@
 // Handlers are organised by domain concern across separate files:
 //
 //   - handlers.go          — TaskManagementHandler struct + constructor (this file)
-//   - message_handler.go   — SendMessage
-//   - stream_handler.go    — StreamJobEvents, GetJobStatus, CancelJob
+//   - message_handler.go   — SendMessage (inline SSE streaming)
 //   - thread_handler.go    — DeleteThread, UpdateThreadTitle
 //   - agent_handler.go     — ListAgents, GetAgent
 //   - artifact_handler.go  — ListArtifacts, DownloadArtifact, UploadAttachment
 //   - toolset_handler.go   — ListAgentToolSets
 //   - plugin_handler.go    — ListPlugins
 //   - document_handler.go  — ListDocuments, UploadDocument
-//   - task_types.go        — Task / TaskState value types
 //   - helpers.go           — WriteSSEEvent
 package taskmgmt
 
@@ -32,43 +30,27 @@ import (
 // SSEConfig holds tunable parameters for Server-Sent Event connections.
 // All values have safe production defaults via DefaultSSEConfig().
 type SSEConfig struct {
-	// WriteTimeout is the deadline applied to every individual SSE write
-	// (heartbeat or event frame). If a write cannot complete within this
-	// window the connection is torn down and the client reconnects with
-	// ?lastEventId= for lossless replay.
+	// WriteTimeout is the deadline applied to every individual SSE write.
+	// If a write cannot complete within this window the connection is torn
+	// down and the client can retry.
 	WriteTimeout time.Duration
-
-	// HeartbeatInterval controls how often an SSE comment line is sent to
-	// probe the connection. Should be ≤ WriteTimeout so idle connections
-	// are tested within one deadline window.
-	HeartbeatInterval time.Duration
-
-	// MaxConnectionTTL is the maximum lifetime of a single SSE connection.
-	// After this duration the server closes the connection with a retry: 0
-	// hint so the client reconnects immediately (to any healthy pod).
-	// This is a safety net for graceful rolling deploys — with per-write
-	// deadlines, dead clients are caught much sooner.
-	MaxConnectionTTL time.Duration
 }
 
 // DefaultSSEConfig returns production-safe defaults.
 func DefaultSSEConfig() SSEConfig {
 	return SSEConfig{
-		WriteTimeout:      15 * time.Second,
-		HeartbeatInterval: 15 * time.Second,
-		MaxConnectionTTL:  30 * time.Minute,
+		WriteTimeout: 15 * time.Second,
 	}
 }
 
 // TaskManagementHandler encapsulates dependencies for HTTP handlers for task management.
 type TaskManagementHandler struct {
 	log                      *logger.Logger
-	taskManager              *taskmanagement.AsynqTaskManager
+	orchestrator             taskmanagement.Orchestrator
 	agentProvider            agent.AgentProvider
 	authService              shared.AuthService
 	threadQueryService       chatcontracts.ThreadQueryService
 	aguiProjection           agui.AguiProjection
-	broadcaster              agui.AguiBroadcaster
 	threadMgmt               *threadmgmt.Manager
 	artifactStore            artifact.Service
 	toolRegistry             *toolregistry.Registry
@@ -82,12 +64,11 @@ type TaskManagementHandler struct {
 // NewTaskManagementHandler creates a new HTTP handler for task management.
 func NewTaskManagementHandler(
 	log *logger.Logger,
-	taskManager *taskmanagement.AsynqTaskManager,
+	orchestrator taskmanagement.Orchestrator,
 	agentProvider agent.AgentProvider,
 	authService shared.AuthService,
 	threadQueryService chatcontracts.ThreadQueryService,
 	aguiProjection agui.AguiProjection,
-	broadcaster agui.AguiBroadcaster,
 	threadMgmt *threadmgmt.Manager,
 	artifactStore artifact.Service,
 	toolRegistry *toolregistry.Registry,
@@ -99,12 +80,11 @@ func NewTaskManagementHandler(
 ) *TaskManagementHandler {
 	return &TaskManagementHandler{
 		log:                      log,
-		taskManager:              taskManager,
+		orchestrator:             orchestrator,
 		agentProvider:            agentProvider,
 		authService:              authService,
 		threadQueryService:       threadQueryService,
 		aguiProjection:           aguiProjection,
-		broadcaster:              broadcaster,
 		threadMgmt:               threadMgmt,
 		artifactStore:            artifactStore,
 		toolRegistry:             toolRegistry,
