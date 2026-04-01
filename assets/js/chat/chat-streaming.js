@@ -30,6 +30,9 @@ export function createStreamingMethods() {
          */
         async __streamResponse(message, threadId, agentName = '', toolCallId = null, attachedFiles = []) {
             const state = this.__getThreadState(threadId);
+            
+            // Create abort controller for this request
+            state.abortController = new AbortController();
 
             // Close existing stream if any (expected during elicitation responses)
             if (state.eventSource) {
@@ -72,6 +75,7 @@ export function createStreamingMethods() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body),
+                    signal: state.abortController.signal,
                 });
 
                 if (!response.ok) {
@@ -166,21 +170,24 @@ export function createStreamingMethods() {
         },
 
         /**
-         * Stop streaming manually
+         * Stop streaming manually (called when user presses Escape)
          */
         __stopStreaming() {
             const state = this.__currentState;
-            if (state.eventSource) {
-                state.eventSource.close();
-                state.eventSource = null;
-                state.isStreaming = false;
-                if (state.heartbeatInterval) {
-                    clearInterval(state.heartbeatInterval);
-                    state.heartbeatInterval = null;
-                }
-                this.__announce(window.i18n.t('Streaming cancelled'));
-                console.log('Streaming cancelled by user');
+            
+            // Abort the fetch request to stop the SSE stream
+            if (state.abortController) {
+                state.abortController.abort();
+                state.abortController = null;
             }
+            
+            state.isStreaming = false;
+            if (state.heartbeatInterval) {
+                clearInterval(state.heartbeatInterval);
+                state.heartbeatInterval = null;
+            }
+            this.__announce(window.i18n.t('Streaming cancelled'));
+            console.log('Streaming cancelled by user');
         },
 
         /**

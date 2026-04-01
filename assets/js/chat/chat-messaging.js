@@ -21,6 +21,13 @@ import { syncToolState } from './chat-tool-registry.js';
 export function createMessagingMethods() {
     return {
         /**
+         * Cancel/stop the current streaming job
+         */
+        cancelJob() {
+            this.__stopStreaming();
+        },
+
+        /**
          * Send a message
          * @param {string|null} overrideMessage - Optional message to send (e.g. from elicitation)
          */
