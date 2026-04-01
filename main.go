@@ -620,7 +620,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		ProfileProvider:        &adkgoProfileAdapter{repo: userProfileRepo},
 		ToolReqs:               toolReqsService,
 		BlockEnforcer:          toolReqsService,
-		ConfirmEnforcer:        toolReqsService,
+		ConfirmChecker:         toolReqsService,
 		MCPResolver:            mcpModule.Service(),
 		A2AResolver:            a2aModule.Service(),
 		A2ASubAgentProvider:    &a2aSubAgentAdapter{svc: a2aModule.Service()},

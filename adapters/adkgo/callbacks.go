@@ -17,6 +17,72 @@ import (
 )
 
 // ──────────────────────────────────────────────────────────────────────────────
+// ADK-Native Confirmation Callback
+//
+// Uses ADK's built-in confirmation protocol (RequestConfirmation →
+// adk_request_confirmation → FunctionResponse) instead of the legacy
+// io.Confirm() → ErrAuthRequired pause/resume flow.
+//
+// Benefits:
+//   - Standard ADK protocol — no custom pause/resume mechanism
+//   - Frontend receives adk_request_confirmation events natively
+//   - Confirmation state tracked in session.EventActions
+//   - Compatible with ADK's RequestConfirmationRequestProcessor
+// ──────────────────────────────────────────────────────────────────────────────
+
+// buildConfirmationCallback creates a BeforeToolCallback that enforces user
+// confirmation using ADK's native HITL protocol.
+//
+// The callback:
+//  1. Skips if confirmation was already provided (ctx.ToolConfirmation() != nil)
+//  2. Checks per-user config via ConfirmationChecker (DB + admin policies)
+//  3. If needed, calls ctx.RequestConfirmation() and returns ErrConfirmationRequired
+//  4. ADK then generates adk_request_confirmation events for the frontend
+//
+// userID and toolSetID are captured in the closure so the callback doesn't
+// need to extract them from context metadata.
+func buildConfirmationCallback(
+	checker ConfirmationChecker,
+	agentName, userID, toolSetID string,
+) llmagent.BeforeToolCallback {
+	return func(ctx adktool.Context, t adktool.Tool, args map[string]any) (map[string]any, error) {
+		toolName := t.Name()
+
+		// If confirmation was already provided by the user, check the result.
+		if confirmation := ctx.ToolConfirmation(); confirmation != nil {
+			if !confirmation.Confirmed {
+				return nil, fmt.Errorf("tool %q %w", toolName, adktool.ErrConfirmationRejected)
+			}
+			return nil, nil // confirmed — proceed with tool execution
+		}
+
+		// No confirmation yet — check if this tool/user combination requires it.
+		needsConfirmation, hint := checker.CheckConfirmation(ctx, userID, agentName, toolSetID, toolName, args)
+		if !needsConfirmation {
+			return nil, nil
+		}
+
+		// Build default hint if none provided.
+		if hint == "" {
+			hint = fmt.Sprintf("Tool '%s' requires your confirmation before executing.", toolName)
+		}
+
+		// Use ADK's native confirmation protocol.
+		// This stores the request in eventActions.RequestedToolConfirmations
+		// and ADK will generate an adk_request_confirmation FunctionCall event.
+		if err := ctx.RequestConfirmation(hint, toolName); err != nil {
+			return nil, err
+		}
+
+		// Prevent the agent from summarizing while waiting for user approval.
+		ctx.Actions().SkipSummarization = true
+
+		// Return the sentinel error — ADK's OnToolErrorCallback will handle it.
+		return nil, fmt.Errorf("tool %q %w", toolName, adktool.ErrConfirmationRequired)
+	}
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Native ADK-Go Tool Callbacks
 //
 // These functions produce native ADK BeforeToolCallback / AfterToolCallback
@@ -83,7 +149,6 @@ func toolLoggingCallbacks(
 // middlewares that only need to inspect or block tool execution:
 //
 //   - BlockMiddleware (blocks tools the user has disabled)
-//   - ConfirmationMiddleware (requires user approval before proceeding)
 //
 // The middleware chain runs with a no-op terminal — if any middleware returns
 // an error (e.g. tool blocked), it is surfaced as an error result map so

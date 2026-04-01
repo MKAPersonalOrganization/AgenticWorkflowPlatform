@@ -175,31 +175,7 @@ document generation, external API calls) without freezing the conversation.
 
 ---
 
-## 8. Align Tool Confirmation with ADK Native HITL
-
-**What ADK-Go offers:**
-Native `toolconfirmation` package with `RequireConfirmation` flag,
-`ConfirmationProvider` function, and `adk_request_confirmation` function call
-protocol. The LLM sees a structured confirmation event and pauses until the
-client responds.
-
-**What we have today:** Custom `ConfirmationEnforcer` middleware that bridges to
-ADK callbacks. Works but diverges from the standard protocol.
-
-**Proposed refactor:**
-- Migrate from custom ConfirmationEnforcer to ADK's native
-  `tool.WithConfirmation()` wrapper.
-- Map `adk_request_confirmation` function calls directly in event translation.
-- Expose per-tool "Require confirmation" toggle in the agent designer.
-- Add `ConfirmationProvider` support for dynamic rules (e.g., "confirm if
-  amount > $100").
-
-**Impact:** Medium — reduces custom code, aligns with ADK upgrades, and
-simplifies the confirmation UX.
-
----
-
-## 9. Plugin System for Users
+## 8. Plugin System for Users
 
 **What ADK-Go offers:**
 Full plugin lifecycle: `OnUserMessage`, `BeforeRun`, `AfterRun`, `OnEvent`,
@@ -223,7 +199,7 @@ plugin configuration.
 
 ---
 
-## 10. Agent Evaluation Framework
+## 9. Agent Evaluation Framework
 
 **What ADK-Go offers:**
 Stub routes exist (`ListEvalSets`, `ListEvalResults`) but the framework is
@@ -247,7 +223,7 @@ Without evaluation, prompt engineering is guesswork.
 
 ---
 
-## 11. BeforeAgentCallback as Guardrails
+## 10. BeforeAgentCallback as Guardrails
 
 **What ADK-Go offers:**
 `BeforeAgentCallback` runs before agent execution and can short-circuit with
@@ -270,7 +246,7 @@ no-code platforms.
 
 ---
 
-## 12. OpenTelemetry Observability
+## 11. OpenTelemetry Observability
 
 **What ADK-Go offers:**
 Built-in OpenTelemetry integration with spans for `invoke_agent`,
@@ -298,13 +274,12 @@ LLM costs.
 |---|---------|--------|--------|----------|
 | 1 | Agent Memory Service | High | Medium | P0 |
 | 3 | Instruction Templating | High | Low | P0 |
-| 10 | Evaluation Framework | High | High | P0 |
-| 11 | Guardrails (BeforeAgentCallback) | High | Medium | P0 |
+| 9 | Evaluation Framework | High | High | P0 |
+| 10 | Guardrails (BeforeAgentCallback) | High | Medium | P0 |
 | 2 | Artifact Service | High | Medium | P1 |
 | 5 | State Scopes in UI | Medium | Low | P1 |
-| 8 | Native Tool Confirmation | Medium | Low | P1 |
 | 6 | Dynamic Toolsets | Medium | Medium | P2 |
 | 7 | Long-Running Tools | Medium | High | P2 |
-| 9 | Plugin System | Medium | High | P2 |
-| 12 | OpenTelemetry | Medium | Medium | P2 |
+| 8 | Plugin System | Medium | High | P2 |
+| 11 | OpenTelemetry | Medium | Medium | P2 |
 | 4 | Dynamic Instruction Providers | Medium | Medium | P2 |

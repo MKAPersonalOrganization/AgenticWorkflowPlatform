@@ -232,11 +232,11 @@ func TestService_RequiresConfirmation(t *testing.T) {
 	}
 }
 
-func TestService_ConfirmationMiddleware_NotNil(t *testing.T) {
+func TestService_CheckConfirmation_NotNil(t *testing.T) {
 	svc := newTestService(t)
-	mw := svc.ConfirmationMiddleware("agent1")
-	if mw == nil {
-		t.Error("expected non-nil middleware")
+	needs, _ := svc.CheckConfirmation(context.Background(), "user1", "agent1", "", "calculator", nil)
+	if needs {
+		t.Error("calculator should not require confirmation by default")
 	}
 }
 

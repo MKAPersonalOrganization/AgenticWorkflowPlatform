@@ -4,152 +4,113 @@ import (
 	"context"
 	"testing"
 
-	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/agent/io"
 	"school-with-ai/modules/toolreqs"
 )
 
 // =============================================================================
-// Middleware tests
+// CheckConfirmation tests
 // =============================================================================
 
-func TestMiddleware_NoPolicy_PassesThrough(t *testing.T) {
+func TestCheckConfirmation_NoPolicy_NoConfirmation(t *testing.T) {
 	cr := toolreqs.NewConfirmationRequirement()
-	mw := toolreqs.ConfirmationMiddleware(nil, cr, "agent1")
-
-	called := false
-	handler := mw(agent.HandlerFunc(func(c *agent.Context) error {
-		called = true
-		return nil
-	}))
-
-	tool := &mockTool{name: "calculator"}
-	ctx := agent.NewToolContext(context.Background(), tool, map[string]any{"x": 1})
-	if err := handler.Handle(ctx); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	needs, hint := toolreqs.CheckConfirmation(context.Background(), nil, cr, "user1", "agent1", "", "calculator", nil)
+	if needs {
+		t.Error("expected no confirmation when no policy exists")
 	}
-	if !called {
-		t.Error("expected handler to be called when no confirmation policy")
+	if hint != "" {
+		t.Errorf("expected empty hint, got %q", hint)
 	}
 }
 
-func TestMiddleware_WithPolicy_NoopHandler_AutoApproves(t *testing.T) {
+func TestCheckConfirmation_GlobalPolicy_RequiresConfirmation(t *testing.T) {
 	cr := toolreqs.NewConfirmationRequirement()
 	cr.SetGlobalPolicy("dangerous_tool", &toolreqs.ConfirmationPolicy{
 		AlwaysConfirm: true,
 		Hint:          "Confirm dangerous action?",
 	})
-	mw := toolreqs.ConfirmationMiddleware(nil, cr, "agent1")
 
-	called := false
-	handler := mw(agent.HandlerFunc(func(c *agent.Context) error {
-		called = true
-		return nil
-	}))
-
-	// NoopHandler auto-approves all confirmations.
-	goCtx := io.WithHandler(context.Background(), &io.NoopHandler{})
-	tool := &mockTool{name: "dangerous_tool"}
-	ctx := agent.NewToolContext(goCtx, tool, nil)
-
-	if err := handler.Handle(ctx); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	needs, hint := toolreqs.CheckConfirmation(context.Background(), nil, cr, "user1", "agent1", "", "dangerous_tool", nil)
+	if !needs {
+		t.Error("expected confirmation when global policy exists")
 	}
-	if !called {
-		t.Error("expected handler to be called after auto-approval")
+	if hint != "Confirm dangerous action?" {
+		t.Errorf("expected hint from policy, got %q", hint)
 	}
 }
 
-func TestMiddleware_WithPolicy_DenyHandler_Blocks(t *testing.T) {
+func TestCheckConfirmation_GlobalPolicy_NoHint_UsesDefault(t *testing.T) {
 	cr := toolreqs.NewConfirmationRequirement()
 	cr.SetGlobalPolicy("dangerous_tool", &toolreqs.ConfirmationPolicy{
 		AlwaysConfirm: true,
+		// No Hint provided
 	})
-	mw := toolreqs.ConfirmationMiddleware(nil, cr, "agent1")
 
-	called := false
-	handler := mw(agent.HandlerFunc(func(c *agent.Context) error {
-		called = true
-		return nil
-	}))
-
-	// DenyHandler rejects all confirmations.
-	goCtx := io.WithHandler(context.Background(), &io.DenyHandler{})
-	tool := &mockTool{name: "dangerous_tool"}
-	ctx := agent.NewToolContext(goCtx, tool, nil)
-
-	if err := handler.Handle(ctx); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	needs, hint := toolreqs.CheckConfirmation(context.Background(), nil, cr, "user1", "agent1", "", "dangerous_tool", nil)
+	if !needs {
+		t.Error("expected confirmation when global policy exists")
 	}
-	if called {
-		t.Error("handler should NOT be called when user denies")
-	}
-	// Should have set a denial result.
-	result, ok := ctx.Result.(map[string]any)
-	if !ok {
-		t.Fatal("expected result to be set")
-	}
-	if denied, _ := result["denied"].(bool); !denied {
-		t.Error("expected denied flag in result")
+	// getHint returns a default hint when policy has no hint.
+	if hint == "" {
+		t.Error("expected non-empty hint from policy's default")
 	}
 }
 
-func TestMiddleware_WithPolicy_PauseHandler_ReturnsAuthError(t *testing.T) {
+func TestCheckConfirmation_ConfirmFunc_Dynamic(t *testing.T) {
 	cr := toolreqs.NewConfirmationRequirement()
-	cr.SetGlobalPolicy("file_delete", &toolreqs.ConfirmationPolicy{
+	cr.SetGlobalPolicy("delete_tool", &toolreqs.ConfirmationPolicy{
+		ConfirmFunc: func(toolName string, args map[string]any) bool {
+			hard, _ := args["hard_delete"].(bool)
+			return hard
+		},
+		Hint: "Hard delete requires confirmation",
+	})
+
+	// Should not require confirmation for soft delete
+	needs, _ := toolreqs.CheckConfirmation(context.Background(), nil, cr, "user1", "agent1", "", "delete_tool", map[string]any{"hard_delete": false})
+	if needs {
+		t.Error("should not require confirmation for soft delete")
+	}
+
+	// Should require confirmation for hard delete
+	needs, hint := toolreqs.CheckConfirmation(context.Background(), nil, cr, "user1", "agent1", "", "delete_tool", map[string]any{"hard_delete": true})
+	if !needs {
+		t.Error("should require confirmation for hard delete")
+	}
+	if hint != "Hard delete requires confirmation" {
+		t.Errorf("expected hint from policy, got %q", hint)
+	}
+}
+
+func TestCheckConfirmation_AgentSpecificPolicy_OverridesDefault(t *testing.T) {
+	cr := toolreqs.NewConfirmationRequirement()
+	cr.SetDefaultPolicy("tool_x", &toolreqs.ConfirmationPolicy{
+		AlwaysConfirm: false,
+	})
+	cr.SetAgentPolicy("agent1", "tool_x", &toolreqs.ConfirmationPolicy{
 		AlwaysConfirm: true,
+		Hint:          "Agent-specific confirmation",
 	})
-	mw := toolreqs.ConfirmationMiddleware(nil, cr, "agent1")
 
-	handler := mw(agent.HandlerFunc(func(c *agent.Context) error {
-		t.Error("handler should NOT be called when paused")
-		return nil
-	}))
-
-	// PauseHandler returns ErrAuthRequired to pause execution.
-	goCtx := io.WithHandler(context.Background(), &io.PauseHandler{})
-	tool := &mockTool{name: "file_delete"}
-	ctx := agent.NewToolContext(goCtx, tool, nil)
-
-	err := handler.Handle(ctx)
-	if err == nil {
-		t.Fatal("expected an error from PauseHandler")
+	// Agent1 should require confirmation
+	needs, hint := toolreqs.CheckConfirmation(context.Background(), nil, cr, "user1", "agent1", "", "tool_x", nil)
+	if !needs {
+		t.Error("expected confirmation for agent-specific policy")
 	}
-	// The error should be an ErrAuthRequired (sentinel for pause).
-	if _, ok := err.(*io.ErrAuthRequired); !ok {
-		t.Errorf("expected *io.ErrAuthRequired, got %T: %v", err, err)
+	if hint != "Agent-specific confirmation" {
+		t.Errorf("expected agent-specific hint, got %q", hint)
 	}
-}
 
-func TestMiddleware_NonFunctionContext_PassesThrough(t *testing.T) {
-	cr := toolreqs.NewConfirmationRequirement()
-	cr.SetGlobalPolicy("any_tool", &toolreqs.ConfirmationPolicy{AlwaysConfirm: true})
-	mw := toolreqs.ConfirmationMiddleware(nil, cr, "agent1")
-
-	called := false
-	handler := mw(agent.HandlerFunc(func(c *agent.Context) error {
-		called = true
-		return nil
-	}))
-
-	// Agent context (not a function call) — middleware should pass through.
-	ctx := agent.NewAgentContext(context.Background(), nil, nil, false)
-	if err := handler.Handle(ctx); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !called {
-		t.Error("expected handler to be called for non-function context")
+	// Agent2 should NOT require confirmation (falls back to default)
+	needs, _ = toolreqs.CheckConfirmation(context.Background(), nil, cr, "user1", "agent2", "", "tool_x", nil)
+	if needs {
+		t.Error("should not require confirmation for agent without policy")
 	}
 }
 
 // =============================================================================
-// Test helpers
+// BlockMiddleware tests (unchanged — still uses middleware pattern)
 // =============================================================================
 
-type mockTool struct {
-	name string
-}
-
-func (t *mockTool) Name() string          { return t.name }
-func (t *mockTool) Description() string   { return "mock tool" }
-func (t *mockTool) Schema() *agent.Schema { return nil }
+// Note: BlockMiddleware tests are in a separate file or integrated into
+// the service tests. The middleware pattern is retained for blocking since
+// it's a simple pass-through check, not a pause/resume flow.
