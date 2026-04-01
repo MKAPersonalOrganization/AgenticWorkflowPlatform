@@ -247,28 +247,7 @@ Without evaluation, prompt engineering is guesswork.
 
 ---
 
-## 11. IncludeContents Control (Conversation History Visibility)
-
-**What ADK-Go offers:**
-`IncludeContents` field on llmagent: `"none"` strips all prior conversation
-history, `"default"` includes it. This controls what context each agent in a
-workflow sees.
-
-**What we have today:** Always default (full history). No per-agent control.
-
-**Proposed work:**
-- Add a "Conversation History" toggle in the workflow tree builder per agent
-  node: "Include previous messages" (on/off).
-- Map to `IncludeContents: "none"` when off.
-- Useful for: agents that should only see their specific input (via OutputKey)
-  without being influenced by upstream conversation.
-
-**Impact:** Low-medium — improves workflow precision. Prevents downstream agents
-from being confused by upstream tool calls.
-
----
-
-## 12. BeforeAgentCallback as Guardrails
+## 11. BeforeAgentCallback as Guardrails
 
 **What ADK-Go offers:**
 `BeforeAgentCallback` runs before agent execution and can short-circuit with
@@ -291,7 +270,7 @@ no-code platforms.
 
 ---
 
-## 13. OpenTelemetry Observability
+## 12. OpenTelemetry Observability
 
 **What ADK-Go offers:**
 Built-in OpenTelemetry integration with spans for `invoke_agent`,
@@ -313,23 +292,6 @@ LLM costs.
 
 ---
 
-## 14. AutoCreateSession
-
-**What ADK-Go offers:**
-Recent addition: `AutoCreateSession: true` in runner config. If a session
-doesn't exist, it's created automatically instead of returning an error.
-
-**What we have today:** Manual session creation in the adapter.
-
-**Proposed refactor:**
-- Enable `AutoCreateSession` in the runner and remove the manual session
-  creation logic in `RunnerAdapter`.
-- Simplifies the codebase and aligns with upstream behavior.
-
-**Impact:** Low — code simplification, reduces adapter surface.
-
----
-
 ## Priority Matrix
 
 | # | Feature | Impact | Effort | Priority |
@@ -337,14 +299,12 @@ doesn't exist, it's created automatically instead of returning an error.
 | 1 | Agent Memory Service | High | Medium | P0 |
 | 3 | Instruction Templating | High | Low | P0 |
 | 10 | Evaluation Framework | High | High | P0 |
-| 12 | Guardrails (BeforeAgentCallback) | High | Medium | P0 |
+| 11 | Guardrails (BeforeAgentCallback) | High | Medium | P0 |
 | 2 | Artifact Service | High | Medium | P1 |
 | 5 | State Scopes in UI | Medium | Low | P1 |
 | 8 | Native Tool Confirmation | Medium | Low | P1 |
-| 11 | IncludeContents Control | Medium | Low | P1 |
-| 14 | AutoCreateSession | Low | Low | P1 |
 | 6 | Dynamic Toolsets | Medium | Medium | P2 |
 | 7 | Long-Running Tools | Medium | High | P2 |
 | 9 | Plugin System | Medium | High | P2 |
-| 13 | OpenTelemetry | Medium | Medium | P2 |
+| 12 | OpenTelemetry | Medium | Medium | P2 |
 | 4 | Dynamic Instruction Providers | Medium | Medium | P2 |
