@@ -370,6 +370,11 @@ func (s *Service) ExecuteRun(
 		var executionError error
 		awaitingInteraction := false
 		for de, err := range processedEvents {
+			// Check if context was cancelled (client disconnected)
+			if ctx.Err() != nil {
+				s.log.Info(ctx, "Orchestrator: Context cancelled, stopping execution")
+				return
+			}
 			if err != nil {
 				executionError = err
 				break

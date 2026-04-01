@@ -111,10 +111,15 @@ func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Reque
 
 	// Execute the run and stream events inline
 	for event, err := range h.orchestrator.ExecuteRun(r.Context(), execReq) {
+		// Check if context was cancelled OR write to client failed
+		writeErr := rc.SetWriteDeadline(time.Now().Add(h.sse.WriteTimeout))
+		if writeErr != nil || r.Context().Err() != nil {
+			h.log.Info(r.Context(), "[API] Client disconnected, aborting stream")
+			return
+		}
+
 		if err != nil {
 			h.log.Error(r.Context(), "[API] Run execution error", "error", err)
-			// Try to send error as SSE before returning
-			_ = rc.SetWriteDeadline(time.Now().Add(h.sse.WriteTimeout))
 			_ = WriteSSEEvent(w, map[string]any{"type": "RUN_ERROR", "message": err.Error()}, "")
 			flusher.Flush()
 			return
@@ -122,10 +127,8 @@ func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Reque
 
 		aguiEvents := taskmanagement.ToAguiEvents(event)
 		for _, ae := range aguiEvents {
-			if err := rc.SetWriteDeadline(time.Now().Add(h.sse.WriteTimeout)); err != nil {
-				return
-			}
 			if err := WriteSSEEvent(w, ae, ""); err != nil {
+				h.log.Info(r.Context(), "[API] Write failed, client disconnected")
 				return
 			}
 		}
