@@ -42,6 +42,17 @@ import (
 // ──────────────────────────────────────────────────────────────────────────────
 
 // RunnerAdapter bridges adk-go to the agentorchestrator.Runner interface.
+//
+// Each Run call:
+//  1. Resolves per-user model config → creates model.LLM
+//  2. Resolves agent config → builds tools, system prompt
+//  3. Builds an adk-go llmagent
+//  4. Reconstructs an in-memory session from thread history
+//  5. Runs the agent via adk-go runner
+//  6. Translates session.Events → thread domain events
+// ──────────────────────────────────────────────────────────────────────────────
+
+// RunnerAdapter bridges adk-go to the agentorchestrator.Runner interface.
 type RunnerAdapter struct {
 	log                    *logger.Logger
 	agentProvider          AgentProvider

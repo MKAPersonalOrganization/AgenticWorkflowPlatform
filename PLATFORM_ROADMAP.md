@@ -330,24 +330,6 @@ doesn't exist, it's created automatically instead of returning an error.
 
 ---
 
-## 15. Recursive Agent Lookup (FindAgent)
-
-**What ADK-Go offers:**
-Recent addition: `FindAgent(name string)` on agents recursively searches the
-sub-agent tree. Replaces the old runner-level `findAgent` helper.
-
-**What we have today:** Agent lookup via `AgentProvider.GetForUser()` — database
-lookup, not tree traversal.
-
-**Proposed work:**
-- Use `FindAgent` for runtime agent inspection in the workflow debugger.
-- Enable a "Go to agent" feature in the trace view that navigates to the
-  sub-agent's configuration.
-
-**Impact:** Low — developer experience improvement.
-
----
-
 ## Priority Matrix
 
 | # | Feature | Impact | Effort | Priority |
@@ -366,4 +348,3 @@ lookup, not tree traversal.
 | 9 | Plugin System | Medium | High | P2 |
 | 13 | OpenTelemetry | Medium | Medium | P2 |
 | 4 | Dynamic Instruction Providers | Medium | Medium | P2 |
-| 15 | Recursive Agent Lookup | Low | Low | P3 |
