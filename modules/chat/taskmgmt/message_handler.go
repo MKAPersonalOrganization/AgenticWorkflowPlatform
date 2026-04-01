@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
+	"school-with-ai/foundation/agent"
+	"school-with-ai/modules/chat/agentorchestrator"
 	"school-with-ai/modules/chat/taskmanagement"
 )
 
@@ -15,7 +18,7 @@ type FileAttachment struct {
 	FileName string `json:"fileName,omitempty"` // Original filename
 }
 
-// SendMessageRequest represents the async chat request.
+// SendMessageRequest represents the chat request.
 type SendMessageRequest struct {
 	ContextID   string           `json:"contextId,omitempty"`   // Optional: existing context (threadID)
 	Message     string           `json:"message"`               // The message/input for the task
@@ -24,13 +27,13 @@ type SendMessageRequest struct {
 	Attachments []FileAttachment `json:"attachments,omitempty"` // Optional: attached files
 }
 
-// SendMessage handles POST /api/messages - async chat message processing.
+// SendMessage handles POST /v1/message:send — runs the agent inline and streams
+// AGUI events back as SSE on the same HTTP response.
 func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
 	user := h.authService.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-
 		return
 	}
 
@@ -38,61 +41,94 @@ func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Reque
 	var req SendMessageRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
-
 		return
 	}
 
 	if req.Message == "" && len(req.Attachments) == 0 {
 		http.Error(w, "Message or attachments required", http.StatusBadRequest)
-
 		return
 	}
 
-	h.log.Info(r.Context(), "[API] Async chat request received",
+	// Generate IDs
+	contextID := req.ContextID
+	if contextID == "" {
+		contextID = fmt.Sprintf("thread_%s_%d", user.ID, time.Now().UnixNano())
+	}
+	messageID := agent.GenerateID()
+
+	h.log.Info(r.Context(), "[API] Streaming chat request",
 		"userID", user.ID,
-		"contextID", req.ContextID,
+		"contextID", contextID,
 		"numAttachments", len(req.Attachments))
 
-	// Convert file attachments to task manager format
-	var attachments []taskmanagement.FileAttachment
+	// Convert file attachments
+	var attachments []agentorchestrator.FileAttachment
 	for _, att := range req.Attachments {
-		attachments = append(attachments, taskmanagement.FileAttachment{
+		attachments = append(attachments, agentorchestrator.FileAttachment{
 			URL:      att.URL,
 			MimeType: att.MimeType,
 			FileName: att.FileName,
 		})
 	}
 
-	// Submit task via manager (handles ID generation and payload construction)
-	result, err := h.taskManager.SubmitChatTask(r.Context(), user.ID, req.Message, req.ContextID, req.AgentName, req.ToolCallID, attachments)
-	if err != nil {
-		h.log.Error(r.Context(), "[API] Failed to submit task", "error", err)
-		http.Error(w, "Failed to submit task", http.StatusInternalServerError)
+	// Set SSE headers — must happen before any writes commit the status code.
+	origin := h.allowedOrigin
+	if origin == "" {
+		origin = "self"
+	}
+	w.Header().Set("Access-Control-Allow-Origin", origin)
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
 		return
 	}
 
-	h.log.Info(r.Context(), "[API] Task submitted successfully",
-		"jobID", result.JobID,
-		"taskID", result.TaskInfo.ID,
-		"queue", result.TaskInfo.Queue)
+	// Per-write deadline pattern: set a short deadline before every individual
+	// write so zombie clients are detected quickly.
+	rc := http.NewResponseController(w)
 
-	// Return task response
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted) // 202 Accepted for async operations
-
-	// Create Task
-	task := NewTask(result.JobID, result.ContextID, TaskStateSubmitted)
-	task.Metadata["streamUrl"] = fmt.Sprintf("/v1/tasks/%s:subscribe", result.JobID)
-
-	h.log.Info(r.Context(), "[API] Returning task response",
-		"taskID", task.ID,
-		"contextID", task.ContextID,
-		"status", task.Status.State,
-		"streamUrl", task.Metadata["streamUrl"])
-
-	if err := json.NewEncoder(w).Encode(task); err != nil {
-		h.log.Error(r.Context(), "[API] Failed to encode response", "error", err)
-
+	// Send the contextId as the first SSE event so the frontend knows the threadID.
+	_ = rc.SetWriteDeadline(time.Now().Add(h.sse.WriteTimeout))
+	if err := WriteSSEEvent(w, map[string]string{"type": "SESSION_START", "contextId": contextID}, ""); err != nil {
 		return
+	}
+	flusher.Flush()
+
+	// Build orchestrator request
+	execReq := agentorchestrator.RunExecutionRequest{
+		ThreadID:    contextID,
+		UserID:      user.ID,
+		AgentName:   req.AgentName,
+		Message:     req.Message,
+		MessageID:   messageID,
+		ToolCallID:  req.ToolCallID,
+		Attachments: attachments,
+	}
+
+	// Execute the run and stream events inline
+	for event, err := range h.orchestrator.ExecuteRun(r.Context(), execReq) {
+		if err != nil {
+			h.log.Error(r.Context(), "[API] Run execution error", "error", err)
+			// Try to send error as SSE before returning
+			_ = rc.SetWriteDeadline(time.Now().Add(h.sse.WriteTimeout))
+			_ = WriteSSEEvent(w, map[string]any{"type": "RUN_ERROR", "message": err.Error()}, "")
+			flusher.Flush()
+			return
+		}
+
+		aguiEvents := taskmanagement.ToAguiEvents(event)
+		for _, ae := range aguiEvents {
+			if err := rc.SetWriteDeadline(time.Now().Add(h.sse.WriteTimeout)); err != nil {
+				return
+			}
+			if err := WriteSSEEvent(w, ae, ""); err != nil {
+				return
+			}
+		}
+		flusher.Flush()
 	}
 }

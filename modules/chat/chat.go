@@ -1,7 +1,7 @@
 // Package chat is the chat bounded context module. It owns the full vertical
 // slice for real-time conversational AI: HTTP handlers, agent orchestration,
-// Asynq task management, thread lifecycle (event sourcing), AGUI + LLM context
-// projections, and long-term memory.
+// thread lifecycle (event sourcing), AGUI + LLM context projections, and
+// long-term memory.
 //
 // This is a facade module (ADR 014, Sub-phase 5a) that encapsulates the
 // construction of existing packages. A future Sub-phase 5b will relocate the
@@ -17,7 +17,6 @@
 //	chatModule.SetRunner(runner)                          // Phase 2: complete init
 //	chatModule.RegisterProjection(persistenceRouter)
 //	chatModule.RegisterRoutes(r, authMiddleware)
-//	defer chatModule.Shutdown()
 package chat
 
 import (
@@ -32,7 +31,6 @@ import (
 	"school-with-ai/modules/chat/projection/agui"
 	"school-with-ai/modules/chat/projection/llmcontext"
 	"school-with-ai/modules/chat/projections"
-	"school-with-ai/modules/chat/taskmanagement"
 	"school-with-ai/modules/chat/thread"
 	"school-with-ai/modules/chat/threadmgmt"
 	"school-with-ai/platform/artifact"
@@ -57,7 +55,7 @@ type Dependencies struct {
 	SnapshotStore            es.SnapshotStore // optional — accelerates thread loading
 	ArtifactService          artifact.Service
 	UserProfileRepo          chatcontracts.UserProfileRepository
-	Emitter                  agentorchestrator.EventEmitter // transient event router
+	Emitter                  agentorchestrator.EventEmitter // transient event router (optional)
 	AgentProvider            agent.AgentProvider
 	AuthService              shared.AuthService
 	ToolRegistry             *toolregistry.Registry
@@ -66,12 +64,10 @@ type Dependencies struct {
 	TenantID                 string
 	AllowedOrigin            string
 	SSE                      taskmgmthandlers.SSEConfig
-	Broadcaster              agui.AguiBroadcaster
-	AsynqConfig              taskmanagement.AsynqConfig
 }
 
 // Module is the chat bounded context. It owns handlers, services, projections,
-// and the Asynq task manager for real-time conversational AI.
+// and inline SSE streaming for real-time conversational AI.
 //
 // Public API for main.go:
 //
@@ -80,11 +76,9 @@ type Dependencies struct {
 //	module.SetRunner(runner)
 //	module.RegisterProjection(persistenceRouter)
 //	module.RegisterRoutes(r, authMiddleware)
-//	defer module.Shutdown()
 type Module struct {
 	log            *logger.Logger
 	orchestrator   *agentorchestrator.Service
-	taskManager    *taskmanagement.AsynqTaskManager
 	threadMgmt     *threadmgmt.Manager
 	aguiProjection *agui.PostgresAguiProjection
 	llmProjection  *llmcontext.PostgresLLMContextProjection
@@ -92,7 +86,7 @@ type Module struct {
 	chatHandler    *taskmgmthandlers.TaskManagementHandler
 	aguiHandler    *aguihandlers.AguiProjectionHandler
 
-	// Stored for two-phase construction (SetRunner creates task manager + handlers).
+	// Stored for two-phase construction (SetRunner creates handlers).
 	deps Dependencies
 }
 
@@ -140,25 +134,19 @@ func (m *Module) Orchestrator() *agentorchestrator.Service {
 }
 
 // SetRunner completes two-phase construction: sets the runner on the
-// orchestrator and creates the Asynq task manager and HTTP handlers.
+// orchestrator and creates the HTTP handlers.
 // Must be called exactly once, before RegisterRoutes.
 func (m *Module) SetRunner(runner agentorchestrator.Runner) {
 	m.orchestrator.SetRunner(runner)
 
-	// Create task manager (starts Asynq worker in background)
-	m.taskManager = taskmanagement.NewAsynqTaskManager(
-		m.log, m.deps.AsynqConfig, m.orchestrator,
-	)
-
 	// Create HTTP handlers
 	m.chatHandler = taskmgmthandlers.NewTaskManagementHandler(
 		m.log,
-		m.taskManager,
+		m.orchestrator,
 		m.deps.AgentProvider,
 		m.deps.AuthService,
 		m.threadQuery,
 		m.aguiProjection,
-		m.deps.Broadcaster,
 		m.threadMgmt,
 		m.deps.ArtifactService,
 		m.deps.ToolRegistry,
@@ -207,10 +195,6 @@ func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 		r.Post("/v1/threads/{threadId}/attachments:upload", authMW.RequireAuthFunc(h.UploadAttachment))
 	})
 
-	// Task management
-	r.Get("/v1/tasks/{id}:subscribe", authMW.RequireAuthFunc(h.StreamJobEvents))
-	r.Post("/v1/tasks/{id}:cancel", authMW.RequireAuthFunc(h.CancelJob))
-
 	// Agents
 	r.Get("/v1/agents", authMW.RequireAuthFunc(h.ListAgents))
 	r.Get("/v1/agents/{agentId}", authMW.RequireAuthFunc(h.GetAgent))
@@ -242,11 +226,4 @@ func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 	r.Get("/api/agui/threads/{threadId}/messages", authMW.RequireAuthFunc(ah.GetMessages))
 	r.Delete("/api/agui/threads/{threadId}", authMW.RequireAuthFunc(h.DeleteThread))
 	r.Patch("/api/agui/threads/{threadId}", authMW.RequireAuthFunc(h.UpdateThreadTitle))
-}
-
-// Shutdown gracefully stops the Asynq task manager.
-func (m *Module) Shutdown() {
-	if m.taskManager != nil {
-		m.taskManager.Shutdown()
-	}
 }

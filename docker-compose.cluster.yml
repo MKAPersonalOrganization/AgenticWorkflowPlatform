@@ -85,15 +85,9 @@ services:
       - APP_DB_MAX_OPEN_CONNS=20
       # A2A: Allow connecting to private/Docker-internal agent addresses
       - A2A_ALLOW_PRIVATE_NETWORKS=true
-      # NATS JetStream — event fan-out and replay
-      - APP_NATS_URL=nats://nats-1:4222,nats://nats-2:4222,nats://nats-3:4222
-      - APP_NATS_PASSWORD=${NATS_PASSWORD}
-      - APP_NATS_REPLICAS=3
     volumes:
       - ./tls:/app/tls:ro
     depends_on:
-      nats-1:
-        condition: service_healthy
       redis-master:
         condition: service_healthy
       app-postgres:
@@ -174,10 +168,6 @@ services:
       - APP_DB_MAX_OPEN_CONNS=20
       # A2A: Allow connecting to private/Docker-internal agent addresses
       - A2A_ALLOW_PRIVATE_NETWORKS=true
-      # NATS JetStream — event fan-out and replay
-      - APP_NATS_URL=nats://nats-1:4222,nats://nats-2:4222,nats://nats-3:4222
-      - APP_NATS_PASSWORD=${NATS_PASSWORD}
-      - APP_NATS_REPLICAS=3
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -186,8 +176,6 @@ services:
       - intranet
     depends_on:
       migrate:
-        condition: service_healthy
-      nats-1:
         condition: service_healthy
       redis-master:
         condition: service_healthy
@@ -209,75 +197,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
-
-  # ===========================================================================
-  # NATS — 3-node JetStream cluster for real-time event fan-out and replay
-  # ===========================================================================
-  nats-1:
-    image: nats:2.10-alpine
-    command:
-      - --config=/etc/nats/nats.conf
-      - --name=nats-1
-      - --cluster_name=school-nats
-      - --cluster=nats://0.0.0.0:6222
-      - --routes=nats://nats-2:6222,nats://nats-3:6222
-    environment:
-      - NATS_PASSWORD=${NATS_PASSWORD}
-    volumes:
-      - ./infra/cluster/nats.conf:/etc/nats/nats.conf:ro
-      - nats-1-data:/data
-    networks:
-      - intranet
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8222/healthz"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 5s
-
-  nats-2:
-    image: nats:2.10-alpine
-    command:
-      - --config=/etc/nats/nats.conf
-      - --name=nats-2
-      - --cluster_name=school-nats
-      - --cluster=nats://0.0.0.0:6222
-      - --routes=nats://nats-1:6222,nats://nats-3:6222
-    environment:
-      - NATS_PASSWORD=${NATS_PASSWORD}
-    volumes:
-      - ./infra/cluster/nats.conf:/etc/nats/nats.conf:ro
-      - nats-2-data:/data
-    networks:
-      - intranet
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8222/healthz"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 5s
-
-  nats-3:
-    image: nats:2.10-alpine
-    command:
-      - --config=/etc/nats/nats.conf
-      - --name=nats-3
-      - --cluster_name=school-nats
-      - --cluster=nats://0.0.0.0:6222
-      - --routes=nats://nats-1:6222,nats://nats-2:6222
-    environment:
-      - NATS_PASSWORD=${NATS_PASSWORD}
-    volumes:
-      - ./infra/cluster/nats.conf:/etc/nats/nats.conf:ro
-      - nats-3-data:/data
-    networks:
-      - intranet
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8222/healthz"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 5s
 
   # ===========================================================================
   # Redis — master + 2 replicas for read distribution + data redundancy
@@ -542,9 +461,6 @@ networks:
   intranet:
 
 volumes:
-  nats-1-data:
-  nats-2-data:
-  nats-3-data:
   redis-master-data:
   minio-cluster-data:
   app-postgres-cluster-data:
