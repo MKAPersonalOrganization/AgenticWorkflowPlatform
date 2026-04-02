@@ -335,12 +335,11 @@ func (e *ArtifactVersionSaved) EventTimestamp() time.Time { return e.Timestamp }
 func (e *ArtifactVersionSaved) AggregateID() string       { return e.ThreadID }
 
 // StateChangeReported is emitted when an agent sets a value in session state
-// (e.g. via Config.OutputKey or a tool's StateDelta). This is a transient
-// event — NOT persisted to the event store — used to notify the frontend of
-// state accumulation across workflow steps so it can display intermediate
-// results or pass data between UI components.
+// (e.g. via Config.OutputKey or a tool's StateDelta). This is a durable
+// event — persisted to the event store — enabling stateful agents across
+// process restarts and supporting multi-agent workflows that read/write state.
 //
-// Only user-visible keys are reported (internal keys prefixed "__" and
+// Only user-visible keys are persisted (internal keys prefixed "__" and
 // ADK-Go ephemeral "temp:" keys are suppressed).
 type StateChangeReported struct {
 	ThreadID  string    `json:"threadId"`

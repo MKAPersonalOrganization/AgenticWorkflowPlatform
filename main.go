@@ -159,7 +159,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 			Password string `conf:"mask"`
 		}
 
-
 		Artifacts struct {
 			S3Endpoint  string `conf:"default:localhost:9100"`
 			S3AccessKey string `conf:"default:minio"`
@@ -307,7 +306,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 		}
 	}()
 	log.Info(ctx, "startup", "status", "rate-limit Redis client initialized", "addr", cfg.Redis.Addr)
-
 
 	// Use the Postgres event store directly as the write model
 	eventLog := baseEventStore

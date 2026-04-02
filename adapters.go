@@ -22,6 +22,7 @@ import (
 	"school-with-ai/shared"
 
 	"github.com/google/uuid"
+	adkagent "google.golang.org/adk/agent"
 )
 
 // adkgoProfileAdapter bridges identity.UserProfileRepository to
@@ -257,10 +258,15 @@ func mapFileStat(s *filesystem.FileStat) *fsplugin.FileStat {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// userAwareAgentProvider implements agent.AgentProvider by loading all agents
-// from the database. In the unified model, every agent — simple or composed —
-// is an AgentDefinition. Composed agents (those with a graph) implement
-// agent.WorkflowAgent so the ADK-Go adapter can detect them.
+// userAwareAgentProvider implements both agent.AgentProvider and agent.Loader
+// (ADK-Go interface) by loading all agents from the database. In the unified
+// model, every agent — simple or composed — is an AgentDefinition. Composed
+// agents (those with a graph) implement agent.WorkflowAgent so the ADK-Go
+// adapter can detect them.
+//
+// The Loader interface is used by adkrest.NewServer for REST API integration.
+// GetForUser requires user context; LoadAgent (used by REST server) requires
+// the userID to be passed separately via context.
 // ──────────────────────────────────────────────────────────────────────────────
 
 type userAwareAgentProvider struct {
@@ -273,10 +279,12 @@ func newUserAwareAgentProvider(
 	return &userAwareAgentProvider{repo: repo}
 }
 
+// Get implements agent.Loader — requires user context, use GetForUser instead.
 func (p *userAwareAgentProvider) Get(name string) (agent.Agent, error) {
 	return nil, fmt.Errorf("agent %q requires user context; use GetForUser", name)
 }
 
+// GetForUser implements AgentProvider — resolves agent with user context.
 func (p *userAwareAgentProvider) GetForUser(ctx context.Context, name, userID string) (agent.Agent, error) {
 	if userID == "" {
 		return nil, fmt.Errorf("user ID is required to resolve agent %q", name)
@@ -292,10 +300,12 @@ func (p *userAwareAgentProvider) GetForUser(ctx context.Context, name, userID st
 	return p.agentFromDefinition(agentDef), nil
 }
 
+// List implements agent.Loader — returns empty list; agents are user-specific.
 func (p *userAwareAgentProvider) List() []agent.Agent {
 	return []agent.Agent{}
 }
 
+// ListForUser implements AgentLister — lists all agents available to a user.
 func (p *userAwareAgentProvider) ListForUser(ctx context.Context, userID string) ([]agent.Agent, error) {
 	if userID == "" {
 		return nil, nil
@@ -311,6 +321,41 @@ func (p *userAwareAgentProvider) ListForUser(ctx context.Context, userID string)
 	}
 	return agents, nil
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// adkgoAgentLoader adapts userAwareAgentProvider to agent.Loader interface.
+// Used by adkrest.NewServer for REST API integration.
+// ──────────────────────────────────────────────────────────────────────────────
+
+type adkgoAgentLoader struct {
+	provider *userAwareAgentProvider
+	rootName string
+}
+
+func newAdkgoAgentLoader(provider *userAwareAgentProvider) *adkgoAgentLoader {
+	return &adkgoAgentLoader{provider: provider}
+}
+
+// ListAgents implements agent.Loader — returns agent names available to the user.
+// Note: REST server uses this without user context, so it returns an empty
+// list. User-specific agent listing is handled via ListForUser.
+func (l *adkgoAgentLoader) ListAgents() []string {
+	return []string{}
+}
+
+// LoadAgent implements agent.Loader — loads agent by name.
+// For REST server integration, the userID should be passed in the request context.
+// Returns an error because our agents are user-specific and require user context.
+func (l *adkgoAgentLoader) LoadAgent(name string) (adkagent.Agent, error) {
+	return nil, fmt.Errorf("agents are user-specific; use GetForUser with userID context")
+}
+
+// RootAgent implements agent.Loader — returns nil as agents are user-specific.
+func (l *adkgoAgentLoader) RootAgent() adkagent.Agent {
+	return nil
+}
+
+var _ adkagent.Loader = (*adkgoAgentLoader)(nil)
 
 func (p *userAwareAgentProvider) agentFromDefinition(def *agentstore.AgentDefinition) agent.Agent {
 	cfg := agent.Config{

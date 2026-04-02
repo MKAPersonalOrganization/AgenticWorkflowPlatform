@@ -207,7 +207,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			modelCfg = overridden
 		}
 
-		// 4. Build in-memory session from thread history (if any).
+		// 4. Build session from thread history (if any).
 		//
 		// When there is existing conversation history, we replay it into an
 		// adk-go session so the LLM agent sees prior context. For fresh
@@ -217,6 +217,9 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 		// Session state from history must be available before Invocation is
 		// constructed so inv.State reflects values accumulated by prior agents
 		// (e.g. via Config.OutputKey).
+		//
+		// Session state is persisted via StateChangeReported events to the event
+		// store. State is restored from ThreadAggregate.State during BuildSessionFromThread.
 		sessionSvc := session.InMemoryService()
 		var sess session.Session
 		if agg != nil && len(agg.Messages) > 0 {
