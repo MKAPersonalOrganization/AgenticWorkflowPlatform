@@ -3,6 +3,7 @@ package adkgo
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"iter"
 	"time"
 
@@ -50,6 +51,17 @@ func BuildSessionFromThread(
 		}
 		if err := svc.AppendEvent(ctx, sess, evt); err != nil {
 			return nil, err
+		}
+	}
+
+	// Inject persisted state from the aggregate into the session.
+	// This restores state written by agents (e.g., via OutputKey) so that
+	// subsequent agent runs can read values set by prior runs.
+	if len(agg.State) > 0 {
+		for key, value := range agg.State {
+			if err := sess.State().Set(key, value); err != nil {
+				return nil, fmt.Errorf("setting persisted state key %q: %w", key, err)
+			}
 		}
 	}
 

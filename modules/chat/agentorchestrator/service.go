@@ -191,7 +191,8 @@ func (s *Service) isDurable(event thread.Event) bool {
 		*thread.InputProvided,
 		*thread.AuthGranted,
 		*thread.AuthDenied,
-		*thread.ToolCancelled:
+		*thread.ToolCancelled,
+		*thread.StateChangeReported:
 		return true
 
 	// Agent Framework Events - Transient (NOT persisted)
@@ -244,6 +245,10 @@ func (s *Service) persistDurableEvent(ctx context.Context, event thread.Event) e
 		*thread.ToolCancelled:
 		_, err := s.threadMgmt.RecordToolEvent(ctx, event.AggregateID(), event)
 		return err
+	case *thread.StateChangeReported:
+		// State is persisted via the event store; the ThreadAggregate.Apply()
+		// method updates the State map. No additional action needed here.
+		return nil
 	default:
 		return nil
 	}

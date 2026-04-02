@@ -3,6 +3,7 @@ package thread
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -15,6 +16,7 @@ type ThreadAggregate struct {
 	Title            string
 	Messages         []Message
 	ActiveToolStates map[string]ToolCallState
+	State            map[string]any // Session state persisted from agent runs
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	IsDeleted        bool
@@ -28,6 +30,7 @@ func NewThreadAggregate(id string) *ThreadAggregate {
 		},
 		Messages:         make([]Message, 0),
 		ActiveToolStates: make(map[string]ToolCallState),
+		State:            make(map[string]any),
 	}
 }
 
@@ -303,6 +306,17 @@ func (t *ThreadAggregate) Apply(event Event) {
 	case *TokenUsageReported:
 		// Track token usage if needed
 		t.UpdatedAt = e.Timestamp
+
+	case *StateChangeReported:
+		// Persist session state from agent runs.
+		// Keys prefixed with "__" or "temp:" are internal ADK keys and not persisted.
+		if !strings.HasPrefix(e.Key, "__") && !strings.HasPrefix(e.Key, "temp:") {
+			if t.State == nil {
+				t.State = make(map[string]any)
+			}
+			t.State[e.Key] = e.Value
+		}
+		t.UpdatedAt = e.Timestamp
 	}
 }
 
@@ -319,6 +333,7 @@ type threadSnapshot struct {
 	Title            string                   `json:"title"`
 	Messages         []Message                `json:"messages"`
 	ActiveToolStates map[string]ToolCallState `json:"active_tool_states,omitempty"`
+	State            map[string]any           `json:"state,omitempty"`
 	CreatedAt        time.Time                `json:"created_at"`
 	UpdatedAt        time.Time                `json:"updated_at"`
 	IsDeleted        bool                     `json:"is_deleted"`
@@ -331,6 +346,7 @@ func (t *ThreadAggregate) MarshalSnapshot() (json.RawMessage, error) {
 		Title:            t.Title,
 		Messages:         t.Messages,
 		ActiveToolStates: t.ActiveToolStates,
+		State:            t.State,
 		CreatedAt:        t.CreatedAt,
 		UpdatedAt:        t.UpdatedAt,
 		IsDeleted:        t.IsDeleted,
@@ -350,6 +366,10 @@ func (t *ThreadAggregate) UnmarshalSnapshot(data json.RawMessage) error {
 	t.ActiveToolStates = snap.ActiveToolStates
 	if t.ActiveToolStates == nil {
 		t.ActiveToolStates = make(map[string]ToolCallState)
+	}
+	t.State = snap.State
+	if t.State == nil {
+		t.State = make(map[string]any)
 	}
 	t.CreatedAt = snap.CreatedAt
 	t.UpdatedAt = snap.UpdatedAt
