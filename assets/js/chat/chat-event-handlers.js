@@ -569,7 +569,7 @@ export function createEventHandlerMethods() {
             state.parallelAgentMessages = {};
             state.parallelCoalesceMap = {};
             state.parallelParent = null;
-            eventSource.close();
+            eventSource?.close();
         },
 
         /**
@@ -593,7 +593,7 @@ export function createEventHandlerMethods() {
             if (threadId === this.__currentThreadId) {
                 this.__showError(event.message || window.i18n.t('An error occurred'), threadId);
             }
-            eventSource.close();
+            eventSource?.close();
         },
 
         // ============================================
