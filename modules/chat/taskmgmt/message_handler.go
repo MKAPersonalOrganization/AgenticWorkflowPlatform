@@ -80,6 +80,8 @@ func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	// Disable any reverse-proxy response buffering (nginx, Cloudflare, etc.)
+	w.Header().Set("X-Accel-Buffering", "no")
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -90,6 +92,14 @@ func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Reque
 	// Per-write deadline pattern: set a short deadline before every individual
 	// write so zombie clients are detected quickly.
 	rc := http.NewResponseController(w)
+
+	// Opt into full-duplex mode so HTTP/2's response buffering is bypassed.
+	// Without this, Go's HTTP/2 framer coalesces small SSE writes into a
+	// single DATA frame, causing tokens to arrive in bursts instead of
+	// streaming smoothly. On HTTP/1.1 this is a no-op.
+	if err := rc.EnableFullDuplex(); err != nil {
+		h.log.Info(r.Context(), "[API] EnableFullDuplex not supported, SSE may buffer on HTTP/2", "error", err)
+	}
 
 	// Send the contextId as the first SSE event so the frontend knows the threadID.
 	_ = rc.SetWriteDeadline(time.Now().Add(h.sse.WriteTimeout))
