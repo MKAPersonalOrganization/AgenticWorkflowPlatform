@@ -1026,6 +1026,35 @@ export const alpineflowPropertyPanel = () => ({
         }
     },
 
+    // Granular tool-level controls
+    isToolBlocked(plugin, tool) {
+        return tool?.requirement_config?.action === 'block';
+    },
+
+    async toggleTool(plugin, tool) {
+        if (!this.node?.agent_id || !plugin?.id || !tool?.id) return;
+
+        const newAction = this.isToolBlocked(plugin, tool) ? 'allow' : 'block';
+        try {
+            const response = await fetch(`/v1/agents/${encodeURIComponent(this.node.agent_id)}/toolsets/${encodeURIComponent(plugin.id)}/tools/${encodeURIComponent(tool.id)}/requirements`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: newAction }),
+            });
+            if (response.ok) {
+                tool.requirement_config = tool.requirement_config || {};
+                tool.requirement_config.action = newAction;
+            }
+        } catch (err) {
+            console.error('Failed to toggle tool:', err);
+        }
+    },
+
+    getToolEnabledCount(plugin) {
+        if (!plugin.tools) return 0;
+        return plugin.tools.filter(t => t.requirement_config?.action !== 'block').length;
+    },
+
     get agents()     { return Alpine.store('flow').agents     || []; },
     get connectors() { return Alpine.store('flow').connectors || []; },
     get isRoot()     { return Alpine.store('flow').graph?.id === this.node?.id; },
