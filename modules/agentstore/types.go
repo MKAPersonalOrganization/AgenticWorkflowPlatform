@@ -306,11 +306,20 @@ type CompositionNode struct {
 
 	// ── Remote-node fields (Type = "remote") ──
 	// A2AConnectorID references a registered A2A connector for remote delegation.
-	A2AConnectorID           string `json:"a2a_connector_id,omitempty"`
+	A2AConnectorID string `json:"a2a_connector_id,omitempty"`
+
+	// ── Orchestration settings (llmagent.Config fields) ──
 	OutputKey                string `json:"output_key,omitempty"`
 	DisallowTransferToParent *bool  `json:"disallow_transfer_to_parent,omitempty"`
 	DisallowTransferToPeers  *bool  `json:"disallow_transfer_to_peers,omitempty"`
 	IncludeContents          string `json:"include_contents,omitempty"`
+
+	// InputSchema defines expected input when this agent is invoked as a tool.
+	// Maps to llmagent.Config.InputSchema.
+	InputSchemaJSON string `json:"input_schema,omitempty"`
+	// OutputSchema forces structured JSON output. Maps to llmagent.Config.OutputSchema.
+	// When set, tool use is disabled.
+	OutputSchemaJSON string `json:"output_schema,omitempty"`
 
 	// ── Composite-node fields ──
 	Children      []CompositionNode `json:"children,omitempty"`
