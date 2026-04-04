@@ -11,14 +11,14 @@ import (
 	"school-with-ai/components/textarea"
 )
 
-// AgentDesignerDialog is the main dialog for designing agents.
-// Two modes: Node Design (single agent) and Pipeline Compose (workflow).
+// AgentDesignerDialog is the unified dialog for designing all ADK-Go agent types.
+// LLM agents, Sequential, Parallel, Loop — all share the same Agent interface.
 templ AgentDesignerDialog() {
 	<div
 		x-data="agentDesigner"
-		@open-agent-designer.window="open($event.detail?.mode)"
-		@open-agent-designer-node.window="open('node'); $nextTick(() => showEditNodeForm($event.detail))"
-		@open-agent-designer-pipeline.window="open('pipeline'); $nextTick(() => showEditPipelineForm($event.detail))"
+		@open-agent-designer.window="open()"
+		@open-agent-designer-node.window="open(); $nextTick(() => showEditNodeForm($event.detail))"
+		@open-agent-designer-pipeline.window="open(); $nextTick(() => showEditPipelineForm($event.detail))"
 		@agents-updated.window="fetchAgents()"
 	>
 		@dialog.Dialog(dialog.Props{
@@ -31,9 +31,8 @@ templ AgentDesignerDialog() {
 					":class": "expanded ? '!max-w-[calc(100vw-2rem)] !max-h-[calc(100vh-2rem)] !w-[calc(100vw-2rem)] !h-[calc(100vh-2rem)]' : ''",
 				},
 			}) {
-				<!-- Header with mode tabs -->
-				@dialog.Header(dialog.HeaderProps{Class: "p-4 pb-0 border-b border-border"}) {
-					<div class="flex items-center justify-between mb-3">
+				@dialog.Header(dialog.HeaderProps{Class: "p-4 pb-3 border-b border-border"}) {
+					<div class="flex items-center justify-between">
 						<div>
 							@dialog.Title() {
 								<span class="flex items-center gap-2">
@@ -42,7 +41,7 @@ templ AgentDesignerDialog() {
 								</span>
 							}
 							@dialog.Description() {
-								{ i18n.T(ctx, "Build LLM Agents or compose them into Workflow Agents — Sequential, Parallel, and Loop — powered by ADK-Go.") }
+								{ i18n.T(ctx, "Design agents — LLM, Sequential, Parallel, Loop — powered by ADK-Go.") }
 							}
 						</div>
 						<div class="flex items-center gap-1">
@@ -76,497 +75,246 @@ templ AgentDesignerDialog() {
 							}
 						</div>
 					</div>
-					<!-- Mode Tab Bar -->
-					<div class="flex gap-0 -mb-px">
-						<button
-							type="button"
-							@click="switchMode('node')"
-							class="px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5"
-							:class="mode === 'node' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'"
-						>
-							@icon.Bot(icon.Props{Class: "size-4"})
-							{ i18n.T(ctx, "LLM Agent") }
-						</button>
-						<button
-							type="button"
-							@click="switchMode('pipeline')"
-							class="px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5"
-							:class="mode === 'pipeline' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'"
-						>
-							@icon.GitBranch(icon.Props{Class: "size-4"})
-							{ i18n.T(ctx, "Workflow Agent") }
-						</button>
-					</div>
 				}
 				<!-- ═══════════════════════════════════════════ -->
-				<!-- NODE DESIGN MODE                           -->
+				<!-- UNIFIED AGENT LIST                         -->
 				<!-- ═══════════════════════════════════════════ -->
-				<template x-if="mode === 'node'">
+				<template x-if="view === 'list'">
 					<div class="flex flex-col flex-1 overflow-hidden" :class="expanded ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[calc(90vh-8rem)]'">
-						<!-- Node List View -->
-						<template x-if="nodeView === 'list'">
-							<div class="flex flex-col flex-1 overflow-hidden">
-								<div class="px-4 pt-3 pb-2 flex items-center gap-2">
-									<div class="flex-1">
-										@input.Input(input.Props{
-											Type:        input.TypeSearch,
-											Placeholder: i18n.T(ctx, "Search LLM agents..."),
-											Class:       "h-9 bg-muted/40 border-transparent focus-within:bg-background",
-											Attributes: templ.Attributes{
-												"x-model.debounce.300ms": "searchQuery",
-												"@input":                 "searchAgents()",
-											},
-										})
-									</div>
+						<div class="flex flex-col flex-1 overflow-hidden">
+							<div class="px-4 pt-3 pb-2 flex items-center gap-2">
+								<div class="flex-1">
+									@input.Input(input.Props{
+										Type:        input.TypeSearch,
+										Placeholder: i18n.T(ctx, "Search agents..."),
+										Class:       "h-9 bg-muted/40 border-transparent focus-within:bg-background",
+										Attributes: templ.Attributes{
+											"x-model.debounce.300ms": "searchQuery",
+											"@input":                 "searchAgents()",
+										},
+									})
+								</div>
+								<!-- New Agent dropdown -->
+								<div class="relative" x-data="{ showNewMenu: false }" @click.outside="showNewMenu = false">
 									@button.Button(button.Props{
 										Size:    button.SizeSm,
 										Variant: button.VariantDefault,
 										Class:   "gap-1.5 shrink-0",
 										Attributes: templ.Attributes{
-											"@click": "showCreateNodeForm()",
+											"@click": "showNewMenu = !showNewMenu",
 										},
 									}) {
 										@icon.Plus(icon.Props{Class: "size-4"})
-										{ i18n.T(ctx, "New LLM Agent") }
+										{ i18n.T(ctx, "New Agent") }
+										@icon.ChevronDown(icon.Props{Class: "size-3"})
 									}
+									<div
+										x-show="showNewMenu"
+										x-transition
+										class="absolute right-0 top-full mt-1 w-48 rounded-lg border border-border bg-popover shadow-md z-50 py-1"
+									>
+										<button
+											type="button"
+											@click="showNewMenu = false; showCreateNodeForm()"
+											class="flex items-center gap-2 w-full px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
+										>
+											@icon.Bot(icon.Props{Class: "size-4 text-emerald-500"})
+											{ i18n.T(ctx, "LLM Agent") }
+										</button>
+										<button
+											type="button"
+											@click="showNewMenu = false; showCreatePipelineForm()"
+											class="flex items-center gap-2 w-full px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
+										>
+											@icon.GitBranch(icon.Props{Class: "size-4 text-indigo-500"})
+											{ i18n.T(ctx, "Workflow Agent") }
+										</button>
+									</div>
 								</div>
-								<div class="flex-1 overflow-y-auto px-4 pb-4 scrollbar-thin min-h-[300px]">
-									<template x-if="loading">
-										<div class="space-y-3">
-											<template x-for="i in 3" :key="i">
-												<div class="flex items-center gap-3 p-3 animate-pulse rounded-lg border border-border">
-													<div class="size-10 rounded-lg bg-muted"></div>
-													<div class="flex-1 space-y-2">
-														<div class="h-4 bg-muted rounded-md w-1/3"></div>
-														<div class="h-3 bg-muted rounded-md w-2/3"></div>
+							</div>
+							<div class="flex-1 overflow-y-auto px-4 pb-4 scrollbar-thin min-h-[300px]">
+								<template x-if="loading">
+									<div class="space-y-3">
+										<template x-for="i in 3" :key="i">
+											<div class="flex items-center gap-3 p-3 animate-pulse rounded-lg border border-border">
+												<div class="size-10 rounded-lg bg-muted"></div>
+												<div class="flex-1 space-y-2">
+													<div class="h-4 bg-muted rounded-md w-1/3"></div>
+													<div class="h-3 bg-muted rounded-md w-2/3"></div>
+												</div>
+											</div>
+										</template>
+									</div>
+								</template>
+								<template x-if="!loading">
+									<div>
+										<template x-if="filteredAgents.length === 0">
+											<div class="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
+												@icon.Workflow(icon.Props{Class: "size-12 opacity-20"})
+												<template x-if="searchQuery">
+													<div class="text-center">
+														<p class="text-sm font-medium">{ i18n.T(ctx, "No agents found") }</p>
+														<p class="text-xs mt-1">{ i18n.T(ctx, "Try a different search term.") }</p>
 													</div>
-												</div>
-											</template>
-										</div>
-									</template>
-									<template x-if="!loading">
-										<div>
-											<template x-if="filteredAgents.length === 0">
-												<div class="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
-													@icon.Bot(icon.Props{Class: "size-12 opacity-20"})
-													<template x-if="searchQuery">
-														<div class="text-center">
-															<p class="text-sm font-medium">{ i18n.T(ctx, "No LLM agents found") }</p>
-															<p class="text-xs mt-1">{ i18n.T(ctx, "Try a different search term.") }</p>
-														</div>
-													</template>
-													<template x-if="!searchQuery">
-														<div class="text-center">
-															<p class="text-sm font-medium">{ i18n.T(ctx, "No LLM agents yet") }</p>
-															<p class="text-xs mt-1">{ i18n.T(ctx, "Create your first LLM agent to get started.") }</p>
-															@button.Button(button.Props{
-																Size:    button.SizeSm,
-																Variant: button.VariantOutline,
-																Class:   "mt-3 gap-1.5",
-																Attributes: templ.Attributes{
-																	"@click": "showCreateNodeForm()",
-																},
-															}) {
-																@icon.Plus(icon.Props{Class: "size-3.5"})
-																{ i18n.T(ctx, "Create LLM Agent") }
-															}
-														</div>
-													</template>
-												</div>
-											</template>
-											<!-- Agent Node Cards Grid -->
-											<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-												<template x-for="ag in filteredAgents" :key="ag.id">
-													<div
-														class="group relative rounded-xl border border-border hover:border-primary/30 hover:shadow-sm transition-all duration-200 cursor-pointer overflow-hidden bg-card"
-														@click="showEditNodeForm(ag)"
-													>
-														<div class="p-4">
-															<div class="flex items-start gap-3">
-																<!-- Agent Icon -->
-																<div class="size-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0 [&_svg]:size-5">
+												</template>
+												<template x-if="!searchQuery">
+													<div class="text-center">
+														<p class="text-sm font-medium">{ i18n.T(ctx, "No agents yet") }</p>
+														<p class="text-xs mt-1">{ i18n.T(ctx, "Create your first agent to get started.") }</p>
+													</div>
+												</template>
+											</div>
+										</template>
+										<!-- Agent Cards Grid -->
+										<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+											<template x-for="ag in filteredAgents" :key="ag.id">
+												<div
+													class="group relative rounded-xl border border-border hover:border-primary/30 hover:shadow-sm transition-all duration-200 cursor-pointer overflow-hidden bg-card"
+													@click="ag.isComposed ? showEditPipelineForm(ag) : showEditNodeForm(ag)"
+												>
+													<div class="p-4">
+														<div class="flex items-start gap-3">
+															<!-- Agent Icon -->
+															<div
+																class="size-10 rounded-lg flex items-center justify-center shrink-0 [&_svg]:size-5"
+																:class="ag.isComposed ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'bg-primary/10 text-primary'"
+															>
+																<template x-if="ag.isComposed">
+																	@icon.GitBranch(icon.Props{Class: "size-5"})
+																</template>
+																<template x-if="!ag.isComposed">
 																	<span x-html="ag.icon"></span>
-																</div>
-																<div class="flex-1 min-w-0">
-																	<h3 class="text-sm font-semibold text-foreground truncate" x-text="ag.name"></h3>
-																	<p class="text-xs text-muted-foreground mt-0.5 line-clamp-2" x-text="ag.description || 'No description'"></p>
-																</div>
+																</template>
 															</div>
-															<!-- Node metadata -->
-															<div class="flex items-center gap-2 mt-3 pt-2 border-t border-border/50">
+															<div class="flex-1 min-w-0">
+																<h3 class="text-sm font-semibold text-foreground truncate" x-text="ag.name"></h3>
+																<p class="text-xs text-muted-foreground mt-0.5 line-clamp-2" x-text="ag.description || 'No description'"></p>
+															</div>
+														</div>
+														<!-- Metadata -->
+														<div class="flex items-center gap-2 mt-3 pt-2 border-t border-border/50">
+															<template x-if="!ag.isComposed">
 																@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "text-[9px] px-1.5 py-0 h-4"}) {
 																	@icon.Bot(icon.Props{Class: "size-2.5 me-0.5"})
 																	{ i18n.T(ctx, "LLM Agent") }
 																}
-																<span class="text-[10px] text-muted-foreground" x-text="formatDate(ag.createdAt || ag.created_at)"></span>
-																<div class="flex-1"></div>
-																<div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" @click.stop>
-																	@button.Button(button.Props{
-																		Size:    button.SizeIcon,
-																		Variant: button.VariantGhost,
-																		Class:   "size-7 text-destructive hover:text-destructive",
-																		Attributes: templ.Attributes{
-																			"@click.stop": "confirmDeleteNode(ag)",
-																			"title":       i18n.T(ctx, "Delete"),
-																		},
-																	}) {
-																		@icon.Trash2(icon.Props{Class: "size-3.5"})
-																	}
-																</div>
+															</template>
+															<template x-if="ag.isComposed">
+																@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "text-[9px] px-1.5 py-0 h-4 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"}) {
+																	@icon.GitBranch(icon.Props{Class: "size-2.5 me-0.5"})
+																	{ i18n.T(ctx, "Workflow") }
+																}
+															</template>
+															<template x-if="ag.isComposed && ag.graph">
+																<span class="text-[10px] text-muted-foreground">
+																	<span x-text="collectAgentIds(ag.graph).length"></span> agents
+																</span>
+															</template>
+															<span class="text-[10px] text-muted-foreground" x-text="formatDate(ag.createdAt || ag.created_at)"></span>
+															<div class="flex-1"></div>
+															<div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" @click.stop>
+																@button.Button(button.Props{
+																	Size:    button.SizeIcon,
+																	Variant: button.VariantGhost,
+																	Class:   "size-7 text-destructive hover:text-destructive",
+																	Attributes: templ.Attributes{
+																		"@click.stop": "ag.isComposed ? confirmDeletePipeline(ag) : confirmDeleteNode(ag)",
+																		"title":       i18n.T(ctx, "Delete"),
+																	},
+																}) {
+																	@icon.Trash2(icon.Props{Class: "size-3.5"})
+																}
 															</div>
 														</div>
 													</div>
-												</template>
-											</div>
+												</div>
+											</template>
 										</div>
-									</template>
-								</div>
+									</div>
+								</template>
 							</div>
-						</template>
-						<!-- Node Create/Edit Form View -->
-						<template x-if="nodeView === 'form'">
-							<div class="flex flex-col flex-1 overflow-hidden">
-								<div class="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/50">
-									@button.Button(button.Props{
-										Size:    button.SizeIcon,
-										Variant: button.VariantGhost,
-										Class:   "size-8",
-										Attributes: templ.Attributes{
-											"@click": "nodeView = 'list'",
-										},
-									}) {
-										@icon.ArrowLeft(icon.Props{Class: "size-4"})
-									}
-									<h3 class="text-sm font-semibold" x-text="editingAgent ? 'Edit LLM Agent' : 'Create LLM Agent'"></h3>
-									<span class="text-[10px] text-muted-foreground" x-text="editingAgent ? 'Modify agent instruction &amp; settings' : 'Define the agent\'s role and instruction'"></span>
-								</div>
-								<div class="flex-1 overflow-y-auto p-4 scrollbar-thin space-y-4">
-									@agentNodeForm()
-								</div>
-								<!-- Save Footer -->
-								<div class="px-4 py-3 border-t bg-muted/50 flex items-center justify-end gap-2">
-									@button.Button(button.Props{
-										Variant: button.VariantGhost,
-										Class:   "h-8 px-3 text-xs",
-										Attributes: templ.Attributes{
-											"@click": "nodeView = 'list'",
-										},
-									}) {
-										{ i18n.T(ctx, "Cancel") }
-									}
-									@button.Button(button.Props{
-										Variant: button.VariantDefault,
-										Class:   "h-8 px-4 text-xs gap-1.5",
-										Attributes: templ.Attributes{
-											"@click":    "saveNode()",
-											":disabled": "saving || !form.name.trim()",
-										},
-									}) {
-										<span x-show="!saving" x-text="editingAgent ? 'Save Changes' : 'Create LLM Agent'"></span>
-										<span x-show="saving" class="flex items-center gap-1.5">
-											<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
-											{ i18n.T(ctx, "Saving...") }
-										</span>
-									}
-								</div>
-							</div>
-						</template>
-						<!-- Node Delete Confirmation -->
-						<template x-if="nodeView === 'delete'">
-							@deleteConfirmation("nodeView = 'list'", "deleteNode()")
-						</template>
+						</div>
 					</div>
 				</template>
 				<!-- ═══════════════════════════════════════════ -->
-				<!-- PIPELINE COMPOSE MODE                      -->
+				<!-- LLM AGENT FORM                             -->
 				<!-- ═══════════════════════════════════════════ -->
-				<template x-if="mode === 'pipeline'">
+				<template x-if="view === 'agentForm'">
 					<div class="flex flex-col flex-1 overflow-hidden" :class="expanded ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[calc(90vh-8rem)]'">
-						<!-- Pipeline Canvas (list) View -->
-						<template x-if="pipelineView === 'canvas'">
-							<div class="flex flex-col flex-1 overflow-hidden">
-								<div class="px-4 pt-3 pb-2 flex items-center gap-2">
-									<div class="flex-1">
-										@input.Input(input.Props{
-											Type:        input.TypeSearch,
-											Placeholder: i18n.T(ctx, "Search workflow agents..."),
-											Class:       "h-9 bg-muted/40 border-transparent focus-within:bg-background",
-											Attributes: templ.Attributes{
-												"x-model.debounce.300ms": "pipelineSearchQuery",
-												"@input":                 "filterPipelines()",
-											},
-										})
-									</div>
-									@button.Button(button.Props{
-										Size:    button.SizeSm,
-										Variant: button.VariantDefault,
-										Class:   "gap-1.5 shrink-0",
-										Attributes: templ.Attributes{
-											"@click": "showCreatePipelineForm()",
-										},
-									}) {
-										@icon.Plus(icon.Props{Class: "size-4"})
-										{ i18n.T(ctx, "New Workflow Agent") }
-									}
-								</div>
-								<div class="flex-1 overflow-y-auto px-4 pb-4 scrollbar-thin min-h-[300px]">
-									<template x-if="loading">
-										<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-											<template x-for="i in 4" :key="i">
-												<div class="p-4 rounded-lg border border-border animate-pulse">
-													<div class="flex items-center gap-3 mb-3">
-														<div class="size-10 rounded-lg bg-muted"></div>
-														<div class="flex-1 space-y-2">
-															<div class="h-4 bg-muted rounded w-2/3"></div>
-															<div class="h-3 bg-muted rounded w-1/3"></div>
-														</div>
-													</div>
-												</div>
-											</template>
-										</div>
-									</template>
-									<template x-if="!loading">
-										<div>
-											<template x-if="filteredPipelines.length === 0">
-												<div class="flex flex-col items-center justify-center py-12 gap-4 text-muted-foreground">
-													@icon.GitBranch(icon.Props{Class: "size-12 opacity-20"})
-													<div class="text-center">
-														<p class="text-sm font-medium">{ i18n.T(ctx, "No Workflow Agents yet") }</p>
-														<p class="text-xs mt-1 max-w-sm">
-															{ i18n.T(ctx, "Compose LLM Agents into Workflow Agents using Sequential, Parallel, and Loop patterns — mapping directly to ADK-Go's sequentialagent, parallelagent, and loopagent.") }
-														</p>
-													</div>
-													@button.Button(button.Props{
-														Size:    button.SizeSm,
-														Variant: button.VariantOutline,
-														Class:   "gap-1.5",
-														Attributes: templ.Attributes{
-															"@click": "showCreatePipelineForm()",
-														},
-													}) {
-														@icon.Plus(icon.Props{Class: "size-3.5"})
-														{ i18n.T(ctx, "Create Workflow Agent") }
-													}
-													<!-- Quick explanation cards -->
-													<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4 w-full max-w-2xl">
-														@pipelineTypeCard("sequential", "↓ Sequential", "Runs sub-agents one after another. Each agent completes before the next starts. Use OutputKey + {var} to pass results downstream.", "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20")
-														@pipelineTypeCard("parallel", "∥ Parallel", "Runs sub-agents concurrently in isolated branches. Each branch gets its own conversation context. Results are collected and merged.", "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20")
-														@pipelineTypeCard("loop", "↻ Loop", "Repeatedly runs sub-agents up to MaxIterations or until a sub-agent signals Escalate. Ideal for iterative refinement cycles.", "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20")
-														@pipelineTypeCard("agent", "● LLM Agent", "A leaf node backed by an LLM Agent you created. Set OutputKey to save its output to session state for downstream agents.", "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20")
-													</div>
-												</div>
-											</template>
-											<!-- Pipeline Cards -->
-											<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-												<template x-for="pipeline in filteredPipelines" :key="pipeline.id">
-													<div
-														class="group relative rounded-xl border border-border hover:border-indigo-500/30 hover:shadow-md transition-all duration-200 cursor-pointer overflow-hidden bg-card"
-														@click="showEditPipelineForm(pipeline)"
-													>
-														<div class="p-4">
-															<div class="flex items-start gap-3">
-																<div class="size-10 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
-																	@icon.GitBranch(icon.Props{Class: "size-5"})
-																</div>
-																<div class="flex-1 min-w-0">
-																	<div class="flex items-center gap-2">
-																		<h3 class="text-sm font-semibold text-foreground truncate" x-text="pipeline.name"></h3>
-																		@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "text-[9px] px-1.5 py-0 h-4 shrink-0 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"}) {
-																			@icon.GitBranch(icon.Props{Class: "size-2.5 me-0.5"})
-																			{ i18n.T(ctx, "Workflow Agent") }
-																		}
-																	</div>
-																	<p class="text-xs text-muted-foreground mt-0.5 line-clamp-2" x-text="pipeline.description || 'No description'"></p>
-																</div>
-															</div>
-															<!-- Pipeline stats -->
-															<div class="flex items-center gap-3 mt-3 pt-2 border-t border-border/50">
-																<template x-if="pipeline.graph">
-																	<span class="text-[10px] text-muted-foreground">
-																		<span x-text="collectAgentIds(pipeline.graph).length"></span> agents ·
-																		<span x-text="countNodes(pipeline.graph)"></span> nodes
-																	</span>
-																</template>
-																<span class="text-[10px] text-muted-foreground" x-text="formatDate(pipeline.createdAt || pipeline.created_at)"></span>
-																<div class="flex-1"></div>
-																<div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" @click.stop>
-																	@button.Button(button.Props{
-																		Size:    button.SizeIcon,
-																		Variant: button.VariantGhost,
-																		Class:   "size-7 text-destructive hover:text-destructive",
-																		Attributes: templ.Attributes{
-																			"@click.stop": "confirmDeletePipeline(pipeline)",
-																			"title":       i18n.T(ctx, "Delete"),
-																		},
-																	}) {
-																		@icon.Trash2(icon.Props{Class: "size-3.5"})
-																	}
-																</div>
-															</div>
-														</div>
-													</div>
-												</template>
-											</div>
-										</div>
-									</template>
-								</div>
-							</div>
-						</template>
-						<!-- Pipeline Form View (editor with tree builder) -->
-						<template x-if="pipelineView === 'form'">
-							<div class="flex flex-col flex-1 overflow-hidden">
-								<div class="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/50">
-									@button.Button(button.Props{
-										Size:    button.SizeIcon,
-										Variant: button.VariantGhost,
-										Class:   "size-8",
-										Attributes: templ.Attributes{
-											"@click": "pipelineView = 'canvas'",
-										},
-									}) {
-										@icon.ArrowLeft(icon.Props{Class: "size-4"})
-									}
-									<h3 class="text-sm font-semibold" x-text="editingPipeline ? 'Edit Workflow Agent' : 'Create Workflow Agent'"></h3>
-									<div class="flex-1"></div>
-									<!-- Validation indicator -->
-									<div class="flex items-center gap-1.5">
-										<template x-if="isPipelineValid">
-											<span class="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
-												@icon.CircleCheck(icon.Props{Class: "size-3.5"})
-												{ i18n.T(ctx, "Valid") }
-											</span>
-										</template>
-										<template x-if="!isPipelineValid">
-											<span class="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400">
-												@icon.TriangleAlert(icon.Props{Class: "size-3.5"})
-												<span x-text="pipelineErrors.length + ' issue' + (pipelineErrors.length !== 1 ? 's' : '')"></span>
-											</span>
-										</template>
-									</div>
-									<!-- Open visual canvas -->
-									@button.Button(button.Props{
-										Size:    button.SizeSm,
-										Variant: button.VariantOutline,
-										Class:   "h-7 px-2.5 text-xs gap-1.5",
-										Attributes: templ.Attributes{
-											"@click": "openFlowView()",
-											"title":  i18n.T(ctx, "Open visual canvas editor"),
-										},
-									}) {
-										@icon.Workflow(icon.Props{Class: "size-3.5"})
-										{ i18n.T(ctx, "Canvas") }
-									}
-								</div>
-								<!-- Split panel: left = config, right = tree -->
-								<div class="flex-1 overflow-hidden flex" :class="expanded ? '' : ''">
-									<!-- Left: Pipeline Config -->
-									<div class="w-[320px] shrink-0 border-e border-border overflow-y-auto scrollbar-thin p-4 space-y-4">
-										@pipelineConfigForm()
-									</div>
-									<!-- Right: Tree Builder / Visual -->
-									<div class="flex-1 overflow-y-auto scrollbar-thin p-4">
-										<div class="space-y-3">
-											<!-- Pipeline graph tree builder -->
-											<template x-if="pipelineGraph">
-												<div>
-													<div class="space-y-2" x-data="workflowTreeBuilder()" x-init="init()">
-														<div x-html="renderPipelineNode(pipelineGraph, 'graph', 0, false)"></div>
-													</div>
-													<!-- Stats bar -->
-													<div class="flex items-center gap-4 p-2 mt-3 rounded-lg bg-muted/30 border border-border">
-														<span class="text-[11px] text-muted-foreground" x-text="countNodes(pipelineGraph) + ' nodes'"></span>
-														<span class="text-[11px] text-muted-foreground" x-text="'depth ' + nodeDepth(pipelineGraph)"></span>
-														<span class="text-[11px] text-muted-foreground" x-text="collectAgentIds(pipelineGraph).length + ' agents'"></span>
-														<template x-if="countNodes(pipelineGraph) >= 50">
-															<span class="text-[11px] text-amber-600 dark:text-amber-400 font-medium">{ i18n.T(ctx, "Node limit reached") }</span>
-														</template>
-													</div>
-													<!-- Validation errors -->
-													<template x-if="pipelineErrors.length > 0">
-														<div class="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-1">
-															<h4 class="text-xs font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-																@icon.TriangleAlert(icon.Props{Class: "size-3.5"})
-																{ i18n.T(ctx, "Validation Issues") }
-															</h4>
-															<template x-for="err in pipelineErrors" :key="err">
-																<p class="text-[11px] text-amber-600/80 dark:text-amber-400/80" x-text="'• ' + err"></p>
-															</template>
-														</div>
-													</template>
-												</div>
-											</template>
-										</div>
-									</div>
-								</div>
-								<!-- Save Footer -->
-								<div class="px-4 py-3 border-t bg-muted/50 flex items-center justify-between">
-									<span class="text-[10px] text-muted-foreground">
-										{ i18n.T(ctx, "Workflow Agents compose LLM Agents via Sequential → Parallel → Loop. Set OutputKey on each agent node and reference it as {key} in downstream Instructions.") }
-									</span>
-									<div class="flex items-center gap-2">
-										@button.Button(button.Props{
-											Variant: button.VariantGhost,
-											Class:   "h-8 px-3 text-xs",
-											Attributes: templ.Attributes{
-												"@click": "pipelineView = 'canvas'",
-											},
-										}) {
-											{ i18n.T(ctx, "Cancel") }
-										}
-										@button.Button(button.Props{
-											Variant: button.VariantDefault,
-											Class:   "h-8 px-4 text-xs gap-1.5",
-											Attributes: templ.Attributes{
-												"@click":    "savePipeline()",
-												":disabled": "pipelineSaving || !pipelineName.trim() || !isPipelineValid",
-											},
-										}) {
-											<span x-show="!pipelineSaving" x-text="editingPipeline ? 'Save Workflow Agent' : 'Create Workflow Agent'"></span>
-											<span x-show="pipelineSaving" class="flex items-center gap-1.5">
-												<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
-												{ i18n.T(ctx, "Saving...") }
-											</span>
-										}
-									</div>
-								</div>
-							</div>
-						</template>
-					<!-- ═══════════════════════════════════════════ -->
-					<!-- ALPINEFLOW CANVAS VIEW                      -->
-					<!-- ═══════════════════════════════════════════ -->
-					<template x-if="pipelineView === 'flow'">
-						<div class="flex flex-col flex-1 overflow-hidden" :class="expanded ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[calc(90vh-8rem)]'">
-							<!-- Flow Header -->
-							<div class="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/50 shrink-0">
-								@button.Button(button.Props{
-									Size:    button.SizeIcon,
-									Variant: button.VariantGhost,
-									Class:   "size-8",
-									Attributes: templ.Attributes{
-										"@click": "closeFlowView()",
-										"title":  i18n.T(ctx, "Back to tree editor"),
-									},
-								}) {
-									@icon.ArrowLeft(icon.Props{Class: "size-4"})
-								}
-								<h3 class="text-sm font-semibold" x-text="(editingPipeline ? 'Edit' : 'New') + ' — ' + (pipelineName || 'Workflow Agent')"></h3>
-								<div class="flex-1"></div>
-								<button
-									@click="$store.flow.undo()"
-									:disabled="!$store.flow.canUndo()"
-									title="Undo (Ctrl+Z)"
-									class="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-								>
-									@icon.Undo2(icon.Props{Class: "size-3.5"})
-								</button>
-								<button
-									@click="$store.flow.autoLayout()"
-									title="Auto-arrange layout"
-									class="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-								>
-									@icon.LayoutGrid(icon.Props{Class: "size-3.5"})
-									{ i18n.T(ctx, "Auto") }
-								</button>
+						<div class="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/50">
+							@button.Button(button.Props{
+								Size:    button.SizeIcon,
+								Variant: button.VariantGhost,
+								Class:   "size-8",
+								Attributes: templ.Attributes{
+									"@click": "view = 'list'",
+								},
+							}) {
+								@icon.ArrowLeft(icon.Props{Class: "size-4"})
+							}
+							<h3 class="text-sm font-semibold" x-text="editingAgent ? 'Edit LLM Agent' : 'Create LLM Agent'"></h3>
+							<span class="text-[10px] text-muted-foreground" x-text="editingAgent ? 'Modify agent instruction &amp; settings' : 'Define the agent\'s role and instruction'"></span>
+						</div>
+						<div class="flex-1 overflow-y-auto p-4 scrollbar-thin space-y-4">
+							@agentNodeForm()
+						</div>
+						<!-- Save Footer -->
+						<div class="px-4 py-3 border-t bg-muted/50 flex items-center justify-end gap-2">
+							@button.Button(button.Props{
+								Variant: button.VariantGhost,
+								Class:   "h-8 px-3 text-xs",
+								Attributes: templ.Attributes{
+									"@click": "view = 'list'",
+								},
+							}) {
+								{ i18n.T(ctx, "Cancel") }
+							}
+							@button.Button(button.Props{
+								Variant: button.VariantDefault,
+								Class:   "h-8 px-4 text-xs gap-1.5",
+								Attributes: templ.Attributes{
+									"@click":    "saveNode()",
+									":disabled": "saving || !form.name.trim()",
+								},
+							}) {
+								<span x-show="!saving" x-text="editingAgent ? 'Save Changes' : 'Create Agent'"></span>
+								<span x-show="saving" class="flex items-center gap-1.5">
+									<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
+									{ i18n.T(ctx, "Saving...") }
+								</span>
+							}
+						</div>
+					</div>
+				</template>
+				<!-- ═══════════════════════════════════════════ -->
+				<!-- DELETE CONFIRMATION                         -->
+				<!-- ═══════════════════════════════════════════ -->
+				<template x-if="view === 'delete'">
+					@deleteConfirmation("view = 'list'", "deletingAgent?.isComposed ? deletePipeline() : deleteNode()")
+				</template>
+				<!-- ═══════════════════════════════════════════ -->
+				<!-- WORKFLOW AGENT FORM                         -->
+				<!-- ═══════════════════════════════════════════ -->
+				<!-- ═══════════════════════════════════════════ -->
+				<!-- WORKFLOW TREE EDITOR                        -->
+				<!-- ═══════════════════════════════════════════ -->
+				<template x-if="view === 'flow'">
+					<div class="flex flex-col flex-1 overflow-hidden" :class="expanded ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[calc(90vh-8rem)]'">
+						<!-- Header -->
+						<div class="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/50 shrink-0">
+							@button.Button(button.Props{
+								Size:    button.SizeIcon,
+								Variant: button.VariantGhost,
+								Class:   "size-8",
+								Attributes: templ.Attributes{
+									"@click": "_syncGraphFromStore(); view = 'list'",
+									"title":  i18n.T(ctx, "Back to agent list"),
+								},
+							}) {
+								@icon.ArrowLeft(icon.Props{Class: "size-4"})
+							}
+							<h3 class="text-sm font-semibold" x-text="(editingPipeline ? 'Edit' : 'New') + ' Workflow Agent'"></h3>
+							<div class="flex-1"></div>
 							<div class="flex items-center gap-1">
 								<template x-if="isPipelineValid">
 									<span class="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
@@ -581,322 +329,61 @@ templ AgentDesignerDialog() {
 									</span>
 								</template>
 							</div>
-							<!-- Sidebar toggles -->
-							<div class="flex items-center gap-1 border-l border-border/30 pl-2 ml-2">
-								<button
-									@click="toggleFlowViewMode()"
-									:title="flowViewMode === 'canvas' ? 'Switch to tree view' : 'Switch to canvas view'"
-									class="flex items-center justify-center w-7 h-7 rounded text-xs transition-all duration-150"
-									:class="flowViewMode === 'tree' ? 'text-indigo-400 bg-indigo-500/15 hover:bg-indigo-500/25' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'"
-								>
-									<template x-if="flowViewMode === 'tree'">
-										@icon.GitBranch(icon.Props{Class: "size-3.5"})
-									</template>
-									<template x-if="flowViewMode === 'canvas'">
-										@icon.Workflow(icon.Props{Class: "size-3.5"})
-									</template>
-								</button>
-								<button
-									@click="togglePalette()"
-									:title="paletteVisible ? 'Hide component palette (Ctrl+[)' : 'Show component palette (Ctrl+[)'"
-									class="flex items-center justify-center w-7 h-7 rounded text-xs transition-all duration-150"
-									:class="paletteVisible ? 'text-indigo-400 bg-indigo-500/15 hover:bg-indigo-500/25' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'"
-								>
-									@icon.PanelLeft(icon.Props{Class: "size-3.5"})
-								</button>
-								<button
-									@click="togglePropertyPanel()"
-									:title="propertyPanelVisible ? 'Hide property panel (Ctrl+])' : 'Show property panel (Ctrl+])'"
-									class="flex items-center justify-center w-7 h-7 rounded text-xs transition-all duration-150"
-									:class="propertyPanelVisible ? 'text-indigo-400 bg-indigo-500/15 hover:bg-indigo-500/25' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'"
-								>
-									@icon.PanelRight(icon.Props{Class: "size-3.5"})
-								</button>
-								<template x-if="!paletteVisible || !propertyPanelVisible">
-									<button
-										@click="paletteVisible = true; propertyPanelVisible = true"
-										title="Show all panels"
-										class="flex items-center justify-center w-7 h-7 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-150"
-									>
-										@icon.LayoutPanelLeft(icon.Props{Class: "size-3.5"})
-									</button>
-								</template>
+							<!-- Property panel toggle -->
+							<button
+								@click="togglePropertyPanel()"
+								:title="propertyPanelVisible ? 'Hide property panel (Ctrl+])' : 'Show property panel (Ctrl+])'"
+								class="flex items-center justify-center w-7 h-7 rounded text-xs transition-all duration-150"
+								:class="propertyPanelVisible ? 'text-indigo-400 bg-indigo-500/15 hover:bg-indigo-500/25' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'"
+							>
+								@icon.PanelRight(icon.Props{Class: "size-3.5"})
+							</button>
+							@button.Button(button.Props{
+								Variant: button.VariantDefault,
+								Class:   "h-8 px-4 text-xs gap-1.5",
+								Attributes: templ.Attributes{
+									"@click":    "saveFromFlowView()",
+									":disabled": "pipelineSaving || !pipelineName.trim()",
+								},
+							}) {
+								<span x-show="!pipelineSaving" x-text="editingPipeline ? 'Save' : 'Create'"></span>
+								<span x-show="pipelineSaving" class="flex items-center gap-1.5">
+									<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
+								</span>
+							}
+						</div>
+						<!-- Name + description bar -->
+						<div class="flex items-center gap-2 px-3 py-1.5 border-b border-border/50 bg-muted/20 shrink-0">
+							<span class="text-[10px] text-muted-foreground shrink-0">{ i18n.T(ctx, "Name") }</span>
+							<input
+								x-model="pipelineName"
+								type="text"
+								placeholder="Workflow Agent name..."
+								class="flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
+							/>
+							<span class="text-[10px] text-muted-foreground shrink-0 border-l border-border/50 pl-2">{ i18n.T(ctx, "Desc") }</span>
+							<input
+								x-model="pipelineDescription"
+								type="text"
+								placeholder="Optional description..."
+								class="flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
+							/>
+						</div>
+						<!-- Tree + Property Panel -->
+						<div class="flex flex-1 overflow-hidden">
+							<!-- Tree View -->
+							<div
+								x-data="editableWorkflowTree()"
+								x-init="init()"
+								class="flex-1 overflow-auto"
+								style="background:#0d1117;"
+							>
+								<div class="ewt-pipeline-canvas">
+									<!-- Tree will be rendered here -->
+								</div>
 							</div>
-								@button.Button(button.Props{
-									Variant: button.VariantDefault,
-									Class:   "h-8 px-4 text-xs gap-1.5",
-									Attributes: templ.Attributes{
-										"@click":    "saveFromFlowView()",
-										":disabled": "pipelineSaving || !pipelineName.trim()",
-									},
-								}) {
-									<span x-show="!pipelineSaving" x-text="editingPipeline ? 'Save' : 'Create'"></span>
-									<span x-show="pipelineSaving" class="flex items-center gap-1.5">
-										<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
-									</span>
-								}
-							</div>
-							<!-- Pipeline name + description bar -->
-							<div class="flex items-center gap-2 px-3 py-1.5 border-b border-border/50 bg-muted/20 shrink-0">
-								<span class="text-[10px] text-muted-foreground shrink-0">{ i18n.T(ctx, "Name") }</span>
-								<input
-									x-model="pipelineName"
-									type="text"
-									placeholder="Workflow Agent name..."
-									class="flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
-								/>
-								<span class="text-[10px] text-muted-foreground shrink-0 border-l border-border/50 pl-2">{ i18n.T(ctx, "Desc") }</span>
-								<input
-									x-model="pipelineDescription"
-									type="text"
-									placeholder="Optional description..."
-									class="flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
-								/>
-							</div>
-							<!-- Three-panel layout: Palette | Canvas | Property Panel -->
-							<div class="flex flex-1 overflow-hidden">
-								<!-- LEFT: Palette -->
-								<div
-									x-data="alpineflowPalette"
-									x-show="paletteVisible"
-									x-transition:enter="transition-all duration-200 ease-out"
-									x-transition:enter-start="opacity-0 -translate-x-full"
-									x-transition:enter-end="opacity-100 translate-x-0"
-									x-transition:leave="transition-all duration-150 ease-in"
-									x-transition:leave-start="opacity-100 translate-x-0"
-									x-transition:leave-end="opacity-0 -translate-x-full"
-									class="w-52 shrink-0 border-r border-border/60 flex flex-col overflow-hidden"
-									style="background:#0f1117;"
-								>
-									<!-- Search -->
-									<div class="p-2.5 border-b border-border/40">
-										<input
-											x-model="search"
-											type="search"
-											placeholder="Search agents..."
-											class="w-full text-xs rounded-lg px-2.5 py-1.5 text-gray-200 placeholder:text-gray-600 outline-none focus:ring-1 focus:ring-indigo-500/50"
-											style="background:#1a1f2e; border:1px solid rgba(255,255,255,0.07);"
-										/>
-									</div>
-									<!-- Container types -->
-									<div class="p-2.5 border-b border-border/40 space-y-0.5">
-										<p class="text-[8px] uppercase tracking-widest text-gray-600 font-semibold mb-2 px-1">{ i18n.T(ctx, "Containers") }</p>
-										<template x-for="t in compositeTypes" :key="t.type">
-											<div
-												draggable="true"
-												@dragstart="onDragStartType($event, t.type)"
-												class="flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-grab active:cursor-grabbing select-none transition-colors"
-												style="&amp;:hover { background:rgba(255,255,255,0.04); }"
-												:style="`&amp;:hover { background:rgba(255,255,255,0.04); }`"
-												onmouseenter="this.style.background='rgba(255,255,255,0.04)'"
-												onmouseleave="this.style.background='transparent'"
-											>
-												<div class="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold" :style="`background:${t.color}18; color:${t.color}`" x-text="t.char"></div>
-												<div class="min-w-0">
-													<div class="text-[11px] font-medium text-gray-200" x-text="t.label"></div>
-													<div class="text-[9px] text-gray-600 truncate" x-text="t.desc"></div>
-												</div>
-											</div>
-										</template>
-									</div>
-									<!-- LLM Agents -->
-									<div class="flex-1 overflow-y-auto p-2.5 space-y-0.5 scrollbar-thin">
-										<p class="text-[8px] uppercase tracking-widest text-gray-600 font-semibold mb-2 px-1">{ i18n.T(ctx, "LLM Agents") }</p>
-										<template x-if="filteredAgents.length === 0">
-											<p class="text-[10px] text-gray-600 px-1 italic py-2">{ i18n.T(ctx, "No agents") }</p>
-										</template>
-										<template x-for="agent in filteredAgents" :key="agent.id">
-											<div
-												draggable="true"
-												@dragstart="onDragStartAgent($event, agent)"
-												class="flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-grab active:cursor-grabbing select-none transition-colors"
-												onmouseenter="this.style.background='rgba(5,150,105,0.08)'"
-												onmouseleave="this.style.background='transparent'"
-											>
-												<div class="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold" style="background:#05966918; color:#059669;">A</div>
-												<div class="min-w-0">
-													<div class="text-[11px] font-medium text-gray-200 truncate" x-text="agent.name"></div>
-													<div class="text-[9px] text-gray-600 truncate" x-text="agent.description || 'LLM Agent'"></div>
-												</div>
-											</div>
-										</template>
-										<!-- Remote connectors -->
-										<template x-if="connectors.length > 0">
-											<div class="mt-3 space-y-0.5">
-												<p class="text-[8px] uppercase tracking-widest text-gray-600 font-semibold mb-2 px-1">{ i18n.T(ctx, "Remote A2A") }</p>
-												<template x-for="conn in connectors" :key="conn.id">
-													<div
-														draggable="true"
-														@dragstart="onDragStartConnector($event, conn)"
-														class="flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-grab active:cursor-grabbing select-none transition-colors"
-														onmouseenter="this.style.background='rgba(190,18,60,0.08)'"
-														onmouseleave="this.style.background='transparent'"
-													>
-														<div class="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold" style="background:#be123c18; color:#be123c;">R</div>
-														<div class="min-w-0">
-															<div class="text-[11px] font-medium text-gray-200 truncate" x-text="conn.name || conn.id"></div>
-															<div class="text-[9px] text-gray-600">Remote A2A</div>
-														</div>
-													</div>
-												</template>
-											</div>
-										</template>
-									</div>
-									<div class="p-2.5 border-t border-border/40">
-										<p class="text-[8px] text-gray-700 leading-relaxed font-mono">{ i18n.T(ctx, "Drag items onto the canvas to add them") }</p>
-									</div>
-								</div>
-								<!-- CENTER: Canvas or Tree View -->
-								<!-- Tree View (default) -->
-								<template x-if="flowViewMode === 'tree'">
-									<div
-										x-data="editableWorkflowTree()"
-										x-init="init()"
-										class="flex-1 overflow-auto"
-										style="background:#0d1117;"
-									>
-										<div class="ewt-pipeline-canvas">
-											<!-- Tree will be rendered here -->
-										</div>
-									</div>
-								</template>
-								<!-- Canvas View -->
-								<template x-if="flowViewMode === 'canvas'">
-									<div
-										x-data="alpineflowCanvas"
-										data-flow-canvas
-										class="flex-1 relative overflow-hidden select-none"
-										:style="'background-color:#0d1117;' + gridBg"
-										@wheel.prevent="onWheel"
-										@mousedown="onMouseDown"
-										@dragover.prevent="onDragOver"
-										@drop="onDrop"
-										x-effect="Alpine.store('flow').canvasEl = $el"
-									>
-									<!-- Dot-grid overlay -->
-									<div
-										class="pointer-events-none absolute inset-0"
-										style="background-image:radial-gradient(circle,rgba(255,255,255,.07) 1px,transparent 1px);background-size:28px 28px;"
-										:style="'background-position:' + (($store.flow.panX % 28 + 28) % 28) + 'px ' + (($store.flow.panY % 28 + 28) % 28) + 'px'"
-									></div>
-									<!-- Transform group -->
-									<div
-										class="absolute top-0 left-0 pointer-events-none"
-										style="width:6000px;height:6000px;transform-origin:0 0;"
-										:style="'transform:' + transform"
-									>
-										<!-- SVG edge layer — rendered via x-html to avoid <template> inside SVG namespace -->
-										<svg
-											class="absolute inset-0 overflow-visible"
-											style="width:6000px;height:6000px;pointer-events:none;"
-											x-html="edgesSvgContent"
-										></svg>
-										<!-- Node layer -->
-										<template x-for="flatNode in $store.flow.flatNodes" :key="flatNode.id">
-											<div
-												x-data="alpineflowNode(flatNode.id)"
-												:style="nodeStyle"
-												class="absolute pointer-events-auto"
-											>
-												<!-- Input port (hidden for root) -->
-												<div
-													class="absolute left-1/2 -translate-x-1/2 -top-3.5 z-20 w-7 h-7 flex items-center justify-center"
-													x-show="!isRoot"
-												>
-													<div
-														class="w-3.5 h-3.5 rounded-full border-2 cursor-crosshair transition-all duration-200 hover:scale-125"
-														:style="`background:#0d1117; border-color:${$store.flow.connecting ? '#818cf8' : typeColor};` + ($store.flow.connecting ? 'box-shadow:0 0 0 3px ' + typeColor + '30;' : '')"
-														@mouseup.stop="onInputPortMouseUp"
-													></div>
-												</div>
-												<!-- Node card -->
-												<div
-													class="rounded-2xl overflow-hidden cursor-pointer transition-all duration-150 hover:brightness-110"
-													:style="'background:#13171f;' + cardStyle"
-													@mousedown.stop="onHeaderMouseDown"
-												>
-													<!-- Top colour accent bar -->
-													<div class="h-[3px] w-full" :style="'background:' + typeColor + ';' + (isSelected ? 'opacity:1;' : 'opacity:0.6;')"></div>
-													<!-- Header row -->
-													<div class="flex items-center gap-2 px-3 pt-2.5 pb-2 cursor-grab active:cursor-grabbing">
-														<!-- Type icon badge -->
-														<div
-															class="shrink-0 w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold select-none"
-															:style="'background:' + typeColor + '1a; color:' + typeColor"
-															x-text="typeChar"
-														></div>
-														<!-- Node name -->
-														<span class="text-[11px] font-semibold text-gray-100 truncate flex-1 leading-tight" x-text="displayLabel"></span>
-														<!-- Type chip -->
-														<span
-															class="shrink-0 text-[8px] uppercase tracking-widest font-semibold px-1.5 py-0.5 rounded-full"
-															:style="'background:' + typeColor + '18; color:' + typeColor"
-															x-text="typeLabel"
-														></span>
-														<!-- Collapse toggle (composite only) -->
-														<button
-															x-show="isComposite"
-															@click.stop="toggleCollapse()"
-															:title="n.collapsed ? 'Expand' : 'Collapse'"
-															class="ml-1 opacity-30 hover:opacity-80 transition-opacity text-gray-400"
-														>
-															<svg class="size-3" viewBox="0 0 10 10" fill="currentColor">
-																<path x-show="!n.collapsed" d="M5 7L1 3h8z"/>
-																<path x-show="n.collapsed" d="M7 5L3 1v8z"/>
-															</svg>
-														</button>
-													</div>
-													<!-- Body -->
-													<div class="px-3 pb-3 space-y-1">
-														<!-- Unconfigured warning -->
-														<div x-show="isUnconfigured" class="flex items-center gap-1.5 text-amber-400/80">
-															<span class="text-[9px]">⚠</span>
-															<span class="text-[10px]">Not configured</span>
-														</div>
-														<!-- Body text -->
-														<p x-show="!isUnconfigured && bodyText" class="text-[11px] text-gray-400 truncate leading-snug" x-text="bodyText"></p>
-														<!-- Output key badge -->
-														<p x-show="outputKeyBadge" class="font-mono text-[9px] text-indigo-400/60 truncate" x-text="outputKeyBadge"></p>
-													</div>
-													<!-- Quick-add strip (composite, not collapsed) -->
-													<template x-if="isComposite && !n.collapsed">
-														<div class="flex gap-1 flex-wrap px-2.5 py-2 border-t border-white/[0.05] bg-white/[0.02]">
-															<button @click.stop="addChildNode('agent')"      class="text-[8px] px-2 py-0.5 rounded-full bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-400/70 hover:text-emerald-300 transition-colors font-medium">+ Agent</button>
-															<button @click.stop="addChildNode('sequential')" class="text-[8px] px-2 py-0.5 rounded-full bg-violet-500/10  hover:bg-violet-500/25  text-violet-400/70  hover:text-violet-300  transition-colors font-medium">+ Seq</button>
-															<button @click.stop="addChildNode('parallel')"   class="text-[8px] px-2 py-0.5 rounded-full bg-sky-500/10    hover:bg-sky-500/25    text-sky-400/70    hover:text-sky-300    transition-colors font-medium">+ Par</button>
-															<button @click.stop="addChildNode('loop')"       class="text-[8px] px-2 py-0.5 rounded-full bg-amber-500/10  hover:bg-amber-500/25  text-amber-400/70  hover:text-amber-300  transition-colors font-medium">+ Loop</button>
-														</div>
-													</template>
-												</div>
-												<!-- Output port -->
-												<div class="absolute left-1/2 -translate-x-1/2 -bottom-3.5 z-20 w-7 h-7 flex items-center justify-center">
-													<div
-														class="w-3.5 h-3.5 rounded-full border-2 cursor-crosshair transition-all duration-200 hover:scale-125"
-														:style="`border-color:${typeColor}; background:${$store.flow.connecting?.sourceId===nodeId ? typeColor : '#0d1117'};` + ($store.flow.connecting?.sourceId===nodeId ? 'box-shadow:0 0 8px ' + typeColor + '80;' : '')"
-														@mousedown.stop="onOutputPortMouseDown"
-													></div>
-												</div>
-											</div>
-										</template>
-									</div>
-								<!-- Zoom + fit controls -->
-								<div class="absolute bottom-4 right-4 flex items-center gap-1 z-20">
-									<button @click="zoomOut()" title="Zoom out" class="w-7 h-7 flex items-center justify-center rounded-lg bg-[#1e2533]/90 border border-white/10 text-gray-300 text-sm hover:bg-[#252d3d] hover:text-white transition-colors backdrop-blur-sm">−</button>
-									<button @click="zoomReset()" title="Reset zoom" class="h-7 px-2 min-w-[3rem] flex items-center justify-center rounded-lg bg-[#1e2533]/90 border border-white/10 text-gray-300 text-[10px] font-mono hover:bg-[#252d3d] hover:text-white transition-colors backdrop-blur-sm" x-text="zoomLabel"></button>
-									<button @click="zoomIn()" title="Zoom in" class="w-7 h-7 flex items-center justify-center rounded-lg bg-[#1e2533]/90 border border-white/10 text-gray-300 text-sm hover:bg-[#252d3d] hover:text-white transition-colors backdrop-blur-sm">+</button>
-									<div class="w-px h-5 bg-white/10 mx-0.5"></div>
-									<button @click="centerGraph()" title="Center graph" class="w-7 h-7 flex items-center justify-center rounded-lg bg-[#1e2533]/90 border border-white/10 text-gray-300 text-sm hover:bg-[#252d3d] hover:text-white transition-colors backdrop-blur-sm">⊕</button>
-									<button @click="fitToView()" title="Fit to view" class="w-7 h-7 flex items-center justify-center rounded-lg bg-[#1e2533]/90 border border-white/10 text-gray-300 text-sm hover:bg-[#252d3d] hover:text-white transition-colors backdrop-blur-sm">⊡</button>
-									<button @click="fitAll()" title="Auto-layout &amp; fit" class="w-7 h-7 flex items-center justify-center rounded-lg bg-[#1e2533]/90 border border-white/10 text-gray-300 text-sm hover:bg-[#252d3d] hover:text-white transition-colors backdrop-blur-sm">⊞</button>
-								</div>
-								<!-- Keyboard hint -->
-								<div class="absolute bottom-4 left-4 text-[9px] text-gray-700 z-20 select-none pointer-events-none font-mono tracking-wide">
-									{ i18n.T(ctx, "Click to select · Drag to move · Pull port to connect · Scroll = zoom · Space+drag = pan · Del = delete · F = fit · C = center") }
-								</div>
-								</div>
-								</template>
-								<!-- RIGHT: Property Panel -->
-								<div
+							<!-- Property Panel -->
+							<div
 									x-data="alpineflowPropertyPanel"
 									x-show="propertyPanelVisible"
 									x-transition:enter="transition-all duration-200 ease-out"
@@ -1062,26 +549,13 @@ templ AgentDesignerDialog() {
 									</div>
 								</div>
 							</template>
-						</div>
-					</template>
-						<!-- Pipeline Delete Confirmation -->
-						<template x-if="pipelineView === 'delete'">
-							@deleteConfirmation("pipelineView = 'canvas'", "deletePipeline()")
-						</template>
 					</div>
 				</template>
-				<!-- Footer (only on list views) -->
-				<template x-if="(mode === 'node' && nodeView === 'list') || (mode === 'pipeline' && pipelineView === 'canvas')">
+				<!-- Footer (only on list view) -->
+				<template x-if="view === 'list'">
 					@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
 						<div class="flex items-center justify-between w-full">
-							<span class="text-xs text-muted-foreground">
-								<template x-if="mode === 'node'">
-									<span x-text="`${filteredAgents.length} LLM agent${filteredAgents.length !== 1 ? 's' : ''}`"></span>
-								</template>
-								<template x-if="mode === 'pipeline'">
-									<span x-text="`${filteredPipelines.length} workflow agent${filteredPipelines.length !== 1 ? 's' : ''}`"></span>
-								</template>
-							</span>
+							<span class="text-xs text-muted-foreground" x-text="`${filteredAgents.length} agent${filteredAgents.length !== 1 ? 's' : ''}`"></span>
 							@dialog.Close() {
 								@button.Button(button.Props{Variant: button.VariantGhost, Class: "h-8 px-3 text-xs"}) {
 									{ i18n.T(ctx, "Close") }
@@ -1986,149 +1460,6 @@ templ filesystemsSection() {
 				</div>
 			</template>
 		</div>
-	</div>
-}
-
-// pipelineConfigForm renders the left panel of the pipeline editor with name, description, etc.
-templ pipelineConfigForm() {
-	<!-- Pipeline Name -->
-	<div class="space-y-2">
-		@label.Label(label.Props{}) {
-			{ i18n.T(ctx, "Workflow Agent Name") }
-			<span class="text-destructive">*</span>
-		}
-		@input.Input(input.Props{
-			Placeholder: i18n.T(ctx, "e.g., Code Review Pipeline, Research & Report..."),
-			Attributes: templ.Attributes{
-				"x-model":   "pipelineName",
-				"maxlength": "100",
-			},
-		})
-	</div>
-	<!-- Description -->
-	<div class="space-y-2">
-		@label.Label(label.Props{}) {
-			{ i18n.T(ctx, "Description") }
-		}
-		@input.Input(input.Props{
-			Placeholder: i18n.T(ctx, "What does this workflow agent do?"),
-			Attributes: templ.Attributes{
-				"x-model":   "pipelineDescription",
-				"maxlength": "500",
-			},
-		})
-	</div>
-	<!-- System Prompt (for the root orchestrator) -->
-	<div class="space-y-2">
-		@label.Label(label.Props{}) {
-			{ i18n.T(ctx, "Root Instruction (optional)") }
-		}
-		@textarea.Textarea(textarea.Props{
-			Placeholder: i18n.T(ctx, "Shared instruction for the root orchestrator (Sequential/Parallel/Loop agents rarely need this)."),
-			Class:       "min-h-[80px] resize-y text-xs",
-			Rows:        3,
-			Attributes: templ.Attributes{
-				"x-model": "pipelineSystemPrompt",
-			},
-		})
-	</div>
-	<!-- Orchestration (root-level) -->
-	<div class="border border-border rounded-lg">
-		<details class="group">
-			<summary class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors cursor-pointer select-none">
-				<span class="flex items-center gap-2">
-					@icon.Settings2(icon.Props{Class: "size-4 text-muted-foreground"})
-					{ i18n.T(ctx, "Workflow Settings") }
-				</span>
-				<span class="transition-transform duration-200 group-open:rotate-180">
-					@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
-				</span>
-			</summary>
-			<div class="px-3 pb-3 border-t border-border pt-3 space-y-3">
-				<!-- Global Instruction -->
-				<div class="space-y-1.5">
-					<span class="text-xs font-medium flex items-center gap-1.5">
-						@icon.Globe(icon.Props{Class: "size-3.5 text-muted-foreground"})
-						{ i18n.T(ctx, "Global Instruction") }
-					</span>
-					@textarea.Textarea(textarea.Props{
-						Placeholder: i18n.T(ctx, "Applied to every agent in this workflow tree. Use for cross-cutting rules like language or tone."),
-						Class:       "min-h-[48px] resize-y text-[11px]",
-						Rows:        2,
-						Attributes: templ.Attributes{
-							"x-model": "pipelineOrchestration.globalInstruction",
-						},
-					})
-				</div>
-				<!-- Output Key -->
-				<div class="space-y-1.5">
-					<span class="text-xs font-medium flex items-center gap-1.5">
-						@icon.Key(icon.Props{Class: "size-3.5 text-muted-foreground"})
-						{ i18n.T(ctx, "Output Key") }
-					</span>
-					@input.Input(input.Props{
-						Placeholder: i18n.T(ctx, "Save this workflow's final output under this key..."),
-						Class:       "h-7 text-[11px]",
-						Attributes: templ.Attributes{
-							"x-model": "pipelineOrchestration.outputKey",
-						},
-					})
-				</div>
-				<!-- Output Schema -->
-				<div class="space-y-1.5">
-					<span class="text-xs font-medium flex items-center gap-1.5">
-						@icon.Braces(icon.Props{Class: "size-3.5 text-muted-foreground"})
-						{ i18n.T(ctx, "Output Schema") }
-					</span>
-					@textarea.Textarea(textarea.Props{
-						Placeholder: i18n.T(ctx, `{"type": "object", ...}`),
-						Class:       "min-h-[48px] resize-y font-mono text-[10px]",
-						Rows:        2,
-						Attributes: templ.Attributes{
-							"x-model": "pipelineOrchestration.outputSchema",
-						},
-					})
-				</div>
-			</div>
-		</details>
-	</div>
-	<!-- Legend / ADK-Go mapping -->
-	<div class="rounded-lg bg-muted/30 border border-border p-3 space-y-2">
-		<h4 class="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
-			@icon.Info(icon.Props{Class: "size-3.5"})
-			{ i18n.T(ctx, "ADK-Go Node Types") }
-		</h4>
-		<div class="grid grid-cols-2 gap-1.5">
-			<div class="flex items-center gap-1.5">
-				<span class="size-2 rounded-full bg-blue-500"></span>
-				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Sequential → sequentialagent.New") }</span>
-			</div>
-			<div class="flex items-center gap-1.5">
-				<span class="size-2 rounded-full bg-amber-500"></span>
-				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Parallel → parallelagent.New") }</span>
-			</div>
-			<div class="flex items-center gap-1.5">
-				<span class="size-2 rounded-full bg-purple-500"></span>
-				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Loop → loopagent.New (exit_loop on last child)") }</span>
-			</div>
-			<div class="flex items-center gap-1.5">
-				<span class="size-2 rounded-full bg-emerald-500"></span>
-				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Agent → llmagent.New (leaf node)") }</span>
-			</div>
-			<div class="col-span-2 flex items-start gap-1.5 mt-0.5">
-				<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "💡 Set OutputKey on each agent, reference as {key} in downstream Instructions. Loop's last child auto-receives exit_loop tool.") }</span>
-			</div>
-		</div>
-	</div>
-}
-
-// pipelineTypeCard renders an explanatory card for a pipeline node type (used in the empty state).
-templ pipelineTypeCard(nodeType string, label string, desc string, badgeClass string) {
-	<div class="rounded-lg border border-border p-3 text-start">
-		<span class={ "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold mb-2 border", badgeClass }>
-			{ label }
-		</span>
-		<p class="text-[11px] text-muted-foreground">{ desc }</p>
 	</div>
 }
 

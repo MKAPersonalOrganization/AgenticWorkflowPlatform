@@ -1,46 +1,28 @@
 /**
  * Agent Designer Component
  *
- * A dedicated dialog for designing agents. Two modes:
+ * Unified dialog for designing all ADK-Go agent types:
+ *   - LLM Agent     → llmagent.New(...)
+ *   - Sequential    → sequentialagent.New({ SubAgents })
+ *   - Parallel      → parallelagent.New({ SubAgents })
+ *   - Loop          → loopagent.New({ SubAgents, MaxIterations })
  *
- *   1. **Node Design Mode** — Create or edit a single agent definition
- *      (name, system prompt, tools, KBs, orchestration settings).
- *
- *   2. **Pipeline Compose Mode** — Visually compose multiple agents into
- *      a workflow pipeline using sequential, parallel, and loop patterns.
- *      Maps 1:1 to ADK-Go's composition model (sequentialagent, parallelagent, loopagent).
- *
- * The designer dialog is opened from the navbar via a dedicated icon,
- * or via events dispatched from the agents listing.
- *
- * ADK-Go alignment:
- *   - Each leaf node in a pipeline maps to llmagent.New(...)
- *   - Sequential → sequentialagent.New({ SubAgents })
- *   - Parallel   → parallelagent.New({ SubAgents })
- *   - Loop       → loopagent.New({ SubAgents, MaxIterations })
- *   - Transfer policies, output keys, include_contents map to LLM agent config
- *   - The last child of a loop gets exit_loop tool automatically (backend)
+ * All agents share the same Agent interface in ADK-Go.
+ * Transfer policies, output keys, include_contents map to agent config.
+ * The last child of a loop gets exit_loop tool automatically (backend).
  */
 export const agentDesigner = () => ({
     // ══════════════════════════════════════════
     // State
     // ══════════════════════════════════════════
 
-    /** @type {'node' | 'pipeline'} Active mode tab */
-    mode: 'node',
+    /** @type {'list' | 'agentForm' | 'flow' | 'delete'} */
+    view: 'list',
 
-    /** @type {'list' | 'form' | 'delete'} Node design sub-view */
-    nodeView: 'list',
-
-    /** @type {'canvas' | 'form'} Pipeline sub-view */
-    pipelineView: 'canvas',
-
-    /** @type {'canvas' | 'tree'} Flow editor view mode */
-    flowViewMode: 'tree',
-
-    // Agent list
-    agents: [],
-    filteredAgents: [],
+    // Agent lists
+    allAgents: [],      // all agent definitions (both LLM and workflow)
+    agents: [],         // non-composed only (for palette/tree builder leaf references)
+    filteredAgents: [],  // filtered allAgents for the list view
     loading: false,
     saving: false,
     searchQuery: '',
@@ -125,63 +107,30 @@ export const agentDesigner = () => ({
     // A2A connectors (for remote nodes)
     connectors: [],
 
-    // Pipeline list state
-    pipelines: [],
-    filteredPipelines: [],
-    pipelineSearchQuery: '',
-
     // Canvas interaction
     selectedNodePath: null,
     dragState: null,
 
-    // Sidebar visibility (for flow canvas)
-    paletteVisible: true,
+    // Sidebar visibility (for property panel)
     propertyPanelVisible: true,
 
     // ══════════════════════════════════════════
     // Lifecycle
     // ══════════════════════════════════════════
 
-    async open(startMode) {
-        this.mode = startMode || 'node';
-        this.nodeView = 'list';
-        this.pipelineView = 'canvas';
+    async open() {
+        this.view = 'list';
         this.searchQuery = '';
-        this.pipelineSearchQuery = '';
         this.selectedNodePath = null;
         await Promise.all([this.fetchAgents(), this.fetchConnectors()]);
-        this.filterPipelines();
     },
 
     toggleExpand() {
         this.expanded = !this.expanded;
     },
 
-    switchMode(mode) {
-        this.mode = mode;
-        if (mode === 'pipeline' && this.pipelines.length === 0) {
-            this.filterPipelines();
-        }
-    },
-
-    togglePalette() {
-        this.paletteVisible = !this.paletteVisible;
-    },
-
     togglePropertyPanel() {
         this.propertyPanelVisible = !this.propertyPanelVisible;
-    },
-
-    toggleFlowViewMode() {
-        this.flowViewMode = this.flowViewMode === 'canvas' ? 'tree' : 'canvas';
-        // Adjust panel visibility for tree view to maximize space
-        if (this.flowViewMode === 'tree') {
-            this.paletteVisible = false;
-            this.propertyPanelVisible = false;
-        } else {
-            this.paletteVisible = true;
-            this.propertyPanelVisible = true;
-        }
     },
 
     // ══════════════════════════════════════════
@@ -195,11 +144,9 @@ export const agentDesigner = () => ({
             if (response.ok) {
                 const data = await response.json();
                 const all = data.agents || [];
-                // Separate simple agents from composed pipelines
-                this.agents = all.filter(a => !a.isComposed);
-                this.pipelines = all.filter(a => a.isComposed);
+                this.allAgents = all;
+                this.agents = all.filter(a => !a.isComposed); // leaf agents for palette/tree builder
                 this.applyFilter();
-                this.filterPipelines();
             }
         } catch (err) {
             console.error('Failed to fetch agents:', err);
@@ -229,8 +176,7 @@ export const agentDesigner = () => ({
             const response = await fetch(`/v1/agent-definitions/search?q=${encodeURIComponent(this.searchQuery)}`);
             if (response.ok) {
                 const data = await response.json();
-                const all = data.agents || [];
-                this.filteredAgents = all.filter(a => !a.isComposed);
+                this.filteredAgents = data.agents || [];
             }
         } catch (err) {
             console.error('Failed to search agents:', err);
@@ -239,7 +185,7 @@ export const agentDesigner = () => ({
     },
 
     applyFilter() {
-        let results = [...this.agents];
+        let results = [...this.allAgents];
         if (this.searchQuery.trim()) {
             const q = this.searchQuery.toLowerCase();
             results = results.filter(a =>
@@ -248,18 +194,6 @@ export const agentDesigner = () => ({
             );
         }
         this.filteredAgents = results;
-    },
-
-    filterPipelines() {
-        let results = [...this.pipelines];
-        if (this.pipelineSearchQuery.trim()) {
-            const q = this.pipelineSearchQuery.toLowerCase();
-            results = results.filter(a =>
-                a.name.toLowerCase().includes(q) ||
-                (a.description && a.description.toLowerCase().includes(q))
-            );
-        }
-        this.filteredPipelines = results;
     },
 
     // ══════════════════════════════════════════
@@ -301,7 +235,7 @@ export const agentDesigner = () => ({
         this.agentFilesystems = [];
         this.providerModelOptions = [];
         this.providerModelsError = '';
-        this.nodeView = 'form';
+        this.view = 'agentForm';
     },
 
     showEditNodeForm(agent) {
@@ -341,7 +275,7 @@ export const agentDesigner = () => ({
         this.showRequirementsPanel = false;
         this.providerModelOptions = [];
         this.providerModelsError = '';
-        this.nodeView = 'form';
+        this.view = 'agentForm';
 
         // Load tool/KB/FS data
         this.fetchAgentPlugins(agent.id);
@@ -408,8 +342,7 @@ export const agentDesigner = () => ({
 
             if (response.ok) {
                 await this.fetchAgents();
-                this.nodeView = 'list';
-                // Notify other components that agent list changed
+                this.view = 'list';
                 window.dispatchEvent(new CustomEvent('agents-updated'));
             } else {
                 const err = await response.json().catch(() => ({}));
@@ -426,7 +359,7 @@ export const agentDesigner = () => ({
 
     confirmDeleteNode(agent) {
         this.deletingAgent = agent;
-        this.nodeView = 'delete';
+        this.view = 'delete';
     },
 
     async deleteNode() {
@@ -438,7 +371,7 @@ export const agentDesigner = () => ({
             });
             if (response.ok) {
                 await this.fetchAgents();
-                this.nodeView = 'list';
+                this.view = 'list';
                 window.dispatchEvent(new CustomEvent('agents-updated'));
             } else {
                 const err = await response.json().catch(() => ({}));
@@ -796,8 +729,6 @@ export const agentDesigner = () => ({
             children: [this.createNode('agent')],
         };
         this.selectedNodePath = null;
-        this.pipelineView = 'form';
-        // Open directly in the visual canvas
         this.$nextTick(() => this.openFlowView());
     },
 
@@ -834,8 +765,6 @@ export const agentDesigner = () => ({
             outputSchema: pipeline.outputSchema || '',
         };
         this.selectedNodePath = null;
-        this.pipelineView = 'form';
-        // Open directly in the visual canvas
         this.$nextTick(() => this.openFlowView());
     },
 
@@ -877,7 +806,7 @@ export const agentDesigner = () => ({
 
             if (response.ok) {
                 await this.fetchAgents();
-                this.pipelineView = 'canvas';
+                this.view = 'list';
                 window.dispatchEvent(new CustomEvent('agents-updated'));
             } else {
                 const err = await response.json().catch(() => ({}));
@@ -893,7 +822,7 @@ export const agentDesigner = () => ({
 
     confirmDeletePipeline(pipeline) {
         this.deletingAgent = pipeline;
-        this.pipelineView = 'delete';
+        this.view = 'delete';
     },
 
     async deletePipeline() {
@@ -905,7 +834,7 @@ export const agentDesigner = () => ({
             });
             if (response.ok) {
                 await this.fetchAgents();
-                this.pipelineView = 'canvas';
+                this.view = 'list';
                 window.dispatchEvent(new CustomEvent('agents-updated'));
             } else {
                 const err = await response.json().catch(() => ({}));
@@ -1189,7 +1118,7 @@ export const agentDesigner = () => ({
         };
         collectIds(this.pipelineGraph);
 
-        const knownIds = new Set([...(this.agents || []), ...(this.pipelines || [])].map(a => a.id));
+        const knownIds = new Set((this.allAgents || []).map(a => a.id));
         const missingIds = [...new Set(graphAgentIds.filter(id => id && !knownIds.has(id)))];
 
         const fetched = await Promise.all(
@@ -1204,16 +1133,7 @@ export const agentDesigner = () => ({
         const allAgents = [...this.agents, ...fetched.filter(Boolean)];
 
         store.load(this.pipelineGraph, allAgents, this.connectors, this.pipelineSystemPrompt);
-        this.pipelineView = 'flow';
-
-        // Reset sidebar visibility when opening flow view
-        if (this.flowViewMode === 'tree') {
-            this.paletteVisible = false;
-            this.propertyPanelVisible = false;
-        } else {
-            this.paletteVisible = true;
-            this.propertyPanelVisible = true;
-        }
+        this.view = 'flow';
 
         // Initialize the editable workflow tree component
         this.$nextTick(() => {
@@ -1224,18 +1144,13 @@ export const agentDesigner = () => ({
                 treeEl.__x.$data.setConnectors(this.connectors);
                 treeEl.__x.$data.onChange((graph) => {
                     this.pipelineGraph = graph;
-                    // Also sync to flow store for canvas view
                     store.load(graph, allAgents, this.connectors, this.pipelineSystemPrompt);
                 });
             }
         });
 
-        // Add keyboard shortcuts for sidebar toggles
+        // Keyboard shortcut for property panel toggle
         this._sidebarKeyHandler = (e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === '[') {
-                e.preventDefault();
-                this.paletteVisible = !this.paletteVisible;
-            }
             if ((e.metaKey || e.ctrlKey) && e.key === ']') {
                 e.preventDefault();
                 this.propertyPanelVisible = !this.propertyPanelVisible;
@@ -1245,22 +1160,7 @@ export const agentDesigner = () => ({
     },
 
     /**
-     * Switch back from flow canvas to the form-based tree editor.
-     * Syncs the modified graph back from the store into pipelineGraph.
-     */
-    closeFlowView() {
-        this._syncGraphFromStore();
-        this.pipelineView = 'form';
-
-        // Clean up keyboard listener
-        if (this._sidebarKeyHandler) {
-            document.removeEventListener('keydown', this._sidebarKeyHandler);
-            this._sidebarKeyHandler = null;
-        }
-    },
-
-    /**
-     * Save from the flow canvas view — syncs graph from store then calls savePipeline().
+     * Save from the flow view — syncs graph from store then calls savePipeline().
      */
     async saveFromFlowView() {
         this._syncGraphFromStore();

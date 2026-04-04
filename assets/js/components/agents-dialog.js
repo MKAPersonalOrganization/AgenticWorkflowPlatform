@@ -149,7 +149,7 @@ export const agentsManager = () => ({
             window.tui.dialog.close('agents-manager-dialog');
         }
         setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('open-agent-designer', { detail: { mode: 'node' } }));
+            window.dispatchEvent(new CustomEvent('open-agent-designer'));
             if (window.tui?.dialog?.open) {
                 window.tui.dialog.open('agent-designer-dialog');
             }
