@@ -577,7 +577,7 @@ templ AgentDesignerDialog() {
 																	<div class="flex items-center gap-2 px-2 py-1.5">
 																		@icon.Blocks(icon.Props{Class: "size-3 text-gray-500 shrink-0"})
 																		<span class="text-[10px] font-medium text-gray-300 flex-1 truncate" x-text="plugin.name"></span>
-																		<span class="text-[8px] text-gray-600" x-text="plugin.tools?.length + ' tools'"></span>
+																		<span class="text-[8px] text-gray-600" x-text="getToolEnabledCount(plugin) + '/' + plugin.tools?.length"></span>
 																		<button
 																			@click="detachToolSet(plugin)"
 																			title="Detach tool"
@@ -586,20 +586,33 @@ templ AgentDesignerDialog() {
 																			✕
 																		</button>
 																	</div>
+																	<!-- Individual tools -->
+																	<template x-if="plugin.tools && plugin.tools.length > 0">
+																		<div class="border-t border-white/5">
+																			<template x-for="tool in plugin.tools" :key="tool.id">
+																				<div class="flex items-center gap-2 px-2 py-1.5 border-b border-white/5 last:border-0" :class="isToolBlocked(plugin, tool) ? 'opacity-50' : ''">
+																					<span class="w-3 shrink-0"></span>
+																					<span class="text-[9px] text-gray-400 flex-1 truncate" :class="isToolBlocked(plugin, tool) ? 'line-through' : ''" x-text="tool.name"></span>
+																					<button
+																						@click="toggleTool(plugin, tool)"
+																						type="button"
+																						role="switch"
+																						:aria-checked="!isToolBlocked(plugin, tool)"
+																						class="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+																						:class="isToolBlocked(plugin, tool) ? 'bg-gray-600' : 'bg-indigo-500'"
+																					>
+																						<span class="pointer-events-none inline-block size-3 rounded-full bg-background shadow ring-0 transition-transform duration-200" :class="isToolBlocked(plugin, tool) ? 'translate-x-0' : 'translate-x-3'"></span>
+																					</button>
+																				</div>
+																			</template>
+																		</div>
+																	</template>
 																</div>
 															</template>
 														</div>
 													</div>
 
 													<!-- Add Tool Dialog -->
-													<template x-if="showAddToolDialog">
-														<button
-															type="button"
-															data-tui-dialog-trigger="add-tool-dialog"
-															class="hidden"
-														></button>
-													</template>
-													@dialog.Dialog(dialog.Props{ID: "add-tool-dialog"})
 													<div
 														x-show="showAddToolDialog"
 														x-transition:enter="transition ease-out duration-200"
