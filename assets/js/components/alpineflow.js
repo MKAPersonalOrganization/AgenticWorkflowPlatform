@@ -81,7 +81,12 @@ export function initFlowStore() {
         systemPrompt: '',   // pipeline-level system prompt (synced on open/save)
 
         // Interaction state
-        selectedId: null,
+        _selectedId: null,
+        get selectedId() { return this._selectedId; },
+        set selectedId(val) {
+            this._selectedId = val;
+            window.dispatchEvent(new CustomEvent('flow-selection-changed', { detail: { id: val } }));
+        },
         connecting: null,       // { sourceId } while dragging a wire
         connectMouseX: 0,       // canvas-space mouse position during wire drag
         connectMouseY: 0,
@@ -91,6 +96,40 @@ export function initFlowStore() {
         panX: 60,
         panY: 60,
         zoom: 1.0,
+
+        // Agent metadata (tools, KBs, filesystems) keyed by agent ID
+        agentPlugins: {},
+        agentKBs: {},
+        agentFilesystems: {},
+
+        // Fetch metadata for an agent
+        async fetchAgentMetadata(agentId) {
+            if (this.agentPlugins[agentId]) return;
+            const [plugins, kbs, fss] = await Promise.all([
+                fetch(`/v1/plugins?agent_id=${encodeURIComponent(agentId)}`)
+                    .then(r => r.ok ? r.json() : { plugins: [] })
+                    .then(d => d.plugins || []),
+                fetch(`/v1/agents/${encodeURIComponent(agentId)}/workspaces`)
+                    .then(r => r.ok ? r.json() : { workspaces: [] })
+                    .then(d => d.workspaces || []),
+                fetch(`/v1/agents/${encodeURIComponent(agentId)}/filesystems`)
+                    .then(r => r.ok ? r.json() : [])
+                    .catch(() => []),
+            ]);
+            this.agentPlugins[agentId] = plugins;
+            this.agentKBs[agentId] = kbs;
+            this.agentFilesystems[agentId] = fss;
+        },
+
+        getPlugins(agentId) {
+            return this.agentPlugins[agentId] || [];
+        },
+        getKBs(agentId) {
+            return this.agentKBs[agentId] || [];
+        },
+        getFilesystems(agentId) {
+            return this.agentFilesystems[agentId] || [];
+        },
 
         // Undo history
         _history: [],
@@ -847,19 +886,144 @@ export const alpineflowPalette = () => ({
 
 // ─── Property Panel Component ─────────────────────────────────────────────────
 export const alpineflowPropertyPanel = () => ({
-    // node is kept as a plain reactive data property, updated via Alpine.effect in init().
-    // This guarantees reactivity regardless of how Alpine tracks getter dependencies.
     node: null,
+    showAdvanced: false,
+    showTools: false,
+    loadingMetadata: false,
+
+    // Tool management - local state like other dialogs
+    showAddToolDialog: false,
+    availableTools: [],
+    loadingAvailableTools: false,
+    agentPlugins: [],
+    loadingTools: false,
 
     init() {
-        // Alpine.effect re-runs whenever reactive dependencies change.
-        // Accessing store.selectedId and store.graph inside creates the dependency.
-        Alpine.effect(() => {
-            const id = Alpine.store('flow').selectedId;
-            // Also read graph to re-trigger when the graph mutates (node moves, etc.)
-            void Alpine.store('flow').graph;
-            this.node = id ? Alpine.store('flow').nodeById(id) : null;
+        const update = () => {
+            if (!Alpine.store('flow')) return;
+            const store = Alpine.store('flow');
+            this.node = store.selectedId ? store.nodeById(store.selectedId) : null;
+            this.showAdvanced = false;
+            this.showTools = false;
+            this.showAddToolDialog = false;
+            this.agentPlugins = [];
+
+            if (this.node?.type === 'agent' && this.node?.agent_id) {
+                this.fetchAgentPlugins(this.node.agent_id);
+            }
+        };
+
+        // Initial load - get current selection
+        this.$nextTick(() => {
+            update();
+            window.addEventListener('flow-selection-changed', update);
         });
+    },
+
+    async fetchAgentPlugins(agentId) {
+        this.loadingMetadata = true;
+        this.loadingTools = true;
+        try {
+            const response = await fetch(`/v1/plugins?agent_id=${encodeURIComponent(agentId)}`);
+            if (response.ok) {
+                const data = await response.json();
+                this.agentPlugins = data.plugins || [];
+            }
+        } catch (err) {
+            console.error('Failed to fetch agent plugins:', err);
+        } finally {
+            this.loadingMetadata = false;
+            this.loadingTools = false;
+        }
+    },
+
+    // Check if plugin has allow action (attached)
+    isPluginAttached(plugin) {
+        return plugin?.requirement_config?.action === 'allow';
+    },
+
+    // For the list of attached plugins (tools section)
+    get configuredPlugins() {
+        return this.agentPlugins.filter(p => this.isPluginAttached(p));
+    },
+
+    get toolCount() {
+        return this.configuredPlugins.reduce((sum, p) => sum + (p.tools?.length || 0), 0);
+    },
+
+    // Open add tool dialog
+    async openAddToolDialog() {
+        if (!this.node?.agent_id) return;
+        this.showAddToolDialog = true;
+        this.loadingAvailableTools = true;
+        this.availableTools = [];
+
+        try {
+            const response = await fetch(`/v1/plugins?agent_id=${encodeURIComponent(this.node.agent_id)}`);
+            if (response.ok) {
+                const data = await response.json();
+                this.availableTools = data.plugins || [];
+            }
+        } catch (err) {
+            console.error('Failed to fetch available tools:', err);
+        } finally {
+            this.loadingAvailableTools = false;
+        }
+    },
+
+    closeAddToolDialog() {
+        this.showAddToolDialog = false;
+        this.availableTools = [];
+    },
+
+    // Check if a plugin from availableTools is attached
+    isToolAttached(pluginId) {
+        const plugin = this.agentPlugins.find(p => p.id === pluginId);
+        return plugin ? this.isPluginAttached(plugin) : false;
+    },
+
+    async attachToolSet(plugin) {
+        if (!this.node?.agent_id || !plugin?.id) return;
+
+        try {
+            const response = await fetch(`/v1/agents/${encodeURIComponent(this.node.agent_id)}/toolsets/${encodeURIComponent(plugin.id)}/requirements`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'allow' }),
+            });
+            if (response.ok) {
+                const existingPlugin = this.agentPlugins.find(p => p.id === plugin.id);
+                if (existingPlugin) {
+                    existingPlugin.requirement_config = { action: 'allow' };
+                }
+                const availablePlugin = this.availableTools.find(p => p.id === plugin.id);
+                if (availablePlugin) {
+                    availablePlugin.requirement_config = { action: 'allow' };
+                }
+            }
+        } catch (err) {
+            console.error('Failed to attach toolset:', err);
+        }
+    },
+
+    async detachToolSet(plugin) {
+        if (!this.node?.agent_id || !plugin?.id) return;
+
+        try {
+            const response = await fetch(`/v1/agents/${encodeURIComponent(this.node.agent_id)}/toolsets/${encodeURIComponent(plugin.id)}/requirements`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'block' }),
+            });
+            if (response.ok) {
+                const existingPlugin = this.agentPlugins.find(p => p.id === plugin.id);
+                if (existingPlugin) {
+                    existingPlugin.requirement_config = { action: 'block' };
+                }
+            }
+        } catch (err) {
+            console.error('Failed to detach toolset:', err);
+        }
     },
 
     get agents()     { return Alpine.store('flow').agents     || []; },
@@ -870,6 +1034,17 @@ export const alpineflowPropertyPanel = () => ({
     get nodeTypeColor() { return typeColor(this.node?.type); },
     get nodeTypeChar() {
         return { sequential:'S', parallel:'P', loop:'L', conditional:'?', agent:'A', remote:'R' }[this.node?.type] || '?';
+    },
+    get nodeTypeLabel() {
+        const labels = {
+            agent: 'LLM Agent',
+            sequential: 'Sequential',
+            parallel: 'Parallel',
+            loop: 'Loop',
+            remote: 'Remote Agent',
+            conditional: 'Conditional',
+        };
+        return labels[this.node?.type] || 'Unknown';
     },
 
     get selectedAgent() {
@@ -893,6 +1068,11 @@ export const alpineflowPropertyPanel = () => ({
     set(key, val) {
         const n = this.node;
         if (n) n[key] = val;
+    },
+
+    setBool(key, checked) {
+        const n = this.node;
+        if (n) n[key] = checked;
     },
 
     toggleBool(key) {
@@ -922,16 +1102,63 @@ export const alpineflowPropertyPanel = () => ({
     get canMoveUp()   { const i = this.parentInfo; return i && i.index > 0; },
     get canMoveDown() { const i = this.parentInfo; return i && i.index < i.parent.children.length - 1; },
 
-    // ── Conditional routing helpers ────────────────────────────────────────
     get isConditionalChild() {
         const info = this.parentInfo;
         return info && info.parent.type === 'conditional';
     },
     get isEvaluator() {
-        // First child of a conditional parent is the evaluator
         return this.isConditionalChild && this.parentInfo?.index === 0;
     },
     get isConditionalBranch() {
         return this.isConditionalChild && this.parentInfo?.index > 0;
+    },
+
+    hasInputSchema() {
+        return this.node?.input_schema && this.node.input_schema.trim() !== '';
+    },
+    hasOutputSchema() {
+        return this.node?.output_schema && this.node.output_schema.trim() !== '';
+    },
+    getInputSchemaPreview() {
+        const schema = this.node?.input_schema;
+        if (!schema) return '';
+        try {
+            const obj = JSON.parse(schema);
+            if (obj.properties) {
+                const keys = Object.keys(obj.properties);
+                return keys.length > 0 ? `params: ${keys.join(', ')}` : 'any';
+            }
+            return 'valid JSON';
+        } catch {
+            return 'invalid JSON';
+        }
+    },
+    getOutputSchemaPreview() {
+        const schema = this.node?.output_schema;
+        if (!schema) return '';
+        try {
+            const obj = JSON.parse(schema);
+            return obj.type || 'valid JSON';
+        } catch {
+            return 'invalid JSON';
+        }
+    },
+
+    // Tool permission helpers
+    isPluginEnabled(plugin) {
+        const action = plugin?.requirement_config?.action;
+        return action === 'allow' || action === 'require_confirmation';
+    },
+    isToolEnabled(plugin, tool) {
+        const action = tool?.requirement_config?.action;
+        return action === 'allow' || action === 'require_confirmation';
+    },
+    isToolBlocked(plugin, tool) {
+        const action = tool?.requirement_config?.action;
+        return action === 'block';
+    },
+    getPluginEnabledCount(plugin) {
+        if (!plugin.tools) return 0;
+        return plugin.tools.filter(t => t.requirement_config?.action !== 'block').length;
     },
 });
