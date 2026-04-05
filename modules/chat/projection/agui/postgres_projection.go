@@ -15,6 +15,7 @@ import (
 	"school-with-ai/modules/chat/thread"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
+	"github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/types"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -576,16 +577,16 @@ func (p *PostgresAguiProjection) GetThreadState(ctx context.Context, threadID st
 		content := msg.Content
 		aguimsit := aguievents.Message{
 			ID:      msg.MessageID,
-			Role:    msg.Role,
+			Role:    types.Role(msg.Role),
 			Content: &content,
 		}
 
 		if msg.ToolCallID != nil {
-			aguimsit.ToolCallID = msg.ToolCallID
+			aguimsit.ToolCallID = *msg.ToolCallID
 		}
 
 		if msg.AgentName != nil {
-			aguimsit.Name = msg.AgentName
+			aguimsit.Name = *msg.AgentName
 		}
 
 		if msg.ToolCalls != nil {
