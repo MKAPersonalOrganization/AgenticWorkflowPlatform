@@ -18,10 +18,10 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"strings"
 	"sync/atomic"
 
 	"github.com/a2aproject/a2a-go/v2/a2a"
-	"github.com/a2aproject/a2a-go/v2/internal/utils"
 )
 
 // Config exposes options for customizing [Client] behavior.
@@ -40,10 +40,6 @@ type Config struct {
 	// If there's no overlap in supported Transport Factory will return an error on Client
 	// creation attempt.
 	PreferredTransports []a2a.TransportProtocol
-	// Whether client prefers to poll for task updates instead of blocking until a terminal state is reached.
-	// If set to true, non-streaming send message result might be a Message or a Task in any (including non-terminal) state.
-	// Callers are responsible for running the polling loop. This configuration does not apply to streaming requests.
-	Polling bool
 }
 
 // Client represents a transport-agnostic implementation of A2A client.
@@ -85,7 +81,7 @@ func (c *Client) CancelTask(ctx context.Context, req *a2a.CancelTaskRequest) (*a
 
 // SendMessage implements the 'SendMessage' protocol method (non-streaming).
 func (c *Client) SendMessage(ctx context.Context, req *a2a.SendMessageRequest) (a2a.SendMessageResult, error) {
-	req = c.withDefaultSendConfig(req, blocking(!c.config.Polling))
+	req = c.withDefaultSendConfig(req)
 	return doCall(ctx, c, "SendMessage", req, c.transport.SendMessage)
 }
 
@@ -94,7 +90,7 @@ func (c *Client) SendStreamingMessage(ctx context.Context, req *a2a.SendMessageR
 	return func(yield func(a2a.Event, error) bool) {
 		method := "SendStreamingMessage"
 
-		req = c.withDefaultSendConfig(req, blocking(true))
+		req = c.withDefaultSendConfig(req)
 
 		ctx, res := interceptBefore[*a2a.SendMessageRequest, a2a.SendMessageResult](ctx, c, method, req)
 		if res.earlyErr != nil {
@@ -235,11 +231,13 @@ func (c *Client) Destroy() error {
 	return c.transport.Destroy()
 }
 
-type blocking bool
-
-func (c *Client) withDefaultSendConfig(message *a2a.SendMessageRequest, blocking blocking) *a2a.SendMessageRequest {
-	if c.config.PushConfig == nil && c.config.AcceptedOutputModes == nil && blocking {
-		return message
+func (c *Client) withDefaultSendConfig(message *a2a.SendMessageRequest) *a2a.SendMessageRequest {
+	if c.config.PushConfig == nil && c.config.AcceptedOutputModes == nil {
+		// Attach config to all v0.* protocol requests to preserve legacy blocking=true default
+		// which will be applied on conversion.
+		if message.Config != nil || !strings.HasPrefix(string(c.endpoint.ProtocolVersion), "0") {
+			return message
+		}
 	}
 	result := *message
 	if result.Config == nil {
@@ -254,7 +252,6 @@ func (c *Client) withDefaultSendConfig(message *a2a.SendMessageRequest, blocking
 	if result.Config.AcceptedOutputModes == nil {
 		result.Config.AcceptedOutputModes = c.config.AcceptedOutputModes
 	}
-	result.Config.Blocking = utils.Ptr(bool(blocking))
 	return &result
 }
 
@@ -278,6 +275,9 @@ func interceptBefore[Req any, Resp any](ctx context.Context, c *Client, method s
 
 	for i, interceptor := range c.interceptors {
 		localCtx, result, err := interceptor.Before(ctx, &req)
+
+		ctx = localCtx
+
 		if err != nil || result != nil {
 			var typedResult Resp
 			if result != nil {
@@ -294,7 +294,6 @@ func interceptBefore[Req any, Resp any](ctx context.Context, c *Client, method s
 			outcome.earlyErr = err
 			return ctx, outcome
 		}
-		ctx = localCtx
 	}
 
 	if req.Payload == nil {
