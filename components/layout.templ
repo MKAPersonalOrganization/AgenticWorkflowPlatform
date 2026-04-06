@@ -5,10 +5,18 @@ import (
 	"aicompass/components/agenteditor"
 	"aicompass/components/agents"
 	"aicompass/components/convsearch"
+	"aicompass/components/datepicker"
+	"aicompass/components/dialog"
+	"aicompass/components/dropdown"
 	"aicompass/components/filesystem"
 	"aicompass/components/i18n"
 	"aicompass/components/nav"
+	"aicompass/components/popover"
 	"aicompass/components/resources"
+	"aicompass/components/selectbox"
+	"aicompass/components/tagsinput"
+	"aicompass/components/timepicker"
+	"aicompass/components/toast"
 	"aicompass/components/tools"
 	"aicompass/platform/toolregistry"
 	"aicompass/shared"
@@ -84,6 +92,15 @@ templ BaseLayout(props LayoutProps) {
 			     before the module-based component registrations ran. -->
 			<script src="/assets/js/filesystem.js"></script>
 			<script type="module" src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+			<!-- templui component scripts -->
+			@popover.Script()
+			@dialog.Script()
+			@selectbox.Script()
+			@dropdown.Script()
+			@datepicker.Script()
+			@timepicker.Script()
+			@tagsinput.Script()
+			@toast.Script()
 		</head>
 		<body class="flex h-dvh bg-background text-foreground antialiased overflow-hidden" x-data="themeManager">
 			<div class="flex h-dvh w-full overflow-hidden">
