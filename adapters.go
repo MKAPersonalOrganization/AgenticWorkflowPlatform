@@ -22,7 +22,6 @@ import (
 	"aicompass/shared"
 
 	"github.com/google/uuid"
-	adkagent "google.golang.org/adk/agent"
 )
 
 // adkgoProfileAdapter bridges identity.UserProfileRepository to
@@ -321,41 +320,6 @@ func (p *userAwareAgentProvider) ListForUser(ctx context.Context, userID string)
 	}
 	return agents, nil
 }
-
-// ──────────────────────────────────────────────────────────────────────────────
-// adkgoAgentLoader adapts userAwareAgentProvider to agent.Loader interface.
-// Used by adkrest.NewServer for REST API integration.
-// ──────────────────────────────────────────────────────────────────────────────
-
-type adkgoAgentLoader struct {
-	provider *userAwareAgentProvider
-	rootName string
-}
-
-func newAdkgoAgentLoader(provider *userAwareAgentProvider) *adkgoAgentLoader {
-	return &adkgoAgentLoader{provider: provider}
-}
-
-// ListAgents implements agent.Loader — returns agent names available to the user.
-// Note: REST server uses this without user context, so it returns an empty
-// list. User-specific agent listing is handled via ListForUser.
-func (l *adkgoAgentLoader) ListAgents() []string {
-	return []string{}
-}
-
-// LoadAgent implements agent.Loader — loads agent by name.
-// For REST server integration, the userID should be passed in the request context.
-// Returns an error because our agents are user-specific and require user context.
-func (l *adkgoAgentLoader) LoadAgent(name string) (adkagent.Agent, error) {
-	return nil, fmt.Errorf("agents are user-specific; use GetForUser with userID context")
-}
-
-// RootAgent implements agent.Loader — returns nil as agents are user-specific.
-func (l *adkgoAgentLoader) RootAgent() adkagent.Agent {
-	return nil
-}
-
-var _ adkagent.Loader = (*adkgoAgentLoader)(nil)
 
 func (p *userAwareAgentProvider) agentFromDefinition(def *agentstore.AgentDefinition) agent.Agent {
 	cfg := agent.Config{
