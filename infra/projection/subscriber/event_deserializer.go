@@ -1,7 +1,7 @@
 package subscriber
 
 import (
-	es "school-with-ai/foundation/eventsourcing"
+	es "aicompass/foundation/eventsourcing"
 )
 
 // deserializeDomainEvent deserializes a domain event from JSON based on its

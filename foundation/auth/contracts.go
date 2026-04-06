@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"school-with-ai/shared"
+	"aicompass/shared"
 )
 
 // SessionReader retrieves the authenticated user's identity from an HTTP session.

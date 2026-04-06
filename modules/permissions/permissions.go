@@ -1,10 +1,10 @@
 package permissions
 
 import (
-	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/auth"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/modules/permissions/workspace"
+	"aicompass/foundation/agent"
+	"aicompass/foundation/auth"
+	"aicompass/foundation/logger"
+	"aicompass/modules/permissions/workspace"
 
 	"github.com/go-chi/chi/v5"
 )

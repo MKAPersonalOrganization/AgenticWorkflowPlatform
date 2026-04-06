@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime/debug"
-	"school-with-ai/foundation/errs"
-	"school-with-ai/foundation/metrics"
+	"aicompass/foundation/errs"
+	"aicompass/foundation/metrics"
 )
 
 // Panics recovers from panics and converts the panic to an error so it is

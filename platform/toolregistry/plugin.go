@@ -6,8 +6,8 @@ import (
 	"sort"
 	"sync"
 
-	"school-with-ai/foundation/agent"
-	"school-with-ai/platform/artifact"
+	"aicompass/foundation/agent"
+	"aicompass/platform/artifact"
 
 	"github.com/a-h/templ"
 )

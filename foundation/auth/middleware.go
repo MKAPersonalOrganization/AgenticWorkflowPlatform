@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"school-with-ai/shared"
+	"aicompass/shared"
 )
 
 // sessionCacheEntry holds a cached user with its expiration time.

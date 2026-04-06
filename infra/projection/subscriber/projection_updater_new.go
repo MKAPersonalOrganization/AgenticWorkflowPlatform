@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	es "school-with-ai/foundation/eventsourcing"
-	"school-with-ai/foundation/logger"
+	es "aicompass/foundation/eventsourcing"
+	"aicompass/foundation/logger"
 
-	pgstore "school-with-ai/infra/eventstore/postgres"
+	pgstore "aicompass/infra/eventstore/postgres"
 
 	"github.com/jmoiron/sqlx"
 )

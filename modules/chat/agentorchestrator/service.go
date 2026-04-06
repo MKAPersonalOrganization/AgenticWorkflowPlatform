@@ -10,13 +10,13 @@ import (
 	"sync"
 	"time"
 
-	"school-with-ai/foundation/agent"
-	es "school-with-ai/foundation/eventsourcing"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/modules/chat/chatcontracts"
-	"school-with-ai/modules/chat/thread"
-	"school-with-ai/modules/chat/threadmgmt"
-	"school-with-ai/platform/artifact"
+	"aicompass/foundation/agent"
+	es "aicompass/foundation/eventsourcing"
+	"aicompass/foundation/logger"
+	"aicompass/modules/chat/chatcontracts"
+	"aicompass/modules/chat/thread"
+	"aicompass/modules/chat/threadmgmt"
+	"aicompass/platform/artifact"
 )
 
 // EventEmitter is the interface for broadcasting events.

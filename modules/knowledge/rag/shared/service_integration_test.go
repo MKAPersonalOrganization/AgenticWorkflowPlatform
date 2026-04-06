@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"school-with-ai/modules/knowledge/rag/shared"
+	"aicompass/modules/knowledge/rag/shared"
 
 	"github.com/stretchr/testify/assert"
 )

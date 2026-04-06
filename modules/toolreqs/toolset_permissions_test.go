@@ -5,12 +5,12 @@ import (
 	"os"
 	"testing"
 
-	"school-with-ai/foundation/logger"
-	"school-with-ai/modules/toolreqs"
-	"school-with-ai/modules/toolreqs/mocks"
-	"school-with-ai/platform/toolregistry"
+	"aicompass/foundation/logger"
+	"aicompass/modules/toolreqs"
+	"aicompass/modules/toolreqs/mocks"
+	"aicompass/platform/toolregistry"
 
-	toolregistry_mocks "school-with-ai/platform/toolregistry/mocks"
+	toolregistry_mocks "aicompass/platform/toolregistry/mocks"
 
 	"github.com/alicebob/miniredis/v2"
 	goredis "github.com/redis/go-redis/v9"

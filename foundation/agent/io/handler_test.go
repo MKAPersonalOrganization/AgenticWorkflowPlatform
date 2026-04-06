@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"school-with-ai/foundation/agent/io"
+	"aicompass/foundation/agent/io"
 )
 
 // =============================================================================

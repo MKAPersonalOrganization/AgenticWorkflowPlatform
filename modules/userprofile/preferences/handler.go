@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"school-with-ai/foundation/logger"
-	"school-with-ai/shared"
+	"aicompass/foundation/logger"
+	"aicompass/shared"
 )
 
 // handler manages user preference HTTP requests.

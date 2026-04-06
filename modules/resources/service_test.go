@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"school-with-ai/platform/artifact"
+	"aicompass/platform/artifact"
 
 	"github.com/google/uuid"
 )

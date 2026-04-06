@@ -2,7 +2,7 @@ package chatread
 
 import (
 	"context"
-	"school-with-ai/modules/chat/thread"
+	"aicompass/modules/chat/thread"
 )
 
 // ThreadStore provides read access to thread state.

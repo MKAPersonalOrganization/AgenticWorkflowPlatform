@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"school-with-ai/foundation/logger"
-	"school-with-ai/modules/chat/thread"
-	"school-with-ai/modules/chat/threadmgmt"
+	"aicompass/foundation/logger"
+	"aicompass/modules/chat/thread"
+	"aicompass/modules/chat/threadmgmt"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

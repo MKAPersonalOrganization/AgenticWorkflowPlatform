@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"school-with-ai/infra/githubauth"
+	"aicompass/infra/githubauth"
 )
 
 // githubHandler handles GitHub OAuth connection endpoints.

@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"school-with-ai/shared"
+	"aicompass/shared"
 )
 
 // PricingResponse represents pipeline cost pricing.

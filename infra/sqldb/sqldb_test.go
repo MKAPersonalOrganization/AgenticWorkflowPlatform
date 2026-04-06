@@ -1,7 +1,7 @@
 package sqldb_test
 
 import (
-	"school-with-ai/infra/sqldb"
+	"aicompass/infra/sqldb"
 	"testing"
 	"time"
 )

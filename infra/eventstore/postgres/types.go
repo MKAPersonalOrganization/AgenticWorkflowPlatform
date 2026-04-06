@@ -3,7 +3,7 @@ package postgres
 import (
 	"time"
 
-	es "school-with-ai/foundation/eventsourcing"
+	es "aicompass/foundation/eventsourcing"
 )
 
 // EventWithPosition wraps a domain event with its global position metadata.

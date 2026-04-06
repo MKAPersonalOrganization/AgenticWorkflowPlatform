@@ -8,8 +8,8 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
-	"school-with-ai/shared"
-	"school-with-ai/modules/knowledge/rag/tasks"
+	"aicompass/shared"
+	"aicompass/modules/knowledge/rag/tasks"
 	"time"
 )
 

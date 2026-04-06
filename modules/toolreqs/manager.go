@@ -1,7 +1,7 @@
 package toolreqs
 
 import (
-	"school-with-ai/foundation/logger"
+	"aicompass/foundation/logger"
 
 	"github.com/redis/go-redis/v9"
 )

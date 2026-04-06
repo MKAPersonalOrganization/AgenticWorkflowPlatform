@@ -417,4 +417,4 @@ This ensures that abandoned threads do not accumulate core NATS subscriptions or
 | `foundation/eventsourcing/event.go` | `BroadcastEnvelope.SeqID` changed from Redis Stream entry ID to UnixNano timestamp |
 | `modules/chat/projection/agui/agui_projection.go` | `Replay` doc updated to reflect UnixNano SeqID format |
 | `infra/cluster/nats.conf` | JetStream configuration: 256 MB memory store, 4 GB file store, 2 MB max payload |
-| `docker-compose.cluster.yml` | 3-node NATS cluster (`nats-1`, `nats-2`, `nats-3`) with full-mesh routing; app pods connect to all 3 nodes with `SCHOOL_NATS_REPLICAS=3` |
+| `docker-compose.cluster.yml` | 3-node NATS cluster (`nats-1`, `nats-2`, `nats-3`) with full-mesh routing; app pods connect to all 3 nodes with `AI_NATS_REPLICAS=3` |

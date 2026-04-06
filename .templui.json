@@ -1,7 +1,7 @@
 {
   "componentsDir": "components",
   "utilsDir": "components/utils",
-  "moduleName": "school-with-ai",
+  "moduleName": "aicompass",
   "jsDir": "assets/js",
   "jsPublicPath": "/assets/js"
 }

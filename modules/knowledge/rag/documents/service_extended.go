@@ -9,7 +9,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
-	"school-with-ai/shared"
+	"aicompass/shared"
 )
 
 // DocumentMetadataResponse wraps the JSON metadata from the API.

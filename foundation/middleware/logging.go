@@ -4,7 +4,7 @@ package middleware
 import (
 	"fmt"
 	"net/http"
-	"school-with-ai/foundation/logger"
+	"aicompass/foundation/logger"
 	"time"
 )
 

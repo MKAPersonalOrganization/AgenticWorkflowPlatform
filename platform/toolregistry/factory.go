@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"school-with-ai/foundation/agent"
-	"school-with-ai/platform/artifact"
+	"aicompass/foundation/agent"
+	"aicompass/platform/artifact"
 )
 
 // ExecutableToolFactory creates executable tools from tool registry entries and tool sets.

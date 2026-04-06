@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"net/http"
 
-	component "school-with-ai/components/analytics"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/modules/analytics/statistics"
-	"school-with-ai/shared"
+	component "aicompass/components/analytics"
+	"aicompass/foundation/logger"
+	"aicompass/modules/analytics/statistics"
+	"aicompass/shared"
 )
 
 // Module is the analytics bounded context. It wraps the statistics projection

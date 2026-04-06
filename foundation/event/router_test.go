@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	es "school-with-ai/foundation/eventsourcing"
+	es "aicompass/foundation/eventsourcing"
 )
 
 // testEvent is a test-local event type used to avoid importing module types

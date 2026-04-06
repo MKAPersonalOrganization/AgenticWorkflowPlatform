@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"school-with-ai/modules/chat/thread"
+	"aicompass/modules/chat/thread"
 
 	"github.com/stretchr/testify/assert"
 )

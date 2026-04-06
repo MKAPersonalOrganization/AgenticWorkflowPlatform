@@ -3,10 +3,10 @@ package billing
 import (
 	"context"
 
-	"school-with-ai/foundation/event"
-	es "school-with-ai/foundation/eventsourcing"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/foundation/auth"
+	"aicompass/foundation/event"
+	es "aicompass/foundation/eventsourcing"
+	"aicompass/foundation/logger"
+	"aicompass/foundation/auth"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"

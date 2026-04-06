@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"school-with-ai/shared"
+	"aicompass/shared"
 	"strings"
 )
 
@@ -77,13 +77,13 @@ func (s *Service) Execute(ctx context.Context, tCtx *shared.TenantContext, req *
 	return &queryResp, nil
 }
 
-// Stream performs a streaming RAG query.
-func (s *Service) Stream(ctx context.Context, tCtx *shared.TenantContext, req *StreamQueryRequest) (<-chan string, <-chan error) {
-	textChan := make(chan string)
+// Stream performs a streaming RAG query with v2 structured JSON events.
+func (s *Service) Stream(ctx context.Context, tCtx *shared.TenantContext, req *StreamQueryRequest) (<-chan *QueryStreamEvent, <-chan error) {
+	eventChan := make(chan *QueryStreamEvent)
 	errChan := make(chan error, 1)
 
 	go func() {
-		defer close(textChan)
+		defer close(eventChan)
 		defer close(errChan)
 
 		url := fmt.Sprintf("%s/api/v1/query/stream", s.baseURL)
@@ -135,8 +135,13 @@ func (s *Service) Stream(ctx context.Context, tCtx *shared.TenantContext, req *S
 			line := scanner.Text()
 			if strings.HasPrefix(line, "data: ") {
 				content := strings.TrimPrefix(line, "data: ")
-				if content != "" {
-					textChan <- content
+				if content != "" && content != "[DONE]" {
+					var event QueryStreamEvent
+					if err := json.Unmarshal([]byte(content), &event); err != nil {
+						errChan <- fmt.Errorf("failed to unmarshal event: %w", err)
+						return
+					}
+					eventChan <- &event
 				}
 			}
 		}
@@ -148,5 +153,5 @@ func (s *Service) Stream(ctx context.Context, tCtx *shared.TenantContext, req *S
 		}
 	}()
 
-	return textChan, errChan
+	return eventChan, errChan
 }

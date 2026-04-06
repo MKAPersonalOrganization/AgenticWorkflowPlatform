@@ -12,7 +12,7 @@ import (
 	"hash/fnv"
 	"strings"
 
-	es "school-with-ai/foundation/eventsourcing"
+	es "aicompass/foundation/eventsourcing"
 
 	"github.com/jmoiron/sqlx"
 )

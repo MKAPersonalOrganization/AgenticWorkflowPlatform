@@ -1,10 +1,10 @@
 package userprofile
 
 import (
-	"school-with-ai/foundation/auth"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/modules/userprofile/identity"
-	"school-with-ai/modules/userprofile/preferences"
+	"aicompass/foundation/auth"
+	"aicompass/foundation/logger"
+	"aicompass/modules/userprofile/identity"
+	"aicompass/modules/userprofile/preferences"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"

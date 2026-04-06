@@ -3,7 +3,7 @@ package middleware
 
 import (
 	"net/http"
-	"school-with-ai/foundation/metrics"
+	"aicompass/foundation/metrics"
 )
 
 // Metrics updates program counters for requests, errors, and goroutines.

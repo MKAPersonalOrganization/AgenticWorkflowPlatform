@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"school-with-ai/foundation/agent"
+	"aicompass/foundation/agent"
 )
 
 func TestStore_CreateTask(t *testing.T) {

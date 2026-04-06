@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"school-with-ai/foundation/agent"
+	"aicompass/foundation/agent"
 )
 
 // A2ARemoteTool wraps an entire A2A agent as a single agent.ExecutableTool.

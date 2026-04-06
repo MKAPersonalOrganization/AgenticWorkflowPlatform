@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/platform/toolregistry"
+	"aicompass/foundation/agent"
+	"aicompass/foundation/logger"
+	"aicompass/platform/toolregistry"
 
 	a2atypes "github.com/a2aproject/a2a-go/v2/a2a"
 	"github.com/a2aproject/a2a-go/v2/a2aclient"

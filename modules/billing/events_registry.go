@@ -1,7 +1,7 @@
 package billing
 
 import (
-	es "school-with-ai/foundation/eventsourcing"
+	es "aicompass/foundation/eventsourcing"
 )
 
 // RegisterEvents registers all billing/payment domain events with the given

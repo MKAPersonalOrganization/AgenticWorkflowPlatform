@@ -3,10 +3,10 @@ package math
 import (
 	"context"
 
-	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/i18n"
-	"school-with-ai/modules/chat/agentorchestrator/prompts"
-	"school-with-ai/platform/artifact"
+	"aicompass/foundation/agent"
+	"aicompass/foundation/i18n"
+	"aicompass/modules/chat/agentorchestrator/prompts"
+	"aicompass/platform/artifact"
 )
 
 // NOTE: Tools are now managed via permissions service instead of hardcoded domain tools

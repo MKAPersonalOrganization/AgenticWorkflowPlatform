@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"school-with-ai/foundation/logger"
+	"aicompass/foundation/logger"
 
 	"github.com/google/uuid"
 	"github.com/stripe/stripe-go/v84"

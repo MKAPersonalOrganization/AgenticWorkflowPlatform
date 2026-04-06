@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"time"
 
-	es "school-with-ai/foundation/eventsourcing"
-	"school-with-ai/foundation/event"
-	"school-with-ai/foundation/logger"
+	es "aicompass/foundation/eventsourcing"
+	"aicompass/foundation/event"
+	"aicompass/foundation/logger"
 
 	"github.com/jmoiron/sqlx"
 )

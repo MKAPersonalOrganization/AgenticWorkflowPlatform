@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"school-with-ai/foundation/agent"
+	"aicompass/foundation/agent"
 )
 
 var (

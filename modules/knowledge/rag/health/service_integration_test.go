@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"school-with-ai/modules/knowledge/rag/health"
+	"aicompass/modules/knowledge/rag/health"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -6,7 +6,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
-	"school-with-ai/foundation/middleware"
+	"aicompass/foundation/middleware"
 	"strings"
 	"testing"
 )

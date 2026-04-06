@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	es "school-with-ai/foundation/eventsourcing"
+	es "aicompass/foundation/eventsourcing"
 
 	"github.com/jmoiron/sqlx"
 )

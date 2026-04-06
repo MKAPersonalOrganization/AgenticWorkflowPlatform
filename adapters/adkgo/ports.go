@@ -6,8 +6,8 @@ import (
 	"context"
 	"iter"
 
-	"school-with-ai/foundation/agent"
-	"school-with-ai/modules/chat/thread"
+	"aicompass/foundation/agent"
+	"aicompass/modules/chat/thread"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────

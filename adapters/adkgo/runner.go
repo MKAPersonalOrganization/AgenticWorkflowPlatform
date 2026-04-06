@@ -21,12 +21,12 @@ import (
 	"google.golang.org/adk/tool/loadmemorytool"
 	"google.golang.org/adk/tool/preloadmemorytool"
 
-	fagent "school-with-ai/foundation/agent"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/modules/chat/thread"
-	"school-with-ai/plugins/agentmemory"
-	"school-with-ai/plugins/artifacts"
-	"school-with-ai/shared"
+	fagent "aicompass/foundation/agent"
+	"aicompass/foundation/logger"
+	"aicompass/modules/chat/thread"
+	"aicompass/plugins/agentmemory"
+	"aicompass/plugins/artifacts"
+	"aicompass/shared"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────

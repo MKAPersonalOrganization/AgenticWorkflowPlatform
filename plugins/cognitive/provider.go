@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"school-with-ai/foundation/agent"
-	"school-with-ai/platform/toolregistry"
+	"aicompass/foundation/agent"
+	"aicompass/platform/toolregistry"
 
 	"github.com/a-h/templ"
 )

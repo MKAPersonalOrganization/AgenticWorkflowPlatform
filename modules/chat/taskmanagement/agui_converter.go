@@ -1,7 +1,7 @@
 package taskmanagement
 
 import (
-	"school-with-ai/modules/chat/thread"
+	"aicompass/modules/chat/thread"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )

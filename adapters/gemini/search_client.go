@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"school-with-ai/plugins/websearch"
+	"aicompass/plugins/websearch"
 
 	"google.golang.org/genai"
 )

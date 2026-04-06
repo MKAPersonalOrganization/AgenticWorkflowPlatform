@@ -3,7 +3,7 @@ package middleware
 import (
 	"context"
 	"net/http"
-	"school-with-ai/foundation/i18n"
+	"aicompass/foundation/i18n"
 	"time"
 
 	"golang.org/x/text/language"

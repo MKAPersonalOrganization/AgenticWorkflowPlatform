@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"sync"
 
-	es "school-with-ai/foundation/eventsourcing"
+	es "aicompass/foundation/eventsourcing"
 )
 
 // HandlerFunc is a function that handles a specific event type.

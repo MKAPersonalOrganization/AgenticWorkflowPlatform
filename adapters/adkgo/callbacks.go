@@ -12,8 +12,8 @@ import (
 	"google.golang.org/adk/model"
 	adktool "google.golang.org/adk/tool"
 
-	fagent "school-with-ai/foundation/agent"
-	"school-with-ai/foundation/logger"
+	fagent "aicompass/foundation/agent"
+	"aicompass/foundation/logger"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────

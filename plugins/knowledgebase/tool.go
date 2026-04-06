@@ -13,7 +13,7 @@ import (
 	"text/template"
 	"time"
 
-	"school-with-ai/foundation/agent"
+	"aicompass/foundation/agent"
 )
 
 // DefaultKBSystemPrompt is the system prompt template for the knowledge base sub-agent.

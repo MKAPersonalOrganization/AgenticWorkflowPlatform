@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"school-with-ai/foundation/agent"
+	"aicompass/foundation/agent"
 )
 
 // =========================================================================

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"school-with-ai/modules/toolreqs"
+	"aicompass/modules/toolreqs"
 )
 
 // InMemoryRepository implements [toolreqs.Repository] with in-memory storage.

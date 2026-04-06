@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"school-with-ai/modules/chat/thread"
+	"aicompass/modules/chat/thread"
 )
 
 // DeleteThread deletes a thread.

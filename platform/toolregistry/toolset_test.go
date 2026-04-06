@@ -5,10 +5,10 @@ import (
 	"os"
 	"testing"
 
-	"school-with-ai/foundation/logger"
-	"school-with-ai/platform/toolregistry"
-	"school-with-ai/platform/toolregistry/mocks"
-	"school-with-ai/plugins/calculator"
+	"aicompass/foundation/logger"
+	"aicompass/platform/toolregistry"
+	"aicompass/platform/toolregistry/mocks"
+	"aicompass/plugins/calculator"
 )
 
 func TestToolSetFunctionality(t *testing.T) {

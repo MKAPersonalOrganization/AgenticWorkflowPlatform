@@ -1,5 +1,14 @@
 package query
 
+// DocumentFilter represents filter criteria for narrowing query scope.
+// Allows filtering RAG query results to only include content from documents
+// matching the specified date range and/or name pattern.
+type DocumentFilter struct {
+	DateFrom        *string `json:"date_from,omitempty"`
+	DateTo          *string `json:"date_to,omitempty"`
+	DocumentPattern *string `json:"document_pattern,omitempty"`
+}
+
 // ConversationMessage represents a single message in the conversation history.
 type ConversationMessage struct {
 	Role    string `json:"role"`
@@ -20,12 +29,19 @@ type QueryRequest struct {
 	RerankTopK          *int                  `json:"rerank_top_k,omitempty"`
 	LLMProvider         *string               `json:"llm_provider,omitempty"`
 	LLMModel            *string               `json:"llm_model,omitempty"`
+	SystemPrompt        *string               `json:"system_prompt,omitempty"`
+	DocumentFilter      *DocumentFilter       `json:"document_filter,omitempty"`
 }
 
 // StreamQueryRequest represents a streaming RAG query request.
 type StreamQueryRequest struct {
-	Query string  `json:"query"`
-	Mode  *string `json:"mode,omitempty"`
+	Query          string          `json:"query"`
+	Mode           *string         `json:"mode,omitempty"`
+	SystemPrompt   *string         `json:"system_prompt,omitempty"`
+	DocumentFilter *DocumentFilter `json:"document_filter,omitempty"`
+	LLMProvider    *string         `json:"llm_provider,omitempty"`
+	LLMModel       *string         `json:"llm_model,omitempty"`
+	StreamFormat   *string         `json:"stream_format,omitempty"`
 }
 
 // SourceReference represents a retrieved context source.
@@ -65,4 +81,31 @@ type QueryResponse struct {
 	Stats          QueryStats        `json:"stats"`
 	ConversationID *string           `json:"conversation_id,omitempty"`
 	Reranked       bool              `json:"reranked,omitempty"`
+}
+
+// QueryStreamEvent represents a streaming event from /query/stream.
+// Supports v2 structured JSON events.
+type QueryStreamEvent struct {
+	Type            string            `json:"type"`
+	Content         *string           `json:"content,omitempty"`
+	Sources         []SourceReference `json:"sources,omitempty"`
+	QueryMode       *string           `json:"query_mode,omitempty"`
+	RetrievalTimeMs *uint64           `json:"retrieval_time_ms,omitempty"`
+	Stats           *QueryStreamStats `json:"stats,omitempty"`
+	LLMProvider     *string           `json:"llm_provider,omitempty"`
+	LLMModel        *string           `json:"llm_model,omitempty"`
+	Message         *string           `json:"message,omitempty"`
+	Code            *string           `json:"code,omitempty"`
+}
+
+// QueryStreamStats represents statistics emitted in the done event.
+type QueryStreamStats struct {
+	EmbeddingTimeMs  uint64   `json:"embedding_time_ms"`
+	RetrievalTimeMs  uint64   `json:"retrieval_time_ms"`
+	GenerationTimeMs uint64   `json:"generation_time_ms"`
+	TotalTimeMs      uint64   `json:"total_time_ms"`
+	SourcesRetrieved int      `json:"sources_retrieved"`
+	RerankTimeMs     *uint64  `json:"rerank_time_ms,omitempty"`
+	TokensUsed       *int     `json:"tokens_used,omitempty"`
+	TokensPerSecond  *float32 `json:"tokens_per_second,omitempty"`
 }

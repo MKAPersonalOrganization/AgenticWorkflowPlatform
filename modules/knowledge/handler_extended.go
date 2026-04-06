@@ -8,12 +8,12 @@ package knowledge
 import (
 	"encoding/json"
 	"net/http"
-	"school-with-ai/modules/knowledge/rag/costs"
-	"school-with-ai/modules/knowledge/rag/entities"
-	"school-with-ai/modules/knowledge/rag/pipeline"
-	"school-with-ai/modules/knowledge/rag/relationships"
-	"school-with-ai/modules/knowledge/rag/tasks"
-	"school-with-ai/modules/knowledge/rag/workspaces"
+	"aicompass/modules/knowledge/rag/costs"
+	"aicompass/modules/knowledge/rag/entities"
+	"aicompass/modules/knowledge/rag/pipeline"
+	"aicompass/modules/knowledge/rag/relationships"
+	"aicompass/modules/knowledge/rag/tasks"
+	"aicompass/modules/knowledge/rag/workspaces"
 	"strconv"
 	"strings"
 

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"school-with-ai/foundation/logger"
-	threadpkg "school-with-ai/modules/chat/thread"
+	"aicompass/foundation/logger"
+	threadpkg "aicompass/modules/chat/thread"
 )
 
 // Manager handles thread lifecycle and persistence using event sourcing.

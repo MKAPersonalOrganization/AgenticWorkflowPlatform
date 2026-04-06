@@ -5,7 +5,7 @@ import (
 	"strings"
 	"text/template"
 
-	"school-with-ai/modules/chat/chatcontracts"
+	"aicompass/modules/chat/chatcontracts"
 )
 
 // Specialty defines a domain specialist for the coordinator agent.

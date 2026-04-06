@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"school-with-ai/foundation/agent"
-	"school-with-ai/platform/toolregistry"
+	"aicompass/foundation/agent"
+	"aicompass/platform/toolregistry"
 )
 
 func TestAskUserTool_Name(t *testing.T) {

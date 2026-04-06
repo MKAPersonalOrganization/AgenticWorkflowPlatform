@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/foundation/health"
+	"aicompass/foundation/logger"
+	"aicompass/foundation/health"
 	"testing"
 )
 

@@ -2,7 +2,7 @@ package i18n
 
 import (
 	"context"
-	"school-with-ai/foundation/i18n"
+	"aicompass/foundation/i18n"
 
 	"golang.org/x/text/language"
 )

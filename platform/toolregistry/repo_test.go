@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"school-with-ai/infra/sqldb"
+	"aicompass/infra/sqldb"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

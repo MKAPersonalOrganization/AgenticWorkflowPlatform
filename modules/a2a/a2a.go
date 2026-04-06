@@ -19,9 +19,9 @@
 package a2a
 
 import (
-	"school-with-ai/foundation/auth"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/platform/toolregistry"
+	"aicompass/foundation/auth"
+	"aicompass/foundation/logger"
+	"aicompass/platform/toolregistry"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"

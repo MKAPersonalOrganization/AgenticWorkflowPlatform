@@ -7,10 +7,10 @@ import (
 	"os"
 	"testing"
 
-	"school-with-ai/foundation/logger"
-	"school-with-ai/shared"
+	"aicompass/foundation/logger"
+	"aicompass/shared"
 
-	taskmgmthandlers "school-with-ai/modules/chat/taskmgmt"
+	taskmgmthandlers "aicompass/modules/chat/taskmgmt"
 )
 
 func newTestLogger() *logger.Logger {

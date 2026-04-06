@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"school-with-ai/shared"
+	"aicompass/shared"
 
 	"github.com/google/uuid"
 )

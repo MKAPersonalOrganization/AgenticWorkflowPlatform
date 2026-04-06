@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"school-with-ai/shared"
+	"aicompass/shared"
 
 	"github.com/google/uuid"
 )
 
 // To run these tests:
-// EDGEQUAKE_BASE_URL=http://localhost:8081 go test -v -tags=integration ./services/rag/query/...
+// EDGEQUAKE_BASE_URL=http://localhost:8081 go test -v -tags=integration ./modules/knowledge/rag/query/...
 
 func TestService_Integration_Execute(t *testing.T) {
 	baseURL := os.Getenv("EDGEQUAKE_BASE_URL")
@@ -60,13 +60,15 @@ func TestService_Integration_Stream(t *testing.T) {
 		Mode:  stringPtr("naive"),
 	}
 
-	textChan, errChan := service.Stream(ctx, tCtx, req)
+	eventChan, errChan := service.Stream(ctx, tCtx, req)
 
 	fmt.Print("Streaming Response: ")
 	receivedAny := false
-	for text := range textChan {
-		fmt.Print(text)
-		receivedAny = true
+	for event := range eventChan {
+		if event.Type == "token" && event.Content != nil {
+			fmt.Print(*event.Content)
+			receivedAny = true
+		}
 	}
 	fmt.Println()
 

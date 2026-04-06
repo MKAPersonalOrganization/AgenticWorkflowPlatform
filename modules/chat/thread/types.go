@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	es "school-with-ai/foundation/eventsourcing"
+	es "aicompass/foundation/eventsourcing"
 )
 
 // Common errors.

@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/platform/toolregistry"
+	"aicompass/foundation/agent"
+	"aicompass/foundation/logger"
+	"aicompass/platform/toolregistry"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
