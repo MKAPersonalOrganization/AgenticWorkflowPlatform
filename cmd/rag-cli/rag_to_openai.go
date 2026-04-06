@@ -311,14 +311,6 @@ func NewAgent(retriever Retriever, llm LLM) *Agent {
 	}
 }
 
-func NewAgentWithPrompt(retriever Retriever, llm LLM, systemPrompt string) *Agent {
-	return &Agent{
-		Retriever:    retriever,
-		LLM:          llm,
-		SystemPrompt: systemPrompt,
-	}
-}
-
 // buildContextString builds the context string from source references (Agent-specific method)
 func (a *Agent) buildContextString(sources []SourceReference) string {
 	var chunks, entities, relationships []string
