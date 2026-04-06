@@ -8,8 +8,8 @@ import (
 	"os"
 	"testing"
 
-	"school-with-ai/shared"
-	"school-with-ai/modules/knowledge/rag/lineage"
+	"aicompass/shared"
+	"aicompass/modules/knowledge/rag/lineage"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

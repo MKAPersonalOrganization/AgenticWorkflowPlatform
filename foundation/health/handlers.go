@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"school-with-ai/foundation/logger"
+	"aicompass/foundation/logger"
 	"sync"
 	"time"
 )

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"school-with-ai/platform/toolregistry"
+	"aicompass/platform/toolregistry"
 )
 
 // InMemoryRepository implements Repository interface with in-memory storage.

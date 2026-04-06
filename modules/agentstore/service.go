@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"school-with-ai/foundation/logger"
+	"aicompass/foundation/logger"
 )
 
 // Composition tree limits prevent unbounded nesting.

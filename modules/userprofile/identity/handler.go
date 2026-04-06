@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"strings"
 
-	"school-with-ai/components/profile"
-	"school-with-ai/foundation/i18n"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/shared"
+	"aicompass/components/profile"
+	"aicompass/foundation/i18n"
+	"aicompass/foundation/logger"
+	"aicompass/shared"
 )
 
 // handler manages user profile HTTP requests.

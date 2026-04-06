@@ -2,7 +2,7 @@ package threadmgmt
 
 import (
 	"context"
-	"school-with-ai/modules/chat/thread"
+	"aicompass/modules/chat/thread"
 )
 
 // EventStoreAdapter adapts thread.EventStore.

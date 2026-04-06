@@ -4,9 +4,9 @@ import (
 "encoding/json"
 "net/http"
 
-	"school-with-ai/shared"
-"school-with-ai/foundation/i18n"
-"school-with-ai/foundation/logger"
+	"aicompass/shared"
+"aicompass/foundation/i18n"
+"aicompass/foundation/logger"
 
 "github.com/go-chi/chi/v5"
 )

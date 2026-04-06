@@ -7,7 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"school-with-ai/shared"
+	"aicompass/shared"
 	"strings"
 	"testing"
 

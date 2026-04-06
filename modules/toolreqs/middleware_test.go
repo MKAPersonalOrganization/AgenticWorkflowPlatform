@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"school-with-ai/modules/toolreqs"
+	"aicompass/modules/toolreqs"
 )
 
 // =============================================================================

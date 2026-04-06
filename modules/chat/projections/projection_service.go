@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"school-with-ai/modules/chat/projection/agui"
+	"aicompass/modules/chat/projection/agui"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )

@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"school-with-ai/foundation/agent"
+	"aicompass/foundation/agent"
 
 	"github.com/google/uuid"
 )

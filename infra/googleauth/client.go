@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"school-with-ai/shared"
+	"aicompass/shared"
 	"time"
 
 	"github.com/google/uuid"

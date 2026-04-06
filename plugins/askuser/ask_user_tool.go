@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/agent/io"
+	"aicompass/foundation/agent"
+	"aicompass/foundation/agent/io"
 )
 
 // AskUserQuestionType enumerates the supported question types.

@@ -7,7 +7,7 @@ import (
 	adktool "google.golang.org/adk/tool"
 	"google.golang.org/genai"
 
-	fagent "school-with-ai/foundation/agent"
+	fagent "aicompass/foundation/agent"
 )
 
 // foundationSchemaToGenAI converts a foundation agent.Schema to a genai.Schema.

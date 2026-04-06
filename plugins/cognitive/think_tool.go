@@ -2,7 +2,7 @@ package cognitive
 
 import (
 	"context"
-	"school-with-ai/foundation/agent"
+	"aicompass/foundation/agent"
 )
 
 // ThinkArgs represents the arguments for the think tool.

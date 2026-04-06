@@ -7,8 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/foundation/otel"
+	"aicompass/foundation/logger"
+	"aicompass/foundation/otel"
 	"strings"
 	"time"
 

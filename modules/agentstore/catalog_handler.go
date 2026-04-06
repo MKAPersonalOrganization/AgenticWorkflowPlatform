@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"school-with-ai/foundation/logger"
-	"school-with-ai/shared"
+	"aicompass/foundation/logger"
+	"aicompass/shared"
 )
 
 // catalogHandler encapsulates HTTP handlers for the shared agent catalog.

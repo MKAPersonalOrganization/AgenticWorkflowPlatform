@@ -16,15 +16,15 @@ package taskmgmt
 import (
 	"time"
 
-	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/modules/chat/chatcontracts"
-	"school-with-ai/modules/chat/projection/agui"
-	"school-with-ai/modules/chat/taskmanagement"
-	"school-with-ai/modules/chat/threadmgmt"
-	"school-with-ai/platform/artifact"
-	"school-with-ai/platform/toolregistry"
-	"school-with-ai/shared"
+	"aicompass/foundation/agent"
+	"aicompass/foundation/logger"
+	"aicompass/modules/chat/chatcontracts"
+	"aicompass/modules/chat/projection/agui"
+	"aicompass/modules/chat/taskmanagement"
+	"aicompass/modules/chat/threadmgmt"
+	"aicompass/platform/artifact"
+	"aicompass/platform/toolregistry"
+	"aicompass/shared"
 )
 
 // SSEConfig holds tunable parameters for Server-Sent Event connections.

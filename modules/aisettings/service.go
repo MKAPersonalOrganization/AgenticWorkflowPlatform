@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"school-with-ai/foundation/agent"
+	"aicompass/foundation/agent"
 )
 
 // service provides business logic for per-user AI settings.

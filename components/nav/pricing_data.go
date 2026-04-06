@@ -3,7 +3,7 @@ package nav
 import (
 	"context"
 	"fmt"
-	"school-with-ai/foundation/i18n"
+	"aicompass/foundation/i18n"
 )
 
 // activationAlpineData returns the Alpine.js x-data JSON for the activation

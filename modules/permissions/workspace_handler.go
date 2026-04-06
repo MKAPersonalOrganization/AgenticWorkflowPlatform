@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/modules/permissions/workspace"
-	"school-with-ai/shared"
+	"aicompass/foundation/agent"
+	"aicompass/foundation/logger"
+	"aicompass/modules/permissions/workspace"
+	"aicompass/shared"
 
 	"github.com/google/uuid"
 )

@@ -1,7 +1,7 @@
 package docs
 
 import (
-	"school-with-ai/components/icon"
+	"aicompass/components/icon"
 
 	"github.com/a-h/templ"
 )

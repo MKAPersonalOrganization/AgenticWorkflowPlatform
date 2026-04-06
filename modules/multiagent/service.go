@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"school-with-ai/foundation/logger"
-	"school-with-ai/modules/agentstore"
+	"aicompass/foundation/logger"
+	"aicompass/modules/agentstore"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────

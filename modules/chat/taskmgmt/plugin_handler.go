@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"school-with-ai/platform/toolregistry"
+	"aicompass/platform/toolregistry"
 )
 
 // PluginResponse represents a plugin (tool set) in the simplified API.

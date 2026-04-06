@@ -5,8 +5,8 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/foundation/middleware"
+	"aicompass/foundation/logger"
+	"aicompass/foundation/middleware"
 	"testing"
 )
 

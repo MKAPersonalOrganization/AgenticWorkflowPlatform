@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"school-with-ai/shared"
+	"aicompass/shared"
 )
 
 // Workspace models the data required by the permissions module for a workspace.

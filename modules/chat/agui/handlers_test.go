@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"school-with-ai/modules/chat/projection/agui"
-	"school-with-ai/shared"
+	"aicompass/modules/chat/projection/agui"
+	"aicompass/shared"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )

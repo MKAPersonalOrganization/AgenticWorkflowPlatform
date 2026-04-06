@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"school-with-ai/foundation/logger"
+	"aicompass/foundation/logger"
 )
 
 // Banner represents a banner message displayed to users.

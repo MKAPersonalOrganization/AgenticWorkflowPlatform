@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"school-with-ai/foundation/event"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/modules/chat/thread"
+	"aicompass/foundation/event"
+	"aicompass/foundation/logger"
+	"aicompass/modules/chat/thread"
 
 	"github.com/jmoiron/sqlx"
 )

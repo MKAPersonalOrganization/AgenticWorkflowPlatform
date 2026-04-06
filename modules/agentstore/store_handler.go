@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"school-with-ai/foundation/logger"
-	"school-with-ai/shared"
+	"aicompass/foundation/logger"
+	"aicompass/shared"
 )
 
 // storeHandler encapsulates HTTP handlers for agent CRUD and sharing operations.

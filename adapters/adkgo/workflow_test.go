@@ -7,7 +7,7 @@ import (
 	"google.golang.org/adk/memory"
 	"google.golang.org/adk/session"
 
-	fagent "school-with-ai/foundation/agent"
+	fagent "aicompass/foundation/agent"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"school-with-ai/infra/sqldb"
+	"aicompass/infra/sqldb"
 )
 
 func main() {

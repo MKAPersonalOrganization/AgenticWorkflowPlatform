@@ -3,7 +3,7 @@ package adkgo
 import (
 	"testing"
 
-	fagent "school-with-ai/foundation/agent"
+	fagent "aicompass/foundation/agent"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────

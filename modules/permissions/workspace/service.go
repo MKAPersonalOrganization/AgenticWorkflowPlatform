@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"school-with-ai/foundation/logger"
-	"school-with-ai/foundation/permcache"
+	"aicompass/foundation/logger"
+	"aicompass/foundation/permcache"
 
 	"github.com/redis/go-redis/v9"
 )

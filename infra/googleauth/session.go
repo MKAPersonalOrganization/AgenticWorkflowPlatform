@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"net/http"
-	"school-with-ai/shared"
+	"aicompass/shared"
 
 	"github.com/gorilla/sessions"
 )

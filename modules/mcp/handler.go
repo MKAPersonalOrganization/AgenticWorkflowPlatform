@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"net/url"
 
-	"school-with-ai/foundation/i18n"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/shared"
+	"aicompass/foundation/i18n"
+	"aicompass/foundation/logger"
+	"aicompass/shared"
 
 	"github.com/go-chi/chi/v5"
 )

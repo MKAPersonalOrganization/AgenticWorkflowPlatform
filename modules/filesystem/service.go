@@ -7,7 +7,7 @@ import (
 	"io"
 	"time"
 
-	"school-with-ai/infra/githubauth"
+	"aicompass/infra/githubauth"
 
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"

@@ -1,7 +1,7 @@
 package postgres
 
 import (
-	es "school-with-ai/foundation/eventsourcing"
+	es "aicompass/foundation/eventsourcing"
 )
 
 // DeserializeDomainEvent deserializes a domain event from JSON based on its

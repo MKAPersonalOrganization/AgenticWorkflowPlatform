@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"school-with-ai/foundation/event"
-	es "school-with-ai/foundation/eventsourcing"
+	"aicompass/foundation/event"
+	es "aicompass/foundation/eventsourcing"
 
 	"github.com/jmoiron/sqlx"
 )

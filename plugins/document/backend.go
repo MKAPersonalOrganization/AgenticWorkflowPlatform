@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"school-with-ai/foundation/agent"
-	"school-with-ai/platform/artifact"
+	"aicompass/foundation/agent"
+	"aicompass/platform/artifact"
 )
 
 // CreateMarkdownTool allows agents to create new markdown files.

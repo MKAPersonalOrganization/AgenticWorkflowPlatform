@@ -5,9 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"school-with-ai/foundation/logger"
-	"school-with-ai/modules/toolreqs"
-	"school-with-ai/modules/toolreqs/mocks"
+	"aicompass/foundation/logger"
+	"aicompass/modules/toolreqs"
+	"aicompass/modules/toolreqs/mocks"
 
 	"github.com/alicebob/miniredis/v2"
 	goredis "github.com/redis/go-redis/v9"

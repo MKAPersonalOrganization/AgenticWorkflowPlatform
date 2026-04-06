@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"school-with-ai/modules/chat/projection/agui"
-	"school-with-ai/shared"
+	"aicompass/modules/chat/projection/agui"
+	"aicompass/shared"
 )
 
 // AguiProjectionHandler provides HTTP endpoints for querying the AGUI projection.

@@ -1,7 +1,7 @@
 package thread
 
 import (
-	es "school-with-ai/foundation/eventsourcing"
+	es "aicompass/foundation/eventsourcing"
 )
 
 // RegisterThreadEvents registers all thread/chat domain events with the given

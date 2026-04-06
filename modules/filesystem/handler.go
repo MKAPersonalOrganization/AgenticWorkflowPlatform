@@ -7,7 +7,7 @@ import (
 	"io"
 	"net/http"
 
-	"school-with-ai/shared"
+	"aicompass/shared"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"

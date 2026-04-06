@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"school-with-ai/foundation/agent"
-	"school-with-ai/modules/chat/agentorchestrator"
-	"school-with-ai/modules/chat/taskmanagement"
+	"aicompass/foundation/agent"
+	"aicompass/modules/chat/agentorchestrator"
+	"aicompass/modules/chat/taskmanagement"
 )
 
 // FileAttachment represents a file sent with a message (image, audio, PDF, etc.).

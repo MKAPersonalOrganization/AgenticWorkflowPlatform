@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/jsonschema-go/jsonschema"
 
-	"school-with-ai/foundation/agent"
+	"aicompass/foundation/agent"
 
 	adktool "google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"

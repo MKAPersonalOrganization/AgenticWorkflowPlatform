@@ -3,10 +3,9 @@ package query
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"school-with-ai/shared"
+	"aicompass/shared"
 	"testing"
 
 	"github.com/google/uuid"
@@ -77,9 +76,16 @@ func TestService_Stream(t *testing.T) {
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
 
-		fmt.Fprint(w, "data: AI\n\n")
-		fmt.Fprint(w, "data:  is\n\n")
-		fmt.Fprint(w, "data:  cool\n\n")
+		events := []QueryStreamEvent{
+			{Type: "token", Content: strPtr("AI")},
+			{Type: "token", Content: strPtr(" is")},
+			{Type: "token", Content: strPtr(" cool")},
+			{Type: "done", Stats: &QueryStreamStats{TotalTimeMs: 100}},
+		}
+		for _, e := range events {
+			data, _ := json.Marshal(e)
+			w.Write([]byte("data: " + string(data) + "\n\n"))
+		}
 	}))
 	defer server.Close()
 
@@ -88,11 +94,13 @@ func TestService_Stream(t *testing.T) {
 		Query: "Tell me about AI",
 	}
 
-	textChan, errChan := service.Stream(context.Background(), nil, req)
+	eventChan, errChan := service.Stream(context.Background(), nil, req)
 
-	var result []string
-	for text := range textChan {
-		result = append(result, text)
+	var tokens []string
+	for event := range eventChan {
+		if event.Type == "token" && event.Content != nil {
+			tokens = append(tokens, *event.Content)
+		}
 	}
 
 	if err := <-errChan; err != nil {
@@ -100,12 +108,16 @@ func TestService_Stream(t *testing.T) {
 	}
 
 	expected := []string{"AI", " is", " cool"}
-	if len(result) != len(expected) {
-		t.Fatalf("expected %d segments, got %d", len(expected), len(result))
+	if len(tokens) != len(expected) {
+		t.Fatalf("expected %d tokens, got %d", len(expected), len(tokens))
 	}
 	for i, v := range expected {
-		if result[i] != v {
-			t.Errorf("expected segment %d to be '%s', got '%s'", i, v, result[i])
+		if tokens[i] != v {
+			t.Errorf("expected token %d to be '%s', got '%s'", i, v, tokens[i])
 		}
 	}
+}
+
+func strPtr(s string) *string {
+	return &s
 }

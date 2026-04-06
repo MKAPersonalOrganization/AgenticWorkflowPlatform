@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/foundation/permcache"
+	"aicompass/foundation/agent"
+	"aicompass/foundation/logger"
+	"aicompass/foundation/permcache"
 
 	"github.com/redis/go-redis/v9"
 )

@@ -1,8 +1,8 @@
 package preferences
 
 import (
-	"school-with-ai/foundation/auth"
-	"school-with-ai/foundation/logger"
+	"aicompass/foundation/auth"
+	"aicompass/foundation/logger"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"

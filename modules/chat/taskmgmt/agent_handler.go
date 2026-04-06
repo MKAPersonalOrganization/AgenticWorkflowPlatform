@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"school-with-ai/foundation/agent"
+	"aicompass/foundation/agent"
 )
 
 // defaultAgentIconSVG is the fallback compass icon for agents without a valid SVG icon.

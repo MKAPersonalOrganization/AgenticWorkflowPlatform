@@ -4,8 +4,8 @@ import (
 	"context"
 	"io"
 
-	"school-with-ai/foundation/auth"
-	"school-with-ai/platform/artifact"
+	"aicompass/foundation/auth"
+	"aicompass/platform/artifact"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"

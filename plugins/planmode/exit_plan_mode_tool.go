@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"school-with-ai/foundation/agent"
+	"aicompass/foundation/agent"
 )
 
 var exitPlanModeSchema = &agent.Schema{

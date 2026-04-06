@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"school-with-ai/foundation/agent"
-	"school-with-ai/platform/toolregistry"
+	"aicompass/foundation/agent"
+	"aicompass/platform/toolregistry"
 )
 
 // mustJSON marshals a value to a JSON string (test helper).

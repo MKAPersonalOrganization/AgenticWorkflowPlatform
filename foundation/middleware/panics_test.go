@@ -3,7 +3,7 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
-	"school-with-ai/foundation/metrics"
+	"aicompass/foundation/metrics"
 	"testing"
 )
 

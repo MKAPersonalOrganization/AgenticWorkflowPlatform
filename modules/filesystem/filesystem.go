@@ -3,8 +3,8 @@ package filesystem
 import (
 	"net/http"
 
-	"school-with-ai/foundation/auth"
-	"school-with-ai/infra/githubauth"
+	"aicompass/foundation/auth"
+	"aicompass/infra/githubauth"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"

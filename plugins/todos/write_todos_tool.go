@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"school-with-ai/foundation/agent"
+	"aicompass/foundation/agent"
 )
 
 // TodoStatus represents the state of a single todo item.

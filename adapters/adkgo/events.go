@@ -9,7 +9,7 @@ import (
 	adktool "google.golang.org/adk/tool"
 	"google.golang.org/genai"
 
-	"school-with-ai/modules/chat/thread"
+	"aicompass/modules/chat/thread"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────

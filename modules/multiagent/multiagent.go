@@ -1,9 +1,9 @@
 package multiagent
 
 import (
-	"school-with-ai/foundation/auth"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/modules/agentstore"
+	"aicompass/foundation/auth"
+	"aicompass/foundation/logger"
+	"aicompass/modules/agentstore"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"

@@ -14,7 +14,7 @@ import (
 	adkmodel "google.golang.org/adk/model"
 	"google.golang.org/adk/model/gemini"
 
-	fagent "school-with-ai/foundation/agent"
+	fagent "aicompass/foundation/agent"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────

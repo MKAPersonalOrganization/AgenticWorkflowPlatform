@@ -1,7 +1,7 @@
 package taskmanagement
 
 import (
-	"school-with-ai/modules/chat/thread"
+	"aicompass/modules/chat/thread"
 	"testing"
 	"time"
 

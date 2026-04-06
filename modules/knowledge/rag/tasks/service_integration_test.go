@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"school-with-ai/shared"
+	"aicompass/shared"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

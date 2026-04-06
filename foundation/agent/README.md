@@ -124,7 +124,7 @@ type Session interface {
 ### Application Code
 
 ```go
-import "school-with-ai/foundation/agent"
+import "aicompass/foundation/agent"
 
 func HandleChatRequest(runner agent.Runner, req *agent.RunRequest) {
     for event, err := range runner.Run(ctx, req) {
@@ -150,7 +150,7 @@ func HandleChatRequest(runner agent.Runner, req *agent.RunRequest) {
 ### Creating an Agent
 
 ```go
-import "school-with-ai/foundation/agent"
+import "aicompass/foundation/agent"
 
 config := agent.Config{
     Name:        "math-tutor",

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"school-with-ai/foundation/logger"
+	"aicompass/foundation/logger"
 )
 
 // Tool represents a tool available in the registry.

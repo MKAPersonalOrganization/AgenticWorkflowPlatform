@@ -20,7 +20,7 @@ import (
 	"google.golang.org/adk/tool/preloadmemorytool"
 	"google.golang.org/genai"
 
-	fagent "school-with-ai/foundation/agent"
+	fagent "aicompass/foundation/agent"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────

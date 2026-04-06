@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"school-with-ai/shared"
+	"aicompass/shared"
 )
 
 // GetChunkLineage retrieves lineage for a specific chunk.

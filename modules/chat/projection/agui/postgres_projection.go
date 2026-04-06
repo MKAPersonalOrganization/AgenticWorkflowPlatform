@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"school-with-ai/components/i18n"
-	"school-with-ai/foundation/agent"
-	"school-with-ai/foundation/event"
-	"school-with-ai/foundation/logger"
-	"school-with-ai/modules/chat/thread"
+	"aicompass/components/i18n"
+	"aicompass/foundation/agent"
+	"aicompass/foundation/event"
+	"aicompass/foundation/logger"
+	"aicompass/modules/chat/thread"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 	"github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/types"

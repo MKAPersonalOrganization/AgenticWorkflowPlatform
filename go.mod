@@ -1,4 +1,4 @@
-module school-with-ai
+module aicompass
 
 go 1.25.0
 

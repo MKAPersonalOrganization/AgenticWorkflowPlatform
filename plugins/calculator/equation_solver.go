@@ -3,7 +3,7 @@ package calculator
 import (
 	"context"
 	"fmt"
-	"school-with-ai/foundation/agent"
+	"aicompass/foundation/agent"
 	"strings"
 )
 

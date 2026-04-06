@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"school-with-ai/platform/toolregistry"
+	"aicompass/platform/toolregistry"
 )
 
 // Service provides business logic for per-user plugin settings.

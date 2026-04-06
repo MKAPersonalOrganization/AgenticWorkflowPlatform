@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"school-with-ai/foundation/agent"
+	"aicompass/foundation/agent"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )

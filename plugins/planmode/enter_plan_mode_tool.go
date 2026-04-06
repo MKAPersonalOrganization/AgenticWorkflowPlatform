@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"school-with-ai/foundation/agent"
+	"aicompass/foundation/agent"
 )
 
 // readOnlyTools is the whitelist of tool categories allowed during plan mode.

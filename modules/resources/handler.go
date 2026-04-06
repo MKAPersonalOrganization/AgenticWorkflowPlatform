@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"school-with-ai/shared"
+	"aicompass/shared"
 
 	"github.com/google/uuid"
 )

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"io"
 
-	"school-with-ai/shared"
+	"aicompass/shared"
 )
 
 var (

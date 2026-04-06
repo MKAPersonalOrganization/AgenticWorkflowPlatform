@@ -3,7 +3,7 @@ package tts
 import (
 	"context"
 	"encoding/json"
-	"school-with-ai/foundation/agent"
+	"aicompass/foundation/agent"
 	"testing"
 )
 

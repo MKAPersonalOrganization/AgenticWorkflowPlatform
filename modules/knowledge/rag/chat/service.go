@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"school-with-ai/shared"
+	"aicompass/shared"
 	"time"
 )
 

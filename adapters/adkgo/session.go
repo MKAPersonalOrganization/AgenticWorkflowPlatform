@@ -10,8 +10,8 @@ import (
 	"google.golang.org/adk/session"
 	"google.golang.org/genai"
 
-	fagent "school-with-ai/foundation/agent"
-	"school-with-ai/modules/chat/thread"
+	fagent "aicompass/foundation/agent"
+	"aicompass/modules/chat/thread"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────

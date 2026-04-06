@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net/http"
 
-	"school-with-ai/modules/chat/chatcontracts"
-	"school-with-ai/shared"
+	"aicompass/modules/chat/chatcontracts"
+	"aicompass/shared"
 
 	"github.com/google/uuid"
 )

@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"school-with-ai/shared"
-	"school-with-ai/foundation/logger"
+	"aicompass/shared"
+	"aicompass/foundation/logger"
 
 	"github.com/stripe/stripe-go/v84"
 	"github.com/stripe/stripe-go/v84/webhook"

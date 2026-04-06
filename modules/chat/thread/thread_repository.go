@@ -3,7 +3,7 @@ package thread
 import (
 	"context"
 
-	es "school-with-ai/foundation/eventsourcing"
+	es "aicompass/foundation/eventsourcing"
 )
 
 // ThreadRepository manages persistence of ThreadAggregate.

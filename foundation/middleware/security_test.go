@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"net/http"
 	"net/http/httptest"
-	"school-with-ai/foundation/middleware"
+	"aicompass/foundation/middleware"
 	"testing"
 )
 

@@ -10,8 +10,8 @@ import (
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
-	"school-with-ai/foundation/agent"
-	"school-with-ai/platform/artifact"
+	"aicompass/foundation/agent"
+	"aicompass/platform/artifact"
 	"strings"
 	"time"
 )
