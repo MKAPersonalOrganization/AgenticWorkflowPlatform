@@ -1,4 +1,4 @@
-// templui component rating - version: v1.9.4 installed by templui v1.9.4
+// templui component rating - version: v1.6.0 installed by templui v1.6.0
 // 📚 Documentation: https://templui.io/docs/components/rating
 package rating
 
@@ -166,7 +166,7 @@ func ratingIcon(style Style, filled bool, value float64) templ.Component {
 	}
 	iconProps := icon.Props{}
 	if filled {
-		iconProps.Class = "fill-current"
+		iconProps.Fill = "currentColor"
 	}
 	switch style {
 	case StyleHeart:
@@ -188,10 +188,6 @@ func (p *Props) setDefaults() {
 	}
 }
 
-var scriptOnce = templ.NewOnceHandle()
-
 templ Script() {
-	@scriptOnce.Once() {
-		@utils.ComponentScript("rating")
-	}
+	<script defer nonce={ templ.GetNonce(ctx) } src={ utils.ScriptURL("/assets/js/rating.min.js") }></script>
 }

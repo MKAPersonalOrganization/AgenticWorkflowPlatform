@@ -1,9 +1,8 @@
-// templui component inputotp - version: v1.9.4 installed by templui v1.9.4
+// templui component inputotp - version: v1.6.0 installed by templui v1.6.0
 // 📚 Documentation: https://templui.io/docs/components/input-otp
 package inputotp
 
 import (
-	"aicompass/components/input"
 	"aicompass/components/utils"
 	"strconv"
 )
@@ -177,11 +176,6 @@ templ Separator(props ...SeparatorProps) {
 	</div>
 }
 
-var scriptOnce = templ.NewOnceHandle()
-
 templ Script() {
-	@scriptOnce.Once() {
-		@input.Script()
-		@utils.ComponentScript("inputotp")
-	}
+	<script defer nonce={ templ.GetNonce(ctx) } src={ utils.ScriptURL("/assets/js/inputotp.min.js") }></script>
 }

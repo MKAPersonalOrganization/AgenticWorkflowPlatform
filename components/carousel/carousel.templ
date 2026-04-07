@@ -1,4 +1,4 @@
-// templui component carousel - version: v1.9.4 installed by templui v1.9.4
+// templui component carousel - version: v1.6.0 installed by templui v1.6.0
 // 📚 Documentation: https://templui.io/docs/components/carousel
 package carousel
 
@@ -135,7 +135,7 @@ templ Previous(props ...PreviousProps) {
 		}
 		class={
 			utils.TwMerge(
-				"absolute left-2 top-1/2 transform -translate-y-1/2 p-2 rounded-full bg-black/20 text-white hover:bg-black/40 focus:outline-none",
+				"absolute start-2 top-1/2 transform -translate-y-1/2 p-2 rounded-full bg-black/20 text-white hover:bg-black/40 focus:outline-none",
 				p.Class,
 			),
 		}
@@ -159,7 +159,7 @@ templ Next(props ...NextProps) {
 		}
 		class={
 			utils.TwMerge(
-				"absolute right-2 top-1/2 transform -translate-y-1/2 p-2 rounded-full bg-black/20 text-white hover:bg-black/40 focus:outline-none",
+				"absolute end-2 top-1/2 transform -translate-y-1/2 p-2 rounded-full bg-black/20 text-white hover:bg-black/40 focus:outline-none",
 				p.Class,
 			),
 		}
@@ -206,10 +206,6 @@ templ Indicators(props ...IndicatorsProps) {
 	</div>
 }
 
-var scriptOnce = templ.NewOnceHandle()
-
 templ Script() {
-	@scriptOnce.Once() {
-		@utils.ComponentScript("carousel")
-	}
+	<script defer nonce={ templ.GetNonce(ctx) } src={ utils.ScriptURL("/assets/js/carousel.min.js") }></script>
 }

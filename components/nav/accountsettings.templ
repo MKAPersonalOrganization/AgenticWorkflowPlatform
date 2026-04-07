@@ -29,9 +29,9 @@ templ AccountSettings(props ...AccountSettingsProps) {
 	}
 	if p.Compact {
 		<div class="mt-auto">
-		@popover.Trigger(popover.TriggerProps{
-			ID: p.ID,
-		}) {
+			@popover.Trigger(popover.TriggerProps{
+				For: p.ID,
+			}) {
 				@button.Button(button.Props{
 					Size:    button.SizeIcon,
 					Variant: button.VariantGhost,
@@ -52,7 +52,7 @@ templ AccountSettings(props ...AccountSettingsProps) {
 		@sidebar.Menu() {
 			@sidebar.MenuItem() {
 				@popover.Trigger(popover.TriggerProps{
-					ID: p.ID,
+					For: p.ID,
 				}) {
 					@sidebar.MenuButton(sidebar.MenuButtonProps{
 						Size:  "lg",

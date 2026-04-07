@@ -1,4 +1,4 @@
-// templui component accordion - version: v1.9.4 installed by templui v1.9.4
+// templui component accordion - version: v1.6.0 installed by templui v1.6.0
 // 📚 Documentation: https://templui.io/docs/components/accordion
 package accordion
 
@@ -86,7 +86,7 @@ templ Trigger(props ...TriggerProps) {
 		class={
 			utils.TwMerge(
 				"flex flex-1 items-start justify-between gap-4 py-4",
-				"text-left text-sm font-medium",
+				"text-start text-sm font-medium",
 				"transition-all hover:underline cursor-pointer",
 				"outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring rounded-md",
 				"disabled:pointer-events-none disabled:opacity-50",
@@ -97,7 +97,10 @@ templ Trigger(props ...TriggerProps) {
 		{ p.Attributes... }
 	>
 		{ children... }
-		@icon.ChevronDown(icon.Props{Class: "size-4 shrink-0 translate-y-0.5 transition-transform duration-200 text-muted-foreground pointer-events-none"})
+		@icon.ChevronDown(icon.Props{
+			Size:  16,
+			Class: "size-4 shrink-0 translate-y-0.5 transition-transform duration-200 text-muted-foreground pointer-events-none",
+		})
 	</summary>
 }
 

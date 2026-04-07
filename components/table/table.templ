@@ -1,4 +1,4 @@
-// templui component table - version: v1.9.4 installed by templui v1.9.4
+// templui component table - version: v1.6.0 installed by templui v1.6.0
 // 📚 Documentation: https://templui.io/docs/components/table
 package table
 
@@ -153,8 +153,8 @@ templ Head(props ...HeadProps) {
 		}
 		class={
 			utils.TwMerge(
-				"h-10 px-2 text-left align-middle font-medium text-muted-foreground",
-				"[&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+				"h-10 px-2 text-start align-middle font-medium text-muted-foreground",
+				"[&:has([role=checkbox])]:pe-0 [&>[role=checkbox]]:translate-y-[2px]",
 				p.Class,
 			),
 		}
@@ -176,7 +176,7 @@ templ Cell(props ...CellProps) {
 		class={
 			utils.TwMerge(
 				"p-2 align-middle",
-				"[&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+				"[&:has([role=checkbox])]:pe-0 [&>[role=checkbox]]:translate-y-[2px]",
 				p.Class,
 			),
 		}

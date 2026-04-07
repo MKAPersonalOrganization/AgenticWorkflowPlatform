@@ -1,4 +1,4 @@
-// templui component progress - version: v1.9.4 installed by templui v1.9.4
+// templui component progress - version: v1.6.0 installed by templui v1.6.0
 // 📚 Documentation: https://templui.io/docs/components/progress
 package progress
 
@@ -122,10 +122,6 @@ func variantClasses(variant Variant) string {
 	}
 }
 
-var scriptOnce = templ.NewOnceHandle()
-
 templ Script() {
-	@scriptOnce.Once() {
-		@utils.ComponentScript("progress")
-	}
+	<script defer nonce={ templ.GetNonce(ctx) } src={ utils.ScriptURL("/assets/js/progress.min.js") }></script>
 }
