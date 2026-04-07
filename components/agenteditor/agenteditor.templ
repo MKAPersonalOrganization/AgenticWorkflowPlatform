@@ -894,8 +894,7 @@ templ AgentDesignerDialog() {
 						x-transition:leave-end="opacity-0"
 						@click="$store.flow._showHelp = false"
 						@keydown.escape.window="if ($store.flow?._showHelp) $store.flow._showHelp = false"
-						class="absolute inset-0 z-50 flex items-center justify-center"
-						style="background:rgba(0,0,0,0.5); backdrop-filter:blur(2px);"
+						class="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px]"
 					>
 						<div @click.stop class="rounded-xl border border-border shadow-2xl max-w-md w-full bg-background">
 							<div class="px-5 pt-5 pb-3">

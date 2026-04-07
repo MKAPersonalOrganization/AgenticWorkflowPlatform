@@ -96,7 +96,7 @@ export const editableWorkflowTree = () => {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                height: 20px;
+                height: 24px;
                 width: 100%;
             }
             .ewt-connector::before {
@@ -105,19 +105,26 @@ export const editableWorkflowTree = () => {
                 left: 50%;
                 top: 0;
                 bottom: 0;
-                width: 1px;
+                width: 2px;
                 background: var(--ewt-color, var(--border));
                 transform: translateX(-50%);
-                opacity: 0.7;
+                opacity: 0.5;
             }
             .ewt-connector-dot {
                 position: relative;
                 z-index: 1;
-                width: 5px;
-                height: 5px;
+                width: 6px;
+                height: 6px;
                 border-radius: 50%;
-                background: var(--ewt-color, var(--muted-foreground));
-                box-shadow: 0 0 4px var(--ewt-color, transparent);
+                background: var(--ewt-color, var(--primary));
+                box-shadow: 
+                    0 0 6px var(--ewt-color, var(--primary)),
+                    0 0 12px var(--ewt-color, var(--primary));
+                animation: ewt-pulse 2s ease-in-out infinite;
+            }
+            @keyframes ewt-pulse {
+                0%, 100% { opacity: 1; transform: scale(1); }
+                50% { opacity: 0.7; transform: scale(0.85); }
             }
 
             /* ── Node card ── */
@@ -126,21 +133,23 @@ export const editableWorkflowTree = () => {
                 border-radius: 8px;
                 border: 1px solid var(--border);
                 background: var(--card);
+                background-image: linear-gradient(180deg, oklch(from var(--card) l c h / 0.5) 0%, var(--card) 100%);
                 padding: 10px 12px 10px 15px;
-                transition: border-color 0.12s, box-shadow 0.12s;
+                transition: border-color 0.12s, box-shadow 0.12s, transform 0.15s ease;
                 width: 100%;
                 max-width: 520px;
                 overflow: hidden;
             }
             .ewt-node:hover {
                 border-color: var(--muted-foreground);
-                box-shadow: 0 2px 8px oklch(0 0 0 / 15%);
+                box-shadow: 0 2px 12px oklch(0 0 0 / 18%);
+                transform: translateY(-1px);
             }
             .ewt-node.selected {
                 border-color: var(--ewt-color, var(--primary));
                 box-shadow:
                     0 0 0 1px var(--ewt-color, var(--primary)),
-                    0 0 12px oklch(from var(--primary) l c h / 10%);
+                    0 4px 16px oklch(from var(--primary) l c h / 15%);
             }
             .ewt-node.drop-target {
                 border-color: #22c55e;
@@ -164,14 +173,19 @@ export const editableWorkflowTree = () => {
                 display: inline-flex;
                 align-items: center;
                 gap: 4px;
-                padding: 2px 7px;
-                border-radius: 4px;
+                padding: 3px 8px;
+                border-radius: 6px;
                 font-size: 10px;
                 font-weight: 600;
-                letter-spacing: 0.01em;
+                letter-spacing: 0.02em;
                 white-space: nowrap;
                 background: var(--ewt-color-muted, var(--muted));
                 color: var(--ewt-color-fg, var(--muted-foreground));
+                box-shadow: 0 1px 2px oklch(0 0 0 / 0.1);
+                transition: all 0.15s ease;
+            }
+            .ewt-badge:hover {
+                box-shadow: 0 2px 8px var(--ewt-color-muted, var(--muted));
             }
             .ewt-badge svg { flex-shrink: 0; }
 
@@ -248,33 +262,34 @@ export const editableWorkflowTree = () => {
             /* ── Loop wrapper ── */
             .ewt-loop-wrap {
                 position: relative;
-                border-radius: 8px;
-                border: 1px dashed rgba(217, 119, 6, 0.3);
-                padding: 14px 12px 16px;
-                background: rgba(217, 119, 6, 0.03);
+                border-radius: 10px;
+                border: 1px dashed oklch(0.45 0.15 45 / 0.3);
+                padding: 16px 14px 18px;
+                background: oklch(0.45 0.15 45 / 0.02);
                 width: 100%;
                 max-width: 520px;
-                transition: border-color 0.15s, background 0.15s;
+                transition: all 0.2s ease;
             }
             .ewt-loop-wrap:hover {
-                border-color: rgba(217, 119, 6, 0.5);
-                background: rgba(217, 119, 6, 0.05);
+                border-color: oklch(0.45 0.15 45 / 0.5);
+                background: oklch(0.45 0.15 45 / 0.04);
+                box-shadow: 0 0 20px oklch(0.45 0.15 45 / 0.08);
             }
             .ewt-loop-badge {
                 position: absolute;
-                top: -9px;
+                top: -10px;
                 right: 12px;
                 display: inline-flex;
                 align-items: center;
                 gap: 3px;
-                padding: 1px 8px;
-                border-radius: 4px;
+                padding: 2px 10px;
+                border-radius: 6px;
                 font-size: 9px;
                 font-weight: 700;
                 font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
                 background: var(--background);
-                color: var(--ewt-color-fg, #fbbf24);
-                border: 1px dashed rgba(217, 119, 6, 0.3);
+                color: oklch(0.6 0.18 45);
+                border: 1px dashed oklch(0.45 0.15 45 / 0.4);
             }
             .ewt-loop-return {
                 display: flex;
@@ -298,23 +313,26 @@ export const editableWorkflowTree = () => {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                width: 20px;
-                height: 20px;
-                border-radius: 3px;
-                border: none;
-                background: transparent;
+                width: 22px;
+                height: 22px;
+                border-radius: 4px;
+                border: 1px solid var(--border);
+                background: var(--card);
                 color: var(--muted-foreground);
                 cursor: pointer;
                 font-size: 11px;
-                transition: all 0.1s;
+                transition: all 0.15s ease;
             }
             .ewt-action-btn:hover {
-                background: var(--accent);
-                color: var(--foreground);
+                background: var(--primary);
+                border-color: var(--primary);
+                color: var(--primary-foreground);
+                box-shadow: 0 2px 8px oklch(from var(--primary) l c h / 25%);
             }
             .ewt-action-btn.danger:hover {
-                background: rgba(239, 68, 68, 0.12);
-                color: #ef4444;
+                background: #dc2626;
+                border-color: #dc2626;
+                color: white;
             }
 
             /* ── Add child buttons ── */
@@ -470,20 +488,23 @@ export const editableWorkflowTree = () => {
 
             /* ── Settings panel ── */
             .ewt-settings-panel {
-                background: var(--muted);
+                background: oklch(from var(--card) l c h / 0.5);
                 border: 1px solid var(--border);
-                border-radius: 6px;
-                padding: 10px;
-                margin-top: 6px;
+                border-radius: 8px;
+                padding: 12px;
+                margin-top: 8px;
                 font-size: 10px;
+                box-shadow: inset 0 1px 3px oklch(0 0 0 / 0.05);
             }
             .ewt-settings-row {
                 display: flex;
                 align-items: center;
                 gap: 8px;
-                margin-bottom: 6px;
+                margin-bottom: 8px;
+                padding-bottom: 8px;
+                border-bottom: 1px solid var(--border);
             }
-            .ewt-settings-row:last-child { margin-bottom: 0; }
+            .ewt-settings-row:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
             .ewt-settings-label {
                 color: var(--muted-foreground);
                 font-size: 9px;
