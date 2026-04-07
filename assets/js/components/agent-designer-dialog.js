@@ -16,7 +16,7 @@ export const agentDesigner = () => ({
     // State
     // ══════════════════════════════════════════
 
-    /** @type {'list' | 'agentForm' | 'flow' | 'delete'} */
+    /** @type {'list' | 'typeSelect' | 'agentForm' | 'flow' | 'delete'} */
     view: 'list',
 
     // Agent lists
@@ -26,6 +26,27 @@ export const agentDesigner = () => ({
     loading: false,
     saving: false,
     searchQuery: '',
+
+    // Toast notifications
+    toasts: [],
+    __toastIdCounter: 0,
+
+    showToast(message, type = 'info', duration = 3500) {
+        const id = ++this.__toastIdCounter;
+        this.toasts.push({ id, message, type, visible: true, leaving: false });
+        if (duration > 0) {
+            setTimeout(() => this.dismissToast(id), duration);
+        }
+        return id;
+    },
+
+    dismissToast(id) {
+        const toast = this.toasts.find(t => t.id === id);
+        if (toast && !toast.leaving) {
+            toast.leaving = true;
+            setTimeout(() => { this.toasts = this.toasts.filter(t => t.id !== id); }, 200);
+        }
+    },
 
     // Editing state
     editingAgent: null,
@@ -343,15 +364,16 @@ export const agentDesigner = () => ({
             if (response.ok) {
                 await this.fetchAgents();
                 this.view = 'list';
+                this.showToast(this.editingAgent ? 'Agent updated' : 'Agent created', 'success', 2500);
                 window.dispatchEvent(new CustomEvent('agents-updated'));
             } else {
                 const err = await response.json().catch(() => ({}));
                 console.error('Failed to save agent:', err);
-                alert(err.error || 'Failed to save agent');
+                this.showToast(err.error || 'Failed to save agent', 'error');
             }
         } catch (err) {
             console.error('Failed to save agent:', err);
-            alert('Failed to save agent');
+            this.showToast('Failed to save agent', 'error');
         } finally {
             this.saving = false;
         }
@@ -372,14 +394,15 @@ export const agentDesigner = () => ({
             if (response.ok) {
                 await this.fetchAgents();
                 this.view = 'list';
+                this.showToast('Agent deleted', 'success', 2500);
                 window.dispatchEvent(new CustomEvent('agents-updated'));
             } else {
                 const err = await response.json().catch(() => ({}));
-                alert(err.error || 'Failed to delete agent');
+                this.showToast(err.error || 'Failed to delete agent', 'error');
             }
         } catch (err) {
             console.error('Failed to delete agent:', err);
-            alert('Failed to delete agent');
+            this.showToast('Failed to delete agent', 'error');
         } finally {
             this.saving = false;
         }
@@ -410,13 +433,13 @@ export const agentDesigner = () => ({
 
     get orchestrationSummary() {
         const flags = [];
-        if (this.form.disallowTransferToParent) flags.push('no↑parent');
-        if (this.form.disallowTransferToPeers) flags.push('no↔peers');
-        if (this.form.outputKey) flags.push('key:' + this.form.outputKey);
-        if (this.form.includeContents === 'none') flags.push('fresh ctx');
-        if (this.form.globalInstruction) flags.push('global');
-        if (this.form.inputSchema) flags.push('in-schema');
-        if (this.form.outputSchema) flags.push('out-schema');
+        if (this.form.disallowTransferToParent) flags.push('no escalation');
+        if (this.form.disallowTransferToPeers) flags.push('no delegation');
+        if (this.form.outputKey) flags.push('output: ' + this.form.outputKey);
+        if (this.form.includeContents === 'none') flags.push('fresh context');
+        if (this.form.globalInstruction) flags.push('shared instructions');
+        if (this.form.inputSchema) flags.push('input schema');
+        if (this.form.outputSchema) flags.push('output schema');
         return flags.length ? flags.join(' · ') : '';
     },
 
@@ -693,11 +716,11 @@ export const agentDesigner = () => ({
             } else {
                 const err = await response.json().catch(() => ({}));
                 console.error('Failed to save requirement config:', err);
-                alert(err.error || 'Failed to save requirement config');
+                this.showToast(err.error || 'Failed to save requirement config', 'error');
             }
         } catch (err) {
             console.error('Failed to save requirement config:', err);
-            alert('Failed to save requirement config');
+            this.showToast('Failed to save requirement config', 'error');
         } finally {
             this.savingReqConfig = false;
         }
@@ -807,14 +830,15 @@ export const agentDesigner = () => ({
             if (response.ok) {
                 await this.fetchAgents();
                 this.view = 'list';
+                this.showToast(this.editingPipeline ? 'Workflow updated' : 'Workflow created', 'success', 2500);
                 window.dispatchEvent(new CustomEvent('agents-updated'));
             } else {
                 const err = await response.json().catch(() => ({}));
-                alert(err.error || 'Failed to save pipeline');
+                this.showToast(err.error || 'Failed to save pipeline', 'error');
             }
         } catch (err) {
             console.error('Failed to save pipeline:', err);
-            alert('Failed to save pipeline');
+            this.showToast('Failed to save pipeline', 'error');
         } finally {
             this.pipelineSaving = false;
         }
@@ -838,11 +862,11 @@ export const agentDesigner = () => ({
                 window.dispatchEvent(new CustomEvent('agents-updated'));
             } else {
                 const err = await response.json().catch(() => ({}));
-                alert(err.error || 'Failed to delete pipeline');
+                this.showToast(err.error || 'Failed to delete pipeline', 'error');
             }
         } catch (err) {
             console.error('Failed to delete pipeline:', err);
-            alert('Failed to delete pipeline');
+            this.showToast('Failed to delete pipeline', 'error');
         } finally {
             this.pipelineSaving = false;
         }
@@ -1038,13 +1062,13 @@ export const agentDesigner = () => ({
         }
 
         if (!this.pipelineName.trim()) {
-            errors.push('Workflow Agent requires a name (→ maps to the root agent.Config.Name)');
+            errors.push('Workflow requires a name.');
         }
 
-        // Root must be composite — a workflow agent is a sequentialagent/parallelagent/loopagent
+        // Root must be composite
         const rootType = this.pipelineGraph.type;
         if (rootType === 'agent' || rootType === 'remote') {
-            errors.push('Root node must be Sequential, Parallel, or Loop (a Workflow Agent orchestrates sub-agents — use the LLM Agent tab for a single agent)');
+            errors.push('The root must be Sequential, Parallel, or Loop. Use "Single Agent" for a standalone agent.');
         }
 
         const walk = (node, path, depth) => {
@@ -1053,18 +1077,18 @@ export const agentDesigner = () => ({
 
             if (node.type === 'agent') {
                 if (!node.agent_id) {
-                    errors.push(`${path}: agent node requires an LLM Agent selection (→ resolves to llmagent.New)`);
+                    errors.push(`${path}: Please select an agent for this node.`);
                 }
             } else if (node.type === 'remote') {
                 if (!node.a2a_connector_id) {
-                    errors.push(`${path}: remote node requires an A2A Connector selection`);
+                    errors.push(`${path}: Please select a remote connector for this node.`);
                 }
             } else if (isComposite) {
                 if (!node.children || node.children.length === 0) {
-                    errors.push(`${path}: ${node.type}agent requires at least one SubAgent`);
+                    errors.push(`${path}: This ${node.type} node needs at least one agent inside it.`);
                 }
                 if (node.type === 'loop' && (!node.max_iterations || node.max_iterations < 1)) {
-                    errors.push(`${path}: loopagent.Config.MaxIterations must be ≥ 1`);
+                    errors.push(`${path}: Loop must repeat at least 1 time.`);
                 }
             }
 

@@ -171,6 +171,69 @@ export function initFlowStore() {
             this.selectedId = null;
         },
         canUndo() { return this._histIdx > 0; },
+        redo() {
+            if (this._histIdx >= this._history.length - 1) return;
+            this._histIdx++;
+            this.graph = JSON.parse(JSON.stringify(this._history[this._histIdx]));
+            this.selectedId = null;
+        },
+        canRedo() { return this._histIdx < this._history.length - 1; },
+
+        // ── Collapse/expand (UI-only, not persisted) ──
+        _showHelp: false,
+        _collapsed: new Set(),
+        toggleCollapse(id) {
+            if (this._collapsed.has(id)) this._collapsed.delete(id);
+            else this._collapsed.add(id);
+            // Force reactivity by replacing the set
+            this._collapsed = new Set(this._collapsed);
+        },
+        isCollapsed(id) { return this._collapsed.has(id); },
+        collapseAll() {
+            const walk = (n) => {
+                if (!n) return;
+                const isComposite = n.children && n.children.length > 0;
+                if (isComposite) this._collapsed.add(n.id);
+                (n.children || []).forEach(walk);
+            };
+            walk(this.graph);
+            this._collapsed = new Set(this._collapsed);
+        },
+        expandAll() { this._collapsed = new Set(); },
+
+        // ── Duplicate ──
+        duplicateNode(id) {
+            if (!id || !this.graph) return;
+            const info = this.parentOf(id);
+            if (!info) return;
+            const { parent, index } = info;
+            const source = parent.children[index];
+            let counter = 0;
+            const clone = (n) => {
+                const c = { ...n, id: `dup-${Date.now()}-${counter++}` };
+                if (c.children) c.children = c.children.map(clone);
+                return c;
+            };
+            const dup = clone(source);
+            this._snapshot();
+            parent.children.splice(index + 1, 0, dup);
+            this.selectedId = dup.id;
+        },
+
+        // ── Tree metrics ──
+        nodeCount() {
+            let c = 0;
+            const walk = (n) => { if (!n) return; c++; (n.children || []).forEach(walk); };
+            walk(this.graph);
+            return c;
+        },
+        maxDepth() {
+            const depth = (n) => {
+                if (!n || !n.children || n.children.length === 0) return 1;
+                return 1 + Math.max(...n.children.map(depth));
+            };
+            return this.graph ? depth(this.graph) : 0;
+        },
 
         // ── Node lookup ──────────────────────────────────────────────────────
         nodeById(id, node) {
@@ -359,9 +422,13 @@ export const alpineflowCanvas = () => ({
             e.preventDefault();
             this._spaceHeld = true;
         }
-        if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
             e.preventDefault();
             Alpine.store('flow').undo();
+        }
+        if (((e.metaKey || e.ctrlKey) && e.key === 'y') || ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'z')) {
+            e.preventDefault();
+            Alpine.store('flow').redo();
         }
         if (e.key === 'Delete' || e.key === 'Backspace') {
             const s = Alpine.store('flow');
