@@ -167,7 +167,7 @@ export function workflowTreeVisualizer() {
                 padding: 10px 14px;
                 transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
                 width: 100%;
-                max-width: 280px;
+                min-width: 200px;
             }
             .wf-node:hover {
                 border-color: oklch(from var(--node-accent, var(--border)) l c h / 50%);
