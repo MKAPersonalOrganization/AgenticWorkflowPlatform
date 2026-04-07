@@ -11,8 +11,8 @@ import (
 	"aicompass/components/textarea"
 )
 
-// AgentDesignerDialog is the unified dialog for designing all ADK-Go agent types.
-// LLM agents, Sequential, Parallel, Loop — all share the same Agent interface.
+// AgentDesignerDialog is the unified dialog for creating and managing AI agents.
+// Supports single agents and multi-agent workflows (sequential, parallel, loop).
 templ AgentDesignerDialog() {
 	<div
 		x-data="agentDesigner"
@@ -41,7 +41,7 @@ templ AgentDesignerDialog() {
 								</span>
 							}
 							@dialog.Description() {
-								{ i18n.T(ctx, "Design agents — LLM, Sequential, Parallel, Loop — powered by ADK-Go.") }
+								{ i18n.T(ctx, "Create and manage AI agents and multi-agent workflows.") }
 							}
 						</div>
 						<div class="flex items-center gap-1">
@@ -94,43 +94,17 @@ templ AgentDesignerDialog() {
 										},
 									})
 								</div>
-								<!-- New Agent dropdown -->
-								<div class="relative" x-data="{ showNewMenu: false }" @click.outside="showNewMenu = false">
-									@button.Button(button.Props{
-										Size:    button.SizeSm,
-										Variant: button.VariantDefault,
-										Class:   "gap-1.5 shrink-0",
-										Attributes: templ.Attributes{
-											"@click": "showNewMenu = !showNewMenu",
-										},
-									}) {
-										@icon.Plus(icon.Props{Class: "size-4"})
-										{ i18n.T(ctx, "New Agent") }
-										@icon.ChevronDown(icon.Props{Class: "size-3"})
-									}
-									<div
-										x-show="showNewMenu"
-										x-transition
-										class="absolute right-0 top-full mt-1 w-48 rounded-lg border border-border bg-popover shadow-md z-50 py-1"
-									>
-										<button
-											type="button"
-											@click="showNewMenu = false; showCreateNodeForm()"
-											class="flex items-center gap-2 w-full px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
-										>
-											@icon.Bot(icon.Props{Class: "size-4 text-emerald-500"})
-											{ i18n.T(ctx, "LLM Agent") }
-										</button>
-										<button
-											type="button"
-											@click="showNewMenu = false; showCreatePipelineForm()"
-											class="flex items-center gap-2 w-full px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
-										>
-											@icon.GitBranch(icon.Props{Class: "size-4 text-indigo-500"})
-											{ i18n.T(ctx, "Workflow Agent") }
-										</button>
-									</div>
-								</div>
+								@button.Button(button.Props{
+									Size:    button.SizeSm,
+									Variant: button.VariantDefault,
+									Class:   "gap-1.5 shrink-0",
+									Attributes: templ.Attributes{
+										"@click": "view = 'typeSelect'",
+									},
+								}) {
+									@icon.Plus(icon.Props{Class: "size-4"})
+									{ i18n.T(ctx, "New Agent") }
+								}
 							</div>
 							<div class="flex-1 overflow-y-auto px-4 pb-4 scrollbar-thin min-h-[300px]">
 								<template x-if="loading">
@@ -237,7 +211,59 @@ templ AgentDesignerDialog() {
 					</div>
 				</template>
 				<!-- ═══════════════════════════════════════════ -->
-				<!-- LLM AGENT FORM                             -->
+				<!-- TYPE SELECTOR                               -->
+				<!-- ═══════════════════════════════════════════ -->
+				<template x-if="view === 'typeSelect'">
+					<div class="flex flex-col flex-1 overflow-hidden">
+						<div class="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/50">
+							@button.Button(button.Props{
+								Size:    button.SizeIcon,
+								Variant: button.VariantGhost,
+								Class:   "size-8",
+								Attributes: templ.Attributes{
+									"@click": "view = 'list'",
+								},
+							}) {
+								@icon.ArrowLeft(icon.Props{Class: "size-4"})
+							}
+							<h3 class="text-sm font-semibold">{ i18n.T(ctx, "What would you like to create?") }</h3>
+						</div>
+						<div class="flex-1 flex items-center justify-center p-8">
+							<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-lg">
+								<!-- Single Agent Card -->
+								<button
+									type="button"
+									@click="showCreateNodeForm()"
+									class="group flex flex-col items-center gap-4 p-6 rounded-xl border-2 border-border hover:border-primary/50 hover:shadow-md bg-card transition-all duration-200 text-center cursor-pointer"
+								>
+									<div class="size-14 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+										@icon.Bot(icon.Props{Class: "size-7"})
+									</div>
+									<div>
+										<h4 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Single Agent") }</h4>
+										<p class="text-xs text-muted-foreground mt-1.5 leading-relaxed">{ i18n.T(ctx, "An AI agent with custom instructions, tools, and knowledge bases.") }</p>
+									</div>
+								</button>
+								<!-- Workflow Card -->
+								<button
+									type="button"
+									@click="showCreatePipelineForm()"
+									class="group flex flex-col items-center gap-4 p-6 rounded-xl border-2 border-border hover:border-indigo-500/50 hover:shadow-md bg-card transition-all duration-200 text-center cursor-pointer"
+								>
+									<div class="size-14 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+										@icon.GitBranch(icon.Props{Class: "size-7"})
+									</div>
+									<div>
+										<h4 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Multi-Agent Workflow") }</h4>
+										<p class="text-xs text-muted-foreground mt-1.5 leading-relaxed">{ i18n.T(ctx, "Orchestrate multiple agents working together in sequence, parallel, or loops.") }</p>
+									</div>
+								</button>
+							</div>
+						</div>
+					</div>
+				</template>
+				<!-- ═══════════════════════════════════════════ -->
+				<!-- AGENT FORM                                  -->
 				<!-- ═══════════════════════════════════════════ -->
 				<template x-if="view === 'agentForm'">
 					<div class="flex flex-col flex-1 overflow-hidden" :class="expanded ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[calc(90vh-8rem)]'">
@@ -252,8 +278,8 @@ templ AgentDesignerDialog() {
 							}) {
 								@icon.ArrowLeft(icon.Props{Class: "size-4"})
 							}
-							<h3 class="text-sm font-semibold" x-text="editingAgent ? 'Edit LLM Agent' : 'Create LLM Agent'"></h3>
-							<span class="text-[10px] text-muted-foreground" x-text="editingAgent ? 'Modify agent instruction &amp; settings' : 'Define the agent\'s role and instruction'"></span>
+							<h3 class="text-sm font-semibold" x-text="editingAgent ? 'Edit Agent' : 'New Agent'"></h3>
+							<span class="text-[10px] text-muted-foreground" x-text="editingAgent ? 'Configure your agent' : 'Set up your new agent'"></span>
 						</div>
 						<div class="flex-1 overflow-y-auto p-4 scrollbar-thin space-y-4">
 							@agentNodeForm()
@@ -299,7 +325,11 @@ templ AgentDesignerDialog() {
 				<!-- WORKFLOW TREE EDITOR                        -->
 				<!-- ═══════════════════════════════════════════ -->
 				<template x-if="view === 'flow'">
-					<div class="flex flex-col flex-1 overflow-hidden" :class="expanded ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[calc(90vh-8rem)]'">
+					<div
+							class="relative flex flex-col flex-1 overflow-hidden"
+							:class="expanded ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[calc(90vh-8rem)]'"
+							@keydown.window="if ($event.key === '?' && $event.target.tagName !== 'INPUT' && $event.target.tagName !== 'TEXTAREA' && $event.target.tagName !== 'SELECT' && view === 'flow') { $event.preventDefault(); $store.flow._showHelp = !$store.flow._showHelp; }"
+						>
 						<!-- Header -->
 						<div class="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/50 shrink-0">
 							@button.Button(button.Props{
@@ -313,7 +343,7 @@ templ AgentDesignerDialog() {
 							}) {
 								@icon.ArrowLeft(icon.Props{Class: "size-4"})
 							}
-							<h3 class="text-sm font-semibold" x-text="(editingPipeline ? 'Edit' : 'New') + ' Workflow Agent'"></h3>
+							<h3 class="text-sm font-semibold" x-text="(editingPipeline ? 'Edit' : 'New') + ' Workflow'"></h3>
 							<div class="flex-1"></div>
 							<div class="flex items-center gap-1">
 								<template x-if="isPipelineValid">
@@ -358,7 +388,7 @@ templ AgentDesignerDialog() {
 							<input
 								x-model="pipelineName"
 								type="text"
-								placeholder="Workflow Agent name..."
+								placeholder="Workflow name..."
 								class="flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
 							/>
 							<span class="text-[10px] text-muted-foreground shrink-0 border-l border-border/50 pl-2">{ i18n.T(ctx, "Desc") }</span>
@@ -369,18 +399,65 @@ templ AgentDesignerDialog() {
 								class="flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
 							/>
 						</div>
-						<!-- Tree + Property Panel -->
-						<div class="flex flex-1 overflow-hidden">
+						<!-- Status Bar -->
+						<div class="flex items-center gap-4 px-3 py-1 border-b border-border/30 bg-muted/10 shrink-0">
+							<span
+								class="text-[10px] font-mono tabular-nums"
+								:class="$store.flow.nodeCount() > 40 ? 'text-amber-500' : 'text-muted-foreground'"
+								x-text="$store.flow.nodeCount() + ' / 50 nodes'"
+							></span>
+							<span
+								class="text-[10px] font-mono tabular-nums"
+								:class="$store.flow.maxDepth() > 4 ? 'text-amber-500' : 'text-muted-foreground'"
+								x-text="'depth ' + $store.flow.maxDepth() + ' / 5'"
+							></span>
+							<span class="flex-1"></span>
+							<button
+								x-show="$store.flow.canUndo()"
+								@click="$store.flow.undo()"
+								class="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+								title="Undo (Ctrl+Z)"
+							>
+								{ i18n.T(ctx, "undo") }
+							</button>
+							<button
+								x-show="$store.flow.canRedo()"
+								@click="$store.flow.redo()"
+								class="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+								title="Redo (Ctrl+Shift+Z)"
+							>
+								{ i18n.T(ctx, "redo") }
+							</button>
+							<span class="text-[10px] text-muted-foreground/50">{ i18n.T(ctx, "? for shortcuts") }</span>
+						</div>
+						<!-- Tree + Property Panel (resizable) -->
+						<div
+							class="flex flex-1 overflow-hidden"
+							x-data="{ panelW: 288, dragging: false }"
+							@mousemove.window="if (dragging) { const r = $el.getBoundingClientRect(); panelW = Math.min(Math.max(r.right - $event.clientX, 200), r.width * 0.6); }"
+							@mouseup.window="dragging = false; document.body.style.cursor = ''; document.body.style.userSelect = '';"
+						>
 							<!-- Tree View -->
 							<div
 								x-data="editableWorkflowTree()"
 								x-init="init()"
-								class="flex-1 overflow-auto"
-								style="background:#0d1117;"
+								class="flex-1 overflow-auto bg-background"
 							>
 								<div class="ewt-pipeline-canvas">
 									<!-- Tree will be rendered here -->
 								</div>
+							</div>
+							<!-- Resize Handle -->
+							<div
+								x-show="propertyPanelVisible"
+								@mousedown.prevent="dragging = true; document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none';"
+								class="shrink-0 w-1 cursor-col-resize group relative z-10"
+								class="shrink-0 w-1 cursor-col-resize group relative z-10 bg-muted"
+							>
+								<div
+									class="absolute inset-y-0 -left-1 -right-1 group-hover:bg-indigo-500/20 transition-colors duration-150"
+									:class="dragging ? 'bg-indigo-500/30' : ''"
+								></div>
 							</div>
 							<!-- Property Panel -->
 							<div
@@ -392,25 +469,27 @@ templ AgentDesignerDialog() {
 								x-transition:leave="transition-all duration-150 ease-in"
 								x-transition:leave-start="opacity-100 translate-x-0"
 								x-transition:leave-end="opacity-0 translate-x-full"
-								class="w-72 shrink-0 border-l overflow-y-auto scrollbar-thin flex flex-col"
-								style="background:#0c0f16; border-color:rgba(255,255,255,0.07);"
+								class="shrink-0 overflow-y-auto scrollbar-thin flex flex-col bg-card border-border"
+								:style="'width:' + panelW + 'px;'"
 							>
 								<template x-if="!node">
 									<div class="flex flex-col h-full">
-										<div class="flex flex-col items-center justify-center flex-1 px-4 py-10 text-center space-y-2">
-											<div class="w-10 h-10 rounded-full flex items-center justify-center mb-1" style="background:rgba(255,255,255,0.04);">
-												<svg class="size-5 text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+										<div class="flex flex-col items-center justify-center flex-1 px-4 py-12 text-center space-y-3">
+											<div class="w-9 h-9 rounded-lg flex items-center justify-center bg-muted border-border">
+												@icon.MousePointerClick(icon.Props{Class: "size-4 text-muted-foreground"})
 											</div>
-											<p class="text-[11px] text-gray-600 leading-relaxed">{ i18n.T(ctx, "Click a node to inspect and edit its properties.") }</p>
+											<div class="space-y-1">
+												<p class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "Properties") }</p>
+												<p class="text-[10px] text-muted-foreground leading-relaxed">{ i18n.T(ctx, "Select a node to view and edit its settings.") }</p>
+											</div>
 										</div>
-										<div class="border-t p-3 space-y-2" style="border-color:rgba(255,255,255,0.06);">
-											<p class="text-[8px] uppercase tracking-widest text-gray-600 font-semibold">{ i18n.T(ctx, "Pipeline System Prompt") }</p>
+										<div class="border-t p-3 space-y-2 border-border">
+											<p class="text-[8px] uppercase tracking-widest text-muted-foreground font-semibold">{ i18n.T(ctx, "Workflow Instructions") }</p>
 											<textarea
 												x-model="$store.flow.systemPrompt"
 												rows="6"
-												placeholder="Global instruction for the root orchestrator..."
-												class="w-full text-[11px] rounded-lg px-2.5 py-2 text-gray-300 placeholder:text-gray-700 outline-none resize-none focus:ring-1 focus:ring-indigo-500/40"
-												style="background:#131720; border:1px solid rgba(255,255,255,0.07);"
+												placeholder="Shared instructions for all agents in this workflow..."
+												class="w-full text-[11px] rounded-lg px-2.5 py-2 text-foreground placeholder:text-muted-foreground outline-none resize-none focus:ring-1 focus:ring-primary/40 bg-background border-border"
 											></textarea>
 										</div>
 									</div>
@@ -418,28 +497,28 @@ templ AgentDesignerDialog() {
 								<template x-if="node">
 									<div class="flex flex-col h-full">
 										<!-- Node Header -->
-										<div class="flex items-center gap-2 px-3 py-2.5 border-b shrink-0" style="border-color:rgba(255,255,255,0.07);">
+										<div class="flex items-center gap-2 px-3 py-2 border-b shrink-0 border-border">
 											<div
-												class="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold"
-												:style="'background:' + nodeTypeColor + '18; color:' + nodeTypeColor"
+												class="shrink-0 w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold"
+												:style="'background:' + nodeTypeColor + '12; color:' + nodeTypeColor + '; border: 1px solid ' + nodeTypeColor + '20'"
 												x-text="nodeTypeChar"
 											></div>
 											<div class="flex-1 min-w-0">
-												<span class="text-[11px] font-semibold text-gray-200 block truncate" x-text="nodeTypeLabel"></span>
-												<span class="text-[9px] text-gray-600 block truncate" x-text="node.label || 'no label'"></span>
+												<span class="text-[10px] font-semibold text-foreground uppercase tracking-wider block truncate" x-text="nodeTypeLabel"></span>
+												<span class="text-[9px] text-muted-foreground block truncate" x-text="node.label || 'unlabeled'"></span>
 											</div>
 											<div class="flex items-center gap-0.5 shrink-0">
-												<button @click="moveUp()" :disabled="!canMoveUp" title="Move up" class="w-6 h-6 flex items-center justify-center rounded hover:bg-white/5 text-gray-600 hover:text-gray-300 disabled:opacity-20 disabled:cursor-not-allowed transition-colors">↑</button>
-												<button @click="moveDown()" :disabled="!canMoveDown" title="Move down" class="w-6 h-6 flex items-center justify-center rounded hover:bg-white/5 text-gray-600 hover:text-gray-300 disabled:opacity-20 disabled:cursor-not-allowed transition-colors">↓</button>
-												<button x-show="!isRoot" @click="deleteNode()" title="Delete node" class="w-6 h-6 flex items-center justify-center rounded hover:bg-red-500/10 text-gray-600 hover:text-red-400 transition-colors">✕</button>
+												<button @click="moveUp()" :disabled="!canMoveUp" title="Move up" class="w-6 h-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors">↑</button>
+												<button @click="moveDown()" :disabled="!canMoveDown" title="Move down" class="w-6 h-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors">↓</button>
+												<button x-show="!isRoot" @click="deleteNode()" title="Delete node" class="w-6 h-6 flex items-center justify-center rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors">✕</button>
 											</div>
 										</div>
 										<!-- Scrollable Content -->
 										<div class="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-thin">
 											<!-- Label Field -->
 											<div>
-												<label class="block text-[8px] uppercase tracking-widest text-gray-600 font-semibold mb-1.5">Label</label>
-												<input :value="node.label" @input="set('label', $event.target.value)" type="text" placeholder="Display name..." class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-gray-200 placeholder:text-gray-700 outline-none focus:ring-1 focus:ring-indigo-500/40" style="background:#131720; border:1px solid rgba(255,255,255,0.07);"/>
+												<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">Label</label>
+												<input :value="node.label" @input="set('label', $event.target.value)" type="text" placeholder="Display name..." class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border"/>
 											</div>
 
 											<!-- Agent Node -->
@@ -447,8 +526,8 @@ templ AgentDesignerDialog() {
 												<div class="space-y-3">
 													<!-- Agent Selector -->
 													<div>
-														<label class="block text-[8px] uppercase tracking-widest text-gray-600 font-semibold mb-1.5">LLM Agent <span class="text-rose-500">*</span></label>
-														<select :value="node.agent_id" @change="set('agent_id', $event.target.value)" class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-gray-200 outline-none focus:ring-1 focus:ring-indigo-500/40" style="background:#131720; border:1px solid rgba(255,255,255,0.07);">
+														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">LLM Agent <span class="text-rose-500">*</span></label>
+														<select :value="node.agent_id" @change="set('agent_id', $event.target.value)" class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border">
 															<option value="">— select agent —</option>
 															<template x-for="ag in agents" :key="ag.id">
 																<option :value="ag.id" x-text="ag.name"></option>
@@ -458,92 +537,92 @@ templ AgentDesignerDialog() {
 
 													<!-- Agent Info Card -->
 													<template x-if="selectedAgent">
-														<div class="rounded-lg overflow-hidden" style="background:#131720; border:1px solid rgba(255,255,255,0.08);">
+<div class="rounded-lg overflow-hidden bg-muted border-border">
 															<!-- Agent name header -->
-															<div class="px-2.5 py-2" style="background:rgba(255,255,255,0.03); border-bottom:1px solid rgba(255,255,255,0.06);">
-																<span class="text-[10px] font-semibold text-gray-200 truncate" x-text="selectedAgent.name"></span>
+															<div class="px-2.5 py-2 bg-muted/50 border-b border-border">
+																<span class="text-[10px] font-semibold text-foreground truncate" x-text="selectedAgent.name"></span>
 															</div>
 															<!-- Model -->
-																	<template x-if="selectedAgent.modelOverride && selectedAgent.modelOverride.modelName">
-																<div class="px-2.5 py-1.5 flex items-center gap-2" style="border-bottom:1px solid rgba(255,255,255,0.05);">
-																	@icon.Cpu(icon.Props{Class: "size-3 text-gray-600"})
-																	<span class="text-[9px] font-mono rounded px-1.5 py-0.5 text-gray-400" style="background:rgba(255,255,255,0.05);" x-text="(selectedAgent.modelOverride.provider ? selectedAgent.modelOverride.provider + '/' : '') + selectedAgent.modelOverride.modelName"></span>
-																</div>
-															</template>
+																<template x-if="selectedAgent.modelOverride && selectedAgent.modelOverride.modelName">
+															<div class="px-2.5 py-1.5 flex items-center gap-2 border-b border-border">
+																@icon.Cpu(icon.Props{Class: "size-3 text-muted-foreground"})
+																<span class="text-[9px] font-mono rounded px-1.5 py-0.5 text-muted-foreground bg-muted" x-text="(selectedAgent.modelOverride.provider ? selectedAgent.modelOverride.provider + '/' : '') + selectedAgent.modelOverride.modelName"></span>
+															</div>
+														</template>
 															<!-- Description -->
 															<template x-if="selectedAgent.description">
-																<div class="px-2.5 py-2" style="border-bottom:1px solid rgba(255,255,255,0.05);">
-																	<p class="text-[10px] text-gray-500 leading-relaxed line-clamp-2" x-text="selectedAgent.description"></p>
+																<div class="px-2.5 py-2 border-b border-border">
+																	<p class="text-[10px] text-muted-foreground leading-relaxed line-clamp-2" x-text="selectedAgent.description"></p>
 																</div>
 															</template>
 															<!-- Agent Config Summary -->
 															<div class="px-2.5 py-2">
-																<div class="flex items-center gap-2 text-[9px] text-gray-600">
+																<div class="flex items-center gap-2 text-[9px] text-muted-foreground">
 																	<template x-if="selectedAgent.output_key">
 																		<span class="flex items-center gap-1">
 																			@icon.Key(icon.Props{Class: "size-2.5"})
-																			<span class="font-mono text-gray-500" x-text="'{'+selectedAgent.output_key+'}'"></span>
+																			<span class="font-mono text-muted-foreground" x-text="'{'+selectedAgent.output_key+'}'"></span>
 																		</span>
 																	</template>
 																</div>
 																<template x-if="!selectedAgent.systemPrompt && !selectedAgent.description && !(selectedAgent.modelOverride && selectedAgent.modelOverride.modelName)">
-																	<p class="text-[10px] text-gray-700 italic">No configuration — click Edit to configure.</p>
+																	<p class="text-[10px] text-muted-foreground italic">{ i18n.T(ctx, "No configuration yet — edit the agent to set it up.") }</p>
 																</template>
 															</div>
 														</div>
 													</template>
 
-													<!-- Output Key (llmagent.OutputKey) -->
+													<!-- Output Variable -->
 													<div>
-														<label class="block text-[8px] uppercase tracking-widest text-gray-600 font-semibold mb-1.5">
+														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">
 															@icon.Key(icon.Props{Class: "size-3 inline me-0.5"})
-															Output Key
+															Output Variable
 														</label>
-														<input :value="node.output_key" @input="set('output_key', $event.target.value)" type="text" placeholder="e.g. research_results" class="w-full text-[11px] font-mono rounded-lg px-2.5 py-1.5 text-gray-200 placeholder:text-gray-700 outline-none focus:ring-1 focus:ring-indigo-500/40" style="background:#131720; border:1px solid rgba(255,255,255,0.07);"/>
-														<p class="text-[9px] text-gray-700 mt-1">Stores output in session state. Downstream agents reference as &#123;&#123;key&#125;&#125;</p>
+														<input :value="node.output_key" @input="set('output_key', $event.target.value)" type="text" placeholder="e.g. research_results" class="w-full text-[11px] font-mono rounded-lg px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border"/>
+														<p class="text-[9px] text-muted-foreground mt-1">{ i18n.T(ctx, "Saves output so other agents can use it via {variable_name}") }</p>
 													</div>
 
-													<!-- History Forwarding (llmagent.IncludeContents) -->
+													<!-- Conversation History -->
 													<div>
-														<label class="block text-[8px] uppercase tracking-widest text-gray-600 font-semibold mb-1.5">
+														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">
 															@icon.MessageSquare(icon.Props{Class: "size-3 inline me-0.5"})
-															History
+															{ i18n.T(ctx, "History") }
 														</label>
-														<select :value="node.include_contents||'default'" @change="set('include_contents', $event.target.value)" class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-gray-200 outline-none focus:ring-1 focus:ring-indigo-500/40" style="background:#131720; border:1px solid rgba(255,255,255,0.07);">
-															<option value="default">Include history</option>
-															<option value="none">Fresh context only</option>
+														<select :value="node.include_contents||'default'" @change="set('include_contents', $event.target.value)" class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border">
+															<option value="default">{ i18n.T(ctx, "Include history") }</option>
+															<option value="none">{ i18n.T(ctx, "Fresh context only") }</option>
 														</select>
-														<p class="text-[9px] text-gray-700 mt-1">Fresh = only current turn (no prior messages)</p>
+														<p class="text-[9px] text-muted-foreground mt-1">{ i18n.T(ctx, "Fresh = agent sees only the current message") }</p>
 													</div>
 
-													<!-- Transfer Policy (llmagent.DisallowTransfer*) -->
+													<!-- Delegation Control -->
 													<div>
-														<label class="block text-[8px] uppercase tracking-widest text-gray-600 font-semibold mb-2">
+														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-2">
 															@icon.ArrowRightLeft(icon.Props{Class: "size-3 inline me-0.5"})
-															Transfer Policy
+															{ i18n.T(ctx, "Delegation") }
 														</label>
 														<div class="space-y-1.5">
 															<label class="flex items-center gap-2 cursor-pointer group">
-																<input type="checkbox" :checked="node.disallow_transfer_to_parent" @change="setBool('disallow_transfer_to_parent', $event.target.checked)" class="rounded accent-indigo-500"/>
-																<span class="text-[10px] text-gray-500 group-hover:text-gray-400 transition-colors">Block → parent</span>
+																<input type="checkbox" :checked="node.disallow_transfer_to_parent" @change="setBool('disallow_transfer_to_parent', $event.target.checked)" class="rounded accent-primary"/>
+																<span class="text-[10px] text-muted-foreground group-hover:text-foreground transition-colors">{ i18n.T(ctx, "Prevent escalation to parent") }</span>
 															</label>
 															<label class="flex items-center gap-2 cursor-pointer group">
-																<input type="checkbox" :checked="node.disallow_transfer_to_peers" @change="setBool('disallow_transfer_to_peers', $event.target.checked)" class="rounded accent-indigo-500"/>
-																<span class="text-[10px] text-gray-500 group-hover:text-gray-400 transition-colors">Block → peers</span>
+																<input type="checkbox" :checked="node.disallow_transfer_to_peers" @change="setBool('disallow_transfer_to_peers', $event.target.checked)" class="rounded accent-primary"/>
+																<span class="text-[10px] text-muted-foreground group-hover:text-foreground transition-colors">{ i18n.T(ctx, "Prevent delegation to siblings") }</span>
 															</label>
 														</div>
 													</div>
 
-													<!-- Tools Section (llmagent.Tools / Toolsets) -->
-													<div class="border-t pt-2" style="border-color:rgba(255,255,255,0.06);">
+													<!-- Tools -->
+													<div class="border-t pt-2 border-border">
 														<div class="flex items-center justify-between">
 															<button
 																@click="showTools = !showTools"
-																class="flex items-center gap-1.5 text-[9px] uppercase tracking-widest text-gray-600 font-semibold hover:text-gray-400 transition-colors py-1"
+																class="flex items-center gap-1.5 text-[9px] uppercase tracking-widest text-muted-foreground font-semibold hover:text-foreground transition-colors py-1"
 															>
 																@icon.Blocks(icon.Props{Class: "size-3"})
 																Tools
-																<span x-show="toolCount > 0" class="text-[8px] px-1 py-0.5 rounded" style="background:rgba(99,102,241,0.2);color:#818cf8;" x-text="toolCount + ' tool' + (toolCount !== 1 ? 's' : '')"></span>
+																<span x-show="toolCount > 0" class="text-[8px] px-1 py-0.5 rounded bg-primary/20 text-primary" x-text="toolCount + ' tool' + (toolCount !== 1 ? 's' : '')"></span>
 																<span class="transition-transform text-[6px]" :class="showTools ? 'rotate-180' : ''">▼</span>
 															</button>
 															<button
@@ -558,30 +637,30 @@ templ AgentDesignerDialog() {
 															<template x-if="loadingMetadata">
 																<div class="space-y-1.5">
 																	<template x-for="i in 2" :key="i">
-																		<div class="flex items-center gap-2 p-2 rounded-lg animate-pulse" style="background:#131720;">
-																			<div class="size-4 rounded bg-gray-700"></div>
-																			<div class="flex-1 h-3 bg-gray-700 rounded"></div>
+																		<div class="flex items-center gap-2 p-2 rounded-lg animate-pulse bg-muted">
+																		<div class="size-4 rounded bg-muted-foreground"></div>
+																		<div class="flex-1 h-3 bg-muted-foreground rounded"></div>
 																		</div>
 																	</template>
 																</div>
 															</template>
 															<!-- No tools configured -->
 															<template x-if="!loadingMetadata && configuredPlugins.length === 0">
-																<div class="text-[10px] text-gray-600 italic py-3 text-center">
-																	No tools attached. Click + Add to attach tools.
-																</div>
+<div class="text-[10px] text-muted-foreground italic py-3 text-center">
+																No tools attached. Click + Add to attach tools.
+															</div>
 															</template>
 															<!-- Configured tool list -->
 															<template x-for="plugin in configuredPlugins" :key="plugin.id">
-																<div class="rounded-lg overflow-hidden" style="background:#131720; border:1px solid rgba(255,255,255,0.06);">
-																	<div class="flex items-center gap-2 px-2 py-1.5">
-																		@icon.Blocks(icon.Props{Class: "size-3 text-gray-500 shrink-0"})
-																		<span class="text-[10px] font-medium text-gray-300 flex-1 truncate" x-text="plugin.name"></span>
-																		<span class="text-[8px] text-gray-600" x-text="getToolEnabledCount(plugin) + '/' + plugin.tools?.length"></span>
+<div class="rounded-lg overflow-hidden bg-muted border-border">
+																		<div class="flex items-center gap-2 px-2 py-1.5">
+																			@icon.Blocks(icon.Props{Class: "size-3 text-muted-foreground shrink-0"})
+																			<span class="text-[10px] font-medium text-foreground flex-1 truncate" x-text="plugin.name"></span>
+																			<span class="text-[8px] text-muted-foreground" x-text="getToolEnabledCount(plugin) + '/' + plugin.tools?.length"></span>
 																		<button
 																			@click="detachToolSet(plugin)"
 																			title="Detach tool"
-																			class="shrink-0 w-5 h-5 rounded text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors text-[10px]"
+																			class="shrink-0 w-5 h-5 rounded text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors text-[10px]"
 																		>
 																			✕
 																		</button>
@@ -592,7 +671,7 @@ templ AgentDesignerDialog() {
 																			<template x-for="tool in plugin.tools" :key="tool.id">
 																				<div class="flex items-center gap-2 px-2 py-1.5 border-b border-white/5 last:border-0" :class="isToolBlocked(plugin, tool) ? 'opacity-50' : ''">
 																					<span class="w-3 shrink-0"></span>
-																					<span class="text-[9px] text-gray-400 flex-1 truncate" :class="isToolBlocked(plugin, tool) ? 'line-through' : ''" x-text="tool.name"></span>
+																					<span class="text-[9px] text-muted-foreground flex-1 truncate" :class="isToolBlocked(plugin, tool) ? 'line-through' : ''" x-text="tool.name"></span>
 																					<button
 																						@click="toggleTool(plugin, tool)"
 																						type="button"
@@ -690,46 +769,44 @@ templ AgentDesignerDialog() {
 													</div>
 
 													<!-- Advanced Section -->
-													<div class="border-t pt-2" style="border-color:rgba(255,255,255,0.06);">
+													<div class="border-t pt-2 border-border">
 														<button
 															@click="showAdvanced = !showAdvanced"
-															class="flex items-center justify-between w-full text-[9px] uppercase tracking-widest text-gray-600 font-semibold hover:text-gray-400 transition-colors py-1"
+															class="flex items-center justify-between w-full text-[9px] uppercase tracking-widest text-muted-foreground font-semibold hover:text-foreground transition-colors py-1"
 														>
 															<span>Advanced (Schema)</span>
 															<span class="transition-transform" :class="showAdvanced ? 'rotate-180' : ''">▼</span>
 														</button>
 														<div x-show="showAdvanced" x-collapse class="space-y-2 pt-2">
-															<!-- Input Schema (llmagent.InputSchema) -->
+															<!-- Input Schema -->
 															<div>
 																<div class="flex items-center justify-between mb-1">
-																	<label class="text-[8px] text-gray-600 font-semibold">Input Schema</label>
-																	<span x-show="hasInputSchema()" class="text-[8px] px-1 py-0.5 rounded" style="background:rgba(34,197,94,0.15);color:#4ade80;" x-text="getInputSchemaPreview()"></span>
+																	<label class="text-[8px] text-muted-foreground font-semibold">Input Schema</label>
+																	<span x-show="hasInputSchema()" class="text-[8px] px-1 py-0.5 rounded bg-green-500/15 text-green-400" x-text="getInputSchemaPreview()"></span>
 																</div>
 																<textarea
 																	:value="node.input_schema || ''"
 																	@input="set('input_schema', $event.target.value)"
 																	rows="3"
 																	placeholder='{"type":"object","properties":{"topic":...}}'
-																	class="w-full text-[10px] font-mono rounded-lg px-2 py-1.5 text-gray-300 placeholder:text-gray-700 outline-none focus:ring-1 focus:ring-indigo-500/40 resize-none"
-																	style="background:#131720; border:1px solid rgba(255,255,255,0.07);"
+																	class="w-full text-[10px] font-mono rounded-lg px-2 py-1.5 text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary/40 resize-none bg-background border-border"
 																></textarea>
-																<p class="text-[8px] text-gray-700 mt-0.5">Defines expected input when agent is invoked as a tool</p>
+																<p class="text-[8px] text-muted-foreground mt-0.5">{ i18n.T(ctx, "Defines the input format when another agent calls this one") }</p>
 															</div>
-															<!-- Output Schema (llmagent.OutputSchema) -->
+															<!-- Output Schema -->
 															<div>
 																<div class="flex items-center justify-between mb-1">
-																	<label class="text-[8px] text-gray-600 font-semibold">Output Schema</label>
-																	<span x-show="hasOutputSchema()" class="text-[8px] px-1 py-0.5 rounded" style="background:rgba(34,197,94,0.15);color:#4ade80;" x-text="getOutputSchemaPreview()"></span>
+																	<label class="text-[8px] text-muted-foreground font-semibold">Output Schema</label>
+																	<span x-show="hasOutputSchema()" class="text-[8px] px-1 py-0.5 rounded bg-green-500/15 text-green-400" x-text="getOutputSchemaPreview()"></span>
 																</div>
 																<textarea
 																	:value="node.output_schema || ''"
 																	@input="set('output_schema', $event.target.value)"
 																	rows="3"
 																	placeholder='{"type":"object","properties":{"summary":...}}'
-																	class="w-full text-[10px] font-mono rounded-lg px-2 py-1.5 text-gray-300 placeholder:text-gray-700 outline-none focus:ring-1 focus:ring-indigo-500/40 resize-none"
-																	style="background:#131720; border:1px solid rgba(255,255,255,0.07);"
+																	class="w-full text-[10px] font-mono rounded-lg px-2 py-1.5 text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary/40 resize-none bg-background border-border"
 																></textarea>
-																<p class="text-[8px] text-gray-700 mt-0.5">Forces structured JSON output. Disables tools when set.</p>
+																<p class="text-[8px] text-muted-foreground mt-0.5">{ i18n.T(ctx, "Forces the agent to respond in a specific JSON format") }</p>
 															</div>
 														</div>
 													</div>
@@ -740,8 +817,8 @@ templ AgentDesignerDialog() {
 											<template x-if="node.type === 'remote'">
 												<div class="space-y-3">
 													<div>
-														<label class="block text-[8px] uppercase tracking-widest text-gray-600 font-semibold mb-1.5">A2A Connector <span class="text-rose-500">*</span></label>
-														<select :value="node.a2a_connector_id" @change="set('a2a_connector_id', $event.target.value)" class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-gray-200 outline-none focus:ring-1 focus:ring-indigo-500/40" style="background:#131720; border:1px solid rgba(255,255,255,0.07);">
+														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">A2A Connector <span class="text-rose-500">*</span></label>
+														<select :value="node.a2a_connector_id" @change="set('a2a_connector_id', $event.target.value)" class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border">
 															<option value="">— select connector —</option>
 															<template x-for="conn in connectors" :key="conn.id">
 																<option :value="conn.id" x-text="conn.name || conn.id"></option>
@@ -749,8 +826,8 @@ templ AgentDesignerDialog() {
 														</select>
 													</div>
 													<div>
-														<label class="block text-[8px] uppercase tracking-widest text-gray-600 font-semibold mb-1.5">Output Key</label>
-														<input :value="node.output_key" @input="set('output_key', $event.target.value)" type="text" placeholder="e.g. remote_result" class="w-full text-[11px] font-mono rounded-lg px-2.5 py-1.5 text-gray-200 placeholder:text-gray-700 outline-none focus:ring-1 focus:ring-indigo-500/40" style="background:#131720; border:1px solid rgba(255,255,255,0.07);"/>
+														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">{ i18n.T(ctx, "Output Variable") }</label>
+														<input :value="node.output_key" @input="set('output_key', $event.target.value)" type="text" placeholder="e.g. remote_result" class="w-full text-[11px] font-mono rounded-lg px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border"/>
 													</div>
 												</div>
 											</template>
@@ -759,25 +836,25 @@ templ AgentDesignerDialog() {
 											<template x-if="node.type === 'loop'">
 												<div class="space-y-3">
 													<div>
-														<label class="block text-[8px] uppercase tracking-widest text-gray-600 font-semibold mb-1.5">Max Iterations</label>
-														<input :value="node.max_iterations||3" @input="set('max_iterations', parseInt($event.target.value)||1)" type="number" min="1" max="100" class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-gray-200 outline-none focus:ring-1 focus:ring-indigo-500/40" style="background:#131720; border:1px solid rgba(255,255,255,0.07);"/>
-														<p class="text-[9px] text-gray-700 mt-1">Loop runs sub-agents this many times or until escalation.</p>
+														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">Max Iterations</label>
+														<input :value="node.max_iterations||3" @input="set('max_iterations', parseInt($event.target.value)||1)" type="number" min="1" max="100" class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border"/>
+														<p class="text-[9px] text-muted-foreground mt-1">{ i18n.T(ctx, "How many times the agents in this loop will repeat.") }</p>
 													</div>
 													<label class="flex items-center gap-2 cursor-pointer group">
-														<input type="checkbox" :checked="node.allow_early_exit" @change="setBool('allow_early_exit', $event.target.checked)" class="rounded accent-indigo-500"/>
-														<span class="text-[10px] text-gray-500 group-hover:text-gray-400 transition-colors">Allow early exit (exit_loop tool)</span>
+														<input type="checkbox" :checked="node.allow_early_exit" @change="setBool('allow_early_exit', $event.target.checked)" class="rounded accent-primary"/>
+														<span class="text-[10px] text-muted-foreground group-hover:text-foreground transition-colors">{ i18n.T(ctx, "Allow the agent to exit the loop early when done") }</span>
 													</label>
 												</div>
 											</template>
 
 											<!-- Sequential/Parallel Node -->
 											<template x-if="node.type === 'sequential' || node.type === 'parallel'">
-												<div class="rounded-lg p-3 text-center" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06);">
-													<p class="text-[10px] text-gray-600">
-														<template x-if="node.type === 'sequential'">Runs sub-agents in order. Each completes before the next starts.</template>
-														<template x-if="node.type === 'parallel'">Runs sub-agents concurrently. Results collected after all complete.</template>
+												<div class="rounded-lg p-3 text-center bg-muted border-border">
+													<p class="text-[10px] text-muted-foreground">
+														<template x-if="node.type === 'sequential'">{ i18n.T(ctx, "Runs agents one after another, in order.") }</template>
+														<template x-if="node.type === 'parallel'">{ i18n.T(ctx, "Runs all agents at the same time, then collects results.") }</template>
 													</p>
-													<p class="text-[9px] text-gray-700 mt-1">
+													<p class="text-[9px] text-muted-foreground mt-1">
 														<template x-if="node.children && node.children.length" x-text="node.children.length + ' sub-agent(s)'"></template>
 														<template x-if="!node.children || node.children.length === 0">No sub-agents yet</template>
 													</p>
@@ -785,8 +862,8 @@ templ AgentDesignerDialog() {
 											</template>
 										</div>
 										<!-- Footer -->
-										<div class="px-3 py-2 border-t shrink-0" style="border-color:rgba(255,255,255,0.06);">
-											<p class="text-[9px] text-gray-700 font-mono truncate" x-text="'id: ' + node.id"></p>
+										<div class="px-3 py-1.5 border-t shrink-0 border-border">
+											<p class="text-[8px] text-muted-foreground font-mono truncate tracking-wide" x-text="node.id"></p>
 										</div>
 									</div>
 								</template>
@@ -806,6 +883,65 @@ templ AgentDesignerDialog() {
 									</div>
 								</div>
 							</template>
+					<!-- Keyboard Shortcuts Overlay -->
+					<div
+						x-show="$store.flow?._showHelp"
+						x-transition:enter="transition ease-out duration-150"
+						x-transition:enter-start="opacity-0"
+						x-transition:enter-end="opacity-100"
+						x-transition:leave="transition ease-in duration-100"
+						x-transition:leave-start="opacity-100"
+						x-transition:leave-end="opacity-0"
+						@click="$store.flow._showHelp = false"
+						@keydown.escape.window="if ($store.flow?._showHelp) $store.flow._showHelp = false"
+						class="absolute inset-0 z-50 flex items-center justify-center"
+						style="background:rgba(0,0,0,0.5); backdrop-filter:blur(2px);"
+					>
+						<div @click.stop class="rounded-xl border border-border shadow-2xl max-w-md w-full bg-background">
+							<div class="px-5 pt-5 pb-3">
+								<h3 class="text-sm font-semibold text-foreground flex items-center gap-2">
+									@icon.Keyboard(icon.Props{Class: "size-4 text-muted-foreground"})
+									{ i18n.T(ctx, "Workflow Editor Shortcuts") }
+								</h3>
+								<p class="text-xs text-muted-foreground mt-1">{ i18n.T(ctx, "Navigate and edit your workflow faster.") }</p>
+							</div>
+							<div class="px-5 pb-4 space-y-4">
+								<!-- Editing -->
+								<div>
+									<h4 class="text-xs font-semibold text-muted-foreground mb-2">{ i18n.T(ctx, "Editing") }</h4>
+									<div class="space-y-1">
+										@shortcutRow(i18n.T(ctx, "Delete selected node"), "Delete")
+										@shortcutRow(i18n.T(ctx, "Duplicate selected node"), "Ctrl+D")
+										@shortcutRow(i18n.T(ctx, "Undo"), "Ctrl+Z")
+										@shortcutRow(i18n.T(ctx, "Redo"), "Ctrl+Shift+Z")
+									</div>
+								</div>
+								<!-- Navigation -->
+								<div>
+									<h4 class="text-xs font-semibold text-muted-foreground mb-2">{ i18n.T(ctx, "Navigation") }</h4>
+									<div class="space-y-1">
+										@shortcutRow(i18n.T(ctx, "Move node up"), "Ctrl+↑")
+										@shortcutRow(i18n.T(ctx, "Move node down"), "Ctrl+↓")
+										@shortcutRow(i18n.T(ctx, "Collapse node"), "←")
+										@shortcutRow(i18n.T(ctx, "Expand node"), "→")
+									</div>
+								</div>
+								<!-- General -->
+								<div>
+									<h4 class="text-xs font-semibold text-muted-foreground mb-2">{ i18n.T(ctx, "General") }</h4>
+									<div class="space-y-1">
+										@shortcutRow(i18n.T(ctx, "Toggle property panel"), "Ctrl+]")
+										@shortcutRow(i18n.T(ctx, "Show this help"), "?")
+									</div>
+								</div>
+								<!-- Tip -->
+								<div class="flex items-start gap-2 p-2.5 bg-muted/30 rounded-lg">
+									@icon.Info(icon.Props{Class: "size-3.5 text-primary shrink-0 mt-0.5"})
+									<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "On macOS, use ⌘ instead of Ctrl") }</p>
+								</div>
+							</div>
+						</div>
+					</div>
 					</div>
 				</template>
 				<!-- Footer (only on list view) -->
@@ -823,56 +959,83 @@ templ AgentDesignerDialog() {
 				</template>
 			}
 		}
+		<!-- Toast Notifications -->
+		<div class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
+			<template x-for="t in toasts" :key="t.id">
+				<div
+					class="pointer-events-auto max-w-xs px-4 py-2.5 rounded-lg shadow-lg text-xs font-medium transition-all duration-200 flex items-center gap-2"
+					:class="{
+						'bg-emerald-600 text-white': t.type === 'success',
+						'bg-red-600 text-white': t.type === 'error',
+						'bg-sky-600 text-white': t.type === 'info',
+						'bg-amber-600 text-white': t.type === 'warning',
+						'opacity-0 translate-y-2': t.leaving,
+						'opacity-100 translate-y-0': !t.leaving,
+					}"
+				>
+					<span x-text="t.message"></span>
+					<button @click="dismissToast(t.id)" class="ml-1 opacity-70 hover:opacity-100 shrink-0">&times;</button>
+				</div>
+			</template>
+		</div>
 	</div>
 }
 
-// agentNodeForm renders the form fields for designing a single agent node.
-// Maps to ADK-Go llmagent.Config: Name, Description, Instruction, Tools, etc.
+// agentNodeForm renders the form fields for creating/editing a single agent.
 templ agentNodeForm() {
-	<!-- Agent Name -->
-	<div class="space-y-2">
-		@label.Label(label.Props{}) {
-			{ i18n.T(ctx, "Agent Name") }
-			<span class="text-destructive">*</span>
-		}
-		@input.Input(input.Props{
-			Placeholder: i18n.T(ctx, "e.g., Writing Coach, Code Reviewer..."),
-			Attributes: templ.Attributes{
-				"x-model":   "form.name",
-				"maxlength": "100",
-			},
-		})
+	<!-- Identity Section -->
+	<div class="space-y-3">
+		<div class="flex items-center gap-2 pb-1">
+			@icon.Bot(icon.Props{Class: "size-3.5 text-muted-foreground"})
+			<span class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{ i18n.T(ctx, "Identity") }</span>
+		</div>
+		<div class="space-y-1.5">
+			@label.Label(label.Props{Class: "text-xs"}) {
+				{ i18n.T(ctx, "Name") }
+				<span class="text-destructive">*</span>
+			}
+			@input.Input(input.Props{
+				Placeholder: i18n.T(ctx, "e.g., Writing Coach, Code Reviewer..."),
+				Class:       "h-8 text-sm",
+				Attributes: templ.Attributes{
+					"x-model":   "form.name",
+					"maxlength": "100",
+				},
+			})
+		</div>
+		<div class="space-y-1.5">
+			@label.Label(label.Props{Class: "text-xs"}) {
+				{ i18n.T(ctx, "Description") }
+			}
+			@input.Input(input.Props{
+				Placeholder: i18n.T(ctx, "Brief description of what this agent does..."),
+				Class:       "h-8 text-sm",
+				Attributes: templ.Attributes{
+					"x-model":   "form.description",
+					"maxlength": "500",
+				},
+			})
+		</div>
 	</div>
-	<!-- Description -->
-	<div class="space-y-2">
-		@label.Label(label.Props{}) {
-			{ i18n.T(ctx, "Description") }
-		}
-		@input.Input(input.Props{
-			Placeholder: i18n.T(ctx, "Brief description of what this agent does..."),
-			Attributes: templ.Attributes{
-				"x-model":   "form.description",
-				"maxlength": "500",
-			},
-		})
-	</div>
-	<!-- System Prompt (maps to llmagent Instruction) -->
-	<div class="space-y-2">
-		@label.Label(label.Props{}) {
-			{ i18n.T(ctx, "Instruction") }
-			<span class="text-destructive">*</span>
-		}
-		@textarea.Textarea(textarea.Props{
-			Placeholder: i18n.T(ctx, "Define this agent's role, expertise, and behavior. Use {output_key} syntax to reference results from upstream agents in a workflow."),
-			Class:       "min-h-[120px] resize-y",
-			Rows:        5,
-			Attributes: templ.Attributes{
-				"x-model": "form.systemPrompt",
-			},
-		})
-		<p class="text-[11px] text-muted-foreground">
-			{ i18n.T(ctx, "→ llmagent.Config.Instruction. Supports {key} template syntax to inject session state (e.g., {research_data}). Append ? for optional keys: {var?}.") }
-		</p>
+	<!-- Instructions Section -->
+	<div class="space-y-3 pt-2 border-t border-border/50">
+		<div class="flex items-center gap-2 pb-1">
+			@icon.FileText(icon.Props{Class: "size-3.5 text-muted-foreground"})
+			<span class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{ i18n.T(ctx, "Instructions") }</span>
+		</div>
+		<div class="space-y-1.5">
+			@textarea.Textarea(textarea.Props{
+				Placeholder: i18n.T(ctx, "Define this agent's role, expertise, and behavior..."),
+				Class:       "min-h-[120px] resize-y text-sm",
+				Rows:        5,
+				Attributes: templ.Attributes{
+					"x-model": "form.systemPrompt",
+				},
+			})
+			<p class="text-[10px] text-muted-foreground">
+				{ i18n.T(ctx, "Describe the agent's role, expertise, and behavior. Use {variable_name} to reference data from other agents in a workflow.") }
+			</p>
+		</div>
 	</div>
 	<!-- Multi-Agent Orchestration Section -->
 	<div class="border border-border rounded-lg">
@@ -883,7 +1046,7 @@ templ agentNodeForm() {
 		>
 			<span class="flex items-center gap-2">
 				@icon.GitBranch(icon.Props{Class: "size-4 text-muted-foreground"})
-				{ i18n.T(ctx, "Multi-Agent & Schema Settings") }
+				{ i18n.T(ctx, "Advanced Settings") }
 				<span class="text-[10px] text-muted-foreground" x-text="orchestrationSummary"></span>
 			</span>
 			<span class="transition-transform duration-200" :class="showOrchestration ? 'rotate-180' : ''">
@@ -892,7 +1055,7 @@ templ agentNodeForm() {
 		</button>
 		<div x-show="showOrchestration" x-collapse class="px-3 pb-3 border-t border-border pt-3 space-y-4">
 			<p class="text-[11px] text-muted-foreground">
-				{ i18n.T(ctx, "These fields map directly to llmagent.Config in ADK-Go. They control how this agent behaves when composed in a Workflow Agent.") }
+				{ i18n.T(ctx, "These settings control how this agent behaves when used as part of a multi-agent workflow.") }
 			</p>
 			@orchestrationFields()
 		</div>
@@ -914,7 +1077,7 @@ templ agentNodeForm() {
 		<div class="border border-border rounded-lg p-3 flex items-start gap-2 bg-muted/30">
 			@icon.Info(icon.Props{Class: "size-4 text-muted-foreground shrink-0 mt-0.5"})
 			<p class="text-[11px] text-muted-foreground">
-				{ i18n.T(ctx, "After creating the agent, you can configure its tools and knowledge bases by editing it.") }
+				{ i18n.T(ctx, "After creating the agent, you can add tools and knowledge bases by editing it.") }
 			</p>
 		</div>
 	</template>
@@ -922,25 +1085,25 @@ templ agentNodeForm() {
 
 // orchestrationFields renders the transfer policy, output key, history, etc.
 templ orchestrationFields() {
-	<!-- Transfer Policy -->
+	<!-- Delegation Control -->
 	<div class="space-y-2">
 		<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
 			@icon.ArrowRightLeft(icon.Props{Class: "size-3.5 text-muted-foreground"})
-			{ i18n.T(ctx, "Transfer Policy") }
+			{ i18n.T(ctx, "Delegation Control") }
 		</span>
 		<p class="text-[11px] text-muted-foreground">
-			{ i18n.T(ctx, "→ llmagent.Config.DisallowTransferToParent / DisallowTransferToPeers") }
+			{ i18n.T(ctx, "Control whether this agent can hand off work to other agents in a workflow.") }
 		</p>
 		<div class="space-y-2 ps-1">
-			@toggleSwitch("form.disallowTransferToParent", i18n.T(ctx, "Block transfer to parent"), i18n.T(ctx, "Prevents this agent from escalating back to its parent."))
-			@toggleSwitch("form.disallowTransferToPeers", i18n.T(ctx, "Block transfer to peers"), i18n.T(ctx, "Prevents this agent from delegating to sibling agents."))
+			@toggleSwitch("form.disallowTransferToParent", i18n.T(ctx, "Prevent escalation to parent"), i18n.T(ctx, "This agent cannot hand work back to its parent agent."))
+			@toggleSwitch("form.disallowTransferToPeers", i18n.T(ctx, "Prevent delegation to siblings"), i18n.T(ctx, "This agent cannot pass work to other agents at the same level."))
 		</div>
 	</div>
-	<!-- Output Key -->
+	<!-- Output Variable -->
 	<div class="space-y-2">
 		<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
 			@icon.Key(icon.Props{Class: "size-3.5 text-muted-foreground"})
-			{ i18n.T(ctx, "Output Key") }
+			{ i18n.T(ctx, "Output Variable") }
 		</span>
 		@input.Input(input.Props{
 			Placeholder: i18n.T(ctx, "e.g., research_results, draft_content..."),
@@ -951,14 +1114,14 @@ templ orchestrationFields() {
 			},
 		})
 		<p class="text-[10px] text-muted-foreground">
-			{ i18n.T(ctx, "→ llmagent.Config.OutputKey — stores this agent's final text output in session state. Downstream agents reference it as {key} in their Instruction.") }
+			{ i18n.T(ctx, "Saves this agent's output so other agents in the workflow can reference it via {variable_name} in their instructions.") }
 		</p>
 	</div>
-	<!-- Include Contents / History Forwarding -->
+	<!-- Conversation History -->
 	<div class="space-y-2">
 		<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
 			@icon.MessageSquare(icon.Props{Class: "size-3.5 text-muted-foreground"})
-			{ i18n.T(ctx, "History Forwarding") }
+			{ i18n.T(ctx, "Conversation History") }
 		</span>
 		<div class="flex gap-2">
 			<button
@@ -979,17 +1142,17 @@ templ orchestrationFields() {
 			</button>
 		</div>
 		<p class="text-[10px] text-muted-foreground">
-			{ i18n.T(ctx, "→ llmagent.Config.IncludeContents. 'Fresh Context' = IncludeContentsNone (agent sees only current turn).") }
+			{ i18n.T(ctx, "Choose whether this agent sees the full conversation or only the current message.") }
 		</p>
 	</div>
-	<!-- Global Instruction -->
+	<!-- Shared Instructions -->
 	<div class="space-y-2">
 		<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
 			@icon.Globe(icon.Props{Class: "size-3.5 text-muted-foreground"})
-			{ i18n.T(ctx, "Global Instruction") }
+			{ i18n.T(ctx, "Shared Instructions") }
 		</span>
 		@textarea.Textarea(textarea.Props{
-			Placeholder: i18n.T(ctx, "Shared instruction applied to all agents in the workflow tree..."),
+			Placeholder: i18n.T(ctx, "Instructions shared with all agents in the workflow..."),
 			Class:       "min-h-[60px] resize-y text-xs",
 			Rows:        2,
 			Attributes: templ.Attributes{
@@ -997,7 +1160,7 @@ templ orchestrationFields() {
 			},
 		})
 		<p class="text-[10px] text-muted-foreground">
-			{ i18n.T(ctx, "→ llmagent.Config.GlobalInstruction. Propagated to ALL agents in the tree. Only effective when this agent is the root.") }
+			{ i18n.T(ctx, "Applied to every agent in the workflow. Only takes effect when this agent is the root orchestrator.") }
 		</p>
 	</div>
 	<!-- Input Schema -->
@@ -1015,7 +1178,7 @@ templ orchestrationFields() {
 			},
 		})
 		<p class="text-[10px] text-muted-foreground">
-			{ i18n.T(ctx, "→ llmagent.Config.InputSchema. Defines expected input when this agent is invoked as a tool (via agent transfer).") }
+			{ i18n.T(ctx, "Defines the expected input format when another agent calls this one. JSON Schema format.") }
 		</p>
 	</div>
 	<!-- Output Schema -->
@@ -1033,7 +1196,7 @@ templ orchestrationFields() {
 			},
 		})
 		<p class="text-[10px] text-muted-foreground">
-			{ i18n.T(ctx, "→ llmagent.Config.OutputSchema (via GenerateContentConfig.ResponseSchema). Forces structured JSON output. When set, tool use is disabled.") }
+			{ i18n.T(ctx, "Forces the agent to respond in a specific JSON format. When set, tool use is disabled.") }
 		</p>
 	</div>
 }
@@ -1061,6 +1224,16 @@ templ toggleSwitch(model string, labelText string, helpText string) {
 	</label>
 }
 
+// shortcutRow renders a single keyboard shortcut row for the help overlay.
+templ shortcutRow(label string, keys string) {
+	<div class="flex items-center justify-between py-1.5 px-2.5 rounded-md hover:bg-muted/50 transition-colors">
+		<span class="text-xs text-foreground">{ label }</span>
+		<div class="flex items-center gap-1">
+			<kbd class="kbd">{ keys }</kbd>
+		</div>
+	</div>
+}
+
 // modelOverrideSection renders a collapsible panel for selecting a specific
 // provider + model for this agent, overriding the user's global AI settings.
 templ modelOverrideSection() {
@@ -1072,7 +1245,7 @@ templ modelOverrideSection() {
 		>
 			<span class="flex items-center gap-2">
 				@icon.Cpu(icon.Props{Class: "size-4 text-muted-foreground"})
-				{ i18n.T(ctx, "Model Override") }
+				{ i18n.T(ctx, "Model") }
 				<span
 					class="text-[10px] text-muted-foreground"
 					x-show="form.modelOverride.provider && form.modelOverride.modelName"
@@ -1085,7 +1258,7 @@ templ modelOverrideSection() {
 		</button>
 		<div x-show="showModelOverride" x-collapse class="px-3 pb-3 border-t border-border pt-3 space-y-3">
 			<p class="text-[11px] text-muted-foreground">
-				{ i18n.T(ctx, "Use a specific provider and model for this agent instead of your global default. The API key must already be configured in Settings › AI.") }
+				{ i18n.T(ctx, "Use a specific AI model for this agent instead of your default. The API key must be configured in Settings.") }
 			</p>
 			<!-- Provider -->
 			<div class="space-y-1.5">
@@ -1141,7 +1314,7 @@ templ modelSettingsSection() {
 		>
 			<span class="flex items-center gap-2">
 				@icon.SlidersHorizontal(icon.Props{Class: "size-4 text-muted-foreground"})
-				{ i18n.T(ctx, "Model Settings") }
+				{ i18n.T(ctx, "Generation Settings") }
 				<span class="text-[10px] text-muted-foreground" x-show="form.modelConfig.temperature !== null || form.modelConfig.topP !== null || form.modelConfig.topK !== null || form.modelConfig.maxOutputTokens !== null || form.modelConfig.stopSequences.length > 0">
 					{ i18n.T(ctx, "overrides set") }
 				</span>
@@ -1152,7 +1325,7 @@ templ modelSettingsSection() {
 		</button>
 		<div x-show="showModelSettings" x-collapse class="px-3 pb-3 border-t border-border pt-3 space-y-4">
 			<p class="text-[11px] text-muted-foreground">
-				{ i18n.T(ctx, "Override model generation parameters for this agent. Leave blank to inherit from your global AI settings.") }
+				{ i18n.T(ctx, "Fine-tune how this agent generates responses. Leave blank to use your defaults.") }
 			</p>
 			<!-- Temperature -->
 			<div class="space-y-1.5">
@@ -1168,7 +1341,7 @@ templ modelSettingsSection() {
 					class="w-full accent-primary"
 					x-model.number="form.modelConfig.temperature"
 				/>
-				<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "0 = deterministic, 2 = creative. Controls output randomness. → GenerateContentConfig.Temperature") }</p>
+				<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Lower values give more focused responses, higher values give more creative ones.") }</p>
 			</div>
 			<!-- Max Output Tokens -->
 			<div class="space-y-1.5">
@@ -1182,7 +1355,7 @@ templ modelSettingsSection() {
 						"max":            "65536",
 					},
 				})
-				<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Maximum tokens in the response. Range 1–65536. → GenerateContentConfig.MaxOutputTokens") }</p>
+				<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Maximum length of the agent's response (1–65,536 tokens).") }</p>
 			</div>
 			<!-- Advanced: TopP / TopK -->
 			<details class="group">
@@ -1205,7 +1378,7 @@ templ modelSettingsSection() {
 							class="w-full accent-primary"
 							x-model.number="form.modelConfig.topP"
 						/>
-						<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Cumulative probability threshold. 0.9 = top 90% of tokens considered. → GenerateContentConfig.TopP") }</p>
+						<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Controls diversity. 0.9 means the model considers the top 90% most likely words.") }</p>
 					</div>
 					<!-- TopK -->
 					<div class="space-y-1.5">
@@ -1218,14 +1391,14 @@ templ modelSettingsSection() {
 								"min":            "1",
 							},
 						})
-						<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Limit sampling to the top K most likely tokens. → GenerateContentConfig.TopK") }</p>
+						<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Limits the model to choosing from the top K most likely words.") }</p>
 					</div>
 				</div>
 			</details>
 			<!-- Stop Sequences -->
 			<div class="space-y-1.5">
 				<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Stop Sequences") }</span>
-				<div class="flex flex-wrap gap-1 min-h-[28px] p-1.5 rounded-md border border-input bg-background">
+				<div class="flex flex-wrap gap-1 min-h-7 p-1.5 rounded-md border border-input bg-background">
 					<template x-for="(seq, idx) in form.modelConfig.stopSequences" :key="idx">
 						<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-[11px] font-mono">
 							<span x-text="seq"></span>
@@ -1245,7 +1418,7 @@ templ modelSettingsSection() {
 						"
 					/>
 				</div>
-				<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Sequences that stop generation when encountered. Press Enter to add each one. → GenerateContentConfig.StopSequences") }</p>
+				<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "The agent will stop generating when it encounters any of these strings. Press Enter to add.") }</p>
 			</div>
 			<!-- Reset button -->
 			<button

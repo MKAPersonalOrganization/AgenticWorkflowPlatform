@@ -72,17 +72,20 @@ export const editableWorkflowTree = () => {
         const style = document.createElement('style');
         style.id = 'ewt-styles';
         style.textContent = `
-            /* ── Editable Workflow Tree ── */
-            .ewt-container {
-                font-family: inherit;
-            }
+            /* ══════════════════════════════════════════════
+               Editable Workflow Tree — Theme-Aware Style
+               ══════════════════════════════════════════════ */
+
+            .ewt-container { font-family: inherit; }
+
             .ewt-pipeline-canvas {
                 position: relative;
-                background-image: radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px);
-                background-size: 28px 28px;
-                border-radius: 0;
+                background-color: var(--background);
+                background-image:
+                    radial-gradient(circle, var(--border) 1px, transparent 1px);
+                background-size: 20px 20px;
                 min-height: 100%;
-                padding: 0;
+                padding: 28px 24px 40px;
                 width: 100%;
                 box-sizing: border-box;
             }
@@ -93,7 +96,7 @@ export const editableWorkflowTree = () => {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                height: 24px;
+                height: 20px;
                 width: 100%;
             }
             .ewt-connector::before {
@@ -102,57 +105,58 @@ export const editableWorkflowTree = () => {
                 left: 50%;
                 top: 0;
                 bottom: 0;
-                width: 1.5px;
-                background: var(--ewt-color, rgba(255,255,255,0.15));
+                width: 1px;
+                background: var(--ewt-color, var(--border));
                 transform: translateX(-50%);
-                opacity: 0.5;
+                opacity: 0.7;
             }
             .ewt-connector-dot {
                 position: relative;
                 z-index: 1;
-                width: 6px;
-                height: 6px;
+                width: 5px;
+                height: 5px;
                 border-radius: 50%;
-                background: var(--ewt-color, rgba(255,255,255,0.3));
+                background: var(--ewt-color, var(--muted-foreground));
+                box-shadow: 0 0 4px var(--ewt-color, transparent);
             }
 
             /* ── Node card ── */
             .ewt-node {
                 position: relative;
-                border-radius: 0.75rem;
-                border: 1px solid rgba(255,255,255,0.08);
-                background: #13171f;
-                padding: 12px 14px;
-                padding-top: 15px; /* space for top accent */
-                transition: all 0.15s ease;
+                border-radius: 8px;
+                border: 1px solid var(--border);
+                background: var(--card);
+                padding: 10px 12px 10px 15px;
+                transition: border-color 0.12s, box-shadow 0.12s;
                 width: 100%;
-                max-width: 400px;
+                max-width: 520px;
                 overflow: hidden;
             }
             .ewt-node:hover {
-                border-color: rgba(255,255,255,0.15);
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                transform: translateY(-1px);
+                border-color: var(--muted-foreground);
+                box-shadow: 0 2px 8px oklch(0 0 0 / 15%);
             }
             .ewt-node.selected {
-                border-color: var(--ewt-color, #818cf8);
-                box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.2), 0 4px 16px rgba(0,0,0,0.4);
+                border-color: var(--ewt-color, var(--primary));
+                box-shadow:
+                    0 0 0 1px var(--ewt-color, var(--primary)),
+                    0 0 12px oklch(from var(--primary) l c h / 10%);
             }
             .ewt-node.drop-target {
                 border-color: #22c55e;
-                box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3);
+                box-shadow: 0 0 0 1px #22c55e, 0 0 8px rgba(34, 197, 94, 0.15);
             }
 
-            /* ── Top accent bar ── */
+            /* ── Left accent bar ── */
             .ewt-node::after {
                 content: '';
                 position: absolute;
                 left: 0;
-                top: 0;
-                right: 0;
-                height: 3px;
-                background: var(--ewt-color, rgba(255,255,255,0.3));
-                border-radius: 0.75rem 0.75rem 0 0;
+                top: 4px;
+                bottom: 4px;
+                width: 3px;
+                background: var(--ewt-color, var(--muted-foreground));
+                border-radius: 0 2px 2px 0;
             }
 
             /* ── Type badge ── */
@@ -160,13 +164,14 @@ export const editableWorkflowTree = () => {
                 display: inline-flex;
                 align-items: center;
                 gap: 4px;
-                padding: 2px 8px;
-                border-radius: 9999px;
+                padding: 2px 7px;
+                border-radius: 4px;
                 font-size: 10px;
                 font-weight: 600;
+                letter-spacing: 0.01em;
                 white-space: nowrap;
-                background: var(--ewt-color-muted, rgba(255,255,255,0.08));
-                color: var(--ewt-color-fg, rgba(255,255,255,0.7));
+                background: var(--ewt-color-muted, var(--muted));
+                color: var(--ewt-color-fg, var(--muted-foreground));
             }
             .ewt-badge svg { flex-shrink: 0; }
 
@@ -174,7 +179,7 @@ export const editableWorkflowTree = () => {
             .ewt-agent-name {
                 font-size: 12px;
                 font-weight: 600;
-                color: #e2e8f0;
+                color: var(--foreground);
                 line-height: 1.3;
                 overflow: hidden;
                 text-overflow: ellipsis;
@@ -182,43 +187,44 @@ export const editableWorkflowTree = () => {
             }
             .ewt-agent-desc {
                 font-size: 10px;
-                color: #64748b;
+                color: var(--muted-foreground);
+                font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
                 line-height: 1.3;
-                margin-top: 2px;
+                margin-top: 3px;
             }
 
             /* ── Parallel fork/join ── */
             .ewt-fork-join {
                 position: relative;
-                height: 16px;
+                height: 14px;
                 width: 100%;
             }
             .ewt-fork-join::before {
                 content: '';
                 position: absolute;
-                left: 8%;
-                right: 8%;
+                left: 10%;
+                right: 10%;
                 top: 50%;
-                height: 1.5px;
-                background: var(--ewt-color, rgba(255,255,255,0.15));
+                height: 1px;
+                background: var(--ewt-color, var(--border));
                 transform: translateY(-50%);
-                opacity: 0.5;
+                opacity: 0.6;
             }
             .ewt-fork-join-center {
                 position: absolute;
                 left: 50%;
                 top: 50%;
                 transform: translate(-50%, -50%);
-                width: 1.5px;
+                width: 1px;
                 height: 100%;
-                background: var(--ewt-color, rgba(255,255,255,0.15));
-                opacity: 0.5;
+                background: var(--ewt-color, var(--border));
+                opacity: 0.6;
             }
 
             /* ── Parallel branches ── */
             .ewt-branches {
                 display: flex;
-                gap: 8px;
+                gap: 12px;
                 justify-content: center;
                 align-items: flex-start;
                 width: 100%;
@@ -226,48 +232,49 @@ export const editableWorkflowTree = () => {
             }
             .ewt-branch {
                 flex: 1;
-                min-width: 0;
-                max-width: 400px;
+                min-width: 180px;
+                max-width: 520px;
                 display: flex;
                 flex-direction: column;
                 align-items: center;
             }
             .ewt-branch-connector {
-                height: 12px;
-                width: 1.5px;
-                background: var(--ewt-color, rgba(255,255,255,0.15));
-                opacity: 0.5;
+                height: 10px;
+                width: 1px;
+                background: var(--ewt-color, var(--border));
+                opacity: 0.6;
             }
 
             /* ── Loop wrapper ── */
             .ewt-loop-wrap {
                 position: relative;
-                border-radius: 0.75rem;
-                border: 1.5px dashed var(--ewt-color-muted, rgba(255,255,255,0.15));
-                padding: 12px 10px 16px;
+                border-radius: 8px;
+                border: 1px dashed rgba(217, 119, 6, 0.3);
+                padding: 14px 12px 16px;
                 background: rgba(217, 119, 6, 0.03);
                 width: 100%;
-                max-width: 320px;
-                transition: border-color 0.2s, background 0.2s;
+                max-width: 520px;
+                transition: border-color 0.15s, background 0.15s;
             }
             .ewt-loop-wrap:hover {
-                border-color: var(--ewt-color, rgba(255,255,255,0.3));
+                border-color: rgba(217, 119, 6, 0.5);
                 background: rgba(217, 119, 6, 0.05);
             }
             .ewt-loop-badge {
                 position: absolute;
-                top: -10px;
+                top: -9px;
                 right: 12px;
                 display: inline-flex;
                 align-items: center;
                 gap: 3px;
-                padding: 2px 8px;
-                border-radius: 9999px;
+                padding: 1px 8px;
+                border-radius: 4px;
                 font-size: 9px;
                 font-weight: 700;
-                background: #1a1a2e;
+                font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+                background: var(--background);
                 color: var(--ewt-color-fg, #fbbf24);
-                border: 1.5px dashed var(--ewt-color-muted, rgba(255,255,255,0.15));
+                border: 1px dashed rgba(217, 119, 6, 0.3);
             }
             .ewt-loop-return {
                 display: flex;
@@ -279,9 +286,9 @@ export const editableWorkflowTree = () => {
             /* ── Action buttons ── */
             .ewt-actions {
                 display: flex;
-                gap: 2px;
+                gap: 1px;
                 opacity: 0;
-                transition: opacity 0.15s;
+                transition: opacity 0.1s;
             }
             .ewt-node:hover .ewt-actions,
             .ewt-node.selected .ewt-actions {
@@ -291,139 +298,150 @@ export const editableWorkflowTree = () => {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                width: 22px;
-                height: 22px;
-                border-radius: 4px;
+                width: 20px;
+                height: 20px;
+                border-radius: 3px;
                 border: none;
                 background: transparent;
-                color: #64748b;
+                color: var(--muted-foreground);
                 cursor: pointer;
+                font-size: 11px;
                 transition: all 0.1s;
             }
             .ewt-action-btn:hover {
-                background: rgba(255,255,255,0.1);
-                color: #e2e8f0;
+                background: var(--accent);
+                color: var(--foreground);
             }
             .ewt-action-btn.danger:hover {
-                background: rgba(239, 68, 68, 0.15);
+                background: rgba(239, 68, 68, 0.12);
                 color: #ef4444;
             }
 
             /* ── Add child buttons ── */
             .ewt-add-children {
                 display: flex;
-                gap: 4px;
+                gap: 3px;
                 flex-wrap: wrap;
-                padding: 8px;
-                border-top: 1px solid rgba(255,255,255,0.05);
-                background: rgba(255,255,255,0.02);
-                border-radius: 0 0 0.75rem 0.75rem;
+                padding: 6px 8px;
+                border-top: 1px solid var(--border);
+                background: var(--muted);
+                border-radius: 0 0 8px 8px;
             }
             .ewt-add-btn {
-                font-size: 10px;
-                padding: 3px 8px;
-                border-radius: 9999px;
-                border: none;
+                font-size: 9px;
+                padding: 2px 7px;
+                border-radius: 3px;
+                border: 1px solid transparent;
                 cursor: pointer;
-                font-weight: 500;
+                font-weight: 600;
+                letter-spacing: 0.02em;
                 transition: all 0.1s;
+                background: transparent;
             }
             .ewt-add-btn.agent {
-                background: rgba(5, 150, 105, 0.15);
-                color: #34d399;
+                color: #059669;
+                border-color: rgba(5, 150, 105, 0.25);
             }
             .ewt-add-btn.agent:hover {
-                background: rgba(5, 150, 105, 0.25);
+                background: rgba(5, 150, 105, 0.1);
+                border-color: rgba(5, 150, 105, 0.4);
             }
             .ewt-add-btn.sequential {
-                background: rgba(124, 58, 237, 0.15);
-                color: #a78bfa;
+                color: #7c3aed;
+                border-color: rgba(124, 58, 237, 0.25);
             }
             .ewt-add-btn.sequential:hover {
-                background: rgba(124, 58, 237, 0.25);
+                background: rgba(124, 58, 237, 0.1);
+                border-color: rgba(124, 58, 237, 0.4);
             }
             .ewt-add-btn.parallel {
-                background: rgba(2, 132, 199, 0.15);
-                color: #38bdf8;
+                color: #0284c7;
+                border-color: rgba(2, 132, 199, 0.25);
             }
             .ewt-add-btn.parallel:hover {
-                background: rgba(2, 132, 199, 0.25);
+                background: rgba(2, 132, 199, 0.1);
+                border-color: rgba(2, 132, 199, 0.4);
             }
             .ewt-add-btn.loop {
-                background: rgba(217, 119, 6, 0.15);
-                color: #fbbf24;
+                color: #d97706;
+                border-color: rgba(217, 119, 6, 0.25);
             }
             .ewt-add-btn.loop:hover {
-                background: rgba(217, 119, 6, 0.25);
+                background: rgba(217, 119, 6, 0.1);
+                border-color: rgba(217, 119, 6, 0.4);
             }
             .ewt-add-btn.conditional {
-                background: rgba(220, 38, 38, 0.15);
-                color: #f87171;
+                color: #dc2626;
+                border-color: rgba(220, 38, 38, 0.25);
             }
             .ewt-add-btn.conditional:hover {
-                background: rgba(220, 38, 38, 0.25);
+                background: rgba(220, 38, 38, 0.1);
+                border-color: rgba(220, 38, 38, 0.4);
             }
 
             /* ── Inline edit ── */
             .ewt-inline-edit {
                 background: transparent;
                 border: 1px solid transparent;
-                border-radius: 4px;
+                border-radius: 3px;
                 padding: 1px 4px;
                 font-size: 12px;
                 font-weight: 600;
-                color: #e2e8f0;
+                color: var(--foreground);
                 width: 100%;
                 outline: none;
                 transition: all 0.1s;
             }
             .ewt-inline-edit:hover {
-                border-color: rgba(255,255,255,0.1);
+                border-color: var(--border);
             }
             .ewt-inline-edit:focus {
-                border-color: rgba(129, 140, 248, 0.5);
-                background: rgba(0,0,0,0.2);
+                border-color: var(--ewt-color, var(--ring));
+                background: var(--muted);
             }
 
             /* ── Agent select dropdown ── */
             .ewt-agent-select {
-                background: rgba(0,0,0,0.3);
-                border: 1px solid rgba(255,255,255,0.1);
-                border-radius: 4px;
-                padding: 4px 8px;
-                font-size: 11px;
-                color: #e2e8f0;
+                background: var(--muted);
+                border: 1px solid var(--border);
+                border-radius: 3px;
+                padding: 3px 6px;
+                font-size: 10px;
+                color: var(--foreground);
                 width: 100%;
                 outline: none;
                 cursor: pointer;
+                transition: border-color 0.1s;
             }
             .ewt-agent-select:focus {
-                border-color: rgba(129, 140, 248, 0.5);
+                border-color: var(--ewt-color, var(--ring));
             }
 
             /* ── Empty state ── */
             .ewt-empty {
                 text-align: center;
-                padding: 24px 16px;
-                color: #475569;
-                font-size: 12px;
-                font-style: italic;
+                padding: 20px 16px;
+                color: var(--muted-foreground);
+                font-size: 11px;
+                border: 1px dashed var(--border);
+                border-radius: 6px;
+                margin: 4px 0;
             }
 
             /* ── Drop zone indicator ── */
             .ewt-drop-zone {
-                border: 2px dashed rgba(34, 197, 94, 0.4);
-                border-radius: 0.75rem;
-                padding: 20px;
+                border: 1px dashed rgba(34, 197, 94, 0.35);
+                border-radius: 6px;
+                padding: 16px;
                 text-align: center;
                 color: #22c55e;
-                font-size: 12px;
-                margin: 8px 0;
-                transition: all 0.15s;
+                font-size: 11px;
+                margin: 6px 0;
+                transition: all 0.12s;
             }
             .ewt-drop-zone.active {
                 border-color: #22c55e;
-                background: rgba(34, 197, 94, 0.08);
+                background: rgba(34, 197, 94, 0.06);
             }
 
             /* ── Move buttons ── */
@@ -431,68 +449,93 @@ export const editableWorkflowTree = () => {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                width: 20px;
-                height: 20px;
+                width: 18px;
+                height: 18px;
                 border-radius: 3px;
                 border: none;
                 background: transparent;
-                color: #475569;
+                color: var(--muted-foreground);
                 cursor: pointer;
                 font-size: 10px;
                 transition: all 0.1s;
             }
             .ewt-move-btn:hover:not(:disabled) {
-                background: rgba(255,255,255,0.1);
-                color: #e2e8f0;
+                background: var(--accent);
+                color: var(--foreground);
             }
             .ewt-move-btn:disabled {
-                opacity: 0.3;
+                opacity: 0.2;
                 cursor: not-allowed;
             }
 
             /* ── Settings panel ── */
             .ewt-settings-panel {
-                background: #0f1117;
-                border: 1px solid rgba(255,255,255,0.08);
-                border-radius: 0.5rem;
-                padding: 12px;
-                margin-top: 8px;
-                font-size: 11px;
+                background: var(--muted);
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                padding: 10px;
+                margin-top: 6px;
+                font-size: 10px;
             }
             .ewt-settings-row {
                 display: flex;
                 align-items: center;
                 gap: 8px;
-                margin-bottom: 8px;
+                margin-bottom: 6px;
             }
-            .ewt-settings-row:last-child {
-                margin-bottom: 0;
-            }
+            .ewt-settings-row:last-child { margin-bottom: 0; }
             .ewt-settings-label {
-                color: #64748b;
-                font-size: 10px;
-                width: 80px;
+                color: var(--muted-foreground);
+                font-size: 9px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                width: 72px;
                 flex-shrink: 0;
             }
             .ewt-settings-input {
                 flex: 1;
-                background: rgba(0,0,0,0.3);
-                border: 1px solid rgba(255,255,255,0.1);
-                border-radius: 4px;
-                padding: 4px 8px;
-                font-size: 11px;
-                color: #e2e8f0;
+                background: var(--background);
+                border: 1px solid var(--border);
+                border-radius: 3px;
+                padding: 3px 6px;
+                font-size: 10px;
+                color: var(--foreground);
                 outline: none;
+                transition: border-color 0.1s;
             }
             .ewt-settings-input:focus {
-                border-color: rgba(129, 140, 248, 0.5);
+                border-color: var(--ewt-color, var(--ring));
             }
-            .ewt-node, .ewt-loop-wrap {
-                cursor: grab;
+
+            /* ── Collapse/expand ── */
+            .ewt-collapse-btn {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 16px;
+                height: 16px;
+                border-radius: 3px;
+                border: none;
+                background: transparent;
+                color: var(--muted-foreground);
+                cursor: pointer;
+                font-size: 8px;
+                transition: all 0.1s;
+                flex-shrink: 0;
             }
-            .ewt-node:active, .ewt-loop-wrap:active {
-                cursor: grabbing;
+            .ewt-collapse-btn:hover { background: var(--accent); color: var(--foreground); }
+            .ewt-collapse-btn svg { transition: transform 0.15s ease; }
+            .ewt-collapsed-summary {
+                font-size: 10px;
+                color: var(--muted-foreground);
+                padding: 6px 0 2px;
+                text-align: center;
+                font-style: italic;
             }
+
+            .ewt-node, .ewt-loop-wrap { cursor: grab; }
+            .ewt-node:active, .ewt-loop-wrap:active { cursor: grabbing; }
         `;
         document.head.appendChild(style);
     }
@@ -516,6 +559,26 @@ export const editableWorkflowTree = () => {
         const node = { id, type, label: '', children: [] };
         if (type === 'loop') node.max_iterations = 3;
         return node;
+    }
+
+    // ── Collapse helpers ────────────────────────────────────────────
+
+    function isCollapsed(nodeId) {
+        const store = typeof Alpine !== 'undefined' ? Alpine.store('flow') : null;
+        return store ? store.isCollapsed(nodeId) : false;
+    }
+
+    function collapseChevron(nodeId) {
+        const collapsed = isCollapsed(nodeId);
+        const rot = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+        return `<button class="ewt-collapse-btn" onclick="event.stopPropagation(); Alpine.store('flow').toggleCollapse('${nodeId}')" title="${collapsed ? 'Expand' : 'Collapse'}">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform:${rot}"><path d="m6 9 6 6 6-6"/></svg>
+        </button>`;
+    }
+
+    function collapsedSummary(node) {
+        const count = node.children ? node.children.length : 0;
+        return `<div class="ewt-collapsed-summary">${count} node${count !== 1 ? 's' : ''} collapsed</div>`;
     }
 
     // ── Render functions ────────────────────────────────────────────
@@ -571,6 +634,7 @@ export const editableWorkflowTree = () => {
                     <div class="ewt-actions">
                         <button class="ewt-action-btn" onclick="window.ewtMoveUp('${nodeId}')" title="Move up">↑</button>
                         <button class="ewt-action-btn" onclick="window.ewtMoveDown('${nodeId}')" title="Move down">↓</button>
+                        <button class="ewt-action-btn" onclick="window.ewtDuplicate('${nodeId}')" title="Duplicate (Ctrl+D)">⧉</button>
                         <button class="ewt-action-btn danger" onclick="window.ewtDeleteNode('${nodeId}')" title="Delete">✕</button>
                     </div>
                 </div>
@@ -609,6 +673,7 @@ export const editableWorkflowTree = () => {
                     <div class="ewt-actions">
                         <button class="ewt-action-btn" onclick="window.ewtMoveUp('${nodeId}')" title="Move up">↑</button>
                         <button class="ewt-action-btn" onclick="window.ewtMoveDown('${nodeId}')" title="Move down">↓</button>
+                        <button class="ewt-action-btn" onclick="window.ewtDuplicate('${nodeId}')" title="Duplicate (Ctrl+D)">⧉</button>
                         <button class="ewt-action-btn danger" onclick="window.ewtDeleteNode('${nodeId}')" title="Delete">✕</button>
                     </div>
                 </div>
@@ -618,20 +683,20 @@ export const editableWorkflowTree = () => {
     function renderSequentialNode(node, agents, connectors, depth, isSelected, nodeId, graph) {
         const m = META.sequential;
         const kids = node.children || [];
+        const collapsed = isCollapsed(nodeId);
 
         let body = '';
-        for (let i = 0; i < kids.length; i++) {
-            body += renderPipelineNode(kids[i], agents, connectors, depth + 1, graph);
-            if (i < kids.length - 1) {
-                body += renderConnector(m.color);
+        if (!collapsed) {
+            for (let i = 0; i < kids.length; i++) {
+                body += renderPipelineNode(kids[i], agents, connectors, depth + 1, graph);
+                if (i < kids.length - 1) body += renderConnector(m.color);
             }
+            if (kids.length === 0) body = `<div class="ewt-empty">Drop agents here or click + to add</div>`;
+        } else {
+            body = collapsedSummary(node);
         }
 
-        if (kids.length === 0) {
-            body = `<div class="ewt-empty">Drop agents here or click + to add</div>`;
-        }
-
-        const addButtons = `
+        const addButtons = collapsed ? '' : `
             <div class="ewt-add-children">
                 <button class="ewt-add-btn agent" onclick="window.ewtAddChild('${nodeId}', 'agent')">+ Agent</button>
                 <button class="ewt-add-btn sequential" onclick="window.ewtAddChild('${nodeId}', 'sequential')">+ Seq</button>
@@ -643,10 +708,14 @@ export const editableWorkflowTree = () => {
         if (depth === 0) {
             return `
                 <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
-                    <div class="ewt-badge" style="background:${m.colorMuted};color:${m.colorFg};margin-bottom:8px;">
-                        ${m.icon}&nbsp;Sequential
+                    <div style="display:flex;align-items:center;gap:4px;margin-bottom:8px;">
+                        ${collapseChevron(nodeId)}
+                        <div class="ewt-badge" style="background:${m.colorMuted};color:${m.colorFg};">
+                            ${m.icon}&nbsp;Sequential
+                        </div>
+                        ${collapsed ? `<span style="font-size:9px;color:#6b7280;">(${kids.length})</span>` : ''}
                     </div>
-                    <div style="display:flex;flex-direction:column;align-items:center;width:100%;max-width:320px;">
+                    <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
                         ${body}
                     </div>
                     ${addButtons}
@@ -655,22 +724,17 @@ export const editableWorkflowTree = () => {
 
         return `
             <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
-                <div class="ewt-node ${isSelected ? 'selected' : ''}" 
+                <div class="ewt-node ${isSelected ? 'selected' : ''}"
                      style="--ewt-color:${m.color};--ewt-color-muted:${m.colorMuted};--ewt-color-fg:${m.colorFg};max-width:unset;"
                      data-node-id="${nodeId}"
                      data-node-type="sequential"
                      draggable="true">
                     <div style="display:flex;align-items:center;gap:8px;">
+                        ${collapseChevron(nodeId)}
                         <div class="ewt-badge" style="background:${m.colorMuted};color:${m.colorFg};">
                             ${m.icon}&nbsp;Sequential
                         </div>
-                        <input type="text" 
-                               class="ewt-inline-edit" 
-                               value="${esc(node.label)}" 
-                               placeholder="Sequence label..."
-                               style="flex:1;"
-                               data-field="label"
-                               data-node-id="${nodeId}" />
+                        <input type="text" class="ewt-inline-edit" value="${esc(node.label)}" placeholder="Sequence label..." style="flex:1;" data-field="label" data-node-id="${nodeId}" />
                         <div class="ewt-actions">
                             <button class="ewt-action-btn" onclick="window.ewtMoveUp('${nodeId}')" title="Move up">↑</button>
                             <button class="ewt-action-btn" onclick="window.ewtMoveDown('${nodeId}')" title="Move down">↓</button>
@@ -688,22 +752,9 @@ export const editableWorkflowTree = () => {
     function renderParallelNode(node, agents, connectors, depth, isSelected, nodeId, graph) {
         const m = META.parallel;
         const kids = node.children || [];
+        const collapsed = isCollapsed(nodeId);
 
-        let branches = '';
-        for (let i = 0; i < kids.length; i++) {
-            branches += `
-                <div class="ewt-branch">
-                    <div class="ewt-branch-connector" style="background:${m.color};"></div>
-                    ${renderPipelineNode(kids[i], agents, connectors, depth + 1, graph)}
-                    <div class="ewt-branch-connector" style="background:${m.color};"></div>
-                </div>`;
-        }
-
-        if (kids.length === 0) {
-            branches = `<div class="ewt-empty">Drop agents here or click + to add</div>`;
-        }
-
-        const addButtons = `
+        const addButtons = collapsed ? '' : `
             <div class="ewt-add-children">
                 <button class="ewt-add-btn agent" onclick="window.ewtAddChild('${nodeId}', 'agent')">+ Agent</button>
                 <button class="ewt-add-btn sequential" onclick="window.ewtAddChild('${nodeId}', 'sequential')">+ Seq</button>
@@ -712,24 +763,39 @@ export const editableWorkflowTree = () => {
                 <button class="ewt-add-btn conditional" onclick="window.ewtAddChild('${nodeId}', 'conditional')">+ Cond</button>
             </div>`;
 
+        let innerContent = '';
+        if (collapsed) {
+            innerContent = collapsedSummary(node);
+        } else {
+            let branches = '';
+            for (let i = 0; i < kids.length; i++) {
+                branches += `
+                    <div class="ewt-branch">
+                        <div class="ewt-branch-connector" style="background:${m.color};"></div>
+                        ${renderPipelineNode(kids[i], agents, connectors, depth + 1, graph)}
+                        <div class="ewt-branch-connector" style="background:${m.color};"></div>
+                    </div>`;
+            }
+            if (kids.length === 0) branches = `<div class="ewt-empty">Drop agents here or click + to add</div>`;
+            innerContent = `
+                <div class="ewt-fork-join" style="--ewt-color:${m.color};"><div class="ewt-fork-join-center" style="background:${m.color};"></div></div>
+                <div class="ewt-branches">${branches}</div>
+                <div class="ewt-fork-join" style="--ewt-color:${m.color};"><div class="ewt-fork-join-center" style="background:${m.color};"></div></div>`;
+        }
+
         return `
             <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
-                <div class="ewt-node ${isSelected ? 'selected' : ''}" 
+                <div class="ewt-node ${isSelected ? 'selected' : ''}"
                      style="--ewt-color:${m.color};--ewt-color-muted:${m.colorMuted};--ewt-color-fg:${m.colorFg};max-width:unset;"
                      data-node-id="${nodeId}"
                      data-node-type="parallel"
                      draggable="true">
                     <div style="display:flex;align-items:center;gap:8px;">
+                        ${collapseChevron(nodeId)}
                         <div class="ewt-badge" style="background:${m.colorMuted};color:${m.colorFg};">
                             ${m.icon}&nbsp;Parallel
                         </div>
-                        <input type="text" 
-                               class="ewt-inline-edit" 
-                               value="${esc(node.label)}" 
-                               placeholder="Parallel label..."
-                               style="flex:1;"
-                               data-field="label"
-                               data-node-id="${nodeId}" />
+                        <input type="text" class="ewt-inline-edit" value="${esc(node.label)}" placeholder="Parallel label..." style="flex:1;" data-field="label" data-node-id="${nodeId}" />
                         <div class="ewt-actions">
                             <button class="ewt-action-btn" onclick="window.ewtMoveUp('${nodeId}')" title="Move up">↑</button>
                             <button class="ewt-action-btn" onclick="window.ewtMoveDown('${nodeId}')" title="Move down">↓</button>
@@ -737,15 +803,7 @@ export const editableWorkflowTree = () => {
                         </div>
                     </div>
                 </div>
-                <div class="ewt-fork-join" style="--ewt-color:${m.color};">
-                    <div class="ewt-fork-join-center" style="background:${m.color};"></div>
-                </div>
-                <div class="ewt-branches">
-                    ${branches}
-                </div>
-                <div class="ewt-fork-join" style="--ewt-color:${m.color};">
-                    <div class="ewt-fork-join-center" style="background:${m.color};"></div>
-                </div>
+                ${innerContent}
                 ${addButtons}
             </div>`;
     }
@@ -754,20 +812,20 @@ export const editableWorkflowTree = () => {
         const m = META.loop;
         const kids = node.children || [];
         const maxIter = node.max_iterations || 3;
+        const collapsed = isCollapsed(nodeId);
 
         let body = '';
-        for (let i = 0; i < kids.length; i++) {
-            body += renderPipelineNode(kids[i], agents, connectors, depth + 1, graph);
-            if (i < kids.length - 1) {
-                body += renderConnector(m.color);
+        if (!collapsed) {
+            for (let i = 0; i < kids.length; i++) {
+                body += renderPipelineNode(kids[i], agents, connectors, depth + 1, graph);
+                if (i < kids.length - 1) body += renderConnector(m.color);
             }
+            if (kids.length === 0) body = `<div class="ewt-empty">Drop agents here or click + to add</div>`;
+        } else {
+            body = collapsedSummary(node);
         }
 
-        if (kids.length === 0) {
-            body = `<div class="ewt-empty">Drop agents here or click + to add</div>`;
-        }
-
-        const loopArrow = `
+        const loopArrow = collapsed ? '' : `
             <div class="ewt-loop-return">
                 <svg width="80" height="18" viewBox="0 0 80 18" fill="none">
                     <path d="M10 2 C10 14, 70 14, 70 2" stroke="${m.color}" stroke-width="1.5" stroke-dasharray="4 3" fill="none" opacity="0.45"/>
@@ -775,7 +833,7 @@ export const editableWorkflowTree = () => {
                 </svg>
             </div>`;
 
-        const addButtons = `
+        const addButtons = collapsed ? '' : `
             <div class="ewt-add-children">
                 <button class="ewt-add-btn agent" onclick="window.ewtAddChild('${nodeId}', 'agent')">+ Agent</button>
                 <button class="ewt-add-btn sequential" onclick="window.ewtAddChild('${nodeId}', 'sequential')">+ Seq</button>
@@ -787,23 +845,12 @@ export const editableWorkflowTree = () => {
         return `
             <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
                 <div class="ewt-loop-wrap" style="--ewt-color:${m.color};--ewt-color-muted:${m.colorMuted};--ewt-color-fg:${m.colorFg};" draggable="true">
-                    <div class="ewt-loop-badge" style="background:#1a1a2e;color:${m.colorFg};border-color:${m.colorMuted};">
-                        ${m.icon}&nbsp;Loop (×<input type="number" 
-                                                    value="${maxIter}" 
-                                                    min="1" 
-                                                    max="100"
-                                                    style="width:24px;background:transparent;border:none;color:${m.colorFg};font-size:9px;font-weight:700;text-align:center;outline:none;"
-                                                    data-field="max_iterations"
-                                                    data-node-id="${nodeId}" />)
+                    <div class="ewt-loop-badge" style="background:var(--background);color:${m.colorFg};border-color:${m.colorMuted};">
+                        ${collapseChevron(nodeId)}
+                        ${m.icon}&nbsp;Loop (×<input type="number" value="${maxIter}" min="1" max="100" style="width:24px;background:transparent;border:none;color:${m.colorFg};font-size:9px;font-weight:700;text-align:center;outline:none;" data-field="max_iterations" data-node-id="${nodeId}" />)
                     </div>
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-                        <input type="text" 
-                               class="ewt-inline-edit" 
-                               value="${esc(node.label)}" 
-                               placeholder="Loop label..."
-                               style="flex:1;"
-                               data-field="label"
-                               data-node-id="${nodeId}" />
+                        <input type="text" class="ewt-inline-edit" value="${esc(node.label)}" placeholder="Loop label..." style="flex:1;" data-field="label" data-node-id="${nodeId}" />
                         <div class="ewt-actions" style="opacity:1;">
                             <button class="ewt-action-btn" onclick="window.ewtMoveUp('${nodeId}')" title="Move up">↑</button>
                             <button class="ewt-action-btn" onclick="window.ewtMoveDown('${nodeId}')" title="Move down">↓</button>
@@ -830,7 +877,7 @@ export const editableWorkflowTree = () => {
         if (kids.length > 0) {
             const evaluator = kids[0];
             evaluatorHtml = `
-                <div style="display:flex;flex-direction:column;align-items:center;width:100%;max-width:320px;margin:0 auto;">
+                <div style="display:flex;flex-direction:column;align-items:center;width:100%;margin:0 auto;">
                     <div class="ewt-badge" style="background:rgba(220,38,38,0.08);color:#fca5a5;font-size:9px;margin-bottom:4px;">
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
                         &nbsp;Evaluator (first child must have output_key)
@@ -1044,6 +1091,15 @@ export const editableWorkflowTree = () => {
                 }
             };
 
+            window.ewtDuplicate = (id) => {
+                const store = Alpine.store('flow');
+                if (store && store.graph) {
+                    store.duplicateNode(id);
+                    this.render();
+                    if (window.__ewtOnChange) window.__ewtOnChange(store.graph);
+                }
+            };
+
             window.ewtAddConditionalBranch = (parentId) => {
                 const condition = prompt('Enter condition value (use * for fallback):', '');
                 if (condition === null) return; // user cancelled
@@ -1218,12 +1274,34 @@ export const editableWorkflowTree = () => {
                         e.preventDefault();
                         window.ewtMoveDown(selectedId);
                     }
-                } else if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
+                } else if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
                     e.preventDefault();
                     store.undo();
-                } else if (e.key === 'y' && (e.ctrlKey || e.metaKey)) {
+                } else if ((e.key === 'y' && (e.ctrlKey || e.metaKey)) || (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey)) {
                     e.preventDefault();
-                    // redo not yet implemented in store
+                    store.redo();
+                } else if (e.key === 'd' && (e.ctrlKey || e.metaKey)) {
+                    if (selectedId) {
+                        e.preventDefault();
+                        store.duplicateNode(selectedId);
+                        this.render();
+                        if (window.__ewtOnChange) window.__ewtOnChange(store.graph);
+                    }
+                } else if (e.key === 'ArrowLeft' && selectedId && !e.ctrlKey) {
+                    const node = findNodeById(store.graph, selectedId);
+                    if (node && node.children && node.children.length > 0 && !store.isCollapsed(selectedId)) {
+                        e.preventDefault();
+                        store.toggleCollapse(selectedId);
+                    }
+                } else if (e.key === 'ArrowRight' && selectedId && !e.ctrlKey) {
+                    if (store.isCollapsed(selectedId)) {
+                        e.preventDefault();
+                        store.toggleCollapse(selectedId);
+                    }
+                } else if (e.key === '?') {
+                    store._showHelp = !store._showHelp;
+                } else if (e.key === 'Escape' && store._showHelp) {
+                    store._showHelp = false;
                 }
             });
 
@@ -1234,6 +1312,7 @@ export const editableWorkflowTree = () => {
                     // Access reactive properties to trigger re-render
                     void store.graph;
                     void store.selectedId;
+                    void store._collapsed;
                     this.render();
                 }
             });
