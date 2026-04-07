@@ -383,20 +383,27 @@ templ AgentDesignerDialog() {
 							}
 						</div>
 						<!-- Name + description bar -->
-						<div class="flex items-center gap-2 px-3 py-1.5 border-b border-border/50 bg-muted/20 shrink-0">
-							<span class="text-[10px] text-muted-foreground shrink-0">{ i18n.T(ctx, "Name") }</span>
+						<div class="flex items-center gap-3 px-3 py-2 border-b border-border/40 bg-muted/10 shrink-0">
+							<div class="flex items-center gap-1.5 text-muted-foreground">
+								@icon.FileText(icon.Props{Class: "size-3.5"})
+								<span class="text-[9px] uppercase tracking-wider font-semibold">{ i18n.T(ctx, "Name") }</span>
+							</div>
 							<input
 								x-model="pipelineName"
 								type="text"
-								placeholder="Workflow name..."
-								class="flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
+								placeholder="Untitled workflow..."
+								class="flex-1 min-w-0 bg-transparent text-xs font-medium text-foreground outline-none placeholder:text-muted-foreground/50"
 							/>
-							<span class="text-[10px] text-muted-foreground shrink-0 border-l border-border/50 pl-2">{ i18n.T(ctx, "Desc") }</span>
+							<span class="text-border/30">|</span>
+							<div class="flex items-center gap-1.5 text-muted-foreground">
+								@icon.AlignLeft(icon.Props{Class: "size-3.5"})
+								<span class="text-[9px] uppercase tracking-wider font-semibold">{ i18n.T(ctx, "Description") }</span>
+							</div>
 							<input
 								x-model="pipelineDescription"
 								type="text"
-								placeholder="Optional description..."
-								class="flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
+								placeholder="Add a description..."
+								class="flex-1 min-w-0 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/50"
 							/>
 						</div>
 						<!-- Status Bar -->
@@ -755,35 +762,40 @@ templ AgentDesignerDialog() {
 																@icon.X(icon.Props{Class: "size-4"})
 															</button>
 														</div>
-														<!-- Body -->
-														<div class="px-5 py-4 max-h-80 overflow-y-auto">
+												<!-- Body -->
+														<div class="px-5 py-4 max-h-[320px] overflow-y-auto">
 															<template x-if="loadingAvailableTools">
-																<div class="space-y-2">
+																<div class="space-y-3">
 																	<template x-for="i in 3" :key="i">
-																		<div class="h-12 rounded-lg animate-pulse bg-muted"></div>
+																		<div class="h-14 rounded-lg animate-pulse bg-muted"></div>
 																	</template>
 																</div>
 															</template>
 															<template x-if="!loadingAvailableTools && availableTools.length === 0">
-																<div class="text-sm text-muted-foreground py-6 text-center">No tools available</div>
+																<div class="flex flex-col items-center justify-center py-8 text-center">
+																	@icon.Blocks(icon.Props{Class: "size-10 text-muted-foreground/30 mb-2"})
+																	<p class="text-sm text-muted-foreground">No tools available</p>
+																</div>
 															</template>
 															<div x-show="!loadingAvailableTools" class="space-y-2">
 																<template x-for="plugin in availableTools" :key="plugin.id">
-																	<div
-																		class="flex items-center gap-3 p-3 rounded-lg border border-border transition-colors cursor-pointer hover:border-primary/50"
+<div
+																		class="group flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/30 transition-all cursor-pointer"
 																		:class="isToolAttached(plugin.id) ? 'opacity-50' : ''"
 																		@click="!isToolAttached(plugin.id) && attachToolSet(plugin)"
 																	>
-																		@icon.Blocks(icon.Props{Class: "size-4 text-muted-foreground shrink-0"})
+																		<div class="size-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+																			@icon.Blocks(icon.Props{Class: "size-5"})
+																		</div>
 																		<div class="flex-1 min-w-0">
 																			<p class="text-sm font-medium text-foreground truncate" x-text="plugin.name"></p>
-																			<p class="text-xs text-muted-foreground truncate" x-text="plugin.tools?.length + ' tool' + (plugin.tools?.length !== 1 ? 's' : '')"></p>
+																			<p class="text-xs text-muted-foreground" x-text="plugin.tools?.length + ' tool' + (plugin.tools?.length !== 1 ? 's' : '')"></p>
 																		</div>
 																		<template x-if="isToolAttached(plugin.id)">
-																			<span class="shrink-0 text-xs text-emerald-500 font-medium">Attached</span>
+																			<span class="shrink-0 text-xs px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-600 font-medium">Attached</span>
 																		</template>
 																		<template x-if="!isToolAttached(plugin.id)">
-																			<span class="shrink-0 text-xs text-primary font-medium">+ Add</span>
+																			<span class="shrink-0 text-xs px-2 py-1 rounded-full bg-primary/10 text-primary font-medium group-hover:bg-primary group-hover:text-primary-foreground transition-colors">+ Add</span>
 																		</template>
 																	</div>
 																</template>
@@ -919,47 +931,60 @@ templ AgentDesignerDialog() {
 						@keydown.escape.window="if ($store.flow?._showHelp) $store.flow._showHelp = false"
 						class="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px]"
 					>
-						<div @click.stop class="rounded-xl border border-border shadow-2xl max-w-md w-full bg-background">
-							<div class="px-5 pt-5 pb-3">
-								<h3 class="text-sm font-semibold text-foreground flex items-center gap-2">
-									@icon.Keyboard(icon.Props{Class: "size-4 text-muted-foreground"})
-									{ i18n.T(ctx, "Workflow Editor Shortcuts") }
-								</h3>
-								<p class="text-xs text-muted-foreground mt-1">{ i18n.T(ctx, "Navigate and edit your workflow faster.") }</p>
+						<div @click.stop class="rounded-2xl border border-border/60 shadow-2xl max-w-lg w-full bg-background overflow-hidden">
+							<div class="px-6 pt-5 pb-4 border-b border-border/40 bg-muted/20">
+								<div class="flex items-center gap-2.5">
+									<div class="size-9 rounded-lg bg-primary/10 flex items-center justify-center">
+										@icon.Keyboard(icon.Props{Class: "size-5 text-primary"})
+									</div>
+									<div>
+										<h3 class="text-base font-semibold text-foreground">{ i18n.T(ctx, "Keyboard Shortcuts") }</h3>
+										<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Navigate and edit your workflow faster.") }</p>
+									</div>
+								</div>
 							</div>
-							<div class="px-5 pb-4 space-y-4">
+							<div class="px-6 py-4 space-y-4">
 								<!-- Editing -->
-								<div>
-									<h4 class="text-xs font-semibold text-muted-foreground mb-2">{ i18n.T(ctx, "Editing") }</h4>
-									<div class="space-y-1">
-										@shortcutRow(i18n.T(ctx, "Delete selected node"), "Delete")
-										@shortcutRow(i18n.T(ctx, "Duplicate selected node"), "Ctrl+D")
+								<div class="space-y-2">
+									<h4 class="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground flex items-center gap-1.5">
+										@icon.Edit3(icon.Props{Class: "size-3"})
+										{ i18n.T(ctx, "Editing") }
+									</h4>
+									<div class="grid grid-cols-2 gap-x-4 gap-y-1.5">
+										@shortcutRow(i18n.T(ctx, "Delete node"), "Delete")
+										@shortcutRow(i18n.T(ctx, "Duplicate"), "Ctrl+D")
 										@shortcutRow(i18n.T(ctx, "Undo"), "Ctrl+Z")
 										@shortcutRow(i18n.T(ctx, "Redo"), "Ctrl+Shift+Z")
 									</div>
 								</div>
 								<!-- Navigation -->
-								<div>
-									<h4 class="text-xs font-semibold text-muted-foreground mb-2">{ i18n.T(ctx, "Navigation") }</h4>
-									<div class="space-y-1">
-										@shortcutRow(i18n.T(ctx, "Move node up"), "Ctrl+↑")
-										@shortcutRow(i18n.T(ctx, "Move node down"), "Ctrl+↓")
-										@shortcutRow(i18n.T(ctx, "Collapse node"), "←")
-										@shortcutRow(i18n.T(ctx, "Expand node"), "→")
+								<div class="space-y-2">
+									<h4 class="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground flex items-center gap-1.5">
+										@icon.Navigation(icon.Props{Class: "size-3"})
+										{ i18n.T(ctx, "Navigation") }
+									</h4>
+									<div class="grid grid-cols-2 gap-x-4 gap-y-1.5">
+										@shortcutRow(i18n.T(ctx, "Move up"), "Ctrl+↑")
+										@shortcutRow(i18n.T(ctx, "Move down"), "Ctrl+↓")
+										@shortcutRow(i18n.T(ctx, "Collapse"), "←")
+										@shortcutRow(i18n.T(ctx, "Expand"), "→")
 									</div>
 								</div>
 								<!-- General -->
-								<div>
-									<h4 class="text-xs font-semibold text-muted-foreground mb-2">{ i18n.T(ctx, "General") }</h4>
-									<div class="space-y-1">
-										@shortcutRow(i18n.T(ctx, "Toggle property panel"), "Ctrl+]")
-										@shortcutRow(i18n.T(ctx, "Show this help"), "?")
+								<div class="space-y-2">
+									<h4 class="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground flex items-center gap-1.5">
+										@icon.Settings(icon.Props{Class: "size-3"})
+										{ i18n.T(ctx, "General") }
+									</h4>
+									<div class="grid grid-cols-2 gap-x-4 gap-y-1.5">
+										@shortcutRow(i18n.T(ctx, "Toggle panel"), "Ctrl+]")
+										@shortcutRow(i18n.T(ctx, "Show help"), "?")
 									</div>
 								</div>
 								<!-- Tip -->
-								<div class="flex items-start gap-2 p-2.5 bg-muted/30 rounded-lg">
-									@icon.Info(icon.Props{Class: "size-3.5 text-primary shrink-0 mt-0.5"})
-									<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "On macOS, use ⌘ instead of Ctrl") }</p>
+								<div class="flex items-start gap-2.5 p-3 bg-muted/30 rounded-lg border border-border/30">
+									@icon.Info(icon.Props{Class: "size-4 text-primary shrink-0 mt-0.5"})
+									<p class="text-[11px] text-muted-foreground leading-relaxed">{ i18n.T(ctx, "On macOS, use ⌘ instead of Ctrl") }</p>
 								</div>
 							</div>
 						</div>
