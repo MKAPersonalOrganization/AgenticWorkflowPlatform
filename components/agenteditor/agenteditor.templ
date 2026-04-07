@@ -400,35 +400,48 @@ templ AgentDesignerDialog() {
 							/>
 						</div>
 						<!-- Status Bar -->
-						<div class="flex items-center gap-4 px-3 py-1 border-b border-border/30 bg-muted/10 shrink-0">
-							<span
-								class="text-[10px] font-mono tabular-nums"
-								:class="$store.flow.nodeCount() > 40 ? 'text-amber-500' : 'text-muted-foreground'"
-								x-text="$store.flow.nodeCount() + ' / 50 nodes'"
-							></span>
-							<span
-								class="text-[10px] font-mono tabular-nums"
-								:class="$store.flow.maxDepth() > 4 ? 'text-amber-500' : 'text-muted-foreground'"
-								x-text="'depth ' + $store.flow.maxDepth() + ' / 5'"
-							></span>
+						<div class="flex items-center gap-4 px-3 py-1.5 border-b border-border/30 bg-muted/10 shrink-0">
+							<div class="flex items-center gap-1.5">
+								@icon.CircleDot(icon.Props{Class: "size-3 text-muted-foreground"})
+								<span
+									class="text-[10px] font-mono tabular-nums"
+									:class="$store.flow.nodeCount() > 40 ? 'text-amber-500' : 'text-muted-foreground'"
+									x-text="$store.flow.nodeCount() + ' nodes'"
+								></span>
+							</div>
+							<div class="flex items-center gap-1.5">
+								@icon.Layers(icon.Props{Class: "size-3 text-muted-foreground"})
+								<span
+									class="text-[10px] font-mono tabular-nums"
+									:class="$store.flow.maxDepth() > 4 ? 'text-amber-500' : 'text-muted-foreground'"
+									x-text="'depth ' + $store.flow.maxDepth()"
+								></span>
+							</div>
 							<span class="flex-1"></span>
 							<button
 								x-show="$store.flow.canUndo()"
 								@click="$store.flow.undo()"
-								class="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+								class="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-muted"
 								title="Undo (Ctrl+Z)"
 							>
-								{ i18n.T(ctx, "undo") }
+								@icon.Undo(icon.Props{Class: "size-3"})
+								{ i18n.T(ctx, "Undo") }
 							</button>
 							<button
 								x-show="$store.flow.canRedo()"
 								@click="$store.flow.redo()"
-								class="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+								class="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-muted"
 								title="Redo (Ctrl+Shift+Z)"
 							>
-								{ i18n.T(ctx, "redo") }
+								@icon.Redo(icon.Props{Class: "size-3"})
+								{ i18n.T(ctx, "Redo") }
 							</button>
-							<span class="text-[10px] text-muted-foreground/50">{ i18n.T(ctx, "? for shortcuts") }</span>
+							<button
+								@click="$store.flow._showHelp = true"
+								class="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+							>
+								{ i18n.T(ctx, "?") }
+							</button>
 						</div>
 						<!-- Tree + Property Panel (resizable) -->
 						<div
@@ -514,20 +527,26 @@ templ AgentDesignerDialog() {
 											</div>
 										</div>
 										<!-- Scrollable Content -->
-										<div class="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-thin">
+										<div class="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
 											<!-- Label Field -->
-											<div>
-												<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">Label</label>
-												<input :value="node.label" @input="set('label', $event.target.value)" type="text" placeholder="Display name..." class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border"/>
+											<div class="space-y-1.5">
+												<label class="flex items-center gap-1.5 text-[9px] uppercase tracking-widest text-muted-foreground font-semibold">
+													@icon.Tag(icon.Props{Class: "size-3"})
+													Label
+												</label>
+												<input :value="node.label" @input="set('label', $event.target.value)" type="text" placeholder="Display name..." class="w-full text-[11px] rounded-md px-3 py-2 text-foreground placeholder:text-muted-foreground/50 outline-none focus:ring-2 focus:ring-primary/30 bg-background border border-border transition-all"/>
 											</div>
 
 											<!-- Agent Node -->
 											<template x-if="node.type === 'agent'">
-												<div class="space-y-3">
+												<div class="space-y-4">
 													<!-- Agent Selector -->
-													<div>
-														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">LLM Agent <span class="text-rose-500">*</span></label>
-														<select :value="node.agent_id" @change="set('agent_id', $event.target.value)" class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border">
+													<div class="space-y-1.5">
+														<label class="flex items-center gap-1.5 text-[9px] uppercase tracking-widest text-muted-foreground font-semibold">
+															@icon.Bot(icon.Props{Class: "size-3"})
+															LLM Agent <span class="text-rose-500">*</span>
+														</label>
+														<select :value="node.agent_id" @change="set('agent_id', $event.target.value)" class="w-full text-[11px] rounded-md px-3 py-2 text-foreground outline-none focus:ring-2 focus:ring-primary/30 bg-background border border-border transition-all">
 															<option value="">— select agent —</option>
 															<template x-for="ag in agents" :key="ag.id">
 																<option :value="ag.id" x-text="ag.name"></option>
@@ -537,27 +556,28 @@ templ AgentDesignerDialog() {
 
 													<!-- Agent Info Card -->
 													<template x-if="selectedAgent">
-<div class="rounded-lg overflow-hidden bg-muted border-border">
+														<div class="rounded-lg overflow-hidden bg-muted border border-border">
 															<!-- Agent name header -->
-															<div class="px-2.5 py-2 bg-muted/50 border-b border-border">
-																<span class="text-[10px] font-semibold text-foreground truncate" x-text="selectedAgent.name"></span>
+															<div class="px-3 py-2.5 bg-muted/50 border-b border-border flex items-center gap-2">
+																@icon.User(icon.Props{Class: "size-4 text-muted-foreground"})
+																<span class="text-[11px] font-semibold text-foreground truncate" x-text="selectedAgent.name"></span>
 															</div>
 															<!-- Model -->
 																<template x-if="selectedAgent.modelOverride && selectedAgent.modelOverride.modelName">
-															<div class="px-2.5 py-1.5 flex items-center gap-2 border-b border-border">
-																@icon.Cpu(icon.Props{Class: "size-3 text-muted-foreground"})
-																<span class="text-[9px] font-mono rounded px-1.5 py-0.5 text-muted-foreground bg-muted" x-text="(selectedAgent.modelOverride.provider ? selectedAgent.modelOverride.provider + '/' : '') + selectedAgent.modelOverride.modelName"></span>
+															<div class="px-3 py-2 flex items-center gap-2 border-b border-border">
+																@icon.Cpu(icon.Props{Class: "size-3.5 text-muted-foreground"})
+																<span class="text-[9px] font-mono rounded px-2 py-0.5 text-muted-foreground bg-background border border-border" x-text="(selectedAgent.modelOverride.provider ? selectedAgent.modelOverride.provider + '/' : '') + selectedAgent.modelOverride.modelName"></span>
 															</div>
 														</template>
 															<!-- Description -->
 															<template x-if="selectedAgent.description">
-																<div class="px-2.5 py-2 border-b border-border">
+																<div class="px-3 py-2.5 border-b border-border">
 																	<p class="text-[10px] text-muted-foreground leading-relaxed line-clamp-2" x-text="selectedAgent.description"></p>
 																</div>
 															</template>
 															<!-- Agent Config Summary -->
-															<div class="px-2.5 py-2">
-																<div class="flex items-center gap-2 text-[9px] text-muted-foreground">
+															<div class="px-3 py-2.5">
+																<div class="flex items-center gap-3 text-[9px] text-muted-foreground">
 																	<template x-if="selectedAgent.output_key">
 																		<span class="flex items-center gap-1">
 																			@icon.Key(icon.Props{Class: "size-2.5"})
@@ -566,47 +586,47 @@ templ AgentDesignerDialog() {
 																	</template>
 																</div>
 																<template x-if="!selectedAgent.systemPrompt && !selectedAgent.description && !(selectedAgent.modelOverride && selectedAgent.modelOverride.modelName)">
-																	<p class="text-[10px] text-muted-foreground italic">{ i18n.T(ctx, "No configuration yet — edit the agent to set it up.") }</p>
+																	<p class="text-[10px] text-muted-foreground/50 italic">{ i18n.T(ctx, "No configuration yet — edit the agent to set it up.") }</p>
 																</template>
 															</div>
 														</div>
 													</template>
 
 													<!-- Output Variable -->
-													<div>
-														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">
-															@icon.Key(icon.Props{Class: "size-3 inline me-0.5"})
+													<div class="space-y-1.5">
+														<label class="flex items-center gap-1.5 text-[9px] uppercase tracking-widest text-muted-foreground font-semibold">
+															@icon.Key(icon.Props{Class: "size-3"})
 															Output Variable
 														</label>
-														<input :value="node.output_key" @input="set('output_key', $event.target.value)" type="text" placeholder="e.g. research_results" class="w-full text-[11px] font-mono rounded-lg px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border"/>
-														<p class="text-[9px] text-muted-foreground mt-1">{ i18n.T(ctx, "Saves output so other agents can use it via {variable_name}") }</p>
+														<input :value="node.output_key" @input="set('output_key', $event.target.value)" type="text" placeholder="e.g. research_results" class="w-full text-[11px] font-mono rounded-md px-3 py-2 text-foreground placeholder:text-muted-foreground/50 outline-none focus:ring-2 focus:ring-primary/30 bg-background border border-border transition-all"/>
+														<p class="text-[9px] text-muted-foreground/70">{ i18n.T(ctx, "Saves output so other agents can use it via {variable_name}") }</p>
 													</div>
 
 													<!-- Conversation History -->
-													<div>
-														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">
-															@icon.MessageSquare(icon.Props{Class: "size-3 inline me-0.5"})
+													<div class="space-y-1.5">
+														<label class="flex items-center gap-1.5 text-[9px] uppercase tracking-widest text-muted-foreground font-semibold">
+															@icon.MessageSquare(icon.Props{Class: "size-3"})
 															{ i18n.T(ctx, "History") }
 														</label>
-														<select :value="node.include_contents||'default'" @change="set('include_contents', $event.target.value)" class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border">
+														<select :value="node.include_contents||'default'" @change="set('include_contents', $event.target.value)" class="w-full text-[11px] rounded-md px-3 py-2 text-foreground outline-none focus:ring-2 focus:ring-primary/30 bg-background border border-border transition-all">
 															<option value="default">{ i18n.T(ctx, "Include history") }</option>
 															<option value="none">{ i18n.T(ctx, "Fresh context only") }</option>
 														</select>
-														<p class="text-[9px] text-muted-foreground mt-1">{ i18n.T(ctx, "Fresh = agent sees only the current message") }</p>
+														<p class="text-[9px] text-muted-foreground/70">{ i18n.T(ctx, "Fresh = agent sees only the current message") }</p>
 													</div>
 
 													<!-- Delegation Control -->
-													<div>
-														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-2">
-															@icon.ArrowRightLeft(icon.Props{Class: "size-3 inline me-0.5"})
+													<div class="space-y-2">
+														<label class="flex items-center gap-1.5 text-[9px] uppercase tracking-widest text-muted-foreground font-semibold">
+															@icon.ArrowRightLeft(icon.Props{Class: "size-3"})
 															{ i18n.T(ctx, "Delegation") }
 														</label>
-														<div class="space-y-1.5">
-															<label class="flex items-center gap-2 cursor-pointer group">
+														<div class="space-y-2 p-2 rounded-md bg-muted/50 border border-border">
+															<label class="flex items-center gap-2.5 cursor-pointer group">
 																<input type="checkbox" :checked="node.disallow_transfer_to_parent" @change="setBool('disallow_transfer_to_parent', $event.target.checked)" class="rounded accent-primary"/>
 																<span class="text-[10px] text-muted-foreground group-hover:text-foreground transition-colors">{ i18n.T(ctx, "Prevent escalation to parent") }</span>
 															</label>
-															<label class="flex items-center gap-2 cursor-pointer group">
+															<label class="flex items-center gap-2.5 cursor-pointer group">
 																<input type="checkbox" :checked="node.disallow_transfer_to_peers" @change="setBool('disallow_transfer_to_peers', $event.target.checked)" class="rounded accent-primary"/>
 																<span class="text-[10px] text-muted-foreground group-hover:text-foreground transition-colors">{ i18n.T(ctx, "Prevent delegation to siblings") }</span>
 															</label>
@@ -614,7 +634,7 @@ templ AgentDesignerDialog() {
 													</div>
 
 													<!-- Tools -->
-													<div class="border-t pt-2 border-border">
+													<div class="border-t pt-3 border-border">
 														<div class="flex items-center justify-between">
 															<button
 																@click="showTools = !showTools"
@@ -622,66 +642,77 @@ templ AgentDesignerDialog() {
 															>
 																@icon.Blocks(icon.Props{Class: "size-3"})
 																Tools
-																<span x-show="toolCount > 0" class="text-[8px] px-1 py-0.5 rounded bg-primary/20 text-primary" x-text="toolCount + ' tool' + (toolCount !== 1 ? 's' : '')"></span>
+																<span x-show="toolCount > 0" class="text-[8px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary" x-text="toolCount"></span>
 																<span class="transition-transform text-[6px]" :class="showTools ? 'rotate-180' : ''">▼</span>
 															</button>
 															<button
 																@click="openAddToolDialog()"
-																class="text-[9px] text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
+																class="text-[9px] text-primary hover:text-primary/80 font-medium transition-colors flex items-center gap-0.5"
 															>
-																+ Add
+																<span>+</span> Add
 															</button>
 														</div>
-														<div x-show="showTools" x-collapse class="pt-2 space-y-2">
+														<div x-show="showTools" x-collapse class="pt-3 space-y-2">
 															<!-- Loading state -->
 															<template x-if="loadingMetadata">
-																<div class="space-y-1.5">
+																<div class="space-y-2">
 																	<template x-for="i in 2" :key="i">
-																		<div class="flex items-center gap-2 p-2 rounded-lg animate-pulse bg-muted">
-																		<div class="size-4 rounded bg-muted-foreground"></div>
-																		<div class="flex-1 h-3 bg-muted-foreground rounded"></div>
+																		<div class="flex items-center gap-3 p-3 rounded-lg animate-pulse bg-muted">
+																			<div class="size-5 rounded bg-muted-foreground/30"></div>
+																			<div class="flex-1 h-4 bg-muted-foreground/30 rounded"></div>
 																		</div>
 																	</template>
 																</div>
 															</template>
 															<!-- No tools configured -->
 															<template x-if="!loadingMetadata && configuredPlugins.length === 0">
-<div class="text-[10px] text-muted-foreground italic py-3 text-center">
+																<div class="text-[10px] text-muted-foreground/60 italic py-4 text-center rounded-md bg-muted/30 border border-border/30">
 																No tools attached. Click + Add to attach tools.
 															</div>
 															</template>
 															<!-- Configured tool list -->
 															<template x-for="plugin in configuredPlugins" :key="plugin.id">
-<div class="rounded-lg overflow-hidden bg-muted border-border">
-																		<div class="flex items-center gap-2 px-2 py-1.5">
-																			@icon.Blocks(icon.Props{Class: "size-3 text-muted-foreground shrink-0"})
-																			<span class="text-[10px] font-medium text-foreground flex-1 truncate" x-text="plugin.name"></span>
-																			<span class="text-[8px] text-muted-foreground" x-text="getToolEnabledCount(plugin) + '/' + plugin.tools?.length"></span>
+																<div class="rounded-lg overflow-hidden bg-muted/50 border border-border">
+																		<div class="flex items-center gap-3 px-3 py-2.5">
+																			<div class="size-8 rounded-md bg-primary/10 flex items-center justify-center">
+																				@icon.Blocks(icon.Props{Class: "size-4 text-primary shrink-0"})
+																			</div>
+																			<div class="flex-1 min-w-0">
+																				<p class="text-[11px] font-medium text-foreground truncate" x-text="plugin.name"></p>
+																				<p class="text-[9px] text-muted-foreground" x-text="getToolEnabledCount(plugin) + '/' + plugin.tools?.length + ' enabled'"></p>
+																			</div>
 																		<button
 																			@click="detachToolSet(plugin)"
 																			title="Detach tool"
-																			class="shrink-0 w-5 h-5 rounded text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors text-[10px]"
+																			class="shrink-0 px-2 py-1 rounded text-[9px] text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors"
 																		>
-																			✕
+																			Remove
 																		</button>
 																	</div>
 																	<!-- Individual tools -->
 																	<template x-if="plugin.tools && plugin.tools.length > 0">
-																		<div class="border-t border-white/5">
+																		<div class="border-t border-border/50 bg-muted/30">
 																			<template x-for="tool in plugin.tools" :key="tool.id">
-																				<div class="flex items-center gap-2 px-2 py-1.5 border-b border-white/5 last:border-0" :class="isToolBlocked(plugin, tool) ? 'opacity-50' : ''">
-																					<span class="w-3 shrink-0"></span>
-																					<span class="text-[9px] text-muted-foreground flex-1 truncate" :class="isToolBlocked(plugin, tool) ? 'line-through' : ''" x-text="tool.name"></span>
+																				<div class="flex items-center gap-3 px-3 py-2 border-b border-border/30 last:border-0" :class="isToolBlocked(plugin, tool) ? 'opacity-50' : ''">
 																					<button
 																						@click="toggleTool(plugin, tool)"
 																						type="button"
 																						role="switch"
 																						:aria-checked="!isToolBlocked(plugin, tool)"
-																						class="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
-																						:class="isToolBlocked(plugin, tool) ? 'bg-gray-600' : 'bg-indigo-500'"
-																					>
-																						<span class="pointer-events-none inline-block size-3 rounded-full bg-background shadow ring-0 transition-transform duration-200" :class="isToolBlocked(plugin, tool) ? 'translate-x-0' : 'translate-x-3'"></span>
-																					</button>
+																				class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+																				:class="isToolBlocked(plugin, tool) ? 'bg-muted-foreground/30' : 'bg-primary'"
+																			>
+																				<span class="pointer-events-none inline-block size-4 rounded-full bg-background shadow ring-0 transition-transform duration-200" :class="isToolBlocked(plugin, tool) ? 'translate-x-0' : 'translate-x-4'"></span>
+																			</button>
+																					<span class="text-[10px] text-foreground flex-1 truncate" :class="isToolBlocked(plugin, tool) ? 'line-through text-muted-foreground' : ''" x-text="tool.name"></span>
+																				</div>
+																			</template>
+																		</div>
+																	</template>
+																</div>
+															</template>
+														</div>
+													</div>
 																				</div>
 																			</template>
 																		</div>
