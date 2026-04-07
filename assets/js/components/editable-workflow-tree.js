@@ -137,7 +137,6 @@ export const editableWorkflowTree = () => {
                 padding: 10px 12px 10px 15px;
                 transition: border-color 0.12s, box-shadow 0.12s, transform 0.15s ease;
                 width: 100%;
-                max-width: 520px;
                 overflow: hidden;
             }
             .ewt-node:hover {
@@ -247,7 +246,6 @@ export const editableWorkflowTree = () => {
             .ewt-branch {
                 flex: 1;
                 min-width: 180px;
-                max-width: 520px;
                 display: flex;
                 flex-direction: column;
                 align-items: center;
@@ -267,7 +265,6 @@ export const editableWorkflowTree = () => {
                 padding: 16px 14px 18px;
                 background: oklch(0.45 0.15 45 / 0.02);
                 width: 100%;
-                max-width: 520px;
                 transition: all 0.2s ease;
             }
             .ewt-loop-wrap:hover {
