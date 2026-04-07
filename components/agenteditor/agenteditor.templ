@@ -82,7 +82,7 @@ templ AgentDesignerDialog() {
 				<template x-if="view === 'list'">
 					<div class="flex flex-col flex-1 overflow-hidden" :class="expanded ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[calc(90vh-8rem)]'">
 						<div class="flex flex-col flex-1 overflow-hidden">
-							<div class="px-4 pt-3 pb-2 flex items-center gap-2">
+							<div class="px-4 pt-3 pb-3 flex items-center gap-3">
 								<div class="flex-1">
 									@input.Input(input.Props{
 										Type:        input.TypeSearch,
@@ -94,6 +94,33 @@ templ AgentDesignerDialog() {
 										},
 									})
 								</div>
+								<!-- Filter Tabs -->
+								<div class="flex items-center gap-0.5 p-0.5 bg-muted/40 rounded-lg">
+									<button
+										type="button"
+										class="px-2.5 py-1 text-[10px] font-medium rounded-md transition-all"
+										:class="agentFilter === 'all' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+										@click="agentFilter = 'all'"
+									>
+										{ i18n.T(ctx, "All") }
+									</button>
+									<button
+										type="button"
+										class="px-2.5 py-1 text-[10px] font-medium rounded-md transition-all"
+										:class="agentFilter === 'agent' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+										@click="agentFilter = 'agent'"
+									>
+										{ i18n.T(ctx, "Agents") }
+									</button>
+									<button
+										type="button"
+										class="px-2.5 py-1 text-[10px] font-medium rounded-md transition-all"
+										:class="agentFilter === 'workflow' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+										@click="agentFilter = 'workflow'"
+									>
+										{ i18n.T(ctx, "Workflows") }
+									</button>
+								</div>
 								@button.Button(button.Props{
 									Size:    button.SizeSm,
 									Variant: button.VariantDefault,
@@ -103,7 +130,7 @@ templ AgentDesignerDialog() {
 									},
 								}) {
 									@icon.Plus(icon.Props{Class: "size-4"})
-									{ i18n.T(ctx, "New Agent") }
+									{ i18n.T(ctx, "New") }
 								}
 							</div>
 							<div class="flex-1 overflow-y-auto px-4 pb-4 scrollbar-thin min-h-[300px]">
@@ -139,71 +166,76 @@ templ AgentDesignerDialog() {
 												</template>
 											</div>
 										</template>
-										<!-- Agent Cards Grid -->
-										<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-											<template x-for="ag in filteredAgents" :key="ag.id">
-												<div
-													class="group relative rounded-xl border border-border hover:border-primary/30 hover:shadow-sm transition-all duration-200 cursor-pointer overflow-hidden bg-card"
-													@click="ag.isComposed ? showEditPipelineForm(ag) : showEditNodeForm(ag)"
-												>
-													<div class="p-4">
-														<div class="flex items-start gap-3">
-															<!-- Agent Icon -->
-															<div
-																class="size-10 rounded-lg flex items-center justify-center shrink-0 [&_svg]:size-5"
-																:class="ag.isComposed ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'bg-primary/10 text-primary'"
-															>
-																<template x-if="ag.isComposed">
-																	@icon.GitBranch(icon.Props{Class: "size-5"})
-																</template>
-																<template x-if="!ag.isComposed">
-																	<span x-html="ag.icon"></span>
-																</template>
-															</div>
-															<div class="flex-1 min-w-0">
-																<h3 class="text-sm font-semibold text-foreground truncate" x-text="ag.name"></h3>
-																<p class="text-xs text-muted-foreground mt-0.5 line-clamp-2" x-text="ag.description || 'No description'"></p>
-															</div>
-														</div>
-														<!-- Metadata -->
-														<div class="flex items-center gap-2 mt-3 pt-2 border-t border-border/50">
-															<template x-if="!ag.isComposed">
-																@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "text-[9px] px-1.5 py-0 h-4"}) {
-																	@icon.Bot(icon.Props{Class: "size-2.5 me-0.5"})
-																	{ i18n.T(ctx, "LLM Agent") }
-																}
-															</template>
-															<template x-if="ag.isComposed">
-																@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "text-[9px] px-1.5 py-0 h-4 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"}) {
-																	@icon.GitBranch(icon.Props{Class: "size-2.5 me-0.5"})
-																	{ i18n.T(ctx, "Workflow") }
-																}
-															</template>
-															<template x-if="ag.isComposed && ag.graph">
-																<span class="text-[10px] text-muted-foreground">
-																	<span x-text="collectAgentIds(ag.graph).length"></span> agents
-																</span>
-															</template>
-															<span class="text-[10px] text-muted-foreground" x-text="formatDate(ag.createdAt || ag.created_at)"></span>
-															<div class="flex-1"></div>
-															<div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" @click.stop>
-																@button.Button(button.Props{
-																	Size:    button.SizeIcon,
-																	Variant: button.VariantGhost,
-																	Class:   "size-7 text-destructive hover:text-destructive",
-																	Attributes: templ.Attributes{
-																		"@click.stop": "ag.isComposed ? confirmDeletePipeline(ag) : confirmDeleteNode(ag)",
-																		"title":       i18n.T(ctx, "Delete"),
-																	},
-																}) {
-																	@icon.Trash2(icon.Props{Class: "size-3.5"})
-																}
-															</div>
-														</div>
-													</div>
-												</div>
-											</template>
+						<!-- Agent Cards Grid -->
+						<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+							<template x-for="ag in filteredAgents" :key="ag.id">
+								<div
+									class="group relative rounded-xl border border-border/60 hover:border-primary/40 hover:shadow-lg transition-all duration-200 cursor-pointer overflow-hidden bg-card"
+									@click="ag.isComposed ? showEditPipelineForm(ag) : showEditNodeForm(ag)"
+								>
+									<!-- Top accent bar -->
+									<div 
+										class="h-1 w-full"
+										:class="ag.isComposed ? 'bg-gradient-to-r from-indigo-500 to-purple-500' : 'bg-gradient-to-r from-emerald-500 to-teal-500'"
+									></div>
+									<div class="p-4 pt-3">
+										<div class="flex items-start gap-3">
+											<!-- Agent Icon -->
+											<div
+												class="size-11 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
+												:class="ag.isComposed ? 'bg-gradient-to-br from-indigo-500/20 to-purple-500/20 text-indigo-600 dark:text-indigo-400' : 'bg-gradient-to-br from-emerald-500/20 to-teal-500/20 text-emerald-600 dark:text-emerald-400'"
+											>
+												<template x-if="ag.isComposed">
+													@icon.GitBranch(icon.Props{Class: "size-5"})
+												</template>
+												<template x-if="!ag.isComposed">
+													<span x-html="ag.icon"></span>
+												</template>
+											</div>
+											<div class="flex-1 min-w-0">
+												<h3 class="text-sm font-semibold text-foreground truncate" x-text="ag.name"></h3>
+												<p class="text-xs text-muted-foreground mt-0.5 line-clamp-2" x-text="ag.description || 'No description'"></p>
+											</div>
 										</div>
+										<!-- Metadata -->
+										<div class="flex items-center gap-2 mt-3 pt-2.5 border-t border-border/40">
+											<template x-if="!ag.isComposed">
+												@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "text-[9px] px-2 py-0 h-5"}) {
+													@icon.Bot(icon.Props{Class: "size-2.5 me-1"})
+													{ i18n.T(ctx, "Agent") }
+												}
+											</template>
+											<template x-if="ag.isComposed">
+												@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "text-[9px] px-2 py-0 h-5 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"}) {
+													@icon.GitBranch(icon.Props{Class: "size-2.5 me-1"})
+													{ i18n.T(ctx, "Workflow") }
+												}
+											</template>
+											<template x-if="ag.isComposed && ag.graph">
+												<span class="text-[10px] text-muted-foreground">
+													<span x-text="collectAgentIds(ag.graph).length"></span> agents
+												</span>
+											</template>
+											<span class="text-[10px] text-muted-foreground/70" x-text="formatDate(ag.createdAt || ag.created_at)"></span>
+											<div class="flex-1"></div>
+											<div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" @click.stop>
+												@button.Button(button.Props{
+													Size:    button.SizeIcon,
+													Variant: button.VariantGhost,
+													Class:   "size-7 text-destructive hover:text-destructive",
+													Attributes: templ.Attributes{
+														"@click.stop": "ag.isComposed ? confirmDeletePipeline(ag) : confirmDeleteNode(ag)",
+														"title":       i18n.T(ctx, "Delete"),
+													},
+												}) {
+													@icon.Trash2(icon.Props{Class: "size-3.5"})
+												}
+											</div>
+										</div>
+									</div>
+								</div>
+							</template>
+						</div>
 									</div>
 								</template>
 							</div>
@@ -229,33 +261,49 @@ templ AgentDesignerDialog() {
 							<h3 class="text-sm font-semibold">{ i18n.T(ctx, "What would you like to create?") }</h3>
 						</div>
 						<div class="flex-1 flex items-center justify-center p-8">
-							<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-lg">
+							<div class="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-2xl">
 								<!-- Single Agent Card -->
 								<button
 									type="button"
 									@click="showCreateNodeForm()"
-									class="group flex flex-col items-center gap-4 p-6 rounded-xl border-2 border-border hover:border-primary/50 hover:shadow-md bg-card transition-all duration-200 text-center cursor-pointer"
+									class="group relative flex flex-col items-center gap-5 p-8 rounded-2xl border-2 border-border/60 hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-500/10 bg-card transition-all duration-300 text-center cursor-pointer overflow-hidden"
 								>
-									<div class="size-14 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-										@icon.Bot(icon.Props{Class: "size-7"})
+									<!-- Hover gradient overlay -->
+									<div class="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+									<div class="relative">
+										<div class="size-16 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shadow-lg shadow-emerald-500/20">
+											@icon.Bot(icon.Props{Class: "size-8"})
+										</div>
 									</div>
-									<div>
-										<h4 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Single Agent") }</h4>
-										<p class="text-xs text-muted-foreground mt-1.5 leading-relaxed">{ i18n.T(ctx, "An AI agent with custom instructions, tools, and knowledge bases.") }</p>
+									<div class="relative">
+										<h4 class="text-base font-bold text-foreground">{ i18n.T(ctx, "Single Agent") }</h4>
+										<p class="text-xs text-muted-foreground mt-2 leading-relaxed max-w-[220px]">{ i18n.T(ctx, "An AI agent with custom instructions, tools, and knowledge bases.") }</p>
+									</div>
+									<div class="relative flex items-center gap-1.5 text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+										<span>Get started</span>
+										@icon.ArrowRight(icon.Props{Class: "size-3"})
 									</div>
 								</button>
 								<!-- Workflow Card -->
 								<button
 									type="button"
 									@click="showCreatePipelineForm()"
-									class="group flex flex-col items-center gap-4 p-6 rounded-xl border-2 border-border hover:border-indigo-500/50 hover:shadow-md bg-card transition-all duration-200 text-center cursor-pointer"
+									class="group relative flex flex-col items-center gap-5 p-8 rounded-2xl border-2 border-border/60 hover:border-indigo-500/50 hover:shadow-xl hover:shadow-indigo-500/10 bg-card transition-all duration-300 text-center cursor-pointer overflow-hidden"
 								>
-									<div class="size-14 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-										@icon.GitBranch(icon.Props{Class: "size-7"})
+									<!-- Hover gradient overlay -->
+									<div class="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+									<div class="relative">
+										<div class="size-16 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-indigo-600/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shadow-lg shadow-indigo-500/20">
+											@icon.GitBranch(icon.Props{Class: "size-8"})
+										</div>
 									</div>
-									<div>
-										<h4 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Multi-Agent Workflow") }</h4>
-										<p class="text-xs text-muted-foreground mt-1.5 leading-relaxed">{ i18n.T(ctx, "Orchestrate multiple agents working together in sequence, parallel, or loops.") }</p>
+									<div class="relative">
+										<h4 class="text-base font-bold text-foreground">{ i18n.T(ctx, "Multi-Agent Workflow") }</h4>
+										<p class="text-xs text-muted-foreground mt-2 leading-relaxed max-w-[220px]">{ i18n.T(ctx, "Orchestrate multiple agents working together in sequence, parallel, or loops.") }</p>
+									</div>
+									<div class="relative flex items-center gap-1.5 text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+										<span>Get started</span>
+										@icon.ArrowRight(icon.Props{Class: "size-3"})
 									</div>
 								</button>
 							</div>
@@ -324,14 +372,14 @@ templ AgentDesignerDialog() {
 				<!-- ═══════════════════════════════════════════ -->
 				<!-- WORKFLOW TREE EDITOR                        -->
 				<!-- ═══════════════════════════════════════════ -->
-				<template x-if="view === 'flow'">
+					<template x-if="view === 'flow'">
 					<div
 							class="relative flex flex-col flex-1 overflow-hidden"
 							:class="expanded ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[calc(90vh-8rem)]'"
 							@keydown.window="if ($event.key === '?' && $event.target.tagName !== 'INPUT' && $event.target.tagName !== 'TEXTAREA' && $event.target.tagName !== 'SELECT' && view === 'flow') { $event.preventDefault(); $store.flow._showHelp = !$store.flow._showHelp; }"
 						>
 						<!-- Header -->
-						<div class="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/50 shrink-0">
+						<div class="flex items-center gap-3 px-4 pt-3 pb-2 border-b border-border/50 shrink-0">
 							@button.Button(button.Props{
 								Size:    button.SizeIcon,
 								Variant: button.VariantGhost,
@@ -343,18 +391,21 @@ templ AgentDesignerDialog() {
 							}) {
 								@icon.ArrowLeft(icon.Props{Class: "size-4"})
 							}
-							<h3 class="text-sm font-semibold" x-text="(editingPipeline ? 'Edit' : 'New') + ' Workflow'"></h3>
+							<div class="flex items-center gap-2">
+								<span class="text-sm font-semibold text-foreground" x-text="(editingPipeline ? 'Edit' : 'New') + ' Workflow'"></span>
+								<span class="text-[10px] text-muted-foreground" x-text="editingPipeline ? 'Configure workflow' : 'Build your workflow'"></span>
+							</div>
 							<div class="flex-1"></div>
-							<div class="flex items-center gap-1">
+							<div class="flex items-center gap-2">
 								<template x-if="isPipelineValid">
-									<span class="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
-										@icon.CircleCheck(icon.Props{Class: "size-3.5"})
+									<span class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+										@icon.CircleCheck(icon.Props{Class: "size-3"})
 										{ i18n.T(ctx, "Valid") }
 									</span>
 								</template>
 								<template x-if="!isPipelineValid">
-									<span class="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400">
-										@icon.TriangleAlert(icon.Props{Class: "size-3.5"})
+									<span class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+										@icon.TriangleAlert(icon.Props{Class: "size-3"})
 										<span x-text="pipelineErrors.length + ' issue' + (pipelineErrors.length !== 1 ? 's' : '')"></span>
 									</span>
 								</template>
@@ -1007,21 +1058,35 @@ templ AgentDesignerDialog() {
 			}
 		}
 		<!-- Toast Notifications -->
-		<div class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
+		<div class="fixed bottom-5 right-5 z-[100] flex flex-col gap-2 pointer-events-none">
 			<template x-for="t in toasts" :key="t.id">
 				<div
-					class="pointer-events-auto max-w-xs px-4 py-2.5 rounded-lg shadow-lg text-xs font-medium transition-all duration-200 flex items-center gap-2"
+					class="pointer-events-auto max-w-sm px-4 py-3 rounded-xl shadow-xl text-xs font-medium transition-all duration-300 flex items-center gap-3 border"
 					:class="{
-						'bg-emerald-600 text-white': t.type === 'success',
-						'bg-red-600 text-white': t.type === 'error',
-						'bg-sky-600 text-white': t.type === 'info',
-						'bg-amber-600 text-white': t.type === 'warning',
-						'opacity-0 translate-y-2': t.leaving,
-						'opacity-100 translate-y-0': !t.leaving,
+						'bg-emerald-600 border-emerald-700 text-white': t.type === 'success',
+						'bg-red-600 border-red-700 text-white': t.type === 'error',
+						'bg-sky-600 border-sky-700 text-white': t.type === 'info',
+						'bg-amber-600 border-amber-700 text-white': t.type === 'warning',
+						'opacity-0 translate-x-4': t.leaving,
+						'opacity-100 translate-x-0': !t.leaving,
 					}"
 				>
-					<span x-text="t.message"></span>
-					<button @click="dismissToast(t.id)" class="ml-1 opacity-70 hover:opacity-100 shrink-0">&times;</button>
+					<template x-if="t.type === 'success'">
+						@icon.CircleCheck(icon.Props{Class: "size-4 shrink-0"})
+					</template>
+					<template x-if="t.type === 'error'">
+						@icon.CircleX(icon.Props{Class: "size-4 shrink-0"})
+					</template>
+					<template x-if="t.type === 'info'">
+						@icon.Info(icon.Props{Class: "size-4 shrink-0"})
+					</template>
+					<template x-if="t.type === 'warning'">
+						@icon.TriangleAlert(icon.Props{Class: "size-4 shrink-0"})
+					</template>
+					<span x-text="t.message" class="flex-1"></span>
+					<button @click="dismissToast(t.id)" class="opacity-60 hover:opacity-100 shrink-0 p-0.5">
+						@icon.X(icon.Props{Class: "size-3.5"})
+					</button>
 				</div>
 			</template>
 		</div>

@@ -19,6 +19,9 @@ export const agentDesigner = () => ({
     /** @type {'list' | 'typeSelect' | 'agentForm' | 'flow' | 'delete'} */
     view: 'list',
 
+    // Agent filter
+    agentFilter: 'all', // 'all' | 'agent' | 'workflow'
+
     // Agent lists
     allAgents: [],      // all agent definitions (both LLM and workflow)
     agents: [],         // non-composed only (for palette/tree builder leaf references)
@@ -197,7 +200,14 @@ export const agentDesigner = () => ({
             const response = await fetch(`/v1/agent-definitions/search?q=${encodeURIComponent(this.searchQuery)}`);
             if (response.ok) {
                 const data = await response.json();
-                this.filteredAgents = data.agents || [];
+                let results = data.agents || [];
+                // Apply type filter
+                if (this.agentFilter === 'agent') {
+                    results = results.filter(a => !a.isComposed);
+                } else if (this.agentFilter === 'workflow') {
+                    results = results.filter(a => a.isComposed);
+                }
+                this.filteredAgents = results;
             }
         } catch (err) {
             console.error('Failed to search agents:', err);
@@ -207,6 +217,15 @@ export const agentDesigner = () => ({
 
     applyFilter() {
         let results = [...this.allAgents];
+        
+        // Apply type filter
+        if (this.agentFilter === 'agent') {
+            results = results.filter(a => !a.isComposed);
+        } else if (this.agentFilter === 'workflow') {
+            results = results.filter(a => a.isComposed);
+        }
+        
+        // Apply search filter
         if (this.searchQuery.trim()) {
             const q = this.searchQuery.toLowerCase();
             results = results.filter(a =>
