@@ -10,7 +10,7 @@ import (
 
 templ GraphSettingsPanel() {
 	@popover.Trigger(popover.TriggerProps{
-		ID:   "graph-settings-popover",
+		For:   "graph-settings-popover",
 		Class: "flex items-center justify-center h-8 w-8 rounded-md border bg-background hover:bg-accent hover:text-accent-foreground transition-all duration-200",
 		Attributes: templ.Attributes{
 			"title": i18n.T(ctx, "Graph Settings"),
