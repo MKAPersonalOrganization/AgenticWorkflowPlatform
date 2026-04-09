@@ -75,10 +75,7 @@ export function createEventHandlerMethods() {
             }
         },
 
-        __handleAgentCalled(value) {
-            const { callerAgent, calledAgent, reason } = value;
-            console.log(`Agent collaboration: ${callerAgent} → ${calledAgent} (${reason})`);
-        },
+
 
         /**
          * Handle AGENT_TRANSFER_STARTED — workflow agent transferred control.
@@ -110,7 +107,6 @@ export function createEventHandlerMethods() {
 
         __handleAgentTransferStarted(value, state, threadId) {
             const { fromAgent, toAgent, workflowType, parentAgent, stepIndex, stepCount, iteration, maxIterations } = value;
-            console.log(`[Workflow] Agent transfer: ${fromAgent} → ${toAgent} (${workflowType || 'direct'}, step ${(stepIndex || 0) + 1}/${stepCount || '?'})`);
 
             // Reset node completion tracking when a new workflow run begins.
             // activeWorkflowContext being null means no prior workflow context existed
@@ -193,7 +189,6 @@ export function createEventHandlerMethods() {
         },
 
         __handleTokenUsageReported(value, state) {
-            console.log('Token usage reported:', value);
             state.tokenUsage = mapTokenUsage(value);
         },
 
@@ -203,7 +198,6 @@ export function createEventHandlerMethods() {
 
         __handleToolStart(value, state) {
             const { toolCallId, toolName, arguments: toolArgs, agentName } = value;
-            console.log(`[Tool] ${toolName} (${toolCallId}) started`);
 
             this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
 
@@ -300,7 +294,6 @@ export function createEventHandlerMethods() {
 
         __handleToolSuccess(value, state) {
             const { toolCallId, toolName, result, arguments: toolArgs, agentName } = value;
-            console.log(`[Tool] ${toolName} (${toolCallId}) completed successfully`);
 
             this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
 
@@ -323,7 +316,6 @@ export function createEventHandlerMethods() {
 
         __handleToolError(value, state) {
             const { toolCallId, toolName, error, arguments: toolArgs, agentName } = value;
-            console.log(`[Tool] ${toolName} (${toolCallId}) error:`, error);
 
             this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
 
@@ -339,7 +331,6 @@ export function createEventHandlerMethods() {
 
         __handleToolNeedsInput(value, state, threadId) {
             const { toolCallId, toolName, question, schema, agentName } = value;
-            console.log(`[Tool] ${toolName} needs input: ${question}`);
 
             this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
 
@@ -362,7 +353,6 @@ export function createEventHandlerMethods() {
 
         __handleToolNeedsAuth(value, state) {
             const { toolCallId, toolName, authSpec, agentName } = value;
-            console.log(`[Tool] ${toolName} needs authorization: ${authSpec.reason}`);
 
             this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
             this.transitionToolState(toolCallId, TOOL_EVENTS.NEEDS_AUTH, { authSpec });
@@ -370,25 +360,21 @@ export function createEventHandlerMethods() {
 
         __handleInputProvided(value) {
             const { toolCallId, input } = value;
-            console.log(`[Tool] Input provided for ${toolCallId}`);
             this.transitionToolState(toolCallId, TOOL_EVENTS.INPUT_PROVIDED, { input });
         },
 
         __handleAuthGranted(value) {
             const { toolCallId } = value;
-            console.log(`[Tool] Authorization granted for ${toolCallId}`);
             this.transitionToolState(toolCallId, TOOL_EVENTS.AUTH_GRANTED, {});
         },
 
         __handleAuthDenied(value) {
             const { toolCallId } = value;
-            console.log(`[Tool] Authorization denied for ${toolCallId}`);
             this.transitionToolState(toolCallId, TOOL_EVENTS.AUTH_DENIED, {});
         },
 
         __handleToolCancelled(value, state) {
             const { toolCallId, toolName } = value;
-            console.log(`[Tool] ${toolName} (${toolCallId}) cancelled`);
 
             this.transitionToolState(toolCallId, TOOL_EVENTS.CANCELLED, { toolName });
         },
@@ -401,7 +387,6 @@ export function createEventHandlerMethods() {
          * Handle TEXT_MESSAGE_START event
          */
         __handleTextMessageStart(event, state, threadId) {
-            console.log(`[STREAM] TEXT_MESSAGE_START for messageId: ${event.messageId}`);
             state.showTypingIndicator = false;
             state.currentStreamingId = event.messageId;
 
@@ -413,7 +398,6 @@ export function createEventHandlerMethods() {
                 this.__perfMetrics.avgResponseTime =
                     (this.__perfMetrics.avgResponseTime * (this.__perfMetrics.messagesReceived - 1) + responseTime) /
                     this.__perfMetrics.messagesReceived;
-                console.log(`Response time: ${responseTime}ms (avg: ${Math.round(this.__perfMetrics.avgResponseTime)}ms)`);
             }
 
             if (threadId === this.__currentThreadId) {
@@ -435,10 +419,8 @@ export function createEventHandlerMethods() {
                     const canonical = state.messages.find(m => m.id === canonicalId);
                     if (canonical) {
                         canonical.streaming = true;
-                        console.log(`[STREAM] Coalescing parallel msg ${event.messageId} → ${canonicalId} (${agentName})`);
                     }
                 } else {
-                    console.log(`[STREAM] Adding new assistant message for ID: ${event.messageId}`);
                     state.messages.push({
                         id: event.messageId,
                         role: 'assistant',
@@ -460,7 +442,6 @@ export function createEventHandlerMethods() {
                     }
                 }
             } else {
-                console.log(`[STREAM] Message already exists for ID: ${event.messageId}, marking as streaming`);
                 existingMsg.streaming = true;
             }
 
@@ -488,11 +469,6 @@ export function createEventHandlerMethods() {
                     streaming: true
                 });
                 msgIndex = state.messages.length - 1;
-            }
-
-            // Log very selectively (first few chars) to avoid log spam but confirm it's working
-            if (!this.__tokenBuffer?.[resolvedId] && state.messages[msgIndex].content.length === 0) {
-                console.log(`[STREAM] First token for ${event.messageId}: "${event.delta}"`);
             }
 
             // Buffer delta into a plain (non-reactive) map — avoids triggering Alpine
@@ -535,7 +511,6 @@ export function createEventHandlerMethods() {
         __handleTextMessageEnd(event, state, threadId) {
             // Resolve coalesced parallel message ID
             const resolvedId = state.parallelCoalesceMap[event.messageId] || event.messageId;
-            console.log(`[STREAM] TEXT_MESSAGE_END for messageId: ${event.messageId}${resolvedId !== event.messageId ? ` (coalesced → ${resolvedId})` : ''}`);
 
             // Cancel any pending RAF and flush remaining buffered tokens.
             // The KaTeX cache + output cache in renderMarkdown make this final
@@ -737,8 +712,6 @@ export function createEventHandlerMethods() {
          */
         __ensureToolCallMessage(state, toolCallId, toolName, agentName) {
             if (state.toolCalls[toolCallId]) return;
-
-            console.log(`[STREAM] Lazily creating tool call message for ${toolName} (${toolCallId})`);
 
             state.toolCalls[toolCallId] = {
                 id: toolCallId,

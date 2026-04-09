@@ -41,7 +41,7 @@ const compassBase = `<svg class="%s" viewBox="0 0 32 32" fill="none" xmlns="http
 // class controls sizing (e.g. "size-4", "size-5", "size-12").
 func CompassLogo(class string) templ.Component {
 	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
-		_, err := w.Write([]byte(fmt.Sprintf(compassBase, class)))
+		_, err := fmt.Fprintf(w, compassBase, class)
 		return err
 	})
 }
@@ -52,7 +52,7 @@ func CompassLogo(class string) templ.Component {
 // so the animation feels native to the UI, not layered on top.
 func CompassLogoAnimated(class string) templ.Component {
 	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
-		_, err := w.Write([]byte(fmt.Sprintf(compassBase, class+" compass-live")))
+		_, err := fmt.Fprintf(w, compassBase, class+" compass-live")
 		return err
 	})
 }

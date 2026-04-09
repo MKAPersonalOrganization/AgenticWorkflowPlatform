@@ -1,11 +1,10 @@
 package multiagent
 
 import (
-	"encoding/json"
-	"net/http"
-
 	"aicompass/foundation/logger"
 	"aicompass/shared"
+	"encoding/json"
+	"net/http"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────

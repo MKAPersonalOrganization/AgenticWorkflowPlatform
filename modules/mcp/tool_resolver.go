@@ -1,11 +1,10 @@
 package mcp
 
 import (
+	"aicompass/foundation/agent"
 	"context"
 	"encoding/json"
 	"fmt"
-
-	"aicompass/foundation/agent"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )

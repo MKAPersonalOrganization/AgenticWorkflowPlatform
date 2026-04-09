@@ -1,12 +1,11 @@
 package todos
 
 import (
+	"aicompass/foundation/agent"
 	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"aicompass/foundation/agent"
 )
 
 // TodoStatus represents the state of a single todo item.

@@ -1,11 +1,10 @@
 package preferences
 
 import (
-	"encoding/json"
-	"net/http"
-
 	"aicompass/foundation/logger"
 	"aicompass/shared"
+	"encoding/json"
+	"net/http"
 )
 
 // handler manages user preference HTTP requests.

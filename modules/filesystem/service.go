@@ -1,13 +1,12 @@
 package filesystem
 
 import (
+	"aicompass/infra/githubauth"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"time"
-
-	"aicompass/infra/githubauth"
 
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"

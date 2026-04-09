@@ -1,12 +1,11 @@
 package tracker
 
 import (
+	"aicompass/foundation/agent"
+	"aicompass/platform/toolregistry"
 	"context"
 	"sync"
 	"time"
-
-	"aicompass/foundation/agent"
-	"aicompass/platform/toolregistry"
 
 	"github.com/a-h/templ"
 )

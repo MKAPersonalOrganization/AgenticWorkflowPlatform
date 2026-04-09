@@ -1,13 +1,12 @@
 package permissions
 
 import (
-	"encoding/json"
-	"net/http"
-
 	"aicompass/foundation/agent"
 	"aicompass/foundation/logger"
 	"aicompass/modules/permissions/workspace"
 	"aicompass/shared"
+	"encoding/json"
+	"net/http"
 
 	"github.com/google/uuid"
 )

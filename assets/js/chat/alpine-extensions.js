@@ -54,7 +54,5 @@ export function chatPlugin(Alpine) {
             getSettings() { return Alpine.store('chatSettings'); },
             isHealthy() { return this.getComponent()?.isHealthy?.() ?? false; },
         };
-
-        console.log('[Chat] Debug: window.__chatDebug available');
     }
 }

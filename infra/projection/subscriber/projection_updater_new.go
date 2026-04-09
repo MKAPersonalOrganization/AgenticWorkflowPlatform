@@ -2,6 +2,7 @@
 package subscriber
 
 import (
+	"aicompass/foundation/logger"
 	"context"
 	"database/sql"
 	"fmt"
@@ -9,7 +10,6 @@ import (
 	"time"
 
 	es "aicompass/foundation/eventsourcing"
-	"aicompass/foundation/logger"
 
 	pgstore "aicompass/infra/eventstore/postgres"
 

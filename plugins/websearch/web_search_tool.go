@@ -1,6 +1,7 @@
 package websearch
 
 import (
+	"aicompass/foundation/agent"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -8,8 +9,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"aicompass/foundation/agent"
 )
 
 // =========================================================================

@@ -1,14 +1,13 @@
 package toolregistry_test
 
 import (
-	"context"
-	"os"
-	"testing"
-
 	"aicompass/foundation/logger"
 	"aicompass/platform/toolregistry"
 	"aicompass/platform/toolregistry/mocks"
 	"aicompass/plugins/calculator"
+	"context"
+	"os"
+	"testing"
 )
 
 func TestToolSetFunctionality(t *testing.T) {

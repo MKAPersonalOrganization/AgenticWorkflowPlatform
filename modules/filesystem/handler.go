@@ -1,13 +1,12 @@
 package filesystem
 
 import (
+	"aicompass/shared"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
-
-	"aicompass/shared"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"

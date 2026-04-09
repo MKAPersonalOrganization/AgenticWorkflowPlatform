@@ -1,13 +1,12 @@
 package askuser
 
 import (
+	"aicompass/foundation/agent"
+	"aicompass/foundation/agent/io"
 	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"aicompass/foundation/agent"
-	"aicompass/foundation/agent/io"
 )
 
 // AskUserQuestionType enumerates the supported question types.

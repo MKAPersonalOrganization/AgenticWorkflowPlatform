@@ -1,6 +1,7 @@
 package query
 
 import (
+	"aicompass/shared"
 	"bufio"
 	"bytes"
 	"context"
@@ -8,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"aicompass/shared"
 	"strings"
 )
 

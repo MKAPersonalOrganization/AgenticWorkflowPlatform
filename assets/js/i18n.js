@@ -88,9 +88,6 @@ function initI18n() {
         // Ensure HTML attributes are set correctly
         document.documentElement.lang = currentLang;
         document.documentElement.dir = lang.dir;
-
-        // Log initialization for debugging
-        console.log(`i18n initialized: ${lang.nativeName} (${lang.dir})`);
     }
 }
 

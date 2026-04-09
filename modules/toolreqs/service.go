@@ -1,13 +1,12 @@
 package toolreqs
 
 import (
-	"context"
-	"fmt"
-	"time"
-
 	"aicompass/foundation/agent"
 	"aicompass/foundation/logger"
 	"aicompass/foundation/permcache"
+	"context"
+	"fmt"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )

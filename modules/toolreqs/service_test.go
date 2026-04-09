@@ -1,13 +1,12 @@
 package toolreqs_test
 
 import (
-	"context"
-	"io"
-	"testing"
-
 	"aicompass/foundation/logger"
 	"aicompass/modules/toolreqs"
 	"aicompass/modules/toolreqs/mocks"
+	"context"
+	"io"
+	"testing"
 
 	"github.com/alicebob/miniredis/v2"
 	goredis "github.com/redis/go-redis/v9"

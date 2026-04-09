@@ -1,13 +1,12 @@
 package filesystem
 
 import (
+	"aicompass/infra/githubauth"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"net/http"
 	"net/url"
-
-	"aicompass/infra/githubauth"
 )
 
 // githubHandler handles GitHub OAuth connection endpoints.

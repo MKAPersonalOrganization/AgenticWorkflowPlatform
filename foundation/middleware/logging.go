@@ -2,9 +2,9 @@
 package middleware
 
 import (
+	"aicompass/foundation/logger"
 	"fmt"
 	"net/http"
-	"aicompass/foundation/logger"
 	"time"
 )
 

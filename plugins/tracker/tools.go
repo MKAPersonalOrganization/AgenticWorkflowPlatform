@@ -1,12 +1,11 @@
 package tracker
 
 import (
+	"aicompass/foundation/agent"
 	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"aicompass/foundation/agent"
 )
 
 // ═══════════════════════════════════════════════════════════════════════════════

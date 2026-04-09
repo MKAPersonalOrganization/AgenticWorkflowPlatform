@@ -1,13 +1,13 @@
 package entities
 
 import (
+	"aicompass/shared"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
-	"aicompass/shared"
 	"strconv"
 	"time"
 )

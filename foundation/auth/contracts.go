@@ -1,10 +1,9 @@
 package auth
 
 import (
+	"aicompass/shared"
 	"context"
 	"net/http"
-
-	"aicompass/shared"
 )
 
 // SessionReader retrieves the authenticated user's identity from an HTTP session.

@@ -1,8 +1,8 @@
 package cognitive
 
 import (
-	"context"
 	"aicompass/foundation/agent"
+	"context"
 )
 
 // ThinkArgs represents the arguments for the think tool.

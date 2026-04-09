@@ -1,10 +1,9 @@
 package codebase
 
 import (
-	"context"
-
 	"aicompass/foundation/agent"
 	"aicompass/platform/toolregistry"
+	"context"
 
 	"github.com/a-h/templ"
 )

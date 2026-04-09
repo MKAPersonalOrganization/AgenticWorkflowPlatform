@@ -3,11 +3,11 @@ package pipeline
 // Extended service methods for additional pipeline endpoints.
 
 import (
+	"aicompass/shared"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"aicompass/shared"
 )
 
 // PricingResponse represents pipeline cost pricing.

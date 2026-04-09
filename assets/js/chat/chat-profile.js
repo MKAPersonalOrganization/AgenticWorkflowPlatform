@@ -75,11 +75,8 @@ export function createProfileMethods() {
         async fetchBanner() {
             try {
                 const response = await fetch('/api/banner');
-                console.log('[Banner] Fetching banner...', response.status);
                 if (response.ok) {
                     const data = await response.json();
-                    console.log('[Banner] Data:', data);
-                    console.log('[Banner] Dismissed IDs:', this.bannerDismissedIds);
                     this.banner = data;
                 }
             } catch (error) {

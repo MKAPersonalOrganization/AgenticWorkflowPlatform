@@ -1,10 +1,9 @@
 package toolreqs_test
 
 import (
+	"aicompass/modules/toolreqs"
 	"context"
 	"testing"
-
-	"aicompass/modules/toolreqs"
 )
 
 // =============================================================================

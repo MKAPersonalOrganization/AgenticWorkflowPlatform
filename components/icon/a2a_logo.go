@@ -27,7 +27,7 @@ const a2aLogoBase = `<svg class="%s" viewBox="0 0 860 860" fill="none" xmlns="ht
 // Uses currentColor so it automatically adapts to light and dark themes.
 func A2ALogo(class string) templ.Component {
 	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
-		_, err := w.Write([]byte(fmt.Sprintf(a2aLogoBase, class)))
+		_, err := fmt.Fprintf(w, a2aLogoBase, class)
 		return err
 	})
 }

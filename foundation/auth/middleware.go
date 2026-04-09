@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"aicompass/shared"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -9,8 +10,6 @@ import (
 	"net/url"
 	"sync"
 	"time"
-
-	"aicompass/shared"
 )
 
 // sessionCacheEntry holds a cached user with its expiration time.

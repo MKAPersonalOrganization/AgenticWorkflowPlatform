@@ -1,15 +1,14 @@
 package mcp
 
 import (
+	"aicompass/foundation/i18n"
+	"aicompass/foundation/logger"
+	"aicompass/shared"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/url"
-
-	"aicompass/foundation/i18n"
-	"aicompass/foundation/logger"
-	"aicompass/shared"
 
 	"github.com/go-chi/chi/v5"
 )

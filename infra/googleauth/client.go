@@ -1,11 +1,11 @@
 package googleauth
 
 import (
+	"aicompass/shared"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"aicompass/shared"
 	"time"
 
 	"github.com/google/uuid"

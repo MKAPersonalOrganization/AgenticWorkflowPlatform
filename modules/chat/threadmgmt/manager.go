@@ -1,12 +1,12 @@
 package threadmgmt
 
 import (
+	"aicompass/foundation/logger"
 	"context"
 	"errors"
 	"fmt"
 	"time"
 
-	"aicompass/foundation/logger"
 	threadpkg "aicompass/modules/chat/thread"
 )
 

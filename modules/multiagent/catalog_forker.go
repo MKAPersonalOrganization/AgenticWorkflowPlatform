@@ -1,14 +1,13 @@
 package multiagent
 
 import (
+	"aicompass/foundation/logger"
+	"aicompass/modules/agentstore"
 	"context"
 	"encoding/json"
 	"fmt"
 
 	"github.com/google/uuid"
-
-	"aicompass/foundation/logger"
-	"aicompass/modules/agentstore"
 )
 
 // catalogSubAgent mirrors agentstore.CatalogSubAgent for JSON unmarshalling.

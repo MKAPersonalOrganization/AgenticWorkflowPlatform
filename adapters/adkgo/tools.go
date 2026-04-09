@@ -1,12 +1,11 @@
 package adkgo
 
 import (
+	"aicompass/foundation/agent"
 	"encoding/json"
 	"fmt"
 
 	"github.com/google/jsonschema-go/jsonschema"
-
-	"aicompass/foundation/agent"
 
 	adktool "google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"

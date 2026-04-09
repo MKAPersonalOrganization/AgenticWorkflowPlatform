@@ -1,6 +1,7 @@
 package taskmgmt
 
 import (
+	"aicompass/platform/artifact"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,8 +9,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"aicompass/platform/artifact"
 
 	"github.com/google/uuid"
 )

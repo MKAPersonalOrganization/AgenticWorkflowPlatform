@@ -1,8 +1,8 @@
 package threadmgmt
 
 import (
-	"context"
 	"aicompass/modules/chat/thread"
+	"context"
 )
 
 // EventStoreAdapter adapts thread.EventStore.

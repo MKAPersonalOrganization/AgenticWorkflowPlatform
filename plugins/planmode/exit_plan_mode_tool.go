@@ -1,12 +1,11 @@
 package planmode
 
 import (
+	"aicompass/foundation/agent"
 	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"aicompass/foundation/agent"
 )
 
 var exitPlanModeSchema = &agent.Schema{

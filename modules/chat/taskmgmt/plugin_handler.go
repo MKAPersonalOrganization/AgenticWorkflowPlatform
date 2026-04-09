@@ -1,10 +1,9 @@
 package taskmgmt
 
 import (
+	"aicompass/platform/toolregistry"
 	"encoding/json"
 	"net/http"
-
-	"aicompass/platform/toolregistry"
 )
 
 // PluginResponse represents a plugin (tool set) in the simplified API.

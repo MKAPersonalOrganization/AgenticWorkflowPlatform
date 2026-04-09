@@ -23,11 +23,10 @@
 package knowledge
 
 import (
-	"context"
-
-	"aicompass/foundation/logger"
 	"aicompass/foundation/auth"
+	"aicompass/foundation/logger"
 	"aicompass/modules/knowledge/edgequake"
+	"context"
 
 	"github.com/go-chi/chi/v5"
 )

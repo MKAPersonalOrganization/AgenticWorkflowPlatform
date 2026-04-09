@@ -1,6 +1,7 @@
 package adkgo
 
 import (
+	"aicompass/modules/chat/thread"
 	"encoding/json"
 	"strings"
 	"time"
@@ -8,8 +9,6 @@ import (
 	"google.golang.org/adk/session"
 	adktool "google.golang.org/adk/tool"
 	"google.golang.org/genai"
-
-	"aicompass/modules/chat/thread"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────

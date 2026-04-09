@@ -165,7 +165,6 @@ export function createMessagingMethods() {
                     // Load token usage if available
                     if (data.tokenUsage) {
                         state.tokenUsage = mapTokenUsage(data.tokenUsage);
-                        console.log('Token usage loaded from history:', state.tokenUsage);
                     }
 
                     // Scroll to bottom after loading (tracked deferred retries)
@@ -408,8 +407,6 @@ export function createMessagingMethods() {
          * @param {string} threadId - Thread ID
          */
         __handleMessagesSnapshot(event, threadId) {
-            console.log('[MESSAGES_SNAPSHOT] Received for thread', threadId, 'with', event?.messages?.length || 0, 'messages');
-
             if (!event?.messages || !Array.isArray(event.messages)) {
                 console.warn('Invalid MESSAGES_SNAPSHOT:', event);
                 return;
@@ -433,8 +430,6 @@ export function createMessagingMethods() {
 
             // Sync stateful components (XState)
             this.__syncThreadToolStates(uiMessages, {}, threadId);
-
-            console.log('[MESSAGES_SNAPSHOT] Processing', state.messages.length, 'messages');
 
             // Scroll to bottom
             if (threadId === this.__currentThreadId) {

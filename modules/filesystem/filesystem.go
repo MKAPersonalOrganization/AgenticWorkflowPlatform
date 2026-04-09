@@ -1,10 +1,9 @@
 package filesystem
 
 import (
-	"net/http"
-
 	"aicompass/foundation/auth"
 	"aicompass/infra/githubauth"
+	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"

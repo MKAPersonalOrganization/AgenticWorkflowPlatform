@@ -1,10 +1,9 @@
 package agui
 
 import (
+	"aicompass/modules/chat/thread"
 	"context"
 	"time"
-
-	"aicompass/modules/chat/thread"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )

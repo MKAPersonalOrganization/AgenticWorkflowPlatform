@@ -1,10 +1,10 @@
 package middleware_test
 
 import (
+	"aicompass/foundation/middleware"
 	"crypto/tls"
 	"net/http"
 	"net/http/httptest"
-	"aicompass/foundation/middleware"
 	"testing"
 )
 

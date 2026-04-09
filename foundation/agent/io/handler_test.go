@@ -1,11 +1,10 @@
 package io_test
 
 import (
+	"aicompass/foundation/agent/io"
 	"context"
 	"errors"
 	"testing"
-
-	"aicompass/foundation/agent/io"
 )
 
 // =============================================================================

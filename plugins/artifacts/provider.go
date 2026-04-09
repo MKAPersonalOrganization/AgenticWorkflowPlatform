@@ -6,11 +6,10 @@
 package artifacts
 
 import (
-	"context"
-	"time"
-
 	"aicompass/foundation/agent"
 	"aicompass/platform/toolregistry"
+	"context"
+	"time"
 
 	"github.com/a-h/templ"
 )
@@ -67,4 +66,4 @@ func (p *Provider) CreateExecutable(_ context.Context, _ string, _ toolregistry.
 }
 
 func (p *Provider) GetUITemplate() templ.Component { return nil }
-func (p *Provider) UIHandledTools() []string        { return nil }
+func (p *Provider) UIHandledTools() []string       { return nil }

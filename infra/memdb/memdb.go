@@ -76,16 +76,16 @@ func (s *Service) AddSessionToMemory(ctx context.Context, sess session.Session) 
 	defer stmt.Close()
 
 	for event := range sess.Events().All() {
-		if event.LLMResponse.Content == nil {
+		if event.Content == nil {
 			continue
 		}
 
-		text := extractText(event.LLMResponse.Content)
+		text := extractText(event.Content)
 		if strings.TrimSpace(text) == "" {
 			continue
 		}
 
-		contentJSON, err := json.Marshal(event.LLMResponse.Content)
+		contentJSON, err := json.Marshal(event.Content)
 		if err != nil {
 			continue // skip unmarshallable events
 		}

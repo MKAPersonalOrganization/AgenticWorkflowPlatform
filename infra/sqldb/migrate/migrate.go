@@ -2,10 +2,10 @@
 package migrate
 
 import (
+	"aicompass/infra/sqldb"
 	"context"
 	_ "embed"
 	"fmt"
-	"aicompass/infra/sqldb"
 
 	"github.com/ardanlabs/darwin/v3"
 	"github.com/ardanlabs/darwin/v3/dialects/postgres"

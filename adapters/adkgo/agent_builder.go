@@ -71,13 +71,13 @@ type llmAgentParams struct {
 	prompt string
 
 	// Callbacks (from middleware bridge and requirements)
-	beforeAgentCallbacks  []agent.BeforeAgentCallback
-	afterAgentCallbacks   []agent.AfterAgentCallback
-	beforeModelCallbacks  []llmagent.BeforeModelCallback
-	afterModelCallbacks   []llmagent.AfterModelCallback
-	beforeToolCallbacks   []llmagent.BeforeToolCallback
-	afterToolCallbacks    []llmagent.AfterToolCallback
-	onToolErrorCallbacks  []llmagent.OnToolErrorCallback
+	beforeAgentCallbacks []agent.BeforeAgentCallback
+	afterAgentCallbacks  []agent.AfterAgentCallback
+	beforeModelCallbacks []llmagent.BeforeModelCallback
+	afterModelCallbacks  []llmagent.AfterModelCallback
+	beforeToolCallbacks  []llmagent.BeforeToolCallback
+	afterToolCallbacks   []llmagent.AfterToolCallback
+	onToolErrorCallbacks []llmagent.OnToolErrorCallback
 
 	// Optional workflow node overrides (nil for regular agents)
 	nodeOverride *fagent.WorkflowNodeInfo
@@ -125,9 +125,10 @@ func buildLLMAgent(p llmAgentParams) (agent.Agent, error) {
 		if n.DisallowTransferToPeers != nil {
 			cfg.DisallowTransferToPeers = *n.DisallowTransferToPeers
 		}
-		if n.IncludeContents == "none" {
+		switch n.IncludeContents {
+		case "none":
 			cfg.IncludeContents = llmagent.IncludeContentsNone
-		} else if n.IncludeContents == "default" {
+		case "default":
 			cfg.IncludeContents = llmagent.IncludeContentsDefault
 		}
 		if n.OutputKey != "" {

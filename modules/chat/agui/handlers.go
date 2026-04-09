@@ -1,13 +1,12 @@
 package agui
 
 import (
+	"aicompass/modules/chat/projection/agui"
+	"aicompass/shared"
 	"bytes"
 	"encoding/json"
 	"net/http"
 	"strconv"
-
-	"aicompass/modules/chat/projection/agui"
-	"aicompass/shared"
 )
 
 // AguiProjectionHandler provides HTTP endpoints for querying the AGUI projection.

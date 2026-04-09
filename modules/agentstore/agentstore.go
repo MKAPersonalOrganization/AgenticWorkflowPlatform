@@ -1,10 +1,9 @@
 package agentstore
 
 import (
-	"context"
-
 	"aicompass/foundation/auth"
 	"aicompass/foundation/logger"
+	"context"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"

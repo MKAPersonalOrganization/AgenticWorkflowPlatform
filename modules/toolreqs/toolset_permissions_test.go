@@ -1,14 +1,13 @@
 package toolreqs_test
 
 import (
-	"context"
-	"os"
-	"testing"
-
 	"aicompass/foundation/logger"
 	"aicompass/modules/toolreqs"
 	"aicompass/modules/toolreqs/mocks"
 	"aicompass/platform/toolregistry"
+	"context"
+	"os"
+	"testing"
 
 	toolregistry_mocks "aicompass/platform/toolregistry/mocks"
 

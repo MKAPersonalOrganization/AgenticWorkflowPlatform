@@ -1,6 +1,8 @@
 package agui
 
 import (
+	"aicompass/modules/chat/projection/agui"
+	"aicompass/shared"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -8,9 +10,6 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
-
-	"aicompass/modules/chat/projection/agui"
-	"aicompass/shared"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 )

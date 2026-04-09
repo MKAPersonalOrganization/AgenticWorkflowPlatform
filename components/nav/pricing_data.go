@@ -1,9 +1,9 @@
 package nav
 
 import (
+	"aicompass/foundation/i18n"
 	"context"
 	"fmt"
-	"aicompass/foundation/i18n"
 )
 
 // activationAlpineData returns the Alpine.js x-data JSON for the activation

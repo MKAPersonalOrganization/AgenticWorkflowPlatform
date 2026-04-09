@@ -1,15 +1,14 @@
 package llmcontext
 
 import (
+	"aicompass/foundation/event"
+	"aicompass/foundation/logger"
+	"aicompass/modules/chat/thread"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
-
-	"aicompass/foundation/event"
-	"aicompass/foundation/logger"
-	"aicompass/modules/chat/thread"
 
 	"github.com/jmoiron/sqlx"
 )

@@ -1,13 +1,13 @@
 package documents
 
 import (
+	"aicompass/shared"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"aicompass/shared"
 	"strings"
 	"testing"
 

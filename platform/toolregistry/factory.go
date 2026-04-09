@@ -1,12 +1,11 @@
 package toolregistry
 
 import (
+	"aicompass/foundation/agent"
+	"aicompass/platform/artifact"
 	"context"
 	"fmt"
 	"sync"
-
-	"aicompass/foundation/agent"
-	"aicompass/platform/artifact"
 )
 
 // ExecutableToolFactory creates executable tools from tool registry entries and tool sets.

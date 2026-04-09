@@ -1,12 +1,12 @@
 package workspaces
 
 import (
+	"aicompass/shared"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"aicompass/shared"
 
 	"github.com/google/uuid"
 )

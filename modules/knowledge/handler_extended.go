@@ -6,14 +6,14 @@ package knowledge
 // settings, and models.
 
 import (
-	"encoding/json"
-	"net/http"
 	"aicompass/modules/knowledge/rag/costs"
 	"aicompass/modules/knowledge/rag/entities"
 	"aicompass/modules/knowledge/rag/pipeline"
 	"aicompass/modules/knowledge/rag/relationships"
 	"aicompass/modules/knowledge/rag/tasks"
 	"aicompass/modules/knowledge/rag/workspaces"
+	"encoding/json"
+	"net/http"
 	"strconv"
 	"strings"
 

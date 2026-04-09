@@ -1,12 +1,11 @@
 package taskmgmt
 
 import (
+	"aicompass/foundation/agent"
 	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
-
-	"aicompass/foundation/agent"
 )
 
 // defaultAgentIconSVG is the fallback compass icon for agents without a valid SVG icon.

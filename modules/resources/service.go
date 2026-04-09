@@ -1,12 +1,11 @@
 package resources
 
 import (
+	"aicompass/platform/artifact"
 	"context"
 	"fmt"
 	"io"
 	"time"
-
-	"aicompass/platform/artifact"
 
 	"github.com/google/uuid"
 )

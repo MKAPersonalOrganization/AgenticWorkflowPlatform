@@ -4,11 +4,10 @@
 package gemini
 
 import (
+	"aicompass/plugins/websearch"
 	"context"
 	"fmt"
 	"strings"
-
-	"aicompass/plugins/websearch"
 
 	"google.golang.org/genai"
 )

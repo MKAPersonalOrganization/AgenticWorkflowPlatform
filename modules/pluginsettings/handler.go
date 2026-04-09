@@ -1,13 +1,12 @@
 package pluginsettings
 
 import (
-	"encoding/json"
-	"net/http"
-
 	"aicompass/foundation/i18n"
 	"aicompass/foundation/logger"
 	"aicompass/platform/toolregistry"
 	"aicompass/shared"
+	"encoding/json"
+	"net/http"
 
 	"github.com/go-chi/chi/v5"
 )

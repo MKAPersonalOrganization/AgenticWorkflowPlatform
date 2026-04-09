@@ -2,13 +2,13 @@
 package sqldb
 
 import (
+	"aicompass/foundation/logger"
+	"aicompass/foundation/otel"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"net/url"
-	"aicompass/foundation/logger"
-	"aicompass/foundation/otel"
 	"strings"
 	"time"
 

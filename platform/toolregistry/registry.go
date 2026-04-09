@@ -1,11 +1,10 @@
 package toolregistry
 
 import (
+	"aicompass/foundation/logger"
 	"context"
 	"fmt"
 	"time"
-
-	"aicompass/foundation/logger"
 )
 
 // Tool represents a tool available in the registry.

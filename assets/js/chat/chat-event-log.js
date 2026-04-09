@@ -66,6 +66,9 @@ export function createEventLogMethods() {
         __addEvent(event, threadId) {
             if (!this.eventLogEnabled) return;
 
+            // Skip high-frequency events that flood the log
+            if (event.type === 'TEXT_MESSAGE_CONTENT') return;
+
             const state = this.__getThreadState(threadId);
 
             state.events.push({
@@ -171,7 +174,6 @@ export function createEventLogMethods() {
                 }).join('\n---\n');
 
                 await navigator.clipboard.writeText(logText);
-                console.log(window.i18n.t('Event log copied to clipboard!'));
 
                 this.eventLogCopied = true;
                 setTimeout(() => {
