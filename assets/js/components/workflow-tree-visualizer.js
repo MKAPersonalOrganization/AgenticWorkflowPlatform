@@ -1,54 +1,24 @@
 /**
- * Workflow Tree Visualizer — Premium Pipeline View
+ * Workflow Tree Visualizer — Horizontal Pipeline View
  *
- * Renders the recursive composition tree as a polished top-down pipeline
+ * Renders the recursive composition tree as a polished left-to-right pipeline
  * using native HTML/CSS with the app's theme CSS variables.  Features:
  *
  *   • Glass-morphism node cards with theme-aware colours
- *   • Animated flow particles on connectors
- *   • Fork / join visual for parallel branches
+ *   • Animated flow particles on horizontal connectors
+ *   • Vertical fork / join visual for parallel branches
  *   • Loop-back indicator with iteration badge
- *   • Responsive – works inside the dialog scroll area
+ *   • Horizontal scroll – ideal for bottom-docked debugger panels
  *   • Fully reactive – updates as the user edits the tree
  */
 export function workflowTreeVisualizer() {
     // ── Type metadata ───────────────────────────────────────────────
     const META = {
-        sequential: {
-            icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>`,
-            label: 'Sequential',
-            accent: 'var(--wf-blue)',
-            accentMuted: 'var(--wf-blue-muted)',
-            accentFg: 'var(--wf-blue-fg)',
-        },
-        parallel: {
-            icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v18"/><path d="M16 3v18"/></svg>`,
-            label: 'Parallel',
-            accent: 'var(--wf-amber)',
-            accentMuted: 'var(--wf-amber-muted)',
-            accentFg: 'var(--wf-amber-fg)',
-        },
-        loop: {
-            icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>`,
-            label: 'Loop',
-            accent: 'var(--wf-purple)',
-            accentMuted: 'var(--wf-purple-muted)',
-            accentFg: 'var(--wf-purple-fg)',
-        },
-        agent: {
-            icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>`,
-            label: 'Agent',
-            accent: 'var(--wf-emerald)',
-            accentMuted: 'var(--wf-emerald-muted)',
-            accentFg: 'var(--wf-emerald-fg)',
-        },
-        conditional: {
-            icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg>`,
-            label: 'Conditional',
-            accent: 'var(--wf-red, oklch(0.62 0.2 25))',
-            accentMuted: 'var(--wf-red-muted, oklch(0.62 0.2 25 / 12%))',
-            accentFg: 'var(--wf-red-fg, oklch(0.55 0.22 25))',
-        },
+        sequential: { label: 'Sequential' },
+        parallel: { label: 'Parallel' },
+        loop: { label: 'Loop' },
+        agent: { label: 'Agent' },
+        conditional: { label: 'Conditional' },
     };
 
     function esc(s) {
@@ -61,242 +31,6 @@ export function workflowTreeVisualizer() {
         const style = document.createElement('style');
         style.id = 'wf-viz-styles';
         style.textContent = `
-            /* ── Workflow visualizer CSS variables ── */
-            .wf-viz {
-                --wf-blue: oklch(0.62 0.16 250);
-                --wf-blue-muted: oklch(0.62 0.16 250 / 12%);
-                --wf-blue-fg: oklch(0.55 0.18 250);
-                --wf-amber: oklch(0.75 0.16 75);
-                --wf-amber-muted: oklch(0.75 0.16 75 / 12%);
-                --wf-amber-fg: oklch(0.65 0.18 75);
-                --wf-purple: oklch(0.62 0.2 300);
-                --wf-purple-muted: oklch(0.62 0.2 300 / 12%);
-                --wf-purple-fg: oklch(0.55 0.22 300);
-                --wf-emerald: oklch(0.7 0.17 165);
-                --wf-emerald-muted: oklch(0.7 0.17 165 / 12%);
-                --wf-emerald-fg: oklch(0.6 0.19 165);
-                --wf-red: oklch(0.62 0.2 25);
-                --wf-red-muted: oklch(0.62 0.2 25 / 12%);
-                --wf-red-fg: oklch(0.55 0.22 25);
-                /* Done / success green */
-                --wf-done:        oklch(0.52 0.17 160);
-                --wf-done-muted:  oklch(0.52 0.17 160 / 14%);
-                --wf-done-fg:     oklch(0.48 0.19 160);
-                /* Running blue */
-                --wf-live:        oklch(0.55 0.20 260);
-                --wf-live-muted:  oklch(0.55 0.20 260 / 14%);
-            }
-            .dark .wf-viz {
-                --wf-blue: oklch(0.7 0.14 250);
-                --wf-blue-muted: oklch(0.7 0.14 250 / 14%);
-                --wf-blue-fg: oklch(0.78 0.12 250);
-                --wf-amber: oklch(0.8 0.14 80);
-                --wf-amber-muted: oklch(0.8 0.14 80 / 14%);
-                --wf-amber-fg: oklch(0.85 0.12 80);
-                --wf-purple: oklch(0.72 0.16 300);
-                --wf-purple-muted: oklch(0.72 0.16 300 / 14%);
-                --wf-purple-fg: oklch(0.8 0.14 300);
-                --wf-emerald: oklch(0.78 0.14 165);
-                --wf-emerald-muted: oklch(0.78 0.14 165 / 14%);
-                --wf-emerald-fg: oklch(0.84 0.12 165);
-                --wf-red: oklch(0.68 0.2 25);
-                --wf-red-muted: oklch(0.68 0.2 25 / 14%);
-                --wf-red-fg: oklch(0.78 0.15 25);
-                --wf-done:        oklch(0.72 0.15 160);
-                --wf-done-muted:  oklch(0.72 0.15 160 / 16%);
-                --wf-done-fg:     oklch(0.78 0.13 160);
-                --wf-live:        oklch(0.72 0.17 260);
-                --wf-live-muted:  oklch(0.72 0.17 260 / 16%);
-            }
-
-            /* ── Pipeline connector ── */
-            .wf-connector {
-                position: relative;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                height: 28px;
-                width: 100%;
-            }
-            .wf-connector::before {
-                content: '';
-                position: absolute;
-                left: 50%;
-                top: 0;
-                bottom: 0;
-                width: 2px;
-                background: linear-gradient(to bottom, var(--connector-color, var(--border)), oklch(from var(--connector-color, var(--border)) l c h / 40%));
-                transform: translateX(-50%);
-            }
-            .wf-connector-dot {
-                position: relative;
-                z-index: 1;
-                width: 7px;
-                height: 7px;
-                border-radius: 50%;
-                background: var(--connector-color, var(--border));
-                box-shadow: 0 0 0 3px var(--background), 0 0 0 4px oklch(from var(--connector-color, var(--border)) l c h / 40%);
-            }
-
-            /* ── Animated flow pulse ── */
-            .wf-connector-flow {
-                position: absolute;
-                left: 50%;
-                top: 0;
-                width: 4px;
-                height: 4px;
-                margin-left: -2px;
-                border-radius: 50%;
-                background: var(--connector-color, var(--border));
-                opacity: 0;
-                animation: wfFlowPulse 2.4s ease-in-out infinite;
-            }
-            @keyframes wfFlowPulse {
-                0%   { top: -2px; opacity: 0; transform: scale(0.6); }
-                15%  { opacity: 0.9; transform: scale(1); }
-                85%  { opacity: 0.9; transform: scale(1); }
-                100% { top: calc(100% + 2px); opacity: 0; transform: scale(0.6); }
-            }
-
-            /* ── Node card ── */
-            .wf-node {
-                position: relative;
-                border-radius: var(--radius, 0.75rem);
-                border: 1px solid var(--node-border, var(--border));
-                background: var(--node-bg, var(--card));
-                padding: 10px 14px;
-                transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
-                width: 100%;
-                min-width: 200px;
-            }
-            .wf-node:hover {
-                border-color: oklch(from var(--node-accent, var(--border)) l c h / 50%);
-                box-shadow: 0 0 0 1px oklch(from var(--node-accent, var(--border)) l c h / 20%),
-                            0 2px 8px -2px oklch(from var(--node-accent, var(--border)) l c h / 12%),
-                            0 8px 24px -4px oklch(0 0 0 / 6%);
-                transform: translateY(-1px);
-            }
-            .dark .wf-node:hover {
-                box-shadow: 0 0 0 1px oklch(from var(--node-accent, var(--border)) l c h / 25%),
-                            0 2px 8px -2px oklch(from var(--node-accent, var(--border)) l c h / 15%),
-                            0 8px 24px -4px oklch(0 0 0 / 25%);
-            }
-
-            /* ── Active Node Highlight ── */
-            .wf-node.is-active {
-                --node-accent: var(--wf-live);
-                --node-border: var(--wf-live-muted);
-                --node-bg: var(--wf-live-muted);
-                border-color: var(--wf-live);
-                box-shadow: 0 0 0 2px var(--wf-live), 0 0 20px oklch(from var(--wf-live) l c h / 35%);
-                transform: translateY(-2px);
-                animation: wfPulseActive 2.5s ease-in-out infinite;
-            }
-            @keyframes wfPulseActive {
-                0%   { box-shadow: 0 0 0 2px var(--wf-live), 0 0 12px oklch(from var(--wf-live) l c h / 20%); }
-                50%  { box-shadow: 0 0 0 2px var(--wf-live), 0 0 28px oklch(from var(--wf-live) l c h / 55%); }
-                100% { box-shadow: 0 0 0 2px var(--wf-live), 0 0 12px oklch(from var(--wf-live) l c h / 20%); }
-            }
-            /* Spinning indicator inside icon badge when active */
-            .wf-node.is-active .wf-badge {
-                position: relative;
-                overflow: hidden;
-            }
-            .wf-node.is-active .wf-badge::after {
-                content: '';
-                position: absolute;
-                inset: -1px;
-                border-radius: inherit;
-                border: 2px solid transparent;
-                border-top-color: var(--wf-live);
-                animation: wfSpinBadge 1s linear infinite;
-            }
-            @keyframes wfSpinBadge {
-                to { transform: rotate(360deg); }
-            }
-            /* Shimmer sweep on active node */
-            .wf-node.is-active::after {
-                content: '';
-                position: absolute;
-                inset: 0;
-                border-radius: inherit;
-                background: linear-gradient(105deg, transparent 30%, oklch(from var(--wf-live) l c h / 10%) 50%, transparent 70%);
-                background-size: 200% 100%;
-                animation: wfActiveShimmer 2s ease-in-out infinite;
-                pointer-events: none;
-            }
-            @keyframes wfActiveShimmer {
-                0%   { background-position: 200% 0; }
-                100% { background-position: -200% 0; }
-            }
-
-            /* ── Completed Node — green success state ── */
-            .wf-node.is-completed {
-                --node-accent: var(--wf-done);
-                --node-border: var(--wf-done-muted);
-                --node-bg: var(--wf-done-muted);
-                border-color: var(--wf-done-muted);
-            }
-            .wf-node.is-completed::before {
-                background: var(--wf-done);
-                opacity: 1;
-            }
-            .wf-node-done-badge {
-                display: inline-flex;
-                align-items: center;
-                gap: 3px;
-                font-size: 10px;
-                font-weight: 700;
-                padding: 2px 7px;
-                border-radius: 999px;
-                background: var(--wf-done-muted);
-                color: var(--wf-done-fg, var(--wf-done));
-                border: 1px solid oklch(from var(--wf-done) l c h / 30%);
-                flex-shrink: 0;
-                white-space: nowrap;
-            }
-
-            /* ── Failed Node ── */
-            .wf-node.is-failed {
-                --node-accent: var(--destructive);
-                --node-border: oklch(from var(--destructive) l c h / 30%);
-                --node-bg: oklch(from var(--destructive) l c h / 10%);
-                border-color: oklch(from var(--destructive) l c h / 45%);
-            }
-            .wf-node.is-failed::before {
-                background: var(--destructive);
-                opacity: 1;
-            }
-            .wf-node-failed-badge {
-                display: inline-flex;
-                align-items: center;
-                gap: 3px;
-                font-size: 10px;
-                font-weight: 700;
-                padding: 2px 7px;
-                border-radius: 999px;
-                background: oklch(from var(--destructive) l c h / 12%);
-                color: var(--destructive);
-                border: 1px solid oklch(from var(--destructive) l c h / 30%);
-                flex-shrink: 0;
-                white-space: nowrap;
-            }
-
-            /* ── Accent stripe on the left edge ── */
-            .wf-node::before {
-                content: '';
-                position: absolute;
-                left: 0;
-                top: 8px;
-                bottom: 8px;
-                width: 3px;
-                border-radius: 0 3px 3px 0;
-                background: var(--node-accent, var(--primary));
-                opacity: 0.8;
-                transition: opacity 0.2s;
-            }
-            .wf-node:hover::before { opacity: 1; }
-
             /* ── Type badge ── */
             .wf-badge {
                 display: inline-flex;
@@ -309,208 +43,377 @@ export function workflowTreeVisualizer() {
                 letter-spacing: 0.02em;
                 line-height: 1;
                 white-space: nowrap;
-                background: var(--badge-bg, var(--muted));
-                color: var(--badge-fg, var(--muted-foreground));
-                border: 1px solid oklch(from var(--badge-fg, var(--muted-foreground)) l c h / 15%);
+                background: var(--muted);
+                color: var(--muted-foreground);
+                border: 1px solid var(--border);
+                flex-shrink: 0;
             }
             .wf-badge svg { flex-shrink: 0; }
 
-            /* ── Parallel fork/join ── */
-            .wf-fork-join {
+            /* ── Node card ── */
+            .wf-node {
                 position: relative;
-                height: 20px;
-                width: 100%;
+                border-radius: 0.5rem;
+                border: 1px solid var(--border);
+                background: var(--card);
+                padding: 10px 14px;
+                min-width: 140px;
+                max-width: 220px;
+                flex-shrink: 0;
+                transition: all 0.15s ease;
             }
-            .wf-fork-join::before {
+            .wf-node:hover {
+                border-color: var(--primary);
+                box-shadow: 0 4px 12px var(--shadow);
+            }
+
+            /* ── Active Node ── */
+            .wf-node.is-active {
+                border-color: var(--primary);
+                box-shadow: 0 0 0 2px var(--primary), 0 4px 16px var(--shadow);
+                transform: translateY(-2px);
+                animation: wfPulseActive 2s ease-in-out infinite;
+            }
+            @keyframes wfPulseActive {
+                0%, 100% { box-shadow: 0 0 0 2px var(--primary), 0 4px 16px var(--shadow); }
+                50% { box-shadow: 0 0 0 2px var(--primary), 0 4px 24px var(--shadow); }
+            }
+            .wf-node.is-active .wf-badge {
+                position: relative;
+            }
+            .wf-node.is-active .wf-badge::after {
                 content: '';
                 position: absolute;
-                left: 8%;
-                right: 8%;
-                top: 50%;
-                height: 2px;
-                background: var(--connector-color, var(--border));
-                transform: translateY(-50%);
-                border-radius: 1px;
+                inset: -2px;
+                border-radius: 9999px;
+                border: 2px solid var(--primary);
+                border-top-color: transparent;
+                animation: wfSpin 0.8s linear infinite;
             }
-            .wf-fork-join-center {
+            @keyframes wfSpin {
+                to { transform: rotate(360deg); }
+            }
+
+            /* ── Completed Node ── */
+            .wf-node.is-completed {
+                border-color: oklch(from var(--success) l c h / 40%);
+                background: oklch(from var(--success) l c h / 8%);
+            }
+            .wf-node-done-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 3px;
+                font-size: 10px;
+                font-weight: 700;
+                padding: 2px 7px;
+                border-radius: 9999px;
+                background: oklch(from var(--success) l c h / 15%);
+                color: var(--success);
+                border: 1px solid oklch(from var(--success) l c h / 30%);
+                white-space: nowrap;
+            }
+
+            /* ── Failed Node ── */
+            .wf-node.is-failed {
+                border-color: oklch(from var(--destructive) l c h / 50%);
+                background: oklch(from var(--destructive) l c h / 10%);
+            }
+            .wf-node-failed-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 3px;
+                font-size: 10px;
+                font-weight: 700;
+                padding: 2px 7px;
+                border-radius: 9999px;
+                background: oklch(from var(--destructive) l c h / 12%);
+                color: var(--destructive);
+                border: 1px solid oklch(from var(--destructive) l c h / 30%);
+                white-space: nowrap;
+            }
+
+            /* ── Inactive / Pending Node (dimmed when others are active) ── */
+            .wf-node.is-inactive {
+                opacity: 0.45;
+                filter: grayscale(15%);
+                transform: scale(0.97);
+            }
+            .wf-node.is-inactive:hover {
+                opacity: 0.7;
+            }
+
+            /* ── Connector (horizontal line between nodes) ── */
+            .wf-connector {
+                position: relative;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 28px;
+                height: 2px;
+                background: var(--border);
+                flex-shrink: 0;
+            }
+            .wf-connector-flow {
                 position: absolute;
-                left: 50%;
-                top: 50%;
-                transform: translate(-50%, -50%);
+                width: 6px;
+                height: 2px;
+                border-radius: 1px;
+                background: var(--primary);
+                animation: wfFlowPulse 2s ease-in-out infinite;
+            }
+            @keyframes wfFlowPulse {
+                0%   { left: -6px; opacity: 0; }
+                20%  { opacity: 1; }
+                80%  { opacity: 1; }
+                100% { left: 28px; opacity: 0; }
+            }
+
+            /* ── Parallel branches (stacked vertically) ── */
+            .wf-branches {
+                display: flex;
+                flex-direction: column;
+            }
+            .wf-branch {
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+            }
+            .wf-branch-connector {
+                width: 16px;
+                height: 2px;
+                background: var(--border);
+                flex-shrink: 0;
+            }
+
+            /* Fork line (vertical line beside parallel branches) */
+            .wf-fork-line {
                 width: 2px;
-                height: 100%;
-                background: var(--connector-color, var(--border));
+                background: var(--border);
+                align-self: stretch;
+                flex-shrink: 0;
             }
 
             /* ── Loop wrapper ── */
             .wf-loop-wrap {
                 position: relative;
-                border-radius: var(--radius, 0.75rem);
-                border: 1.5px dashed oklch(from var(--node-accent, var(--border)) l c h / 40%);
-                padding: 12px 10px 16px;
-                background: oklch(from var(--node-accent, var(--border)) l c h / 4%);
-                width: 100%;
-                max-width: 300px;
-                transition: border-color 0.2s, background 0.2s;
+                border-radius: 0.5rem;
+                border: 1.5px dashed var(--border);
+                padding: 12px 14px 12px 12px;
+                background: oklch(from var(--primary) l c h / 5%);
+                flex-shrink: 0;
             }
-            .wf-loop-wrap:hover {
-                border-color: oklch(from var(--node-accent, var(--border)) l c h / 60%);
-                background: oklch(from var(--node-accent, var(--border)) l c h / 6%);
-            }
-            .wf-loop-badge {
+            .wf-loop-iteration {
                 position: absolute;
-                top: -9px;
+                top: -10px;
                 right: 12px;
-                display: inline-flex;
-                align-items: center;
-                gap: 3px;
-                padding: 1px 7px 1px 5px;
-                border-radius: 9999px;
                 font-size: 9px;
                 font-weight: 700;
-                letter-spacing: 0.03em;
+                padding: 1px 6px;
+                border-radius: 9999px;
                 background: var(--background);
-                color: var(--badge-fg, var(--muted-foreground));
-                border: 1.5px dashed oklch(from var(--node-accent, var(--border)) l c h / 40%);
-            }
-            .wf-loop-badge svg { width: 10px; height: 10px; }
-            .wf-loop-return {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin-top: 6px;
+                color: var(--foreground);
+                border: 1px solid var(--border);
             }
 
-            /* ── Agent name ── */
+            /* ── Conditional wrapper ── */
+            .wf-conditional-wrap {
+                position: relative;
+                border-radius: 0.5rem;
+                border: 1.5px solid var(--border);
+                padding: 12px 14px 12px 12px;
+                background: oklch(from var(--destructive) l c h / 5%);
+                flex-shrink: 0;
+            }
+            .wf-conditional-label {
+                position: absolute;
+                top: -9px;
+                left: 12px;
+                font-size: 9px;
+                font-weight: 700;
+                padding: 1px 6px;
+                border-radius: 4px;
+                background: var(--background);
+                color: var(--destructive);
+                border: 1px solid var(--border);
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+            }
+
+            /* ── Agent name & description ── */
             .wf-agent-name {
-                font-size: 12px;
+                font-size: 13px;
                 font-weight: 600;
                 color: var(--foreground);
                 line-height: 1.3;
-                max-width: 180px;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
             }
             .wf-agent-desc {
-                font-size: 10px;
+                font-size: 11px;
                 color: var(--muted-foreground);
-                line-height: 1.3;
-                margin-top: 1px;
+                margin-top: 2px;
             }
 
-            /* ── Empty state ── */
+            /* ── Empty node placeholder ── */
             .wf-empty {
-                text-align: center;
-                padding: 24px 16px;
+                font-size: 11px;
                 color: var(--muted-foreground);
-                font-size: 12px;
                 font-style: italic;
+                padding: 8px 16px;
+                background: var(--muted);
+                border-radius: 0.5rem;
+                border: 1px dashed var(--border);
+                white-space: nowrap;
+                flex-shrink: 0;
             }
 
-            /* ── Parallel branch columns ── */
-            .wf-branches {
+            /* ── Tree container ── */
+            .wf-tree {
                 display: flex;
-                gap: 8px;
-                justify-content: center;
-                align-items: flex-start;
-                width: 100%;
+                flex-direction: row;
+                align-items: center;
+                gap: 0;
+                padding: 16px;
+                min-height: 60px;
             }
-            .wf-branch {
-                flex: 1;
-                min-width: 0;
-                max-width: 280px;
+
+            /* ── Group container (boundary for each group type) ── */
+            .wf-group {
+                position: relative;
                 display: flex;
                 flex-direction: column;
-                align-items: center;
-            }
-            .wf-branch-connector {
-                position: relative;
-                height: 14px;
-                width: 2px;
-                background: var(--connector-color, var(--border));
+                border-radius: 8px;
+                padding: 16px 20px 20px 20px;
+                background: var(--card);
+                border: 1px solid var(--border);
+                flex-shrink: 0;
             }
 
-            /* ── Pipeline wrapper (dot-grid background) ── */
-            .wf-pipeline-canvas {
-                position: relative;
-                background-image: radial-gradient(circle, oklch(from var(--border) l c h / 30%) 1px, transparent 1px);
-                background-size: 14px 14px;
-                border-radius: var(--radius, 0.75rem);
-                min-height: 80px;
+            /* Group label positioned inside the box (top-left) */
+            .wf-group > .wf-group-label {
+                position: absolute;
+                top: -10px;
+                left: 12px;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                padding: 2px 10px;
+                border-radius: 4px;
+                font-size: 10px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                background: var(--background);
+                color: var(--foreground);
+                border: 1px solid var(--border);
+                white-space: nowrap;
+                z-index: 1;
+            }
+
+            /* Sequential group - solid border */
+            .wf-group.wf-group-sequential {
+                border-style: solid;
+                border-color: var(--border);
+            }
+
+            /* Parallel group - double border style */
+            .wf-group.wf-group-parallel {
+                border-width: 2px;
+                border-style: double;
+                border-color: oklch(from var(--primary) l c h / 40%);
+            }
+
+            /* Loop group - dashed border */
+            .wf-group.wf-group-loop {
+                border-width: 1.5px;
+                border-style: dashed;
+                border-color: oklch(from var(--primary) l c h / 50%);
+                background: oklch(from var(--primary) l c h / 3%);
+            }
+
+            /* Conditional group - dotted border */
+            .wf-group.wf-group-conditional {
+                border-width: 1.5px;
+                border-style: dotted;
+                border-color: oklch(from var(--destructive) l c h / 40%);
+                background: oklch(from var(--destructive) l c h / 3%);
+            }
+
+            /* Content inside group */
+            .wf-group-content {
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+                gap: 8px;
             }
         `;
         document.head.appendChild(style);
     }
 
-    // ── Node renderers ──────────────────────────────────────────────
+    // ── Node renderers ───────────────────────────────────────────────
 
-    function renderPipelineNode(node, agentMap, depth, activeAgentName, completedNodes, failedNodes) {
+    function renderPipelineNode(node, agentMap, depth, activeAgentNames, completedNodes, failedNodes) {
         if (!node) return '';
         const m = META[node.type] || META.agent;
 
         switch (node.type) {
-            case 'agent': return renderAgentNode(node, agentMap, m, activeAgentName, completedNodes, failedNodes);
-            case 'sequential': return renderSequentialNode(node, agentMap, m, depth, activeAgentName, completedNodes, failedNodes);
-            case 'parallel': return renderParallelNode(node, agentMap, m, depth, activeAgentName, completedNodes, failedNodes);
-            case 'loop': return renderLoopNode(node, agentMap, m, depth, activeAgentName, completedNodes, failedNodes);
-            case 'conditional': return renderConditionalNode(node, agentMap, m, depth, activeAgentName, completedNodes, failedNodes);
-            default: return renderAgentNode(node, agentMap, m, activeAgentName, completedNodes, failedNodes);
+            case 'agent': return renderAgentNode(node, agentMap, m, activeAgentNames, completedNodes, failedNodes);
+            case 'sequential': return renderSequentialNode(node, agentMap, m, depth, activeAgentNames, completedNodes, failedNodes);
+            case 'parallel': return renderParallelNode(node, agentMap, m, depth, activeAgentNames, completedNodes, failedNodes);
+            case 'loop': return renderLoopNode(node, agentMap, m, depth, activeAgentNames, completedNodes, failedNodes);
+            case 'conditional': return renderConditionalNode(node, agentMap, m, depth, activeAgentNames, completedNodes, failedNodes);
+            default: return renderAgentNode(node, agentMap, m, activeAgentNames, completedNodes, failedNodes);
         }
     }
 
-    function renderAgentNode(node, agentMap, m, activeAgentName, completedNodes, failedNodes) {
+    function renderAgentNode(node, agentMap, m, activeAgentNames, completedNodes, failedNodes) {
         const name = node.agent_id ? (agentMap[node.agent_id] || 'Unknown Agent') : 'No agent selected';
         const completedInfo = completedNodes?.[name];
         const isFailed    = !!failedNodes?.[name];
         const isCompleted = !!completedInfo && !isFailed;
         const isActive    = !isCompleted && !isFailed &&
-                            activeAgentName && ((name === activeAgentName) || (node.label === activeAgentName));
+                            activeAgentNames && (activeAgentNames[name] || activeAgentNames[node.label]);
+        // Dim nodes that haven't started yet when other agents are actively running
+        const hasAnyActive = activeAgentNames && Object.keys(activeAgentNames).length > 0;
+        const isInactive   = !isActive && !isCompleted && !isFailed && hasAnyActive;
 
         let nodeClass = 'wf-node';
-        if (isActive)    nodeClass += ' is-active';
+        if (isActive)         nodeClass += ' is-active';
         else if (isCompleted) nodeClass += ' is-completed';
         else if (isFailed)    nodeClass += ' is-failed';
+        else if (isInactive)  nodeClass += ' is-inactive';
 
         // Duration badge for completed nodes, error badge for failed
-        const checkSvg = `<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-        const xSvg     = `<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
         let statusBadge = '';
         if (isCompleted) {
             const secs = completedInfo.durationMs != null
                 ? (completedInfo.durationMs / 1000).toFixed(1) + 's'
                 : 'done';
-            statusBadge = `<span class="wf-node-done-badge">${checkSvg} ${secs}</span>`;
+            statusBadge = `<span class="wf-node-done-badge">${secs}</span>`;
         } else if (isFailed) {
-            statusBadge = `<span class="wf-node-failed-badge">${xSvg} error</span>`;
+            statusBadge = `<span class="wf-node-failed-badge">error</span>`;
         }
 
         const outputKey = node.output_key
-            ? `<span class="wf-agent-desc">→ <code style="font-size:10px;padding:0 3px;border-radius:3px;background:var(--muted);font-family:var(--font-mono);">${esc(node.output_key)}</code></span>`
+            ? `<span class="wf-agent-desc">\u2192 <code style="font-size:10px;padding:0 3px;border-radius:3px;background:var(--muted);font-family:var(--font-mono);">${esc(node.output_key)}</code></span>`
             : '';
 
         // Build orchestration badges
         let badges = '';
         if (node.disallow_transfer_to_parent) {
-            badges += `<span style="font-size:9px;padding:0 4px;border-radius:4px;background:oklch(0.65 0.15 25/12%);color:oklch(0.55 0.18 25);font-weight:600;white-space:nowrap;" title="Transfer to parent blocked">⛔ ↑parent</span>`;
+            badges += `<span style="font-size:9px;padding:0 4px;border-radius:4px;background:var(--muted);color:var(--foreground);font-weight:600;white-space:nowrap;" title="Transfer to parent blocked">no parent</span>`;
         }
         if (node.disallow_transfer_to_peers) {
-            badges += `<span style="font-size:9px;padding:0 4px;border-radius:4px;background:oklch(0.65 0.15 25/12%);color:oklch(0.55 0.18 25);font-weight:600;white-space:nowrap;" title="Transfer to peers blocked">⛔ ↔peers</span>`;
+            badges += `<span style="font-size:9px;padding:0 4px;border-radius:4px;background:var(--muted);color:var(--foreground);font-weight:600;white-space:nowrap;" title="Transfer to peers blocked">no peers</span>`;
         }
         if (node.include_contents === 'none') {
-            badges += `<span style="font-size:9px;padding:0 4px;border-radius:4px;background:oklch(0.7 0.14 250/12%);color:oklch(0.55 0.16 250);font-weight:600;white-space:nowrap;" title="Fresh context (no history)">🧹 fresh</span>`;
+            badges += `<span style="font-size:9px;padding:0 4px;border-radius:4px;background:var(--muted);color:var(--foreground);font-weight:600;white-space:nowrap;" title="Fresh context (no history)">fresh</span>`;
         }
         const badgesHtml = badges ? `<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:2px;">${badges}</div>` : '';
 
         const nameFontStyle = isActive ? 'font-weight:700;' : '';
-        const accentOverride = isCompleted ? '' : isFailed ? '' : `--node-accent:${m.accent};--node-border:${m.accentMuted};--node-bg:${m.accentMuted};`;
 
         return `
-            <div class="${nodeClass}" style="${accentOverride}">
+            <div class="${nodeClass}">
                 <div style="display:flex;align-items:center;gap:8px;">
-                    <div class="wf-badge" style="--badge-bg:${m.accentMuted};--badge-fg:${m.accentFg};">
-                        ${m.icon}
-                    </div>
                     <div style="flex:1;min-width:0;">
                         <div class="wf-agent-name" style="${nameFontStyle}">${esc(name)}</div>
                         ${outputKey}
@@ -521,56 +424,32 @@ export function workflowTreeVisualizer() {
             </div>`;
     }
 
-    function connector(accentColor, delay) {
-        const d = delay !== undefined ? delay : (Math.random() * 1.5);
-        return `
-            <div class="wf-connector" style="--connector-color:${accentColor};">
-                <div class="wf-connector-flow" style="animation-delay:${d.toFixed(2)}s;"></div>
-                <div class="wf-connector-dot"></div>
-            </div>`;
+    function connector() {
+        return `<div class="wf-connector"><div class="wf-connector-flow"></div></div>`;
     }
 
-    function renderSequentialNode(node, agentMap, m, depth, activeAgentName, completedNodes, failedNodes) {
+    function renderSequentialNode(node, agentMap, m, depth, activeAgentNames, completedNodes, failedNodes) {
         const kids = node.children || [];
         if (kids.length === 0) return renderEmptyNode(m, 'Empty sequence');
-        
-        const isActive = activeAgentName && (node.label === activeAgentName);
-        const nodeClass = isActive ? 'wf-node is-active' : 'wf-node';
 
         let body = '';
         for (let i = 0; i < kids.length; i++) {
-            body += renderPipelineNode(kids[i], agentMap, depth + 1, activeAgentName, completedNodes, failedNodes);
+            body += renderPipelineNode(kids[i], agentMap, depth + 1, activeAgentNames, completedNodes, failedNodes);
             if (i < kids.length - 1) {
-                body += connector(m.accent, i * 0.4);
+                body += connector();
             }
         }
 
-        if (depth === 0) {
-            return `
-                <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
-                    <div class="wf-badge" style="--badge-bg:${m.accentMuted};--badge-fg:${m.accentFg};margin-bottom:6px;">
-                        ${m.icon}&nbsp;${m.label}
-                    </div>
-                    <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
-                        ${body}
-                    </div>
-                </div>`;
-        }
+        const groupLabel = depth === 0 ? '' : `<div class="wf-group-label">${esc(node.label || m.label)}</div>`;
 
         return `
-            <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
-                <div class="${nodeClass}" style="--node-accent:${m.accent};--node-border:${m.accentMuted};--node-bg:${m.accentMuted};max-width:unset;">
-                    <div class="wf-badge" style="--badge-bg:${m.accentMuted};--badge-fg:${m.accentFg};">
-                        ${m.icon}&nbsp;${esc(node.label || m.label)}
-                    </div>
-                    <div style="display:flex;flex-direction:column;align-items:center;width:100%;padding-top:8px;">
-                        ${body}
-                    </div>
-                </div>
+            <div class="wf-group wf-group-sequential">
+                ${groupLabel}
+                <div class="wf-group-content">${body}</div>
             </div>`;
     }
 
-    function renderParallelNode(node, agentMap, m, depth, activeAgentName, completedNodes, failedNodes) {
+    function renderParallelNode(node, agentMap, m, depth, activeAgentNames, completedNodes, failedNodes) {
         const kids = node.children || [];
         if (kids.length === 0) return renderEmptyNode(m, 'Empty parallel');
 
@@ -578,30 +457,26 @@ export function workflowTreeVisualizer() {
         for (const child of kids) {
             branches += `
                 <div class="wf-branch">
-                    <div class="wf-branch-connector" style="--connector-color:${m.accent};"></div>
-                    ${renderPipelineNode(child, agentMap, depth + 1, activeAgentName, completedNodes, failedNodes)}
-                    <div class="wf-branch-connector" style="--connector-color:${m.accent};"></div>
+                    <div class="wf-branch-connector"></div>
+                    ${renderPipelineNode(child, agentMap, depth + 1, activeAgentNames, completedNodes, failedNodes)}
+                    <div class="wf-branch-connector"></div>
                 </div>`;
         }
 
         return `
-            <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
-                <div class="wf-badge" style="--badge-bg:${m.accentMuted};--badge-fg:${m.accentFg};">
-                    ${m.icon}&nbsp;${esc(node.label || m.label)}
-                </div>
-                <div class="wf-fork-join" style="--connector-color:${m.accent};">
-                    <div class="wf-fork-join-center" style="--connector-color:${m.accent};"></div>
-                </div>
-                <div class="wf-branches">
-                    ${branches}
-                </div>
-                <div class="wf-fork-join" style="--connector-color:${m.accent};">
-                    <div class="wf-fork-join-center" style="--connector-color:${m.accent};"></div>
+            <div class="wf-group wf-group-parallel">
+                <div class="wf-group-label">${esc(node.label || m.label)}</div>
+                <div class="wf-group-content" style="display:flex;flex-direction:column;gap:12px;align-items:stretch;">
+                    <div style="display:flex;flex-direction:row;align-items:stretch;">
+                        <div class="wf-fork-line"></div>
+                        <div class="wf-branches">${branches}</div>
+                        <div class="wf-fork-line"></div>
+                    </div>
                 </div>
             </div>`;
     }
 
-    function renderLoopNode(node, agentMap, m, depth, activeAgentName, completedNodes, failedNodes) {
+    function renderLoopNode(node, agentMap, m, depth, activeAgentNames, completedNodes, failedNodes) {
         const kids = node.children || [];
         const maxIter = node.max_iterations || 3;
 
@@ -610,96 +485,76 @@ export function workflowTreeVisualizer() {
             body = renderEmptyNode(m, 'Empty loop');
         } else {
             for (let i = 0; i < kids.length; i++) {
-                body += renderPipelineNode(kids[i], agentMap, depth + 1, activeAgentName, completedNodes, failedNodes);
+                body += renderPipelineNode(kids[i], agentMap, depth + 1, activeAgentNames, completedNodes, failedNodes);
                 if (i < kids.length - 1) {
-                    body += connector(m.accent, i * 0.3);
+                    body += connector();
                 }
             }
         }
 
-        // Loop-back arrow SVG
-        const loopArrow = `
-            <div class="wf-loop-return">
-                <svg width="80" height="18" viewBox="0 0 80 18" fill="none">
-                    <path d="M10 2 C10 14, 70 14, 70 2" stroke="${m.accent}" stroke-width="1.5" stroke-dasharray="4 3" fill="none" opacity="0.45"/>
-                    <path d="M67 5 L70 1 L73 5" stroke="${m.accent}" stroke-width="1.5" fill="none" opacity="0.45" stroke-linecap="round"/>
-                </svg>
-            </div>`;
-
         return `
-            <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
-                <div class="wf-loop-wrap" style="--node-accent:${m.accent};">
-                    <div class="wf-loop-badge" style="--node-accent:${m.accent};--badge-fg:${m.accentFg};">
-                        ${m.icon}&nbsp;${esc(node.label || m.label)} (×${maxIter})
-                    </div>
-                    <div style="display:flex;flex-direction:column;align-items:center;width:100%;padding-top:2px;">
-                        ${body}
-                    </div>
-                    ${loopArrow}
-                </div>
+            <div class="wf-group wf-group-loop">
+                <div class="wf-group-label">${esc(node.label || m.label)} (${maxIter}x)</div>
+                <div class="wf-group-content">${body}</div>
             </div>`;
     }
 
-    function renderConditionalNode(node, agentMap, m, depth, activeAgentName, completedNodes, failedNodes) {
+    function renderConditionalNode(node, agentMap, m, depth, activeAgentNames, completedNodes, failedNodes) {
         const kids = node.children || [];
 
-        // First child is the evaluator; remaining are branches
         let evaluatorHtml = '';
         let branchesHtml = '';
 
         if (kids.length > 0) {
             evaluatorHtml = `
-                <div style="display:flex;flex-direction:column;align-items:center;width:100%;max-width:280px;margin:0 auto;">
-                    <div style="font-size:9px;color:var(--wf-red-fg, #fca5a5);font-weight:600;margin-bottom:4px;opacity:0.8;">Evaluator</div>
-                    ${renderPipelineNode(kids[0], agentMap, depth + 1, activeAgentName, completedNodes, failedNodes)}
+                <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;">
+                    <div style="font-size:9px;color:var(--foreground);font-weight:600;margin-bottom:4px;opacity:0.8;">Evaluator</div>
+                    ${renderPipelineNode(kids[0], agentMap, depth + 1, activeAgentNames, completedNodes, failedNodes)}
                 </div>`;
         }
 
         if (kids.length > 1) {
-            branchesHtml = '<div class="wf-branches">';
+            let branchItems = '';
             for (let i = 1; i < kids.length; i++) {
                 const branch = kids[i];
                 const condLabel = branch.condition || '???';
                 const isFallback = condLabel === '*';
-                branchesHtml += `
+                branchItems += `
                     <div class="wf-branch">
-                        <div class="wf-branch-connector" style="--connector-color:${m.accent};"></div>
-                        <div style="font-size:9px;color:${isFallback ? 'var(--muted-foreground)' : 'var(--wf-red-fg, #fca5a5)'};font-weight:600;margin-bottom:3px;">
-                            ${isFallback ? 'fallback' : esc(condLabel)}
+                        <div class="wf-branch-connector"></div>
+                        <div style="display:flex;flex-direction:column;align-items:center;">
+                            <div style="font-size:9px;color:${isFallback ? 'var(--muted-foreground)' : 'var(--foreground)'};font-weight:600;margin-bottom:3px;">
+                                ${isFallback ? 'fallback' : esc(condLabel)}
+                            </div>
+                            ${renderPipelineNode(branch, agentMap, depth + 1, activeAgentNames, completedNodes, failedNodes)}
                         </div>
-                        ${renderPipelineNode(branch, agentMap, depth + 1, activeAgentName, completedNodes, failedNodes)}
-                        <div class="wf-branch-connector" style="--connector-color:${m.accent};"></div>
+                        <div class="wf-branch-connector"></div>
                     </div>`;
             }
-            branchesHtml += '</div>';
+            branchesHtml = `
+                <div class="wf-fork-line"></div>
+                <div class="wf-branches">${branchItems}</div>
+                <div class="wf-fork-line"></div>`;
         }
 
         if (kids.length === 0) {
             return renderEmptyNode(m, 'Empty conditional');
         }
 
-        const forkJoin = kids.length > 1 ? `
-            <div class="wf-fork-join" style="--connector-color:${m.accent};">
-                <div class="wf-fork-join-center" style="--connector-color:${m.accent};"></div>
-            </div>` : '';
-
         return `
-            <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
-                <div class="wf-badge" style="--badge-bg:${m.accentMuted};--badge-fg:${m.accentFg};">
-                    ${m.icon}&nbsp;${esc(node.label || m.label)}
-                </div>
-                <div style="display:flex;flex-direction:column;align-items:center;width:100%;padding-top:6px;">
+            <div class="wf-group wf-group-conditional">
+                <div class="wf-group-label">${esc(node.label || m.label)}</div>
+                <div class="wf-group-content" style="display:flex;flex-direction:row;align-items:stretch;">
                     ${evaluatorHtml}
-                    ${forkJoin}
+                    ${evaluatorHtml && branchesHtml ? connector() : ''}
                     ${branchesHtml}
-                    ${forkJoin}
                 </div>
             </div>`;
     }
 
     function renderEmptyNode(m, msg) {
         return `
-            <div class="wf-node" style="--node-accent:${m.accent};--node-border:${m.accentMuted};--node-bg:${m.accentMuted};opacity:0.5;max-width:200px;">
+            <div class="wf-node" style="opacity:0.5;max-width:200px;">
                 <div style="font-size:10px;color:var(--muted-foreground);font-style:italic;text-align:center;padding:2px 0;">${msg}</div>
             </div>`;
     }
@@ -710,7 +565,7 @@ export function workflowTreeVisualizer() {
             injectStyles();
         },
 
-        renderTree(graph, agentsList, activeAgentName, completedNodes, failedNodes) {
+        renderTree(graph, agentsList, activeAgentNames, completedNodes, failedNodes) {
             if (!graph) {
                 return '<div class="wf-empty">Add nodes to see the pipeline preview</div>';
             }
@@ -724,9 +579,9 @@ export function workflowTreeVisualizer() {
 
             return `
                 <div class="wf-viz">
-                    <div class="wf-pipeline-canvas" style="padding:20px 14px;">
-                        <div style="display:flex;flex-direction:column;align-items:center;">
-                            ${renderPipelineNode(graph, agentMap, 0, activeAgentName, completedNodes, failedNodes)}
+                    <div class="wf-pipeline-canvas" style="padding:14px 20px;overflow-x:auto;">
+                        <div style="display:flex;flex-direction:row;align-items:center;justify-content:center;">
+                            ${renderPipelineNode(graph, agentMap, 0, activeAgentNames, completedNodes, failedNodes)}
                         </div>
                     </div>
                 </div>`;

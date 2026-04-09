@@ -9,7 +9,7 @@ import (
 	"aicompass/components/copybutton"
 	"aicompass/components/dialog"
 	"aicompass/components/dropdown"
-	"aicompass/components/eventlog"
+	"aicompass/components/debugger"
 	"aicompass/components/footer"
 	"aicompass/components/icon"
 	"aicompass/components/input"
@@ -195,12 +195,11 @@ templ ChatInputScreen(user *shared.User) {
 							<div x-show="!hasMessages && !isStreaming" x-cloak>
 								@footer.Footer()
 							</div>
-							@eventlog.EventLog()
+							<!-- Debugger Panel (bottom-docked) -->
+							@debugger.DebuggerPanel()
 							</main>
 						<!-- Side Panel (inside layout to push content) -->
 						@sidepanel.SidePanel()
-						<!-- Floating Workflow Graph Panel -->
-						@WorkflowGraphPanel()
 					</div>
 				}
 			</div>
