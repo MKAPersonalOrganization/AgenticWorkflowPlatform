@@ -36,7 +36,6 @@ export function createStreamingMethods() {
 
             // Close existing stream if any (expected during elicitation responses)
             if (state.eventSource) {
-                console.log('Closing existing stream for thread:', threadId);
                 state.eventSource.close();
                 state.eventSource = null;
             }
@@ -122,7 +121,6 @@ export function createStreamingMethods() {
             const processChunk = () => {
                 reader.read().then(({ done, value }) => {
                     if (done) {
-                        console.log('[SSE] Stream completed');
                         state.isStreaming = false;
                         state.showTypingIndicator = false;
                         return;
@@ -187,7 +185,6 @@ export function createStreamingMethods() {
                 state.heartbeatInterval = null;
             }
             this.__announce(window.i18n.t('Streaming cancelled'));
-            console.log('Streaming cancelled by user');
         },
 
         /**
@@ -217,10 +214,8 @@ export function createStreamingMethods() {
 
             switch (event.type) {
                 case 'SESSION_START':
-                    // Store the threadId from SESSION_START if we didn't have one
                     if (event.contextId && !state.threadId) {
                         state.threadId = event.contextId;
-                        console.log('[SSE] Session started with threadId:', event.contextId);
                     }
                     break;
 

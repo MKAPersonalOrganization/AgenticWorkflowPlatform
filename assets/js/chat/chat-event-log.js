@@ -174,7 +174,6 @@ export function createEventLogMethods() {
                 }).join('\n---\n');
 
                 await navigator.clipboard.writeText(logText);
-                console.log(window.i18n.t('Event log copied to clipboard!'));
 
                 this.eventLogCopied = true;
                 setTimeout(() => {

@@ -135,7 +135,6 @@ export function createScrollMethods() {
          */
         __notifyNewMessage(message) {
             this.__announce(window.i18n.t('New message received from assistant'));
-            console.log('New message received:', message.id);
         },
     };
 }
