@@ -106,7 +106,7 @@ export function createEventHandlerMethods() {
         },
 
         __handleAgentTransferStarted(value, state, threadId) {
-
+            const { fromAgent, toAgent, workflowType, parentAgent, stepIndex, stepCount, iteration, maxIterations } = value;
 
             // Reset node completion tracking when a new workflow run begins.
             // activeWorkflowContext being null means no prior workflow context existed
