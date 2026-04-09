@@ -42,6 +42,9 @@ jobs:
       - name: Run go mod tidy
         run: go mod tidy
 
+      - name: Build (to verify package resolution)
+        run: go build ./...
+
       - name: Run go vet
         run: go vet ./...
 
