@@ -95,6 +95,11 @@ export function createEventHandlerMethods() {
                 if (!state.completedNodes) state.completedNodes = {};
                 state.completedNodes = { ...state.completedNodes, [agentName]: { durationMs, timestamp: value.timestamp } };
             }
+            // Remove from active set — this agent is done
+            if (state.activeAgentNames?.[agentName]) {
+                const { [agentName]: _, ...rest } = state.activeAgentNames;
+                state.activeAgentNames = rest;
+            }
         },
 
         __handleStateChangeReported(value, state) {
@@ -114,9 +119,17 @@ export function createEventHandlerMethods() {
                 state.completedNodes = {};
                 state.failedNodes = {};
                 state.workflowOutputs = {};
+                state.activeAgentNames = {};
             }
 
             state.activeAgentName = toAgent;
+            // Track all concurrently active agents (supports parallel highlighting).
+            // In non-parallel transfers the sender is done — remove it.
+            const updatedActive = { ...state.activeAgentNames, [toAgent]: true };
+            if (workflowType && workflowType !== 'parallel' && fromAgent) {
+                delete updatedActive[fromAgent];
+            }
+            state.activeAgentNames = updatedActive;
 
             let orchestratorId = state.activeWorkflowContext?.orchestratorId;
             if (workflowType) {
@@ -564,6 +577,7 @@ export function createEventHandlerMethods() {
             state.eventSource = null;
             state.retryCount = 0;
             state.activeAgentName = null;
+            state.activeAgentNames = {};
             state.activeWorkflowContext = null;
             state.lastWorkflowContext = null;
             state.parallelAgentMessages = {};
@@ -584,6 +598,7 @@ export function createEventHandlerMethods() {
             state.showTypingIndicator = false;
             state.eventSource = null;
             state.activeAgentName = null;
+            state.activeAgentNames = {};
             state.activeWorkflowContext = null;
             state.lastWorkflowContext = null;
             state.parallelAgentMessages = {};

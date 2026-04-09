@@ -46,6 +46,7 @@ export function createEmptyThreadState() {
         tokenUsage: null,
         // Workflow execution state
         activeAgentName: null,
+        activeAgentNames: {},     // { [agentName]: true } — all currently executing agents
         activeWorkflowContext: null,
         lastWorkflowContext: null,
         // Workflow node completion tracking — reset at the start of each new run

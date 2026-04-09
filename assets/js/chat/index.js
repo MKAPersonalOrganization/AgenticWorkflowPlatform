@@ -45,6 +45,7 @@ import { createEventLogMethods } from './chat-event-log.js';
 import { createInputMethods } from './chat-input.js';
 import { createProfileMethods } from './chat-profile.js';
 import { createEventHandlerMethods } from './chat-event-handlers.js';
+import { createDebuggerMethods } from './chat-debugger.js';
 import { chatPlugin } from './alpine-extensions.js';
 
 /**
@@ -79,6 +80,7 @@ document.addEventListener('alpine:init', () => {
         const inputMethods = createInputMethods();
         const profileMethods = createProfileMethods();
         const eventHandlerMethods = createEventHandlerMethods();
+        const debuggerMethods = createDebuggerMethods();
 
         return {
             // Spread initial state
@@ -100,6 +102,7 @@ document.addEventListener('alpine:init', () => {
             ...inputMethods,
             ...profileMethods,
             ...eventHandlerMethods,
+            ...debuggerMethods,
 
             // Constants
             AVAILABLE_AGENTS: [],
@@ -255,6 +258,10 @@ document.addEventListener('alpine:init', () => {
             
             get activeAgentName() {
                 return this.__currentState.activeAgentName || null;
+            },
+
+            get activeAgentNames() {
+                return this.__currentState.activeAgentNames || {};
             },
             
             get activeWorkflowContext() {
