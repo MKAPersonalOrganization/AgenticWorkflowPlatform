@@ -1,11 +1,10 @@
 package prompts
 
 import (
+	"aicompass/modules/chat/chatcontracts"
 	"bytes"
 	"strings"
 	"text/template"
-
-	"aicompass/modules/chat/chatcontracts"
 )
 
 // Specialty defines a domain specialist for the coordinator agent.

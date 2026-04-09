@@ -1,11 +1,11 @@
 package calculator
 
 import (
+	"aicompass/foundation/agent"
 	"context"
 	"errors"
 	"fmt"
 	"math"
-	"aicompass/foundation/agent"
 )
 
 var (

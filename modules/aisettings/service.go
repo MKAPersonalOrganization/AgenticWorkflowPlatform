@@ -1,11 +1,10 @@
 package aisettings
 
 import (
+	"aicompass/foundation/agent"
 	"context"
 	"encoding/json"
 	"fmt"
-
-	"aicompass/foundation/agent"
 )
 
 // service provides business logic for per-user AI settings.

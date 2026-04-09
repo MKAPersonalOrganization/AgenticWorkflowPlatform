@@ -5,6 +5,8 @@ package billing
 // (module-internal); the Module facade in billing.go exposes route registration.
 
 import (
+	"aicompass/foundation/logger"
+	"aicompass/shared"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,9 +14,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"aicompass/shared"
-	"aicompass/foundation/logger"
 
 	"github.com/stripe/stripe-go/v84"
 	"github.com/stripe/stripe-go/v84/webhook"

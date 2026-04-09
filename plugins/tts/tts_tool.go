@@ -1,6 +1,8 @@
 package tts
 
 import (
+	"aicompass/foundation/agent"
+	"aicompass/platform/artifact"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -10,8 +12,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
-	"aicompass/foundation/agent"
-	"aicompass/platform/artifact"
 	"strings"
 	"time"
 )

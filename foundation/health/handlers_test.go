@@ -1,14 +1,14 @@
 package health_test
 
 import (
+	"aicompass/foundation/health"
+	"aicompass/foundation/logger"
 	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"aicompass/foundation/logger"
-	"aicompass/foundation/health"
 	"testing"
 )
 

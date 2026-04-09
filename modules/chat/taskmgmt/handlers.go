@@ -14,8 +14,6 @@
 package taskmgmt
 
 import (
-	"time"
-
 	"aicompass/foundation/agent"
 	"aicompass/foundation/logger"
 	"aicompass/modules/chat/chatcontracts"
@@ -25,6 +23,7 @@ import (
 	"aicompass/platform/artifact"
 	"aicompass/platform/toolregistry"
 	"aicompass/shared"
+	"time"
 )
 
 // SSEConfig holds tunable parameters for Server-Sent Event connections.

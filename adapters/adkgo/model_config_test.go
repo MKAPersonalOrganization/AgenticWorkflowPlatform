@@ -15,9 +15,9 @@ import (
 //   Layer 1 (highest) — per-request RunConfig
 // ──────────────────────────────────────────────────────────────────────────────
 
-func f64(v float64) *float64  { return &v }
-func f32(v float32) *float32  { return &v }
-func i32(v int32) *int32      { return &v }
+func f64(v float64) *float64 { return &v }
+func f32(v float32) *float32 { return &v }
+func i32(v int32) *int32     { return &v }
 
 func TestBuildGenerateContentConfig_AgentModelConfig(t *testing.T) {
 	t.Run("nil agent config falls back to user global temperature", func(t *testing.T) {

@@ -1,6 +1,7 @@
 package injection
 
 import (
+	"aicompass/shared"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -8,7 +9,6 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
-	"aicompass/shared"
 )
 
 const (

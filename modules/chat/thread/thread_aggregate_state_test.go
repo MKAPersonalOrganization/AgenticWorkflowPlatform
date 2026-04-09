@@ -1,10 +1,9 @@
 package thread_test
 
 import (
+	"aicompass/modules/chat/thread"
 	"testing"
 	"time"
-
-	"aicompass/modules/chat/thread"
 
 	"github.com/stretchr/testify/assert"
 )

@@ -1,16 +1,15 @@
 package googleauth
 
 import (
+	"aicompass/foundation/i18n"
+	"aicompass/foundation/logger"
+	"aicompass/shared"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
-
-	"aicompass/foundation/i18n"
-	"aicompass/foundation/logger"
-	"aicompass/shared"
 
 	authcomp "aicompass/components/auth"
 )

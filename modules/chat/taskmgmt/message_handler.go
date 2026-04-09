@@ -1,14 +1,13 @@
 package taskmgmt
 
 import (
+	"aicompass/foundation/agent"
+	"aicompass/modules/chat/agentorchestrator"
+	"aicompass/modules/chat/taskmanagement"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
-
-	"aicompass/foundation/agent"
-	"aicompass/modules/chat/agentorchestrator"
-	"aicompass/modules/chat/taskmanagement"
 )
 
 // FileAttachment represents a file sent with a message (image, audio, PDF, etc.).

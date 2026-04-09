@@ -1,13 +1,13 @@
 package chat
 
 import (
+	"aicompass/shared"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"aicompass/shared"
 	"time"
 )
 

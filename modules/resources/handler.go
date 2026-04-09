@@ -1,6 +1,7 @@
 package resources
 
 import (
+	"aicompass/shared"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -8,8 +9,6 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
-
-	"aicompass/shared"
 
 	"github.com/google/uuid"
 )

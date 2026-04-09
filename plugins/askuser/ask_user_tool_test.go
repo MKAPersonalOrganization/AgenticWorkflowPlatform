@@ -1,11 +1,10 @@
 package askuser
 
 import (
-	"encoding/json"
-	"testing"
-
 	"aicompass/foundation/agent"
 	"aicompass/platform/toolregistry"
+	"encoding/json"
+	"testing"
 )
 
 func TestAskUserTool_Name(t *testing.T) {

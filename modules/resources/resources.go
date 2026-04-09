@@ -1,11 +1,10 @@
 package resources
 
 import (
-	"context"
-	"io"
-
 	"aicompass/foundation/auth"
 	"aicompass/platform/artifact"
+	"context"
+	"io"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"

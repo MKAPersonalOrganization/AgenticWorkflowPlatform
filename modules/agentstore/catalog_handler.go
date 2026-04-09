@@ -1,13 +1,12 @@
 package agentstore
 
 import (
+	"aicompass/foundation/logger"
+	"aicompass/shared"
 	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
-
-	"aicompass/foundation/logger"
-	"aicompass/shared"
 )
 
 // catalogHandler encapsulates HTTP handlers for the shared agent catalog.

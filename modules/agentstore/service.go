@@ -1,12 +1,11 @@
 package agentstore
 
 import (
+	"aicompass/foundation/logger"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-
-	"aicompass/foundation/logger"
 )
 
 // Composition tree limits prevent unbounded nesting.

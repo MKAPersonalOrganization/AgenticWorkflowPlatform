@@ -3,11 +3,10 @@
 package adkgo
 
 import (
-	"context"
-	"iter"
-
 	"aicompass/foundation/agent"
 	"aicompass/modules/chat/thread"
+	"context"
+	"iter"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────

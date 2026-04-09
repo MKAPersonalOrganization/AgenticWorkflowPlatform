@@ -1,11 +1,10 @@
 package aisettings
 
 import (
-	"context"
-
 	"aicompass/foundation/agent"
-	"aicompass/foundation/logger"
 	"aicompass/foundation/auth"
+	"aicompass/foundation/logger"
+	"context"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"

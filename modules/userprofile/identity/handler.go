@@ -1,14 +1,13 @@
 package identity
 
 import (
-	"encoding/json"
-	"net/http"
-	"strings"
-
 	"aicompass/components/profile"
 	"aicompass/foundation/i18n"
 	"aicompass/foundation/logger"
 	"aicompass/shared"
+	"encoding/json"
+	"net/http"
+	"strings"
 )
 
 // handler manages user profile HTTP requests.

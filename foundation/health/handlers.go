@@ -1,10 +1,10 @@
 package health
 
 import (
+	"aicompass/foundation/logger"
 	"context"
 	"encoding/json"
 	"net/http"
-	"aicompass/foundation/logger"
 	"sync"
 	"time"
 )

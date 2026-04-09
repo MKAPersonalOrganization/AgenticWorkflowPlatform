@@ -1,14 +1,13 @@
 package thread_test
 
 import (
+	"aicompass/foundation/logger"
+	"aicompass/modules/chat/thread"
+	"aicompass/modules/chat/threadmgmt"
 	"context"
 	"io"
 	"testing"
 	"time"
-
-	"aicompass/foundation/logger"
-	"aicompass/modules/chat/thread"
-	"aicompass/modules/chat/threadmgmt"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

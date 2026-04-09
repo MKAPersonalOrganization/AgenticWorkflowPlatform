@@ -20,6 +20,7 @@ type mockMemoryService struct{}
 func (m *mockMemoryService) AddSessionToMemory(_ context.Context, _ session.Session) error {
 	return nil
 }
+
 func (m *mockMemoryService) SearchMemory(_ context.Context, _ *memory.SearchRequest) (*memory.SearchResponse, error) {
 	return &memory.SearchResponse{}, nil
 }

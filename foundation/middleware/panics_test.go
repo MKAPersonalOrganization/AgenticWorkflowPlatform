@@ -1,9 +1,9 @@
 package middleware
 
 import (
+	"aicompass/foundation/metrics"
 	"net/http"
 	"net/http/httptest"
-	"aicompass/foundation/metrics"
 	"testing"
 )
 

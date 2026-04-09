@@ -1,6 +1,7 @@
 package adkgo
 
 import (
+	"aicompass/modules/chat/thread"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -11,7 +12,6 @@ import (
 	"google.golang.org/genai"
 
 	fagent "aicompass/foundation/agent"
-	"aicompass/modules/chat/thread"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────

@@ -6,13 +6,13 @@ package billing
 // projection registration.
 
 import (
+	"aicompass/foundation/event"
+	"aicompass/foundation/logger"
 	"context"
 	"fmt"
 	"time"
 
 	es "aicompass/foundation/eventsourcing"
-	"aicompass/foundation/event"
-	"aicompass/foundation/logger"
 
 	"github.com/jmoiron/sqlx"
 )

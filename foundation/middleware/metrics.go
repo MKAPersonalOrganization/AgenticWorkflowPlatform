@@ -2,8 +2,8 @@
 package middleware
 
 import (
-	"net/http"
 	"aicompass/foundation/metrics"
+	"net/http"
 )
 
 // Metrics updates program counters for requests, errors, and goroutines.

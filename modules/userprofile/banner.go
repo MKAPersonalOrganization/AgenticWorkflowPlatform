@@ -1,10 +1,9 @@
 package userprofile
 
 import (
+	"aicompass/foundation/logger"
 	"encoding/json"
 	"net/http"
-
-	"aicompass/foundation/logger"
 )
 
 // Banner represents a banner message displayed to users.

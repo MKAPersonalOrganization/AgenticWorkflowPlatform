@@ -1,13 +1,12 @@
 package main
 
 import (
+	"aicompass/infra/sqldb"
 	"context"
 	"flag"
 	"fmt"
 	"log"
 	"time"
-
-	"aicompass/infra/sqldb"
 )
 
 func main() {

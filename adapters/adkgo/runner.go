@@ -1,6 +1,11 @@
 package adkgo
 
 import (
+	"aicompass/foundation/logger"
+	"aicompass/modules/chat/thread"
+	"aicompass/plugins/agentmemory"
+	"aicompass/plugins/artifacts"
+	"aicompass/shared"
 	"context"
 	"errors"
 	"fmt"
@@ -22,11 +27,6 @@ import (
 	"google.golang.org/adk/tool/preloadmemorytool"
 
 	fagent "aicompass/foundation/agent"
-	"aicompass/foundation/logger"
-	"aicompass/modules/chat/thread"
-	"aicompass/plugins/agentmemory"
-	"aicompass/plugins/artifacts"
-	"aicompass/shared"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────

@@ -1,9 +1,9 @@
 package middleware
 
 import (
+	"aicompass/foundation/i18n"
 	"context"
 	"net/http"
-	"aicompass/foundation/i18n"
 	"time"
 
 	"golang.org/x/text/language"

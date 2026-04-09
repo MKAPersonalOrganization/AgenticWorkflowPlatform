@@ -1,13 +1,6 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"iter"
-	"strings"
-
 	"aicompass/adapters/adkgo"
 	"aicompass/foundation/agent"
 	"aicompass/modules/a2a"
@@ -16,10 +9,17 @@ import (
 	"aicompass/modules/filesystem"
 	"aicompass/modules/knowledge/edgequake"
 	"aicompass/modules/permissions"
-	permworkspace "aicompass/modules/permissions/workspace"
 	"aicompass/modules/userprofile/identity"
 	"aicompass/plugins/fsplugin"
 	"aicompass/shared"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"iter"
+	"strings"
+
+	permworkspace "aicompass/modules/permissions/workspace"
 
 	"github.com/google/uuid"
 )

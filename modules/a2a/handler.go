@@ -1,13 +1,12 @@
 package a2a
 
 import (
-	"encoding/json"
-	"errors"
-	"net/http"
-
 	"aicompass/foundation/i18n"
 	"aicompass/foundation/logger"
 	"aicompass/shared"
+	"encoding/json"
+	"errors"
+	"net/http"
 
 	"github.com/go-chi/chi/v5"
 )

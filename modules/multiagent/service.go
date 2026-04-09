@@ -1,11 +1,10 @@
 package multiagent
 
 import (
-	"context"
-	"fmt"
-
 	"aicompass/foundation/logger"
 	"aicompass/modules/agentstore"
+	"context"
+	"fmt"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────

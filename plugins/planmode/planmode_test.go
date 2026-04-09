@@ -1,12 +1,11 @@
 package planmode
 
 import (
+	"aicompass/foundation/agent"
+	"aicompass/platform/toolregistry"
 	"context"
 	"encoding/json"
 	"testing"
-
-	"aicompass/foundation/agent"
-	"aicompass/platform/toolregistry"
 )
 
 // mustJSON marshals a value to a JSON string (test helper).

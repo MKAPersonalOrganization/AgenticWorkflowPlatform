@@ -1,12 +1,12 @@
 package billing
 
 import (
+	"aicompass/foundation/auth"
+	"aicompass/foundation/event"
+	"aicompass/foundation/logger"
 	"context"
 
-	"aicompass/foundation/event"
 	es "aicompass/foundation/eventsourcing"
-	"aicompass/foundation/logger"
-	"aicompass/foundation/auth"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"

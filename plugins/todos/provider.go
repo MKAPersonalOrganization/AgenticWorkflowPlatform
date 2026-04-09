@@ -1,11 +1,10 @@
 package todos
 
 import (
-	"context"
-	"time"
-
 	"aicompass/foundation/agent"
 	"aicompass/platform/toolregistry"
+	"context"
+	"time"
 
 	"github.com/a-h/templ"
 )

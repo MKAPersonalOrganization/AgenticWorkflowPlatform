@@ -1,14 +1,14 @@
 package analytics
 
 import (
+	"aicompass/foundation/logger"
+	"aicompass/modules/analytics/statistics"
+	"aicompass/shared"
 	"crypto/subtle"
 	"encoding/json"
 	"net/http"
 
 	component "aicompass/components/analytics"
-	"aicompass/foundation/logger"
-	"aicompass/modules/analytics/statistics"
-	"aicompass/shared"
 )
 
 // Module is the analytics bounded context. It wraps the statistics projection

@@ -1,11 +1,10 @@
 package planmode
 
 import (
+	"aicompass/foundation/agent"
 	"context"
 	"encoding/json"
 	"fmt"
-
-	"aicompass/foundation/agent"
 )
 
 // readOnlyTools is the whitelist of tool categories allowed during plan mode.

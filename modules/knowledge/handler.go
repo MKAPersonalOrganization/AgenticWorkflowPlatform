@@ -1,6 +1,13 @@
 package knowledge
 
 import (
+	"aicompass/components/knowledge"
+	"aicompass/foundation/logger"
+	"aicompass/modules/knowledge/edgequake"
+	"aicompass/modules/knowledge/rag/documents"
+	"aicompass/modules/knowledge/rag/graph"
+	"aicompass/modules/knowledge/rag/workspaces"
+	"aicompass/shared"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,14 +16,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-
-	"aicompass/components/knowledge"
-	"aicompass/shared"
-	"aicompass/foundation/logger"
-	"aicompass/modules/knowledge/edgequake"
-	"aicompass/modules/knowledge/rag/documents"
-	"aicompass/modules/knowledge/rag/graph"
-	"aicompass/modules/knowledge/rag/workspaces"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"

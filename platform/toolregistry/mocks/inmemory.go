@@ -1,11 +1,10 @@
 package mocks
 
 import (
+	"aicompass/platform/toolregistry"
 	"context"
 	"fmt"
 	"sync"
-
-	"aicompass/platform/toolregistry"
 )
 
 // InMemoryRepository implements Repository interface with in-memory storage.

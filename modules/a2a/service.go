@@ -1,6 +1,9 @@
 package a2a
 
 import (
+	"aicompass/foundation/agent"
+	"aicompass/foundation/logger"
+	"aicompass/platform/toolregistry"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -12,10 +15,6 @@ import (
 	"os"
 	"strings"
 	"time"
-
-	"aicompass/foundation/agent"
-	"aicompass/foundation/logger"
-	"aicompass/platform/toolregistry"
 
 	a2atypes "github.com/a2aproject/a2a-go/v2/a2a"
 	"github.com/a2aproject/a2a-go/v2/a2aclient"
@@ -659,7 +658,7 @@ func splitPartsTyped(parts a2atypes.ContentParts) (textChunks []StreamChunk, fil
 					MimeType: mimeType,
 				})
 			}
-		// Data parts (structured JSON) are skipped — no UI representation yet.
+			// Data parts (structured JSON) are skipped — no UI representation yet.
 		}
 	}
 	return

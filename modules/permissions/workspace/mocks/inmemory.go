@@ -1,8 +1,8 @@
 package mocks
 
 import (
-	"context"
 	"aicompass/modules/permissions/workspace"
+	"context"
 	"sync"
 )
 

@@ -1,6 +1,12 @@
 package agentorchestrator
 
 import (
+	"aicompass/foundation/agent"
+	"aicompass/foundation/logger"
+	"aicompass/modules/chat/chatcontracts"
+	"aicompass/modules/chat/thread"
+	"aicompass/modules/chat/threadmgmt"
+	"aicompass/platform/artifact"
 	"context"
 	"encoding/base64"
 	"fmt"
@@ -10,13 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"aicompass/foundation/agent"
 	es "aicompass/foundation/eventsourcing"
-	"aicompass/foundation/logger"
-	"aicompass/modules/chat/chatcontracts"
-	"aicompass/modules/chat/thread"
-	"aicompass/modules/chat/threadmgmt"
-	"aicompass/platform/artifact"
 )
 
 // EventEmitter is the interface for broadcasting events.

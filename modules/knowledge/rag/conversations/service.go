@@ -1,13 +1,13 @@
 package conversations
 
 import (
+	"aicompass/shared"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
-	"aicompass/shared"
 	"time"
 
 	"github.com/google/uuid"

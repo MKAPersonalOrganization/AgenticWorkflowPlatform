@@ -1,12 +1,11 @@
 package billing
 
 import (
+	"aicompass/foundation/logger"
 	"context"
 	"errors"
 	"fmt"
 	"time"
-
-	"aicompass/foundation/logger"
 
 	"github.com/google/uuid"
 	"github.com/stripe/stripe-go/v84"

@@ -1,11 +1,10 @@
 package todos
 
 import (
+	"aicompass/foundation/agent"
 	"context"
 	"encoding/json"
 	"testing"
-
-	"aicompass/foundation/agent"
 )
 
 func TestWriteTodosTool_Name(t *testing.T) {

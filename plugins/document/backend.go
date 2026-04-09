@@ -1,13 +1,12 @@
 package document
 
 import (
+	"aicompass/foundation/agent"
+	"aicompass/platform/artifact"
 	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"aicompass/foundation/agent"
-	"aicompass/platform/artifact"
 )
 
 // CreateMarkdownTool allows agents to create new markdown files.

@@ -3,13 +3,13 @@ package documents
 // Extended service methods for additional Edgequake document endpoints.
 
 import (
+	"aicompass/shared"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
-	"aicompass/shared"
 )
 
 // DocumentMetadataResponse wraps the JSON metadata from the API.

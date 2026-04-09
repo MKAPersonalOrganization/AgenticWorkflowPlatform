@@ -1,11 +1,10 @@
 package tracker
 
 import (
+	"aicompass/foundation/agent"
 	"context"
 	"encoding/json"
 	"testing"
-
-	"aicompass/foundation/agent"
 )
 
 func TestStore_CreateTask(t *testing.T) {

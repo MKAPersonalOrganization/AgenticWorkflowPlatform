@@ -1,10 +1,9 @@
 package pluginsettings
 
 import (
+	"aicompass/platform/toolregistry"
 	"context"
 	"fmt"
-
-	"aicompass/platform/toolregistry"
 )
 
 // Service provides business logic for per-user plugin settings.

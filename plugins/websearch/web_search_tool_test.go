@@ -1,12 +1,11 @@
 package websearch
 
 import (
+	"aicompass/foundation/agent"
+	"aicompass/platform/toolregistry"
 	"context"
 	"encoding/json"
 	"testing"
-
-	"aicompass/foundation/agent"
-	"aicompass/platform/toolregistry"
 )
 
 // =========================================================================

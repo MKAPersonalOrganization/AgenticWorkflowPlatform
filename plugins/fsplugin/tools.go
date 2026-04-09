@@ -1,12 +1,11 @@
 package fsplugin
 
 import (
+	"aicompass/foundation/agent"
 	"context"
 	"fmt"
 	"io"
 	"strings"
-
-	"aicompass/foundation/agent"
 
 	"github.com/google/uuid"
 )

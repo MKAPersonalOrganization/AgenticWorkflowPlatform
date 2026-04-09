@@ -1,12 +1,12 @@
 package middleware_test
 
 import (
+	"aicompass/foundation/middleware"
 	"bytes"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
-	"aicompass/foundation/middleware"
 	"strings"
 	"testing"
 )

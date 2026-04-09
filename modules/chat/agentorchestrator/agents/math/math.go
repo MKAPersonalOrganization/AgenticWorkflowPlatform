@@ -1,12 +1,11 @@
 package math
 
 import (
-	"context"
-
 	"aicompass/foundation/agent"
 	"aicompass/foundation/i18n"
 	"aicompass/modules/chat/agentorchestrator/prompts"
 	"aicompass/platform/artifact"
+	"context"
 )
 
 // NOTE: Tools are now managed via permissions service instead of hardcoded domain tools

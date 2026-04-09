@@ -1,12 +1,11 @@
 package taskmgmt
 
 import (
+	"aicompass/modules/chat/chatcontracts"
+	"aicompass/shared"
 	"encoding/json"
 	"errors"
 	"net/http"
-
-	"aicompass/modules/chat/chatcontracts"
-	"aicompass/shared"
 
 	"github.com/google/uuid"
 )

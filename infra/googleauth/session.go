@@ -1,10 +1,10 @@
 package googleauth
 
 import (
+	"aicompass/shared"
 	"crypto/sha256"
 	"encoding/gob"
 	"net/http"
-	"aicompass/shared"
 
 	"github.com/gorilla/sessions"
 )

@@ -1,12 +1,12 @@
 package taskmanagement
 
 import (
+	"aicompass/foundation/logger"
+	"aicompass/modules/chat/agentorchestrator"
+	"aicompass/modules/chat/thread"
 	"context"
 	"fmt"
 	"iter"
-	"aicompass/modules/chat/thread"
-	"aicompass/foundation/logger"
-	"aicompass/modules/chat/agentorchestrator"
 )
 
 // Orchestrator is the interface for orchestrating agent runs with lifecycle events.

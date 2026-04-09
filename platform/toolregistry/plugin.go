@@ -1,13 +1,12 @@
 package toolregistry
 
 import (
+	"aicompass/foundation/agent"
+	"aicompass/platform/artifact"
 	"context"
 	"encoding/json"
 	"sort"
 	"sync"
-
-	"aicompass/foundation/agent"
-	"aicompass/platform/artifact"
 
 	"github.com/a-h/templ"
 )

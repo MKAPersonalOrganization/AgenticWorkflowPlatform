@@ -1,6 +1,7 @@
 package knowledgebase
 
 import (
+	"aicompass/foundation/agent"
 	"bufio"
 	"bytes"
 	"context"
@@ -12,8 +13,6 @@ import (
 	"strings"
 	"text/template"
 	"time"
-
-	"aicompass/foundation/agent"
 )
 
 // DefaultKBSystemPrompt is the system prompt template for the knowledge base sub-agent.

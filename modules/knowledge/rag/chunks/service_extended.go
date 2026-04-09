@@ -3,12 +3,12 @@ package chunks
 // Extended service methods for additional chunk endpoints.
 
 import (
+	"aicompass/shared"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
-	"aicompass/shared"
 )
 
 // GetChunkLineage retrieves lineage for a specific chunk.

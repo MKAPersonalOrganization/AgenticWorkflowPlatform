@@ -1,11 +1,10 @@
 package chatcontracts
 
 import (
+	"aicompass/shared"
 	"context"
 	"errors"
 	"io"
-
-	"aicompass/shared"
 )
 
 var (

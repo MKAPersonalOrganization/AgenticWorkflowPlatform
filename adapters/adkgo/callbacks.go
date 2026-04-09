@@ -1,6 +1,7 @@
 package adkgo
 
 import (
+	"aicompass/foundation/logger"
 	"context"
 	"errors"
 	"fmt"
@@ -13,7 +14,6 @@ import (
 	adktool "google.golang.org/adk/tool"
 
 	fagent "aicompass/foundation/agent"
-	"aicompass/foundation/logger"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────

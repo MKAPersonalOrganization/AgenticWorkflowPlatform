@@ -1,14 +1,13 @@
 package taskmgmt_test
 
 import (
+	"aicompass/foundation/logger"
+	"aicompass/shared"
 	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
-
-	"aicompass/foundation/logger"
-	"aicompass/shared"
 
 	taskmgmthandlers "aicompass/modules/chat/taskmgmt"
 )

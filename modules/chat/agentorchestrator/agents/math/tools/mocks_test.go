@@ -1,9 +1,9 @@
 package tools
 
 import (
+	"aicompass/platform/artifact"
 	"context"
 	"io"
-	"aicompass/platform/artifact"
 )
 
 // MockArtifactStore is a mock implementation of artifact.Service for testing.

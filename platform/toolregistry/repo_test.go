@@ -1,12 +1,11 @@
 package toolregistry
 
 import (
+	"aicompass/infra/sqldb"
 	"context"
 	"os"
 	"testing"
 	"time"
-
-	"aicompass/infra/sqldb"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

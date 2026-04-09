@@ -1,12 +1,12 @@
 package statistics
 
 import (
+	"aicompass/foundation/event"
 	"context"
 	"encoding/json"
 	"fmt"
 	"time"
 
-	"aicompass/foundation/event"
 	es "aicompass/foundation/eventsourcing"
 
 	"github.com/jmoiron/sqlx"

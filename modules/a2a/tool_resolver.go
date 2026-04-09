@@ -1,12 +1,11 @@
 package a2a
 
 import (
+	"aicompass/foundation/agent"
 	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"aicompass/foundation/agent"
 )
 
 // A2ARemoteTool wraps an entire A2A agent as a single agent.ExecutableTool.

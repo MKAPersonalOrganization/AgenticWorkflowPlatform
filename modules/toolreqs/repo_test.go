@@ -1,12 +1,11 @@
 package toolreqs
 
 import (
+	"aicompass/infra/sqldb"
 	"context"
 	"os"
 	"testing"
 	"time"
-
-	"aicompass/infra/sqldb"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

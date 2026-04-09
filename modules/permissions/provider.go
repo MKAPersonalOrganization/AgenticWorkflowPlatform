@@ -1,20 +1,19 @@
 package permissions
 
 import (
+	"aicompass/shared"
 	"context"
 
 	"github.com/google/uuid"
-
-	"aicompass/shared"
 )
 
 // Workspace models the data required by the permissions module for a workspace.
 type Workspace struct {
-	ID          uuid.UUID  `json:"id"`
-	Name        string     `json:"name"`
-	Description *string    `json:"description,omitempty"`
-	Slug        string     `json:"slug"`
-	IsActive    bool       `json:"is_active"`
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	Description *string   `json:"description,omitempty"`
+	Slug        string    `json:"slug"`
+	IsActive    bool      `json:"is_active"`
 }
 
 // WorkspaceList holds a paginated list of Workspace objects.

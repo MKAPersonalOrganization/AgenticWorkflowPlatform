@@ -1,8 +1,8 @@
 package chatread
 
 import (
-	"context"
 	"aicompass/modules/chat/thread"
+	"context"
 )
 
 // ThreadStore provides read access to thread state.

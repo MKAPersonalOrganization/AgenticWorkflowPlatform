@@ -21,7 +21,7 @@ const mcpLogoBase = `<svg class="%s" fill="currentColor" fill-rule="evenodd" vie
 // Uses currentColor so it automatically adapts to light and dark themes.
 func MCPLogo(class string) templ.Component {
 	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
-		_, err := w.Write([]byte(fmt.Sprintf(mcpLogoBase, class)))
+		_, err := fmt.Fprintf(w, mcpLogoBase, class)
 		return err
 	})
 }

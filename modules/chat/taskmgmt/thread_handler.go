@@ -1,11 +1,10 @@
 package taskmgmt
 
 import (
+	"aicompass/modules/chat/thread"
 	"encoding/json"
 	"errors"
 	"net/http"
-
-	"aicompass/modules/chat/thread"
 )
 
 // DeleteThread deletes a thread.

@@ -1,12 +1,12 @@
 package workspaces
 
 import (
+	"aicompass/shared"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"aicompass/shared"
 	"testing"
 
 	"github.com/google/uuid"

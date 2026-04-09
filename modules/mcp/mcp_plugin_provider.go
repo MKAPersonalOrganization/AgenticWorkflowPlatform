@@ -1,11 +1,10 @@
 package mcp
 
 import (
-	"context"
-	"encoding/json"
-
 	"aicompass/foundation/agent"
 	"aicompass/platform/toolregistry"
+	"context"
+	"encoding/json"
 
 	"github.com/a-h/templ"
 )

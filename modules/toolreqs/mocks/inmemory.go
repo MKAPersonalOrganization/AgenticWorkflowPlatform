@@ -1,11 +1,10 @@
 package mocks
 
 import (
+	"aicompass/modules/toolreqs"
 	"context"
 	"fmt"
 	"sync"
-
-	"aicompass/modules/toolreqs"
 )
 
 // InMemoryRepository implements [toolreqs.Repository] with in-memory storage.
