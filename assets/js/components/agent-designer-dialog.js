@@ -18,8 +18,20 @@ export const agentDesigner = () => ({
     // State
     // ══════════════════════════════════════════
 
-    /** @type {'list' | 'typeSelect' | 'importYaml' | 'agentForm' | 'flow' | 'delete'} */
+    /** @type {'list' | 'typeSelect' | 'templates' | 'importYaml' | 'agentForm' | 'flow' | 'delete'} */
     view: 'list',
+
+    // ══════════════════════════════════════════
+    // Templates / Catalog state
+    // ══════════════════════════════════════════
+    catalogEntries: [],
+    catalogCategories: [],
+    catalogSearchQuery: '',
+    catalogSelectedCategory: '',
+    catalogLoading: false,
+    catalogAddingIds: [],
+    catalogAddedIds: [],
+    catalogTotal: 0,
 
     importYamlText: '',
     importYamlURL: '',
@@ -652,6 +664,148 @@ export const agentDesigner = () => ({
             console.error('Failed to fetch agents:', err);
         } finally {
             this.loading = false;
+        }
+    },
+
+    // ══════════════════════════════════════════
+    // Templates / Catalog
+    // ══════════════════════════════════════════
+
+    /** Open the templates/catalog view */
+    openTemplatesView() {
+        this.view = 'templates';
+        this.catalogSearchQuery = '';
+        this.catalogSelectedCategory = '';
+        if (this.catalogEntries.length === 0) {
+            this.fetchCatalog();
+        }
+    },
+
+    /** Fetch the full catalog */
+    async fetchCatalog() {
+        this.catalogLoading = true;
+        try {
+            const response = await fetch('/v1/agent-catalog');
+            if (response.ok) {
+                const data = await response.json();
+                this.catalogEntries = data.entries || [];
+                this.catalogCategories = data.categories || [];
+                this.catalogAddedIds = data.addedCatalogIds || [];
+                this.catalogTotal = data.total || 0;
+            }
+        } catch (err) {
+            console.error('Failed to fetch catalog:', err);
+        } finally {
+            this.catalogLoading = false;
+        }
+    },
+
+    /** Search the catalog */
+    async searchCatalog() {
+        if (!this.catalogSearchQuery.trim()) {
+            this.applyCatalogFilter();
+            return;
+        }
+        try {
+            const response = await fetch(`/v1/agent-catalog/search?q=${encodeURIComponent(this.catalogSearchQuery)}`);
+            if (response.ok) {
+                const data = await response.json();
+                this.catalogEntries = data.entries || [];
+                this.catalogTotal = data.total || 0;
+            }
+        } catch (err) {
+            console.error('Failed to search catalog:', err);
+            this.applyCatalogFilter();
+        }
+    },
+
+    /** Filter catalog by category */
+    applyCatalogFilter() {
+        // For simplicity, re-fetch full catalog and client-side filter
+        if (this.catalogEntries.length === 0) {
+            this.fetchCatalog();
+        }
+    },
+
+    /** Get filtered catalog entries */
+    get filteredCatalogEntries() {
+        let entries = this.catalogEntries;
+        if (this.catalogSelectedCategory) {
+            entries = entries.filter(e => e.category === this.catalogSelectedCategory);
+        }
+        return entries;
+    },
+
+    /** Fork a template from the catalog */
+    async addFromStore(entry) {
+        if (this.catalogAddedIds.includes(entry.id)) return;
+        if (this.catalogAddingIds.includes(entry.id)) return;
+        this.catalogAddingIds.push(entry.id);
+        try {
+            const response = await fetch(`/v1/agent-catalog/${entry.id}/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            if (response.ok) {
+                const data = await response.json();
+                if (!this.catalogAddedIds.includes(entry.id)) {
+                    this.catalogAddedIds.push(entry.id);
+                }
+
+                // Fetch the full agent definition directly using the returned ID
+                const agentId = data.id;
+                if (agentId) {
+                    const fullAgent = await this.fetchAgentById(agentId);
+                    console.log('[addFromStore] fetched agent:', fullAgent);
+                    if (fullAgent) {
+                        // Refresh agents list in background
+                        this.fetchAgents();
+                        window.dispatchEvent(new CustomEvent('agents-updated'));
+
+                        if (fullAgent.isComposed || fullAgent.is_composed) {
+                            this.showEditPipelineForm(fullAgent);
+                        } else {
+                            this.showEditNodeForm(fullAgent);
+                        }
+                        this.showToast('Template added — editing now', 'success', 3000);
+                        return;
+                    }
+                }
+                // Fallback: go to list view
+                this.view = 'list';
+            } else if (response.status === 409) {
+                if (!this.catalogAddedIds.includes(entry.id)) {
+                    this.catalogAddedIds.push(entry.id);
+                }
+                // Already forked — find it in our agents list by matching catalog source ID or name
+                const existing = this.allAgents.find(a => a.sourceCatalogId === entry.id || a.source_catalog_id === entry.id) ||
+                    this.agents.find(a => a.sourceCatalogId === entry.id || a.source_catalog_id === entry.id) ||
+                    this.allAgents.find(a => a.name === entry.name) ||
+                    this.agents.find(a => a.name === entry.name);
+                if (existing) {
+                    // Fetch full definition
+                    const fullAgent = await this.fetchAgentById(existing.id);
+                    console.log('[addFromStore] existing agent:', fullAgent);
+                    if (fullAgent) {
+                        if (fullAgent.isComposed || fullAgent.is_composed) {
+                            this.showEditPipelineForm(fullAgent);
+                        } else {
+                            this.showEditNodeForm(fullAgent);
+                        }
+                        return;
+                    }
+                }
+                this.view = 'list';
+            } else {
+                const errData = await response.text();
+                console.error('Failed to add template:', response.status, errData);
+                this.showToast('Failed to add template', 'error');
+            }
+        } catch (err) {
+            console.error('Failed to add template:', err);
+            this.showToast('Failed to add template', 'error');
+        } finally {
+            this.catalogAddingIds = this.catalogAddingIds.filter(id => id !== entry.id);
         }
     },
 
