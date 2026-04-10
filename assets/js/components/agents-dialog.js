@@ -517,6 +517,7 @@ export const agentsManager = () => ({
                     this.addedCatalogIds.push(entry.id);
                 }
                 this.fetchAgents();
+                window.dispatchEvent(new CustomEvent('agents-updated'));
                 this.storeSuccessId = entry.id;
                 setTimeout(() => {
                     if (this.storeSuccessId === entry.id) this.storeSuccessId = null;

@@ -448,6 +448,9 @@ document.addEventListener('alpine:init', () => {
                 // Fetch available agents
                 this.fetchAgents();
 
+                // Refresh agents when agents are added from the Agent Store or edited
+                window.addEventListener('agents-updated', () => this.fetchAgents());
+
                 // ── DOM Observers (deferred to next tick for DOM readiness) ──
                 this.$nextTick(() => {
                     this.__setupScrollObservers();
