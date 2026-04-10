@@ -390,7 +390,7 @@ templ AgentsDialog() {
 															<template x-if="addedCatalogIds.includes(entry.id)">
 																<span class="inline-flex items-center gap-1 h-7 px-2.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 rounded-md bg-emerald-500/10 border border-emerald-500/20 select-none">
 																	@icon.Check(icon.Props{Class: "size-3"})
-																	{ i18n.T(ctx, "Added") }
+																	{ i18n.T(ctx, "Forked") }
 																</span>
 															</template>
 															<!-- Add / Adding button -->
@@ -402,12 +402,12 @@ templ AgentsDialog() {
 																	class="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 cursor-pointer border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 h-7 px-2.5 text-xs shrink-0"
 																>
 																	<span x-show="!storeAddingIds.includes(entry.id)" class="flex items-center gap-1">
-																		@icon.Plus(icon.Props{Class: "size-3"})
-																		{ i18n.T(ctx, "Add") }
+																		@icon.GitFork(icon.Props{Class: "size-3"})
+																		{ i18n.T(ctx, "Fork") }
 																	</span>
 																	<span x-show="storeAddingIds.includes(entry.id)" class="flex items-center gap-1">
 																		<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
-																		{ i18n.T(ctx, "Adding...") }
+																		{ i18n.T(ctx, "Forking...") }
 																	</span>
 																</button>
 															</template>
@@ -424,7 +424,7 @@ templ AgentsDialog() {
 															class="mt-2 flex items-center gap-1.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400"
 														>
 															@icon.Check(icon.Props{Class: "size-3"})
-															{ i18n.T(ctx, "Agent added to My Agents!") }
+															{ i18n.T(ctx, "Forked to My Agents!") }
 														</div>
 													</div>
 												</template>

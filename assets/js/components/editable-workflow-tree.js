@@ -612,7 +612,7 @@ export const editableWorkflowTree = () => {
         const m = META.agent;
         const name = node.agent_id ? (agents.find(a => a.id === node.agent_id)?.name || 'Unknown') : 'No agent selected';
         const agentOptions = agents.map(a => 
-            `<option value="${a.id}" ${node.agent_id === a.id ? 'selected' : ''}>${esc(a.name)}</option>`
+            `<option value="${a.id}" ${node.agent_id === a.id ? 'selected' : ''}>${esc(a.name)}${a.isComposed ? ' (Workflow)' : ''}</option>`
         ).join('');
 
         return `

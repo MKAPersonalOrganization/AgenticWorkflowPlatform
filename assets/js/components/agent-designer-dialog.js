@@ -24,7 +24,7 @@ export const agentDesigner = () => ({
 
     // Agent lists
     allAgents: [],      // all agent definitions (both LLM and workflow)
-    agents: [],         // non-composed only (for palette/tree builder leaf references)
+    agents: [],         // all agents (including composed) for tree builder leaf references
     filteredAgents: [],  // filtered allAgents for the list view
     loading: false,
     saving: false,
@@ -169,7 +169,7 @@ export const agentDesigner = () => ({
                 const data = await response.json();
                 const all = data.agents || [];
                 this.allAgents = all;
-                this.agents = all.filter(a => !a.isComposed); // leaf agents for palette/tree builder
+                this.agents = all; // all agents (including composed) for tree builder to allow fork references
                 this.applyFilter();
             }
         } catch (err) {
