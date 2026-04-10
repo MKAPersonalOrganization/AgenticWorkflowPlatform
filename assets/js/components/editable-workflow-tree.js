@@ -610,7 +610,9 @@ export const editableWorkflowTree = () => {
 
     function renderAgentNode(node, agents, isSelected, nodeId) {
         const m = META.agent;
-        const name = node.agent_id ? (agents.find(a => a.id === node.agent_id)?.name || 'Unknown') : 'No agent selected';
+        const selectedAgent = agents.find(a => a.id === node.agent_id);
+        const name = node.agent_id ? (selectedAgent?.name || 'Unknown') : 'No agent selected';
+        const isComposed = selectedAgent?.isComposed || false;
         const agentOptions = agents.map(a => 
             `<option value="${a.id}" ${node.agent_id === a.id ? 'selected' : ''}>${esc(a.name)}${a.isComposed ? ' (Workflow)' : ''}</option>`
         ).join('');
@@ -650,6 +652,7 @@ export const editableWorkflowTree = () => {
                         ${node.output_key ? `<div class="ewt-agent-desc">→ ${esc(node.output_key)}</div>` : ''}
                     </div>
                     <div class="ewt-actions">
+                        ${isComposed ? `<button class="ewt-action-btn" onclick="window.ewtEditAgent('${node.agent_id}')" title="Edit Workflow">✎</button>` : ''}
                         <button class="ewt-action-btn" onclick="window.ewtMoveUp('${nodeId}')" title="Move up">↑</button>
                         <button class="ewt-action-btn" onclick="window.ewtMoveDown('${nodeId}')" title="Move down">↓</button>
                         <button class="ewt-action-btn" onclick="window.ewtDuplicate('${nodeId}')" title="Duplicate (Ctrl+D)">⧉</button>
@@ -1083,6 +1086,19 @@ export const editableWorkflowTree = () => {
                     // Sync back to component state
                     if (window.__ewtOnChange) window.__ewtOnChange(store.graph);
                 }
+            };
+
+            window.ewtEditAgent = async (agentId) => {
+                if (!agentId) return;
+                // Close the workflow editor and open the agent editor for this workflow
+                const store = Alpine.store('flow');
+                if (store && store.closeFlowView) {
+                    store.closeFlowView();
+                }
+                // Dispatch event to open agent designer with this workflow
+                window.dispatchEvent(new CustomEvent('open-agent-designer-with-id', { 
+                    detail: { agentId: agentId } 
+                }));
             };
 
             window.ewtAddChild = (parentId, childType) => {

@@ -127,6 +127,7 @@ export const agentDesigner = () => ({
     },
     editingPipeline: null,
     pipelineSaving: false,
+    pipelineConsumers: [],
 
     // A2A connectors (for remote nodes)
     connectors: [],
@@ -160,6 +161,31 @@ export const agentDesigner = () => ({
     // ══════════════════════════════════════════
     // Data Fetching
     // ══════════════════════════════════════════
+
+    async fetchAgentById(agentId) {
+        try {
+            const response = await fetch(`/v1/agent-definitions/${encodeURIComponent(agentId)}`);
+            if (response.ok) {
+                return await response.json();
+            }
+        } catch (err) {
+            console.error('Failed to fetch agent:', err);
+        }
+        return null;
+    },
+
+    async fetchConsumers(agentId) {
+        try {
+            const response = await fetch(`/v1/agent-definitions/${encodeURIComponent(agentId)}/consumers`);
+            if (response.ok) {
+                const data = await response.json();
+                this.pipelineConsumers = data.agents || [];
+            }
+        } catch (err) {
+            console.error('Failed to fetch consumers:', err);
+            this.pipelineConsumers = [];
+        }
+    },
 
     async fetchAgents() {
         this.loading = true;
@@ -807,6 +833,8 @@ export const agentDesigner = () => ({
             outputSchema: pipeline.outputSchema || '',
         };
         this.selectedNodePath = null;
+        // Fetch consumers (workflows that use this workflow as a sub-agent)
+        this.fetchConsumers(pipeline.id);
         this.$nextTick(() => this.openFlowView());
     },
 

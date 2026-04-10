@@ -395,6 +395,40 @@ func (h *storeHandler) search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
+
+// consumers handles GET /v1/agent-definitions/{id}/consumers
+func (h *storeHandler) consumers(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	agentID := r.PathValue("id")
+	if agentID == "" {
+		http.Error(w, "Agent ID is required", http.StatusBadRequest)
+		return
+	}
+
+	consumers, err := h.svc.GetConsumers(r.Context(), user.ID, agentID)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to get consumers", "error", err)
+		http.Error(w, "Failed to get consumers", http.StatusInternalServerError)
+		return
+	}
+
+	resp := listResponse{
+		Agents: make([]agentResponse, 0, len(consumers)),
+	}
+	for i := range consumers {
+		resp.Agents = append(resp.Agents, toAgentResponse(&consumers[i]))
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
 }
 

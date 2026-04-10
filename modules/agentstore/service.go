@@ -129,6 +129,34 @@ func (s *service) listByUser(ctx context.Context, userID string) ([]AgentDefinit
 	return excludeSubAgents(agents), nil
 }
 
+// GetConsumers returns all agents that reference the given agent ID in their graph.
+// This identifies workflows that use this agent as a sub-agent.
+func (s *service) GetConsumers(ctx context.Context, userID, agentID string) ([]AgentDefinition, error) {
+	agents, err := s.repo.ListByUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	var consumers []AgentDefinition
+	for i := range agents {
+		agent := &agents[i]
+		if agent.Graph == nil {
+			continue
+		}
+		if agent.ID == agentID {
+			continue
+		}
+		refs := agent.Graph.CollectAgentIDs()
+		for _, refID := range refs {
+			if refID == agentID {
+				consumers = append(consumers, *agent)
+				break
+			}
+		}
+	}
+	return consumers, nil
+}
+
 // search finds agents matching a query string within a user's agents.
 // Sub-agents consumed by workflows are excluded from results.
 func (s *service) search(ctx context.Context, userID, query string) ([]AgentDefinition, error) {

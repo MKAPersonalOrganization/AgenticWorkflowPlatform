@@ -19,6 +19,7 @@ templ AgentDesignerDialog() {
 		@open-agent-designer.window="open()"
 		@open-agent-designer-node.window="open(); $nextTick(() => showEditNodeForm($event.detail))"
 		@open-agent-designer-pipeline.window="open(); $nextTick(() => showEditPipelineForm($event.detail))"
+		@open-agent-designer-with-id.window="open(); $nextTick(() => { fetchAgentById($event.detail.agentId).then(agent => { if (agent.isComposed) showEditPipelineForm(agent); else showEditNodeForm(agent); }) })"
 		@agents-updated.window="fetchAgents()"
 	>
 		@dialog.Dialog(dialog.Props{
@@ -345,6 +346,18 @@ templ AgentDesignerDialog() {
 							}
 							<h3 class="text-sm font-semibold" x-text="(editingPipeline ? 'Edit' : 'New') + ' Workflow'"></h3>
 							<div class="flex-1"></div>
+							<!-- Consumers indicator -->
+							<template x-if="editingPipeline && pipelineConsumers.length > 0">
+								<div class="flex items-center gap-1.5 text-[10px] text-muted-foreground mr-2">
+									<span class="text-[10px] text-muted-foreground" x-text="pipelineConsumers.length + ' workflow' + (pipelineConsumers.length !== 1 ? 's' : '') + ' use this'"></span>
+									<template x-for="consumer in pipelineConsumers.slice(0, 3)" :key="consumer.id">
+										<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20" x-text="consumer.name"></span>
+									</template>
+									<template x-if="pipelineConsumers.length > 3">
+										<span class="text-[10px] text-muted-foreground">+</span>
+									</template>
+								</div>
+							</template>
 							<div class="flex items-center gap-1">
 								<template x-if="isPipelineValid">
 									<span class="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
