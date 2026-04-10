@@ -655,7 +655,7 @@ export const editableWorkflowTree = () => {
                         ${node.output_key ? `<div class="ewt-agent-desc">→ ${esc(node.output_key)}</div>` : ''}
                     </div>
                     <div class="ewt-actions">
-                        <button class="ewt-action-btn ewt-contrib-btn" onclick="window.ewtToggleContribution('${esc(name)}')" title="Toggle agent contribution">💬</button>
+                        <button type="button" class="ewt-action-btn ewt-contrib-btn" data-agent-toggle="${esc(name)}" title="Toggle agent output">💬</button>
                         ${isComposed ? `<button class="ewt-action-btn" onclick="window.ewtEditAgent('${node.agent_id}')" title="Edit Workflow">✎</button>` : ''}
                         <button class="ewt-action-btn" onclick="window.ewtMoveUp('${nodeId}')" title="Move up">↑</button>
                         <button class="ewt-action-btn" onclick="window.ewtMoveDown('${nodeId}')" title="Move down">↓</button>
@@ -663,8 +663,8 @@ export const editableWorkflowTree = () => {
                         <button class="ewt-action-btn danger" onclick="window.ewtDeleteNode('${nodeId}')" title="Delete">✕</button>
                     </div>
                 </div>
-                <!-- Agent contribution output (populates during test run) -->
-                <div class="ewt-agent-output" data-agent-name="${esc(name)}" style="display:none;"></div>
+                <!-- Agent output bubble -->
+                <div class="ewt-agent-output" data-agent-name="${esc(name)}"></div>
             </div>`;
     }
 
@@ -1083,8 +1083,32 @@ export const editableWorkflowTree = () => {
     // ── Alpine component ────────────────────────────────────────────
 
     return {
+        // Store outputs separately so they survive re-renders
+        _savedOutputs: {},
+
         init() {
             injectStyles();
+
+            // Toggle agent output visibility - simple direct manipulation
+            this.toggleAgentOutput = (agentName) => {
+                const node = this.$el.querySelector(`.ewt-node[data-agent-name="${agentName}"]`);
+                if (node) {
+                    const output = node.querySelector('.ewt-agent-output');
+                    if (output) {
+                        const isVisible = output.style.display === 'block';
+                        output.style.display = isVisible ? 'none' : 'block';
+                    }
+                }
+            };
+
+            // Use event delegation for toggle buttons
+            this.$el.addEventListener('click', (e) => {
+                const toggleBtn = e.target.closest('[data-agent-toggle]');
+                if (toggleBtn) {
+                    const agentName = toggleBtn.getAttribute('data-agent-toggle');
+                    this.toggleAgentOutput(agentName);
+                }
+            });
 
             // Global functions for button clicks
             window.ewtDeleteNode = (id) => {
@@ -1111,10 +1135,29 @@ export const editableWorkflowTree = () => {
             };
 
             window.ewtToggleContribution = (agentName) => {
-                // Dispatch event to agent designer to toggle contribution panel
-                window.dispatchEvent(new CustomEvent('test-panel-toggle-agent', { 
-                    detail: { agentName: agentName } 
-                }));
+                // Toggle output visibility in the workflow tree - query from document
+                document.querySelectorAll('.ewt-node[data-agent-name]').forEach(el => {
+                    const name = el.getAttribute('data-agent-name');
+                    if (name === agentName) {
+                        const output = el.querySelector('.ewt-agent-output');
+                        if (output) {
+                            output.classList.toggle('visible');
+                        }
+                    }
+                });
+            };
+
+            window.ewtToggleOutput = (agentName) => {
+                // Toggle output visibility in the workflow tree - query from document
+                document.querySelectorAll('.ewt-node[data-agent-name]').forEach(el => {
+                    const name = el.getAttribute('data-agent-name');
+                    if (name === agentName) {
+                        const output = el.querySelector('.ewt-agent-output');
+                        if (output) {
+                            output.classList.toggle('visible');
+                        }
+                    }
+                });
             };
 
             window.ewtAddChild = (parentId, childType) => {
@@ -1413,23 +1456,27 @@ export const editableWorkflowTree = () => {
                     // Build output HTML
                     const messagesHtml = messages.map(msg => {
                         const content = msg.content || '';
-                        const roleLabel = msg.role === 'user' ? 'You' : msg.role === 'error' ? 'Error' : 'Response';
                         const isError = msg.role === 'error';
                         const isStreaming = msg.streaming;
                         
-                        return `<div class="ewt-agent-output-message ${isError ? 'error' : ''}">${esc(content)}${isStreaming ? '<span class="streaming-cursor">▋</span>' : ''}</div>`;
+                        return `<div class="ewt-agent-output-message ${isError ? 'error' : ''}">${esc(content)}${isStreaming ? '<span class="streaming-cursor"></span>' : ''}</div>`;
                     }).join('');
 
                     outputDiv.innerHTML = `
                         <div class="ewt-agent-output-header">
                             <span>${esc(nameToMatch)}</span>
-                            <span class="msg-count">${messages.length} message${messages.length !== 1 ? 's' : ''}</span>
+                            <span class="msg-count">${messages.length} msg${messages.length !== 1 ? 's' : ''}</span>
                         </div>
                         ${messagesHtml}
                     `;
                     
+                    // Show output - always auto-display when there's content
                     outputDiv.style.display = 'block';
-                    outputDiv.classList.toggle('streaming', hasStreaming);
+                    if (hasStreaming) {
+                        outputDiv.classList.add('streaming');
+                    } else {
+                        outputDiv.classList.remove('streaming');
+                    }
                     
                     // Auto-scroll to bottom if streaming
                     if (hasStreaming) {
@@ -1464,6 +1511,18 @@ export const editableWorkflowTree = () => {
                 return;
             }
 
+            // Save current output visibility before re-render
+            const currentOutputs = {};
+            if (container.querySelector) {
+                container.querySelectorAll('.ewt-node[data-agent-name]').forEach(node => {
+                    const name = node.getAttribute('data-agent-name');
+                    const output = node.querySelector('.ewt-agent-output');
+                    if (name && output) {
+                        currentOutputs[name] = output.innerHTML;
+                    }
+                });
+            }
+
             // Pass selectedId through the graph object for the renderer
             const graphWithSelection = { ...store.graph, _selectedId: store.selectedId };
 
@@ -1471,6 +1530,20 @@ export const editableWorkflowTree = () => {
                 <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
                     ${renderPipelineNode(graphWithSelection, store.agents || [], store.connectors || [], 0, store)}
                 </div>`;
+
+            // Restore output content after re-render
+            this.$nextTick(() => {
+                container.querySelectorAll('.ewt-node[data-agent-name]').forEach(node => {
+                    const name = node.getAttribute('data-agent-name');
+                    if (name && currentOutputs[name]) {
+                        const output = node.querySelector('.ewt-agent-output');
+                        if (output) {
+                            output.innerHTML = currentOutputs[name];
+                            output.style.display = 'block';
+                        }
+                    }
+                });
+            });
         },
 
         // Compatibility methods called by agent-designer-dialog

@@ -913,27 +913,27 @@ templ AgentDesignerDialog() {
 					<template x-if="testModeActive">
 						<!-- Outer wrapper: height animates between 280px and 40px -->
 						<div
-							class="shrink-0 flex flex-col border-t border-amber-500/20 overflow-hidden transition-all duration-200 ease-in-out"
+							class="shrink-0 flex flex-col border-t border-primary/20 overflow-hidden transition-all duration-200 ease-in-out"
 							:style="testPanelCollapsed ? 'height:40px' : 'height:280px'"
-							style="background:#0d1117;"
+							class="bg-background"
 						>
 							<!-- ── Panel header bar (always visible, 40px) ── -->
-							<div class="flex items-center gap-2 px-3 shrink-0" style="height:40px; background:#161b22; border-bottom:1px solid rgba(255,255,255,0.06);">
+							<div class="flex items-center gap-2 px-3 shrink-0 border-b border-border" style="height:40px;" class="bg-muted/50">
 								<!-- Play icon + label -->
-								<span class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-amber-400">
+								<span class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-primary">
 									<svg xmlns="http://www.w3.org/2000/svg" class="size-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
 									Test Panel
 								</span>
 								<!-- Agent name badge -->
 								<span
 									class="text-[9px] px-1.5 py-0.5 rounded font-mono"
-									style="background:rgba(245,158,11,0.1); color:#fbbf24;"
+									style="background:oklch(from var(--primary) l c h / 10%); color:var(--primary);"
 									x-text="editingPipeline?.name || editingAgent?.name || 'Agent'"
 								></span>
 								<!-- Thread indicator -->
 								<span
 									x-show="testPanelThreadId"
-									class="text-[8px] font-mono text-gray-600 hidden sm:block"
+									class="text-[8px] font-mono text-muted-foreground hidden sm:block"
 									x-text="'thread: ' + (testPanelThreadId ? testPanelThreadId.slice(0,8) + '…' : '')"
 								></span>
 								<span class="flex-1"></span>
@@ -941,8 +941,8 @@ templ AgentDesignerDialog() {
 								<button
 									@click="toggleTestEventLog()"
 									title="Toggle event log"
-									class="flex items-center justify-center w-6 h-6 rounded text-[10px] transition-colors"
-									:style="testPanelShowEventLog ? 'color:#22d3ee;background:rgba(34,211,238,0.1)' : 'color:#6b7280;'"
+									class="flex items-center justify-center w-6 h-6 rounded text-[10px] transition-colors hover:bg-muted"
+									:class="testPanelShowEventLog ? 'text-primary' : 'text-muted-foreground'"
 								>
 									@icon.Terminal(icon.Props{Class: "size-3"})
 								</button>
@@ -950,7 +950,7 @@ templ AgentDesignerDialog() {
 								<button
 									@click="clearTestSession()"
 									title="Clear test session"
-									class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-gray-600 hover:text-gray-400 transition-colors"
+									class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
 								>
 									@icon.Trash2(icon.Props{Class: "size-3"})
 								</button>
@@ -958,9 +958,9 @@ templ AgentDesignerDialog() {
 								<button
 									@click="toggleTestPanel()"
 									:title="testPanelCollapsed ? 'Expand test panel' : 'Collapse test panel'"
-									class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-gray-600 hover:text-gray-400 transition-colors"
+									class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
 								>
-									<span class="transition-transform duration-200 inline-flex" :style="testPanelCollapsed ? '' : 'transform:rotate(180deg)'">
+									<span class="transition-transform duration-200 inline-flex" :class="testPanelCollapsed ? '' : 'rotate-180'">
 										@icon.ChevronDown(icon.Props{Class: "size-3"})
 									</span>
 								</button>
@@ -973,42 +973,43 @@ templ AgentDesignerDialog() {
 								<div class="flex flex-col flex-1 overflow-hidden min-h-0">
 
 									<!-- Empty state -->
-									<div class="flex-1 flex flex-col items-center justify-center py-8 gap-2" style="color:#4b5563;">
-										<svg xmlns="http://www.w3.org/2000/svg" class="size-6 opacity-30" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-										<span style="font-size:10px; color:#6b7280;">Responses appear in workflow nodes</span>
+									<div class="flex-1 flex flex-col items-center justify-center py-8 gap-3 text-muted-foreground">
+										<svg xmlns="http://www.w3.org/2000/svg" class="size-8 opacity-40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+											<path d="M12 20h9"/>
+											<path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+										</svg>
+										<span class="text-xs">Responses appear in workflow nodes</span>
 									</div>
 
 									<!-- ── Input bar ── -->
-									<div class="shrink-0 px-3 pb-2 pt-1.5" style="border-top:1px solid rgba(255,255,255,0.06);">
+									<div class="shrink-0 px-3 pb-2 pt-1.5 border-t border-border">
 										<div class="flex items-center gap-2">
 											<input
 												x-model="testPanelInput"
 												@keydown="handleTestKeydown($event)"
 												:disabled="testPanelStreaming"
 												placeholder="Message the agent... (Enter to send)"
-												class="flex-1 rounded px-2 py-1 text-xs text-gray-300 outline-none disabled:opacity-40 transition-colors"
-												style="background:#21262d; border:1px solid rgba(255,255,255,0.1); font-family:inherit;"
-												:style="testPanelStreaming ? '' : 'border-color:rgba(255,255,255,0.1);'"
-												@focus="$el.style.borderColor='rgba(245,158,11,0.5)'"
-												@blur="$el.style.borderColor='rgba(255,255,255,0.1)'"
+												class="flex-1 rounded px-2.5 py-1.5 text-xs bg-background text-foreground outline-none disabled:opacity-50 transition-colors border border-input"
+												@focus="$el.classList.add('border-primary', 'ring-1', 'ring-primary')"
+												@blur="$el.classList.remove('border-primary', 'ring-1', 'ring-primary')"
 											/>
 											<!-- Send / Stop button -->
 											<button
 												@click="testPanelStreaming ? abortTestMessage() : sendTestMessage()"
 												:disabled="!testPanelStreaming && !testPanelInput.trim()"
 												:title="testPanelStreaming ? 'Stop (Escape)' : 'Send (Enter)'"
-												class="flex items-center justify-center w-7 h-7 rounded transition-all"
-												:style="testPanelStreaming 
-													? 'background:rgba(239,68,68,0.15); color:#f87171; cursor:pointer;' 
+												class="flex items-center justify-center w-8 h-8 rounded-md transition-all hover:scale-105 active:scale-95"
+												:class="testPanelStreaming 
+													? 'bg-destructive/10 text-destructive hover:bg-destructive/20' 
 													: (testPanelInput.trim() 
-														? 'background:rgba(245,158,11,0.15); color:#fbbf24; cursor:pointer;' 
-														: 'background:#21262d; color:#6b7280; cursor:not-allowed;')"
+														? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+														: 'bg-muted text-muted-foreground cursor-not-allowed opacity-50')"
 											>
 												<template x-if="testPanelStreaming">
-													@icon.CircleStop(icon.Props{Class: "size-3.5"})
+													@icon.CircleStop(icon.Props{Class: "size-4"})
 												</template>
 												<template x-if="!testPanelStreaming">
-													@icon.SendHorizontal(icon.Props{Class: "size-3.5"})
+													@icon.SendHorizontal(icon.Props{Class: "size-4"})
 												</template>
 											</button>
 										</div>
@@ -1019,23 +1020,23 @@ templ AgentDesignerDialog() {
 								<!-- ── Event log side pane ── -->
 								<template x-if="testPanelShowEventLog">
 									<div
-										class="w-52 shrink-0 overflow-y-auto scrollbar-thin flex flex-col"
-										style="border-left:1px solid rgba(255,255,255,0.06); font-family:'JetBrains Mono','Fira Code',monospace; font-size:9px;"
+										class="w-56 shrink-0 overflow-y-auto scrollbar-thin flex flex-col bg-muted/20"
+										style="font-family:'JetBrains Mono','Fira Code',monospace;"
 									>
-										<div class="px-2 py-1.5" style="border-bottom:1px solid rgba(255,255,255,0.06); color:#4b5563; font-size:8px; text-transform:uppercase; letter-spacing:0.1em;">
+										<div class="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border">
 											SSE Events
 										</div>
 										<!-- Empty state -->
 										<template x-if="testPanelEvents.length === 0">
-											<div class="flex-1 flex items-center justify-center" style="color:#374151; font-size:9px;">No events yet</div>
+											<div class="flex-1 flex items-center justify-center text-muted-foreground text-xs py-8">No events yet</div>
 										</template>
 										<!-- Event rows -->
-										<div class="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
+										<div class="flex-1 overflow-y-auto px-3 py-2 space-y-1">
 											<template x-for="(ev, idx) in testPanelEvents" :key="idx">
-												<div class="flex items-center gap-1 py-0.5">
-													<span x-text="ev.type" style="color:#22d3ee; flex-shrink:0;"></span>
+												<div class="flex items-center gap-2 py-0.5 text-[11px]">
+													<span x-text="ev.type" class="text-primary font-medium flex-shrink-0;"></span>
 													<template x-if="ev.name">
-														<span x-text="'· ' + ev.name" style="color:#4b5563; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;"></span>
+														<span x-text="'· ' + ev.name" class="text-muted-foreground truncate;"></span>
 													</template>
 												</div>
 											</template>
