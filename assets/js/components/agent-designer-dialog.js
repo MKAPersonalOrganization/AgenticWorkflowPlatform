@@ -18,8 +18,12 @@ export const agentDesigner = () => ({
     // State
     // ══════════════════════════════════════════
 
-    /** @type {'list' | 'typeSelect' | 'agentForm' | 'flow' | 'delete'} */
+    /** @type {'list' | 'typeSelect' | 'importYaml' | 'agentForm' | 'flow' | 'delete'} */
     view: 'list',
+
+    importYamlText: '',
+    importYamlURL: '',
+    importYamlLoading: false,
 
     // Agent filter
     agentFilter: 'all', // 'all' | 'agent' | 'workflow'
@@ -1220,6 +1224,71 @@ export const agentDesigner = () => ({
     // ══════════════════════════════════════════
     // Pipeline Compose Mode — CRUD
     // ══════════════════════════════════════════
+
+    showImportYamlView() {
+        this.importYamlText = '';
+        this.importYamlURL = '';
+        this.view = 'importYaml';
+    },
+
+    onImportYamlFile(event) {
+        const input = event.target;
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            this.importYamlText = String(reader.result || '');
+        };
+        reader.readAsText(file);
+        input.value = '';
+    },
+
+    async submitImportYaml() {
+        if (this.importYamlLoading) return;
+        const urlTrim = this.importYamlURL.trim();
+        const yamlTrim = this.importYamlText.trim();
+        if (urlTrim && yamlTrim) {
+            this.showToast('Provide either URL or YAML, not both', 'error');
+            return;
+        }
+        if (!urlTrim && !yamlTrim) {
+            this.showToast('Paste YAML, choose a file, or enter a URL', 'error');
+            return;
+        }
+        this.importYamlLoading = true;
+        try {
+            const body = urlTrim ? { url: urlTrim } : { yaml: this.importYamlText };
+            const response = await fetch('/v1/agent-definitions/import-yaml', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+                credentials: 'same-origin',
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                this.showToast(data.error || 'Import failed', 'error');
+                return;
+            }
+            await this.fetchAgents();
+            const agent = await this.fetchAgentById(data.id);
+            if (!agent) {
+                this.showToast('Imported but could not load agent', 'error');
+                this.view = 'list';
+                return;
+            }
+            this.showToast('Imported successfully', 'success', 2500);
+            if (data.isComposed) {
+                this.showEditPipelineForm(agent);
+            } else {
+                this.showEditNodeForm(agent);
+            }
+        } catch (err) {
+            console.error('YAML import failed:', err);
+            this.showToast('Import failed', 'error');
+        } finally {
+            this.importYamlLoading = false;
+        }
+    },
 
     showCreatePipelineForm() {
         this.editingPipeline = null;

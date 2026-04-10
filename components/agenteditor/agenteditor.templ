@@ -230,7 +230,7 @@ templ AgentDesignerDialog() {
 							}
 							<h3 class="text-sm font-semibold">{ i18n.T(ctx, "What would you like to create?") }</h3>
 						</div>
-						<div class="flex-1 flex items-center justify-center p-8">
+						<div class="flex-1 flex flex-col items-center justify-center p-8 gap-6 overflow-y-auto">
 							<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-lg">
 								<!-- Single Agent Card -->
 								<button
@@ -261,6 +261,87 @@ templ AgentDesignerDialog() {
 									</div>
 								</button>
 							</div>
+							<button
+								type="button"
+								@click="showImportYamlView()"
+								class="text-sm font-medium text-primary hover:underline"
+							>
+								{ i18n.T(ctx, "Import YAML") }
+							</button>
+						</div>
+					</div>
+				</template>
+				<!-- ═══════════════════════════════════════════ -->
+				<!-- IMPORT YAML                                 -->
+				<!-- ═══════════════════════════════════════════ -->
+				<template x-if="view === 'importYaml'">
+					<div class="flex flex-col flex-1 overflow-hidden">
+						<div class="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/50 shrink-0">
+							@button.Button(button.Props{
+								Size:    button.SizeIcon,
+								Variant: button.VariantGhost,
+								Class:   "size-8",
+								Attributes: templ.Attributes{
+									"@click": "view = 'typeSelect'",
+								},
+							}) {
+								@icon.ArrowLeft(icon.Props{Class: "size-4"})
+							}
+							@icon.FileText(icon.Props{Class: "size-4 text-muted-foreground"})
+							<h3 class="text-sm font-semibold">{ i18n.T(ctx, "Import YAML") }</h3>
+						</div>
+						<div class="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
+							<p class="text-xs text-muted-foreground leading-relaxed">
+								{ i18n.T(ctx, "Paste YAML below, upload a file, or use a public HTTPS URL. Same shape as catalog templates: name, workflow, sub_agents.") }
+							</p>
+							<div class="space-y-1.5">
+								<label class="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">{ i18n.T(ctx, "HTTPS URL (optional if YAML is pasted)") }</label>
+								<input
+									type="url"
+									x-model="importYamlURL"
+									placeholder="https://…"
+									class="w-full rounded-md border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
+								/>
+							</div>
+							<div class="space-y-1.5">
+								<label class="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">{ i18n.T(ctx, "YAML document") }</label>
+								<textarea
+									x-model="importYamlText"
+									rows="14"
+									spellcheck="false"
+									class="w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-mono text-foreground outline-none focus:ring-1 focus:ring-primary resize-y min-h-[200px]"
+								></textarea>
+							</div>
+							<label class="inline-flex items-center gap-2 text-xs text-primary cursor-pointer hover:underline">
+								<input type="file" accept=".yaml,.yml,.txt,text/yaml,text/plain" class="sr-only" @change="onImportYamlFile($event)"/>
+								@icon.FileText(icon.Props{Class: "size-3.5"})
+								<span>{ i18n.T(ctx, "Choose YAML file") }</span>
+							</label>
+						</div>
+						<div class="px-4 py-3 border-t bg-muted/50 flex items-center justify-end gap-2 shrink-0">
+							@button.Button(button.Props{
+								Variant: button.VariantGhost,
+								Class:   "h-8 px-3 text-xs",
+								Attributes: templ.Attributes{
+									"@click": "view = 'typeSelect'",
+								},
+							}) {
+								{ i18n.T(ctx, "Cancel") }
+							}
+							@button.Button(button.Props{
+								Variant: button.VariantDefault,
+								Class:   "h-8 px-4 text-xs gap-1.5",
+								Attributes: templ.Attributes{
+									"@click":    "submitImportYaml()",
+									":disabled": "importYamlLoading",
+								},
+							}) {
+								<span x-show="!importYamlLoading">{ i18n.T(ctx, "Import YAML") }</span>
+								<span x-show="importYamlLoading" class="flex items-center gap-1.5">
+									<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
+									{ i18n.T(ctx, "Importing…") }
+								</span>
+							}
 						</div>
 					</div>
 				</template>

@@ -215,6 +215,61 @@ func (h *storeHandler) create(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// importYAML handles POST /v1/agent-definitions/import-yaml
+func (h *storeHandler) importYAML(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		YAML string `json:"yaml"`
+		URL  string `json:"url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	urlTrim := strings.TrimSpace(req.URL)
+	yamlTrim := strings.TrimSpace(req.YAML)
+	var raw []byte
+	if urlTrim != "" && yamlTrim != "" {
+		writeJSONError(w, "Provide either url or yaml, not both", http.StatusBadRequest)
+		return
+	}
+	if urlTrim != "" {
+		var err error
+		raw, err = fetchYAMLFromURL(r.Context(), urlTrim)
+		if err != nil {
+			h.log.Error(r.Context(), "import yaml fetch url", "error", err)
+			writeJSONError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	} else {
+		raw = []byte(req.YAML)
+	}
+	if strings.TrimSpace(string(raw)) == "" {
+		writeJSONError(w, "YAML body is empty", http.StatusBadRequest)
+		return
+	}
+
+	id, isComposed, err := h.svc.ImportFromYAML(r.Context(), user.ID, raw)
+	if err != nil {
+		h.log.Error(r.Context(), "import yaml", "error", err)
+		writeJSONError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]any{
+		"id":         id,
+		"isComposed": isComposed,
+	})
+}
+
 // update handles PUT /v1/agent-definitions/{id}
 func (h *storeHandler) update(w http.ResponseWriter, r *http.Request) {
 	user := shared.GetUserFromContext(r.Context())

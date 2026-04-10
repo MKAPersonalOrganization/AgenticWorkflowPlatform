@@ -5,7 +5,9 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // Composition tree limits prevent unbounded nesting.
@@ -60,6 +62,88 @@ func (s *service) create(ctx context.Context, agent *AgentDefinition) error {
 		return fmt.Errorf("creating agent: %w", err)
 	}
 	return nil
+}
+
+// ImportFromYAML creates agent definition(s) from catalog-format YAML (see ParseCatalogEntryYAML).
+// Workflow entries create sub-agents plus a composed parent; simple entries create one LLM agent.
+func (s *service) ImportFromYAML(ctx context.Context, userID string, yamlBytes []byte) (agentID string, isComposed bool, err error) {
+	entry, err := ParseCatalogEntryYAML(yamlBytes)
+	if err != nil {
+		return "", false, err
+	}
+	if strings.TrimSpace(entry.Name) == "" {
+		return "", false, fmt.Errorf("YAML must include name")
+	}
+	if entry.IsWorkflow() {
+		id, wErr := s.importComposedFromCatalogEntry(ctx, userID, &entry, "")
+		if wErr != nil {
+			return "", false, wErr
+		}
+		return id, true, nil
+	}
+	if strings.TrimSpace(entry.SystemPrompt) == "" {
+		return "", false, fmt.Errorf("YAML must include system_prompt for a single agent")
+	}
+	agent := &AgentDefinition{
+		UserID:       userID,
+		Name:         entry.Name,
+		Description:  entry.Description,
+		SystemPrompt: entry.SystemPrompt,
+		Icon:         entry.Icon,
+	}
+	if err := s.create(ctx, agent); err != nil {
+		return "", false, err
+	}
+	return agent.ID, false, nil
+}
+
+func (s *service) importComposedFromCatalogEntry(ctx context.Context, userID string, entry *AgentCatalogEntry, sourceCatalogID string) (string, error) {
+	var subAgents []CatalogSubAgent
+	if entry.SubAgentsJSON != "" {
+		if err := json.Unmarshal([]byte(entry.SubAgentsJSON), &subAgents); err != nil {
+			return "", fmt.Errorf("parsing sub_agents: %w", err)
+		}
+	}
+
+	var graph CompositionNode
+	if err := json.Unmarshal([]byte(entry.WorkflowGraphJSON), &graph); err != nil {
+		return "", fmt.Errorf("parsing workflow graph: %w", err)
+	}
+
+	idMap := make(map[string]string, len(subAgents))
+	for _, sa := range subAgents {
+		agent := &AgentDefinition{
+			UserID:       userID,
+			Name:         sa.Name,
+			Description:  sa.Description,
+			SystemPrompt: sa.SystemPrompt,
+			Icon:         sa.Icon,
+		}
+		if err := s.repo.Create(ctx, agent); err != nil {
+			return "", fmt.Errorf("creating sub-agent %q: %w", sa.Name, err)
+		}
+		idMap[sa.ID] = agent.ID
+	}
+
+	remapGraphAgentIDs(&graph, idMap)
+
+	if err := s.validateGraph(ctx, &graph, userID); err != nil {
+		return "", fmt.Errorf("invalid workflow graph: %w", err)
+	}
+
+	composed := &AgentDefinition{
+		UserID:          userID,
+		Name:            entry.Name,
+		Description:     entry.Description,
+		SystemPrompt:    entry.SystemPrompt,
+		Icon:            entry.Icon,
+		SourceCatalogID: sourceCatalogID,
+		Graph:           &graph,
+	}
+	if err := s.repo.Create(ctx, composed); err != nil {
+		return "", fmt.Errorf("creating workflow agent: %w", err)
+	}
+	return composed.ID, nil
 }
 
 // update modifies an existing agent definition.
@@ -353,7 +437,7 @@ func (s *service) validateNode(ctx context.Context, node *CompositionNode, userI
 			return fmt.Errorf("node %q: remote node cannot have children", node.ID)
 		}
 
-	case NodeSequential, NodeParallel, NodeLoop:
+	case NodeSequential, NodeParallel, NodeLoop, NodeConditional:
 		if len(node.Children) == 0 {
 			return fmt.Errorf("node %q: %s node requires at least one child", node.ID, node.Type)
 		}

@@ -256,53 +256,5 @@ func (h *catalogHandler) forkComposedCatalogEntry(
 	userID, catalogID string,
 	entry *AgentCatalogEntry,
 ) (string, error) {
-	// Parse sub-agent definitions from catalog.
-	var subAgents []CatalogSubAgent
-	if entry.SubAgentsJSON != "" {
-		if err := json.Unmarshal([]byte(entry.SubAgentsJSON), &subAgents); err != nil {
-			return "", err
-		}
-	}
-
-	// Parse the composition graph.
-	var graph CompositionNode
-	if err := json.Unmarshal([]byte(entry.WorkflowGraphJSON), &graph); err != nil {
-		return "", err
-	}
-
-	// Create each sub-agent as a standalone visible agent, building an ID remap.
-	idMap := make(map[string]string, len(subAgents))
-	for _, sa := range subAgents {
-		agent := &AgentDefinition{
-			UserID:       userID,
-			Name:         sa.Name,
-			Description:  sa.Description,
-			SystemPrompt: sa.SystemPrompt,
-			Icon:         sa.Icon,
-		}
-		if err := h.agentRepo.Create(ctx, agent); err != nil {
-			return "", err
-		}
-		idMap[sa.ID] = agent.ID
-	}
-
-	// Remap placeholder agent IDs in the graph to real IDs.
-	remapGraphAgentIDs(&graph, idMap)
-
-	// Create the composed agent with the graph.
-	composed := &AgentDefinition{
-		UserID:          userID,
-		Name:            entry.Name,
-		Description:     entry.Description,
-		SystemPrompt:    entry.SystemPrompt,
-		Icon:            entry.Icon,
-		SourceCatalogID: catalogID,
-		Graph:           &graph,
-	}
-
-	if err := h.agentRepo.Create(ctx, composed); err != nil {
-		return "", err
-	}
-
-	return composed.ID, nil
+	return h.svc.importComposedFromCatalogEntry(ctx, userID, entry, catalogID)
 }

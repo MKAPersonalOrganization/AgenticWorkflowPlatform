@@ -53,6 +53,7 @@ func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 	r.Get("/v1/agent-definitions", authMW.RequireAuthFunc(m.storeHandler.list))
 	r.Get("/v1/agent-definitions/search", authMW.RequireAuthFunc(m.storeHandler.search))
 	r.Post("/v1/agent-definitions", authMW.RequireAuthFunc(m.storeHandler.create))
+	r.Post("/v1/agent-definitions/import-yaml", authMW.RequireAuthFunc(m.storeHandler.importYAML))
 	r.Get("/v1/agent-definitions/{id}", authMW.RequireAuthFunc(m.storeHandler.get))
 	r.Put("/v1/agent-definitions/{id}", authMW.RequireAuthFunc(m.storeHandler.update))
 	r.Delete("/v1/agent-definitions/{id}", authMW.RequireAuthFunc(m.storeHandler.delete))

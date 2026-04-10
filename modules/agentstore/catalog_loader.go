@@ -83,6 +83,17 @@ func loadYAMLCatalog() ([]AgentCatalogEntry, error) {
 	return out, nil
 }
 
+// ParseCatalogEntryYAML parses one catalog-style YAML document (same schema as
+// modules/agentstore/catalog/*.yaml): a single LLM agent or a workflow with
+// optional sub_agents definitions.
+func ParseCatalogEntryYAML(data []byte) (AgentCatalogEntry, error) {
+	var spec yamlCatalogSpec
+	if err := yaml.Unmarshal(data, &spec); err != nil {
+		return AgentCatalogEntry{}, fmt.Errorf("parsing YAML: %w", err)
+	}
+	return spec.toEntry()
+}
+
 func (s *yamlCatalogSpec) toEntry() (AgentCatalogEntry, error) {
 	slug := s.Slug
 	if slug == "" {
