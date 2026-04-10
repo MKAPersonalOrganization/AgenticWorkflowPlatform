@@ -372,10 +372,19 @@ templ AgentDesignerDialog() {
 									</span>
 								</template>
 							</div>
+							<!-- Test mode toggle (▶) -->
+							<button
+								@click="toggleTestMode()"
+								:title="testModeActive ? 'Stop testing agent' : 'Test agent (▶)'"
+								class="flex items-center justify-center w-7 h-7 rounded text-xs transition-all duration-150"
+								:class="testModeActive ? 'text-amber-400 bg-amber-500/15 hover:bg-amber-500/25 ring-1 ring-amber-500/30' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'"
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+							</button>
 							<!-- Property panel toggle -->
 							<button
 								@click="togglePropertyPanel()"
-								:title="propertyPanelVisible ? 'Hide property panel (Ctrl+])' : 'Show property panel (Ctrl+])'"
+								:title="propertyPanelVisible ? 'Hide property panel (Ctrl+])' : 'Show property panel (Ctrl+])' "
 								class="flex items-center justify-center w-7 h-7 rounded text-xs transition-all duration-150"
 								:class="propertyPanelVisible ? 'text-indigo-400 bg-indigo-500/15 hover:bg-indigo-500/25' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'"
 							>
@@ -896,6 +905,192 @@ templ AgentDesignerDialog() {
 									</div>
 								</div>
 							</template>
+
+					<!-- ═══════════════════════════════════════════ -->
+					<!-- TEST PANEL (Steps 7-9)                      -->
+					<!-- ═══════════════════════════════════════════ -->
+					<template x-if="testModeActive">
+						<!-- Outer wrapper: height animates between 280px and 40px -->
+						<div
+							class="shrink-0 flex flex-col border-t border-amber-500/20 overflow-hidden transition-all duration-200 ease-in-out"
+							:style="testPanelCollapsed ? 'height:40px' : 'height:280px'"
+							style="background:#0d1117;"
+						>
+							<!-- ── Panel header bar (always visible, 40px) ── -->
+							<div class="flex items-center gap-2 px-3 shrink-0" style="height:40px; background:#161b22; border-bottom:1px solid rgba(255,255,255,0.06);">
+								<!-- Play icon + label -->
+								<span class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-amber-400">
+									<svg xmlns="http://www.w3.org/2000/svg" class="size-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+									Test Panel
+								</span>
+								<!-- Agent name badge -->
+								<span
+									class="text-[9px] px-1.5 py-0.5 rounded font-mono"
+									style="background:rgba(245,158,11,0.1); color:#fbbf24;"
+									x-text="editingPipeline?.name || editingAgent?.name || 'Agent'"
+								></span>
+								<!-- Thread indicator -->
+								<span
+									x-show="testPanelThreadId"
+									class="text-[8px] font-mono text-gray-600 hidden sm:block"
+									x-text="'thread: ' + (testPanelThreadId ? testPanelThreadId.slice(0,8) + '…' : '')"
+								></span>
+								<span class="flex-1"></span>
+								<!-- Event log toggle -->
+								<button
+									@click="toggleTestEventLog()"
+									title="Toggle event log"
+									class="flex items-center justify-center w-6 h-6 rounded text-[10px] transition-colors"
+									:style="testPanelShowEventLog ? 'color:#22d3ee;background:rgba(34,211,238,0.1)' : 'color:#6b7280;'"
+								>
+									@icon.Terminal(icon.Props{Class: "size-3"})
+								</button>
+								<!-- Clear session -->
+								<button
+									@click="clearTestSession()"
+									title="Clear test session"
+									class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-gray-600 hover:text-gray-400 transition-colors"
+								>
+									@icon.Trash2(icon.Props{Class: "size-3"})
+								</button>
+								<!-- Collapse / expand -->
+								<button
+									@click="toggleTestPanel()"
+									:title="testPanelCollapsed ? 'Expand test panel' : 'Collapse test panel'"
+									class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-gray-600 hover:text-gray-400 transition-colors"
+								>
+									<span class="transition-transform duration-200 inline-flex" :style="testPanelCollapsed ? '' : 'transform:rotate(180deg)'">
+										@icon.ChevronDown(icon.Props{Class: "size-3"})
+									</span>
+								</button>
+							</div>
+
+							<!-- ── Content area (hidden when collapsed) ── -->
+							<div x-show="!testPanelCollapsed" class="flex flex-1 overflow-hidden min-h-0">
+
+								<!-- ── Messages + Input column ── -->
+								<div class="flex flex-col flex-1 overflow-hidden min-h-0">
+
+									<!-- Message list -->
+									<div class="flex-1 overflow-y-auto px-3 py-2 space-y-2 scrollbar-thin min-h-0" style="font-family:'JetBrains Mono','Fira Code',monospace; font-size:11px;">
+
+										<!-- Empty state -->
+										<template x-if="testPanelMessages.length === 0 && !testPanelTyping">
+											<div class="flex flex-col items-center justify-center h-full py-8 gap-2" style="color:#4b5563;">
+												<svg xmlns="http://www.w3.org/2000/svg" class="size-6 opacity-30" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+												<span style="font-size:10px; color:#6b7280;">Send a message to test the agent...</span>
+											</div>
+										</template>
+
+										<!-- Message bubbles -->
+										<template x-for="msg in testPanelMessages" :key="msg.id">
+											<div
+												class="flex w-full"
+												:class="msg.role === 'user' ? 'justify-end' : 'justify-start'"
+											>
+												<div
+													class="max-w-[80%] px-2.5 py-1.5 rounded-lg leading-relaxed whitespace-pre-wrap break-words"
+													:style="msg.role === 'user'
+														? 'background:rgba(245,158,11,0.1); color:#fde68a; border:1px solid rgba(245,158,11,0.2);'
+														: msg.role === 'error'
+															? 'background:rgba(239,68,68,0.1); color:#fca5a5; border:1px solid rgba(239,68,68,0.2);'
+															: 'background:#21262d; color:#e5e7eb; border:1px solid rgba(255,255,255,0.06);'"
+												>
+													<!-- Role label -->
+													<div
+														class="text-[8px] uppercase tracking-widest mb-1 font-semibold"
+														:style="msg.role === 'user' ? 'color:#f59e0b;' : msg.role === 'error' ? 'color:#ef4444;' : 'color:#6b7280;'"
+														x-text="msg.role === 'user' ? 'You' : msg.role === 'error' ? '⚠ Error' : 'Agent'"
+													></div>
+													<!-- Content + streaming cursor -->
+													<span x-text="msg.content"></span>
+													<span
+														x-show="msg.streaming"
+														style="display:inline-block; width:2px; height:12px; background:#6b7280; vertical-align:middle; margin-left:1px; animation:blink 1s step-end infinite;"
+													></span>
+												</div>
+											</div>
+										</template>
+
+										<!-- Typing indicator (before first token arrives) -->
+										<template x-if="testPanelTyping">
+											<div class="flex justify-start">
+												<div class="px-2.5 py-1.5 rounded-lg flex items-center gap-1" style="background:#21262d; border:1px solid rgba(255,255,255,0.06);">
+													<span class="block w-1.5 h-1.5 rounded-full animate-bounce" style="background:#6b7280; animation-delay:0ms;"></span>
+													<span class="block w-1.5 h-1.5 rounded-full animate-bounce" style="background:#6b7280; animation-delay:150ms;"></span>
+													<span class="block w-1.5 h-1.5 rounded-full animate-bounce" style="background:#6b7280; animation-delay:300ms;"></span>
+												</div>
+											</div>
+										</template>
+
+									</div><!-- /message list -->
+
+									<!-- ── Input bar ── -->
+									<div class="shrink-0 px-3 pb-2 pt-1.5" style="border-top:1px solid rgba(255,255,255,0.06);">
+										<div class="flex items-center gap-2">
+											<input
+												x-model="testPanelInput"
+												@keydown="handleTestKeydown($event)"
+												:disabled="testPanelStreaming"
+												placeholder="Message the agent... (Enter to send)"
+												class="flex-1 rounded px-2 py-1 text-xs text-gray-300 outline-none disabled:opacity-40 transition-colors"
+												style="background:#21262d; border:1px solid rgba(255,255,255,0.1); font-family:inherit;"
+												:style="testPanelStreaming ? '' : 'border-color:rgba(255,255,255,0.1);'"
+												@focus="$el.style.borderColor='rgba(245,158,11,0.5)'"
+												@blur="$el.style.borderColor='rgba(255,255,255,0.1)'"
+											/>
+											<!-- Send button -->
+											<button
+												@click="sendTestMessage()"
+												:disabled="testPanelStreaming || !testPanelInput.trim()"
+												title="Send (Enter)"
+												class="flex items-center justify-center w-7 h-7 rounded transition-all"
+												:style="(testPanelStreaming || !testPanelInput.trim()) ? 'background:#21262d; color:#6b7280; cursor:not-allowed;' : 'background:rgba(245,158,11,0.15); color:#fbbf24; cursor:pointer;'"
+											>
+												<template x-if="testPanelStreaming">
+													<span class="animate-spin block w-3 h-3 rounded-full" style="border:2px solid #6b7280; border-top-color:transparent;"></span>
+												</template>
+												<template x-if="!testPanelStreaming">
+													@icon.SendHorizontal(icon.Props{Class: "size-3.5"})
+												</template>
+											</button>
+										</div>
+									</div><!-- /input bar -->
+
+								</div><!-- /messages+input column -->
+
+								<!-- ── Event log side pane ── -->
+								<template x-if="testPanelShowEventLog">
+									<div
+										class="w-52 shrink-0 overflow-y-auto scrollbar-thin flex flex-col"
+										style="border-left:1px solid rgba(255,255,255,0.06); font-family:'JetBrains Mono','Fira Code',monospace; font-size:9px;"
+									>
+										<div class="px-2 py-1.5" style="border-bottom:1px solid rgba(255,255,255,0.06); color:#4b5563; font-size:8px; text-transform:uppercase; letter-spacing:0.1em;">
+											SSE Events
+										</div>
+										<!-- Empty state -->
+										<template x-if="testPanelEvents.length === 0">
+											<div class="flex-1 flex items-center justify-center" style="color:#374151; font-size:9px;">No events yet</div>
+										</template>
+										<!-- Event rows -->
+										<div class="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
+											<template x-for="(ev, idx) in testPanelEvents" :key="idx">
+												<div class="flex items-center gap-1 py-0.5">
+													<span x-text="ev.type" style="color:#22d3ee; flex-shrink:0;"></span>
+													<template x-if="ev.name">
+														<span x-text="'· ' + ev.name" style="color:#4b5563; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;"></span>
+													</template>
+												</div>
+											</template>
+										</div>
+									</div><!-- /event log -->
+								</template>
+
+							</div><!-- /content area -->
+						</div><!-- /panel wrapper -->
+					</template>
+					<!-- Blinking cursor keyframe -->
+					<style>@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}</style>
 					<!-- Keyboard Shortcuts Overlay -->
 					<div
 						x-show="$store.flow?._showHelp"

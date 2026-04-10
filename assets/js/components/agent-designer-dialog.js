@@ -140,6 +140,49 @@ export const agentDesigner = () => ({
     propertyPanelVisible: true,
 
     // ══════════════════════════════════════════
+    // Test Panel State
+    // ══════════════════════════════════════════
+
+    /** Whether the amber play button is active and the panel is visible */
+    testModeActive: false,
+
+    /** Whether the panel is collapsed to its 40px header bar */
+    testPanelCollapsed: false,
+
+    /**
+     * Messages rendered in the test panel chat.
+     * Each entry: { id, role: 'user'|'assistant'|'error', content, streaming, timestamp }
+     */
+    testPanelMessages: [],
+
+    /** True while a fetch+SSE stream is in-flight */
+    testPanelStreaming: false,
+
+    /** True while waiting for the first token (shows typing indicator) */
+    testPanelTyping: false,
+
+    /** Bound to the chat input textarea */
+    testPanelInput: '',
+
+    /**
+     * Ephemeral thread ID for this test session.
+     * Generated on first send via crypto.randomUUID(); cleared when test mode is toggled off.
+     */
+    testPanelThreadId: null,
+
+    /** Whether the event log side pane is visible */
+    testPanelShowEventLog: false,
+
+    /**
+     * Raw SSE events logged for the event log side pane.
+     * Each entry: { type, name? }
+     */
+    testPanelEvents: [],
+
+    /** AbortController for the in-flight fetch — allows cancelling mid-stream */
+    testPanelAbortController: null,
+
+    // ══════════════════════════════════════════
     // Lifecycle
     // ══════════════════════════════════════════
 
@@ -156,6 +199,295 @@ export const agentDesigner = () => ({
 
     togglePropertyPanel() {
         this.propertyPanelVisible = !this.propertyPanelVisible;
+    },
+
+    // ══════════════════════════════════════════
+    // Test Panel — Toggle & Utility Methods
+    // ══════════════════════════════════════════
+
+    /**
+     * Toggle test mode on/off.
+     * Turning off aborts any in-flight stream and clears all test state.
+     */
+    toggleTestMode() {
+        if (this.testModeActive) {
+            // Abort any active stream before clearing
+            if (this.testPanelAbortController) {
+                this.testPanelAbortController.abort();
+                this.testPanelAbortController = null;
+            }
+            this.testModeActive = false;
+            this.testPanelCollapsed = false;
+            this.testPanelMessages = [];
+            this.testPanelStreaming = false;
+            this.testPanelTyping = false;
+            this.testPanelInput = '';
+            this.testPanelThreadId = null;
+            this.testPanelShowEventLog = false;
+            this.testPanelEvents = [];
+        } else {
+            this.testModeActive = true;
+            this.testPanelCollapsed = false;
+        }
+    },
+
+    /** Collapse the panel to its 40px header bar, or expand it back to 280px. */
+    toggleTestPanel() {
+        this.testPanelCollapsed = !this.testPanelCollapsed;
+    },
+
+    /** Show or hide the raw SSE event log side pane. */
+    toggleTestEventLog() {
+        this.testPanelShowEventLog = !this.testPanelShowEventLog;
+    },
+
+    /**
+     * Clear all messages, events and the ephemeral thread ID.
+     * Starts a fresh test session on the next send.
+     */
+    clearTestSession() {
+        if (this.testPanelAbortController) {
+            this.testPanelAbortController.abort();
+            this.testPanelAbortController = null;
+        }
+        this.testPanelMessages = [];
+        this.testPanelEvents = [];
+        this.testPanelThreadId = null;
+        this.testPanelStreaming = false;
+        this.testPanelTyping = false;
+        this.testPanelInput = '';
+    },
+
+    /**
+     * Handle keydown in the test panel input.
+     * Sends on Enter; Shift+Enter inserts a newline (default).
+     * @param {KeyboardEvent} event
+     */
+    handleTestKeydown(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            this.sendTestMessage();
+        }
+    },
+
+    // ══════════════════════════════════════════
+    // Test Panel — Send Message
+    // ══════════════════════════════════════════
+
+    /**
+     * Send a message from the test panel to the current agent.
+     * Pushes a user bubble immediately, then starts the SSE stream.
+     */
+    sendTestMessage() {
+        const message = this.testPanelInput.trim();
+        if (!message || this.testPanelStreaming) return;
+
+        // Resolve the target agent ID — workflow takes priority over single agent
+        const agentName = this.editingPipeline?.id || this.editingAgent?.id || '';
+        if (!agentName) {
+            console.warn('[TestPanel] No agent selected — cannot send message');
+            return;
+        }
+
+        // Generate a thread ID for this test session if we don't have one yet
+        if (!this.testPanelThreadId) {
+            this.testPanelThreadId = crypto.randomUUID();
+        }
+
+        // Push the user bubble
+        this.testPanelMessages.push({
+            id: crypto.randomUUID(),
+            role: 'user',
+            content: message,
+            streaming: false,
+            timestamp: new Date().toISOString(),
+        });
+
+        // Clear the input
+        this.testPanelInput = '';
+
+        // Start streaming
+        this.__testStreamResponse(message, agentName);
+    },
+
+    // ══════════════════════════════════════════
+    // Test Panel — Streaming (Steps 4 & 5)
+    // ══════════════════════════════════════════
+
+    /**
+     * POST to /v1/message:send and hand the response body to the SSE processor.
+     * @param {string} message   — the text the user typed
+     * @param {string} agentName — the agent/workflow ID to target
+     */
+    async __testStreamResponse(message, agentName) {
+        this.testPanelStreaming = true;
+        this.testPanelTyping   = true;
+
+        const controller = new AbortController();
+        this.testPanelAbortController = controller;
+
+        try {
+            const body = {
+                contextId: this.testPanelThreadId,
+                message,
+                agentName,
+            };
+
+            const response = await fetch('/v1/message:send', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(body),
+                signal:  controller.signal,
+            });
+
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(`Server error ${response.status}: ${errText}`);
+            }
+
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.includes('text/event-stream')) {
+                throw new Error('Unexpected response type: ' + contentType);
+            }
+
+            this.__testProcessSSEStream(response.body);
+
+        } catch (error) {
+            if (error.name === 'AbortError') return; // intentional cancel — no error bubble
+            console.error('[TestPanel] Stream error:', error);
+            this.testPanelMessages.push({
+                id:        crypto.randomUUID(),
+                role:      'error',
+                content:   error.message || 'An error occurred',
+                streaming: false,
+                timestamp: new Date().toISOString(),
+            });
+            this.testPanelStreaming = false;
+            this.testPanelTyping   = false;
+        }
+    },
+
+    /**
+     * Read a ReadableStream as SSE, buffering partial lines.
+     * Dispatches each complete event to __testHandleEvent().
+     * @param {ReadableStream} stream
+     */
+    __testProcessSSEStream(stream) {
+        const reader  = stream.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let   buffer  = '';
+
+        const pump = () => {
+            reader.read().then(({ done, value }) => {
+                if (done) {
+                    this.testPanelStreaming = false;
+                    this.testPanelTyping   = false;
+                    return;
+                }
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || ''; // keep incomplete last line
+
+                for (const line of lines) {
+                    if (!line.startsWith('data:')) continue;
+                    const data = line.slice(5).trim();
+                    if (!data) continue;
+                    try {
+                        const event = JSON.parse(data);
+                        this.__testHandleEvent(event);
+                    } catch (e) {
+                        console.warn('[TestPanel] SSE parse error:', e);
+                    }
+                }
+
+                pump(); // read next chunk
+            }).catch(err => {
+                if (err.name === 'AbortError') return;
+                console.error('[TestPanel] Stream read error:', err);
+                this.testPanelMessages.push({
+                    id:        crypto.randomUUID(),
+                    role:      'error',
+                    content:   'Stream interrupted: ' + err.message,
+                    streaming: false,
+                    timestamp: new Date().toISOString(),
+                });
+                this.testPanelStreaming = false;
+                this.testPanelTyping   = false;
+            });
+        };
+
+        pump();
+    },
+
+    /**
+     * Handle a single parsed SSE event object.
+     * Updates messages (streaming bubbles) and the event log.
+     * @param {Object} event
+     */
+    __testHandleEvent(event) {
+        if (!event?.type) return;
+
+        // Always log to the event log side pane
+        this.testPanelEvents.push({ type: event.type, name: event.name || null });
+
+        switch (event.type) {
+            case 'TEXT_MESSAGE_START': {
+                // Start a new streaming assistant bubble
+                this.testPanelTyping = false;
+                this.testPanelMessages.push({
+                    id:        event.messageId || crypto.randomUUID(),
+                    role:      'assistant',
+                    content:   '',
+                    streaming: true,
+                    timestamp: new Date().toISOString(),
+                });
+                break;
+            }
+
+            case 'TEXT_MESSAGE_CONTENT': {
+                // Append token delta to the last streaming message
+                const last = this.testPanelMessages[this.testPanelMessages.length - 1];
+                if (last && last.streaming) {
+                    last.content += event.delta || '';
+                }
+                break;
+            }
+
+            case 'TEXT_MESSAGE_END': {
+                // Mark the streaming message as complete
+                const last = this.testPanelMessages[this.testPanelMessages.length - 1];
+                if (last && last.streaming) {
+                    last.streaming = false;
+                }
+                break;
+            }
+
+            case 'RUN_FINISHED': {
+                this.testPanelStreaming = false;
+                this.testPanelTyping   = false;
+                break;
+            }
+
+            case 'RUN_ERROR': {
+                const errMsg = event.message || event.error || 'Agent run failed';
+                this.testPanelMessages.push({
+                    id:        crypto.randomUUID(),
+                    role:      'error',
+                    content:   errMsg,
+                    streaming: false,
+                    timestamp: new Date().toISOString(),
+                });
+                this.testPanelStreaming = false;
+                this.testPanelTyping   = false;
+                break;
+            }
+
+            // All other events (STEP_STARTED, TOOL_*, WORKFLOW_NODE_*, etc.)
+            // are already captured in testPanelEvents above — no bubble needed.
+            default:
+                break;
+        }
     },
 
     // ══════════════════════════════════════════
