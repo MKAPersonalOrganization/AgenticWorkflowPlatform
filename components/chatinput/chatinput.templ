@@ -5,9 +5,7 @@ import "aicompass/components/textarea"
 import "aicompass/components/icon"
 import "aicompass/components/tooltip"
 import "aicompass/components/i18n"
-import "aicompass/components/tokenusage"
 import "aicompass/components/agents"
-import "aicompass/components/agentcapabilities"
 
 templ ChatInput() {
 	<div
@@ -67,8 +65,6 @@ templ ChatInput() {
 				<div class="ms-2 flex items-center gap-1">
 					<!-- Agents Selector -->
 					@agents.AgentsButtonTrigger()
-					<!-- Agent Capabilities -->
-					@agentcapabilities.AgentCapabilities()
 					<!-- Attach Files Button -->
 					@tooltip.Tooltip() {
 						@tooltip.Trigger(tooltip.TriggerProps{}) {
@@ -90,10 +86,8 @@ templ ChatInput() {
 						}
 					}
 				</div>
-				<!-- Center: Token Counter -->
-				<div class="flex-1 flex justify-center">
-					@tokenusage.TokenCounter()
-				</div>
+				<!-- Spacer -->
+				<div class="flex-1"></div>
 				<!-- Right: Send Button -->
 				<div class="me-2 flex items-center gap-1">
 					<!-- Help/Shortcuts -->
