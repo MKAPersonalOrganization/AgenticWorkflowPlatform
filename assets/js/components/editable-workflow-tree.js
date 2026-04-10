@@ -622,6 +622,9 @@ export const editableWorkflowTree = () => {
                  style="--ewt-color:${m.color};--ewt-color-muted:${m.colorMuted};--ewt-color-fg:${m.colorFg};"
                  data-node-id="${nodeId}"
                  data-node-type="agent"
+                 data-agent-id="${node.agent_id}"
+                 data-agent-name="${esc(name)}"
+                 data-node-label="${esc(node.label || '')}"
                  draggable="true">
                 <div style="display:flex;align-items:flex-start;gap:8px;">
                     <div class="ewt-badge" style="background:${m.colorMuted};color:${m.colorFg};">
@@ -674,6 +677,9 @@ export const editableWorkflowTree = () => {
                  style="--ewt-color:${m.color};--ewt-color-muted:${m.colorMuted};--ewt-color-fg:${m.colorFg};"
                  data-node-id="${nodeId}"
                  data-node-type="remote"
+                 data-agent-id="${node.a2a_connector_id}"
+                 data-agent-name="${esc(name)}"
+                 data-node-label="${esc(node.label || '')}"
                  draggable="true">
                 <div style="display:flex;align-items:flex-start;gap:8px;">
                     <div class="ewt-badge" style="background:${m.colorMuted};color:${m.colorFg};">
@@ -1337,6 +1343,31 @@ export const editableWorkflowTree = () => {
                 } else if (e.key === 'Escape' && store._showHelp) {
                     store._showHelp = false;
                 }
+            });
+
+            // Listen for workflow execution tracking from Test Panel or Main Chat
+            window.addEventListener('test-panel-workflow-tracking', (e) => {
+                const { active, completed, failed } = e.detail;
+                const hasAnyActive = Object.keys(active).length > 0;
+                
+                // Manually apply global tracking CSS classes without full Alpine re-render
+                this.$el.querySelectorAll('.ewt-node[data-node-type="agent"], .ewt-node[data-node-type="remote"]').forEach(el => {
+                    const agentName = el.getAttribute('data-agent-name');
+                    const nodeLabel = el.getAttribute('data-node-label');
+                    
+                    const nameToMatch1 = agentName || '';
+                    const nameToMatch2 = nodeLabel || '';
+
+                    const isActive = !!(active[nameToMatch1] || active[nameToMatch2]);
+                    const isCompleted = !!(completed[nameToMatch1] || completed[nameToMatch2]);
+                    const isFailed = !!(failed[nameToMatch1] || failed[nameToMatch2]);
+                    const isInactive = !isActive && !isCompleted && !isFailed && hasAnyActive;
+                    
+                    el.classList.toggle('node-active', isActive);
+                    el.classList.toggle('node-completed', isCompleted);
+                    el.classList.toggle('node-failed', isFailed);
+                    el.classList.toggle('node-inactive', isInactive);
+                });
             });
 
             // Set up observer to re-render when store changes

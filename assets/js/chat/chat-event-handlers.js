@@ -13,6 +13,7 @@
 
 import { safeParseJSON, mapTokenUsage } from './chat-utils.js';
 import { TOOL_EVENTS } from './tool-state-machine.js';
+import { trackWorkflowEvent } from '../utils/workflow-tracker.js';
 
 /**
  * Lifecycle content label generators — lookup table replaces switch statement.
@@ -84,19 +85,7 @@ export function createEventHandlerMethods() {
          * Injects visual section markers for parallel and loop boundaries.
          */
         __handleWorkflowNodeCompleted(value, state) {
-            const { agentName, durationMs, outcome } = value;
-            if (outcome === 'error') {
-                if (!state.failedNodes) state.failedNodes = {};
-                state.failedNodes = { ...state.failedNodes, [agentName]: { timestamp: value.timestamp } };
-            } else {
-                if (!state.completedNodes) state.completedNodes = {};
-                state.completedNodes = { ...state.completedNodes, [agentName]: { durationMs, timestamp: value.timestamp } };
-            }
-            // Remove from active set — this agent is done
-            if (state.activeAgentNames?.[agentName]) {
-                const { [agentName]: _, ...rest } = state.activeAgentNames;
-                state.activeAgentNames = rest;
-            }
+            trackWorkflowEvent({ type: 'WORKFLOW_NODE_COMPLETED', ...value }, state);
         },
 
         __handleStateChangeReported(value, state) {
@@ -108,37 +97,7 @@ export function createEventHandlerMethods() {
         __handleAgentTransferStarted(value, state, threadId) {
             const { fromAgent, toAgent, workflowType, parentAgent, stepIndex, stepCount, iteration, maxIterations } = value;
 
-            // Reset node completion tracking when a new workflow run begins.
-            // activeWorkflowContext being null means no prior workflow context existed
-            // in this thread state — i.e. this is the first transfer of a fresh run.
-            if (!state.activeWorkflowContext && workflowType) {
-                state.completedNodes = {};
-                state.failedNodes = {};
-                state.workflowOutputs = {};
-                state.activeAgentNames = {};
-            }
-
-            state.activeAgentName = toAgent;
-            // Track all concurrently active agents (supports parallel highlighting).
-            // In non-parallel transfers the sender is done — remove it.
-            const updatedActive = { ...state.activeAgentNames, [toAgent]: true };
-            if (workflowType && workflowType !== 'parallel' && fromAgent) {
-                delete updatedActive[fromAgent];
-            }
-            state.activeAgentNames = updatedActive;
-
-            let orchestratorId = state.activeWorkflowContext?.orchestratorId;
-            if (workflowType) {
-                if (!orchestratorId) {
-                    orchestratorId = fromAgent;
-                }
-            } else {
-                orchestratorId = null;
-            }
-
-            state.activeWorkflowContext = workflowType
-                ? { workflowType, parentAgent, stepIndex, stepCount, iteration, maxIterations, orchestratorId }
-                : null;
+            trackWorkflowEvent({ type: 'AGENT_TRANSFER_STARTED', ...value }, state);
 
             // Reset parallel coalesce maps when leaving a parallel section
             // or entering a different parallel section.

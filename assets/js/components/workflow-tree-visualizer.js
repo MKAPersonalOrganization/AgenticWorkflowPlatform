@@ -67,80 +67,7 @@ export function workflowTreeVisualizer() {
                 box-shadow: 0 4px 12px var(--shadow);
             }
 
-            /* ── Active Node ── */
-            .wf-node.is-active {
-                border-color: var(--primary);
-                box-shadow: 0 0 0 2px var(--primary), 0 4px 16px var(--shadow);
-                transform: translateY(-2px);
-                animation: wfPulseActive 2s ease-in-out infinite;
-            }
-            @keyframes wfPulseActive {
-                0%, 100% { box-shadow: 0 0 0 2px var(--primary), 0 4px 16px var(--shadow); }
-                50% { box-shadow: 0 0 0 2px var(--primary), 0 4px 24px var(--shadow); }
-            }
-            .wf-node.is-active .wf-badge {
-                position: relative;
-            }
-            .wf-node.is-active .wf-badge::after {
-                content: '';
-                position: absolute;
-                inset: -2px;
-                border-radius: 9999px;
-                border: 2px solid var(--primary);
-                border-top-color: transparent;
-                animation: wfSpin 0.8s linear infinite;
-            }
-            @keyframes wfSpin {
-                to { transform: rotate(360deg); }
-            }
-
-            /* ── Completed Node ── */
-            .wf-node.is-completed {
-                border-color: oklch(from var(--success) l c h / 40%);
-                background: oklch(from var(--success) l c h / 8%);
-            }
-            .wf-node-done-badge {
-                display: inline-flex;
-                align-items: center;
-                gap: 3px;
-                font-size: 10px;
-                font-weight: 700;
-                padding: 2px 7px;
-                border-radius: 9999px;
-                background: oklch(from var(--success) l c h / 15%);
-                color: var(--success);
-                border: 1px solid oklch(from var(--success) l c h / 30%);
-                white-space: nowrap;
-            }
-
-            /* ── Failed Node ── */
-            .wf-node.is-failed {
-                border-color: oklch(from var(--destructive) l c h / 50%);
-                background: oklch(from var(--destructive) l c h / 10%);
-            }
-            .wf-node-failed-badge {
-                display: inline-flex;
-                align-items: center;
-                gap: 3px;
-                font-size: 10px;
-                font-weight: 700;
-                padding: 2px 7px;
-                border-radius: 9999px;
-                background: oklch(from var(--destructive) l c h / 12%);
-                color: var(--destructive);
-                border: 1px solid oklch(from var(--destructive) l c h / 30%);
-                white-space: nowrap;
-            }
-
-            /* ── Inactive / Pending Node (dimmed when others are active) ── */
-            .wf-node.is-inactive {
-                opacity: 0.45;
-                filter: grayscale(15%);
-                transform: scale(0.97);
-            }
-            .wf-node.is-inactive:hover {
-                opacity: 0.7;
-            }
+        // Active, completed, and failed node CSS animations are globally provided via input.css (.node-active, etc.)
 
             /* ── Connector (horizontal line between nodes) ── */
             .wf-connector {
@@ -376,20 +303,18 @@ export function workflowTreeVisualizer() {
         const isInactive   = !isActive && !isCompleted && !isFailed && hasAnyActive;
 
         let nodeClass = 'wf-node';
-        if (isActive)         nodeClass += ' is-active';
-        else if (isCompleted) nodeClass += ' is-completed';
-        else if (isFailed)    nodeClass += ' is-failed';
-        else if (isInactive)  nodeClass += ' is-inactive';
+        if (isActive)         nodeClass += ' node-active';
+        else if (isCompleted) nodeClass += ' node-completed';
+        else if (isFailed)    nodeClass += ' node-failed';
+        else if (isInactive)  nodeClass += ' node-inactive';
 
         // Duration badge for completed nodes, error badge for failed
         let statusBadge = '';
-        if (isCompleted) {
-            const secs = completedInfo.durationMs != null
-                ? (completedInfo.durationMs / 1000).toFixed(1) + 's'
-                : 'done';
-            statusBadge = `<span class="wf-node-done-badge">${secs}</span>`;
+        if (isCompleted && completedInfo?.durationMs) {
+            const secs = (completedInfo.durationMs / 1000).toFixed(1) + 's';
+            statusBadge = `<span class="node-completed-badge" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:9999px;border-width:1px;white-space:nowrap;">${secs}</span>`;
         } else if (isFailed) {
-            statusBadge = `<span class="wf-node-failed-badge">error</span>`;
+            statusBadge = `<span class="node-failed-badge" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:9999px;border-width:1px;white-space:nowrap;">error</span>`;
         }
 
         const outputKey = node.output_key

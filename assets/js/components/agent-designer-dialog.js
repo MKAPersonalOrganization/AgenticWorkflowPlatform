@@ -11,6 +11,8 @@
  * Transfer policies, output keys, include_contents map to agent config.
  * The last child of a loop gets exit_loop tool automatically (backend).
  */
+import { trackWorkflowEvent } from '../utils/workflow-tracker.js';
+
 export const agentDesigner = () => ({
     // ══════════════════════════════════════════
     // State
@@ -142,6 +144,12 @@ export const agentDesigner = () => ({
     // ══════════════════════════════════════════
     // Test Panel State
     // ══════════════════════════════════════════
+
+    testWorkflowState: {
+        activeAgentNames: {},
+        completedNodes: {},
+        failedNodes: {},
+    },
 
     /** Whether the amber play button is active and the panel is visible */
     testModeActive: false,
@@ -294,6 +302,15 @@ export const agentDesigner = () => ({
             this.testPanelThreadId = crypto.randomUUID();
         }
 
+        // Reset the tracker state for the new turn and update canvas
+        this.testWorkflowState = {
+            activeAgentNames: {},
+            completedNodes: {},
+            failedNodes: {},
+            activeWorkflowContext: null
+        };
+        window.dispatchEvent(new CustomEvent('test-panel-workflow-tracking', { detail: { active: {}, completed: {}, failed: {} }}));
+
         // Push the user bubble
         this.testPanelMessages.push({
             id: crypto.randomUUID(),
@@ -430,6 +447,32 @@ export const agentDesigner = () => ({
 
         // Always log to the event log side pane
         this.testPanelEvents.push({ type: event.type, name: event.name || null });
+
+        // Handle CUSTOM events that contain workflow tracking info
+        if (event.type === 'CUSTOM') {
+            const eventName = event.name;
+            const value = event.value || {};
+            
+            if (eventName === 'AGENT_TRANSFER_STARTED') {
+                trackWorkflowEvent({ type: 'AGENT_TRANSFER_STARTED', ...value }, this.testWorkflowState);
+                window.dispatchEvent(new CustomEvent('test-panel-workflow-tracking', { detail: {
+                    active: this.testWorkflowState.activeAgentNames || {},
+                    completed: this.testWorkflowState.completedNodes || {},
+                    failed: this.testWorkflowState.failedNodes || {},
+                }}));
+                return;
+            }
+            
+            if (eventName === 'WORKFLOW_NODE_COMPLETED') {
+                trackWorkflowEvent({ type: 'WORKFLOW_NODE_COMPLETED', ...value }, this.testWorkflowState);
+                window.dispatchEvent(new CustomEvent('test-panel-workflow-tracking', { detail: {
+                    active: this.testWorkflowState.activeAgentNames || {},
+                    completed: this.testWorkflowState.completedNodes || {},
+                    failed: this.testWorkflowState.failedNodes || {},
+                }}));
+                return;
+            }
+        }
 
         switch (event.type) {
             case 'TEXT_MESSAGE_START': {

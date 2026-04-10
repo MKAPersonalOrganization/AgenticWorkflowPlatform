@@ -705,4 +705,65 @@
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
   }
+
+  /* ========================================
+   * Workflow Agent State Tracking Styles
+   * ======================================== */
+  .node-active {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 2px var(--primary), 0 4px 16px var(--shadow) !important;
+    transform: translateY(-2px) !important;
+    animation: nodePulseActive 2s ease-in-out infinite !important;
+  }
+
+  @keyframes nodePulseActive {
+    0%, 100% { box-shadow: 0 0 0 2px var(--primary), 0 4px 16px var(--shadow); }
+    50% { box-shadow: 0 0 0 2px var(--primary), 0 4px 24px var(--shadow); }
+  }
+
+  .node-active .wf-badge, .node-active .ewt-badge {
+    position: relative;
+  }
+  .node-active .wf-badge::after, .node-active .ewt-badge::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 9999px;
+    border: 2px solid var(--primary);
+    border-top-color: transparent;
+    animation: nodeSpin 0.8s linear infinite;
+  }
+
+  @keyframes nodeSpin {
+    to { transform: rotate(360deg); }
+  }
+
+  .node-completed {
+    border-color: oklch(from var(--success) l c h / 40%) !important;
+    background: oklch(from var(--success) l c h / 8%) !important;
+  }
+
+  .node-completed-badge {
+    color: var(--success);
+    background: oklch(from var(--success) l c h / 15%);
+    border-color: oklch(from var(--success) l c h / 30%);
+  }
+
+  .node-failed {
+    border-color: oklch(from var(--destructive) l c h / 50%) !important;
+    background: oklch(from var(--destructive) l c h / 10%) !important;
+  }
+
+  .node-failed-badge {
+    color: var(--destructive);
+    background: oklch(from var(--destructive) l c h / 12%);
+    border-color: oklch(from var(--destructive) l c h / 30%);
+  }
+
+  .node-inactive {
+    opacity: 0.45 !important;
+    filter: grayscale(15%) !important;
+    transform: scale(0.97) !important;
+  }
 }
+
