@@ -2,7 +2,7 @@ package multiagent
 
 import (
 	"aicompass/foundation/logger"
-	"aicompass/modules/agentstore"
+	"aicompass/modules/agentdefinition"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// catalogSubAgent mirrors agentstore.CatalogSubAgent for JSON unmarshalling.
+// catalogSubAgent mirrors agentdefinition.CatalogSubAgent for JSON unmarshalling.
 type catalogSubAgent struct {
 	ID           string `json:"id"`
 	Name         string `json:"name"`
@@ -19,12 +19,12 @@ type catalogSubAgent struct {
 	Icon         string `json:"icon"`
 }
 
-// CatalogWorkflowForker implements agentstore.WorkflowForker.
+// CatalogWorkflowForker handles forking workflow catalog entries.
 // It creates sub-agents and a workflow definition when a user forks a
 // workflow catalog entry.
 type CatalogWorkflowForker struct {
 	log       *logger.Logger
-	agentRepo agentstore.AgentDefinitionRepository
+	agentRepo agentdefinition.AgentDefinitionRepository
 	wfRepo    WorkflowDefinitionRepository
 }
 
@@ -32,7 +32,7 @@ type CatalogWorkflowForker struct {
 // workflow definitions from catalog workflow templates.
 func NewCatalogWorkflowForker(
 	log *logger.Logger,
-	agentRepo agentstore.AgentDefinitionRepository,
+	agentRepo agentdefinition.AgentDefinitionRepository,
 	wfRepo WorkflowDefinitionRepository,
 ) *CatalogWorkflowForker {
 	return &CatalogWorkflowForker{
@@ -67,7 +67,7 @@ func (f *CatalogWorkflowForker) ForkCatalogWorkflow(
 	// 3. Create each sub-agent and build ID map.
 	idMap := make(map[string]string, len(subs)) // placeholder → real ID
 	for _, sub := range subs {
-		agent := &agentstore.AgentDefinition{
+		agent := &agentdefinition.AgentDefinition{
 			UserID:       userID,
 			Name:         sub.Name,
 			Description:  sub.Description,

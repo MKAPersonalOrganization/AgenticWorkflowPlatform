@@ -1,7 +1,8 @@
-package agentstore
+package templates
 
 import (
 	"aicompass/foundation/logger"
+	"aicompass/modules/agentdefinition"
 	"aicompass/shared"
 	"context"
 	"encoding/json"
@@ -13,17 +14,17 @@ import (
 type catalogHandler struct {
 	log       *logger.Logger
 	catalog   AgentCatalogRepository
-	agentRepo AgentDefinitionRepository
-	svc       *service
+	agentRepo agentdefinition.AgentDefinitionRepository
+	importer  ComposedAgentImporter
 }
 
 func newCatalogHandler(
 	log *logger.Logger,
 	catalog AgentCatalogRepository,
-	agentRepo AgentDefinitionRepository,
-	svc *service,
+	agentRepo agentdefinition.AgentDefinitionRepository,
+	importer ComposedAgentImporter,
 ) *catalogHandler {
-	return &catalogHandler{log: log, catalog: catalog, agentRepo: agentRepo, svc: svc}
+	return &catalogHandler{log: log, catalog: catalog, agentRepo: agentRepo, importer: importer}
 }
 
 // catalogEntryResponse represents a single catalog entry in API responses.
@@ -48,7 +49,7 @@ type catalogListResponse struct {
 	AddedCatalogIDs []string               `json:"addedCatalogIds"`
 }
 
-func toCatalogResponse(e *AgentCatalogEntry) catalogEntryResponse {
+func toCatalogResponse(e *agentdefinition.AgentCatalogEntry) catalogEntryResponse {
 	tags := e.Tags
 	if tags == nil {
 		tags = []string{}
@@ -223,7 +224,7 @@ func (h *catalogHandler) addToMyAgents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ── Simple agent catalog entry ──
-	agent := &AgentDefinition{
+	agent := &agentdefinition.AgentDefinition{
 		UserID:          user.ID,
 		Name:            entry.Name,
 		Description:     entry.Description,
@@ -254,7 +255,7 @@ func (h *catalogHandler) addToMyAgents(w http.ResponseWriter, r *http.Request) {
 func (h *catalogHandler) forkComposedCatalogEntry(
 	ctx context.Context,
 	userID, catalogID string,
-	entry *AgentCatalogEntry,
+	entry *agentdefinition.AgentCatalogEntry,
 ) (string, error) {
-	return h.svc.importComposedFromCatalogEntry(ctx, userID, entry, catalogID)
+	return h.importer.ImportComposedFromCatalogEntry(ctx, userID, entry, catalogID)
 }

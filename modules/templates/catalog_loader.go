@@ -1,10 +1,12 @@
-package agentstore
+package templates
 
 import (
+	"aicompass/modules/agentdefinition"
 	"embed"
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"log"
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
@@ -14,10 +16,6 @@ import (
 var catalogFS embed.FS
 
 // yamlCatalogSpec mirrors the YAML schema for a single catalog entry file.
-//
-// Each file in catalog/*.yaml is one agent — single or workflow. When
-// loaded, its ID is derived deterministically from the slug field so that
-// re-seeding always targets the same row.
 type yamlCatalogSpec struct {
 	Name         string            `yaml:"name"`
 	Slug         string            `yaml:"slug"` // deterministic ID seed; defaults to Name
@@ -53,13 +51,13 @@ type yamlSubAgent struct {
 
 // loadYAMLCatalog reads every *.yaml file from the embedded catalog/ directory
 // and returns the parsed AgentCatalogEntry slice.
-func loadYAMLCatalog() ([]AgentCatalogEntry, error) {
+func loadYAMLCatalog() ([]agentdefinition.AgentCatalogEntry, error) {
 	dirs, err := fs.ReadDir(catalogFS, "catalog")
 	if err != nil {
 		return nil, fmt.Errorf("reading catalog dir: %w", err)
 	}
 
-	var out []AgentCatalogEntry
+	var out []agentdefinition.AgentCatalogEntry
 	for _, de := range dirs {
 		if de.IsDir() || filepath.Ext(de.Name()) != ".yaml" {
 			continue
@@ -84,23 +82,23 @@ func loadYAMLCatalog() ([]AgentCatalogEntry, error) {
 }
 
 // ParseCatalogEntryYAML parses one catalog-style YAML document (same schema as
-// modules/agentstore/catalog/*.yaml): a single LLM agent or a workflow with
+// modules/templates/catalog/*.yaml): a single LLM agent or a workflow with
 // optional sub_agents definitions.
-func ParseCatalogEntryYAML(data []byte) (AgentCatalogEntry, error) {
+func ParseCatalogEntryYAML(data []byte) (agentdefinition.AgentCatalogEntry, error) {
 	var spec yamlCatalogSpec
 	if err := yaml.Unmarshal(data, &spec); err != nil {
-		return AgentCatalogEntry{}, fmt.Errorf("parsing YAML: %w", err)
+		return agentdefinition.AgentCatalogEntry{}, fmt.Errorf("parsing YAML: %w", err)
 	}
 	return spec.toEntry()
 }
 
-func (s *yamlCatalogSpec) toEntry() (AgentCatalogEntry, error) {
+func (s *yamlCatalogSpec) toEntry() (agentdefinition.AgentCatalogEntry, error) {
 	slug := s.Slug
 	if slug == "" {
 		slug = s.Name
 	}
 
-	e := AgentCatalogEntry{
+	e := agentdefinition.AgentCatalogEntry{
 		ID:           deterministicID("catalog-yaml:" + slug),
 		Name:         s.Name,
 		Description:  s.Description,
@@ -121,9 +119,9 @@ func (s *yamlCatalogSpec) toEntry() (AgentCatalogEntry, error) {
 	}
 
 	if len(s.SubAgents) > 0 {
-		subs := make([]CatalogSubAgent, len(s.SubAgents))
+		subs := make([]agentdefinition.CatalogSubAgent, len(s.SubAgents))
 		for i, sa := range s.SubAgents {
-			subs[i] = CatalogSubAgent{
+			subs[i] = agentdefinition.CatalogSubAgent{
 				ID:           sa.ID,
 				Name:         sa.Name,
 				Description:  sa.Description,
@@ -171,37 +169,12 @@ func (n *yamlWorkflowNode) toMap() map[string]interface{} {
 	return m
 }
 
-// resolveIcon maps a short icon name to its Lucide SVG string.
-// If the name is not recognised (e.g. it is already raw SVG), it is returned as-is.
-func resolveIcon(name string) string {
-	m := map[string]string{
-		"bot":             iconBot,
-		"terminal":        iconTerminal,
-		"search-code":     iconSearchCode,
-		"code":            iconCode,
-		"git-branch":      iconGitBranch,
-		"workflow":        iconWorkflow,
-		"pipeline":        iconPipeline,
-		"refresh":         iconRefresh,
-		"graduation-cap":  iconGraduationCap,
-		"book-open":       iconBookOpen,
-		"pencil-line":     iconPencilLine,
-		"clipboard-check": iconClipboardCheck,
-		"gamepad":         iconGamepad,
-		"plane":           iconPlane,
-		"briefcase":       iconBriefcase,
-		"camera":          iconCamera,
-		"target":          iconTarget,
-		"users":           iconUsers,
-		"clapperboard":    iconClapperboard,
-		"trending-up":     iconTrendingUp,
-		"calendar-clock":  iconCalendarClock,
-		"map-pin":         iconMapPin,
-		"book-open-check": iconBookOpenCheck,
-		"sparkles":        iconSparkles,
+// SeedCatalog loads all catalog entries from the embedded YAML files in catalog/*.yaml.
+func SeedCatalog() []agentdefinition.AgentCatalogEntry {
+	entries, err := loadYAMLCatalog()
+	if err != nil {
+		log.Printf("WARNING: failed to load YAML catalog: %v", err)
+		return nil
 	}
-	if svg, ok := m[name]; ok {
-		return svg
-	}
-	return name
+	return entries
 }

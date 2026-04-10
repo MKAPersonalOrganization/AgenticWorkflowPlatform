@@ -1,4 +1,4 @@
-package agentstore
+package agentdefinition
 
 import (
 	"aicompass/foundation/logger"
@@ -16,18 +16,18 @@ const (
 	maxTreeNodes = 50
 )
 
-// service manages user-created agent definitions (both simple and composed).
-type service struct {
+// Service manages user-created agent definitions (both simple and composed).
+type Service struct {
 	log  *logger.Logger
 	repo AgentDefinitionRepository
 }
 
-func newService(log *logger.Logger, repo AgentDefinitionRepository) *service {
-	return &service{log: log, repo: repo}
+func newService(log *logger.Logger, repo AgentDefinitionRepository) *Service {
+	return &Service{log: log, repo: repo}
 }
 
 // create validates and persists a new agent definition.
-func (s *service) create(ctx context.Context, agent *AgentDefinition) error {
+func (s *Service) create(ctx context.Context, agent *AgentDefinition) error {
 	if agent.Name == "" {
 		return fmt.Errorf("agent name is required")
 	}
@@ -64,9 +64,9 @@ func (s *service) create(ctx context.Context, agent *AgentDefinition) error {
 	return nil
 }
 
-// ImportFromYAML creates agent definition(s) from catalog-format YAML (see ParseCatalogEntryYAML).
+// ImportFromCatalogYAML creates agent definition(s) from catalog-format YAML (see ParseCatalogEntryYAML).
 // Workflow entries create sub-agents plus a composed parent; simple entries create one LLM agent.
-func (s *service) ImportFromYAML(ctx context.Context, userID string, yamlBytes []byte) (agentID string, isComposed bool, err error) {
+func (s *Service) ImportFromCatalogYAML(ctx context.Context, userID string, yamlBytes []byte) (agentID string, isComposed bool, err error) {
 	entry, err := ParseCatalogEntryYAML(yamlBytes)
 	if err != nil {
 		return "", false, err
@@ -75,7 +75,7 @@ func (s *service) ImportFromYAML(ctx context.Context, userID string, yamlBytes [
 		return "", false, fmt.Errorf("YAML must include name")
 	}
 	if entry.IsWorkflow() {
-		id, wErr := s.importComposedFromCatalogEntry(ctx, userID, &entry, "")
+		id, wErr := s.ImportComposedFromCatalogEntry(ctx, userID, &entry, "")
 		if wErr != nil {
 			return "", false, wErr
 		}
@@ -97,7 +97,8 @@ func (s *service) ImportFromYAML(ctx context.Context, userID string, yamlBytes [
 	return agent.ID, false, nil
 }
 
-func (s *service) importComposedFromCatalogEntry(ctx context.Context, userID string, entry *AgentCatalogEntry, sourceCatalogID string) (string, error) {
+// ImportComposedFromCatalogEntry creates a composed agent from a catalog entry.
+func (s *Service) ImportComposedFromCatalogEntry(ctx context.Context, userID string, entry *AgentCatalogEntry, sourceCatalogID string) (string, error) {
 	var subAgents []CatalogSubAgent
 	if entry.SubAgentsJSON != "" {
 		if err := json.Unmarshal([]byte(entry.SubAgentsJSON), &subAgents); err != nil {
@@ -147,7 +148,7 @@ func (s *service) importComposedFromCatalogEntry(ctx context.Context, userID str
 }
 
 // update modifies an existing agent definition.
-func (s *service) update(ctx context.Context, agent *AgentDefinition) error {
+func (s *Service) update(ctx context.Context, agent *AgentDefinition) error {
 	if agent.ID == "" {
 		return fmt.Errorf("agent ID is required")
 	}
@@ -188,7 +189,7 @@ func (s *service) update(ctx context.Context, agent *AgentDefinition) error {
 }
 
 // delete removes an agent definition.
-func (s *service) delete(ctx context.Context, id, userID string) error {
+func (s *Service) delete(ctx context.Context, id, userID string) error {
 	s.log.Info(ctx, "deleting agent definition", "agentID", id, "userID", userID)
 
 	if err := s.repo.Delete(ctx, id, userID); err != nil {
@@ -198,14 +199,14 @@ func (s *service) delete(ctx context.Context, id, userID string) error {
 }
 
 // getByID retrieves a single agent by ID.
-func (s *service) getByID(ctx context.Context, id, userID string) (*AgentDefinition, error) {
+func (s *Service) getByID(ctx context.Context, id, userID string) (*AgentDefinition, error) {
 	return s.repo.GetByID(ctx, id, userID)
 }
 
 // listByUser returns all agents created by a specific user.
 // Agents that are referenced as sub-agents inside a workflow graph are
 // excluded so they don't appear as standalone entries in the list.
-func (s *service) listByUser(ctx context.Context, userID string) ([]AgentDefinition, error) {
+func (s *Service) listByUser(ctx context.Context, userID string) ([]AgentDefinition, error) {
 	agents, err := s.repo.ListByUser(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -215,7 +216,7 @@ func (s *service) listByUser(ctx context.Context, userID string) ([]AgentDefinit
 
 // GetConsumers returns all agents that reference the given agent ID in their graph.
 // This identifies workflows that use this agent as a sub-agent.
-func (s *service) GetConsumers(ctx context.Context, userID, agentID string) ([]AgentDefinition, error) {
+func (s *Service) GetConsumers(ctx context.Context, userID, agentID string) ([]AgentDefinition, error) {
 	agents, err := s.repo.ListByUser(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -243,7 +244,7 @@ func (s *service) GetConsumers(ctx context.Context, userID, agentID string) ([]A
 
 // search finds agents matching a query string within a user's agents.
 // Sub-agents consumed by workflows are excluded from results.
-func (s *service) search(ctx context.Context, userID, query string) ([]AgentDefinition, error) {
+func (s *Service) search(ctx context.Context, userID, query string) ([]AgentDefinition, error) {
 	agents, err := s.repo.Search(ctx, userID, query)
 	if err != nil {
 		return nil, err
@@ -281,7 +282,7 @@ func excludeSubAgents(agents []AgentDefinition) []AgentDefinition {
 // ── Sharing ──
 
 // share generates a share token for an agent, making it discoverable.
-func (s *service) share(ctx context.Context, id, userID string) (string, error) {
+func (s *Service) share(ctx context.Context, id, userID string) (string, error) {
 	// Check the agent exists and is owned by the user.
 	agent, err := s.repo.GetByID(ctx, id, userID)
 	if err != nil {
@@ -307,7 +308,7 @@ func (s *service) share(ctx context.Context, id, userID string) (string, error) 
 }
 
 // unshare revokes the share token for an agent.
-func (s *service) unshare(ctx context.Context, id, userID string) error {
+func (s *Service) unshare(ctx context.Context, id, userID string) error {
 	if err := s.repo.UpdateShareToken(ctx, id, userID, "", "private"); err != nil {
 		return fmt.Errorf("unsharing agent: %w", err)
 	}
@@ -316,12 +317,12 @@ func (s *service) unshare(ctx context.Context, id, userID string) error {
 }
 
 // getShared retrieves a shared agent by its token.
-func (s *service) getShared(ctx context.Context, token string) (*AgentDefinition, error) {
+func (s *Service) getShared(ctx context.Context, token string) (*AgentDefinition, error) {
 	return s.repo.GetByShareToken(ctx, token)
 }
 
 // forkShared creates a copy of a shared agent for the target user.
-func (s *service) forkShared(ctx context.Context, token, targetUserID string) (*AgentDefinition, error) {
+func (s *Service) forkShared(ctx context.Context, token, targetUserID string) (*AgentDefinition, error) {
 	source, err := s.repo.GetByShareToken(ctx, token)
 	if err != nil {
 		return nil, fmt.Errorf("shared agent not found: %w", err)
@@ -394,7 +395,7 @@ func (s *service) forkShared(ctx context.Context, token, targetUserID string) (*
 // validateGraph recursively validates the entire composition tree.
 // A workflow agent's root must be a composite node (sequential/parallel/loop)
 // since its purpose is to orchestrate sub-agents.
-func (s *service) validateGraph(ctx context.Context, node *CompositionNode, userID string) error {
+func (s *Service) validateGraph(ctx context.Context, node *CompositionNode, userID string) error {
 	// Root must be composite — a workflow agent orchestrates sub-agents.
 	// A single agent doesn't need a composition graph.
 	if node.Type == NodeAgent || node.Type == NodeRemote {
@@ -410,7 +411,7 @@ func (s *service) validateGraph(ctx context.Context, node *CompositionNode, user
 }
 
 // validateNode validates a single node and recurses into children.
-func (s *service) validateNode(ctx context.Context, node *CompositionNode, userID string, depth int) error {
+func (s *Service) validateNode(ctx context.Context, node *CompositionNode, userID string, depth int) error {
 	if !ValidNodeTypes[node.Type] {
 		return fmt.Errorf("node %q: invalid type %q", node.ID, node.Type)
 	}

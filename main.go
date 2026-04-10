@@ -66,7 +66,7 @@ import (
 
 	healthhandlers "aicompass/foundation/health"
 	a2amod "aicompass/modules/a2a"
-	agentstoremod "aicompass/modules/agentstore"
+	agentdefmod "aicompass/modules/agentdefinition"
 	aisettingsmod "aicompass/modules/aisettings"
 	analyticsmod "aicompass/modules/analytics"
 	billingmod "aicompass/modules/billing"
@@ -78,6 +78,7 @@ import (
 	permissionsmod "aicompass/modules/permissions"
 	pluginsettingsmod "aicompass/modules/pluginsettings"
 	resourcesmod "aicompass/modules/resources"
+	templatesmod "aicompass/modules/templates"
 
 	userprofilemod "aicompass/modules/userprofile"
 
@@ -273,8 +274,11 @@ func run(ctx context.Context, log *logger.Logger) error {
 	userProfileModule := userprofilemod.New(log, db)
 	userProfileRepo := userProfileModule.UserProfileRepo()
 
-	// Initialize Agent Store module (agent definitions + catalog + composition + sharing)
-	agentStoreModule := agentstoremod.New(log, db)
+	// Initialize Agent Definition module (user-owned agent definitions, sharing, composition)
+	agentDefModule := agentdefmod.New(log, db)
+
+	// Initialize Templates module (browsable catalog of agent templates)
+	templatesModule := templatesmod.New(log, db, agentDefModule.Repo(), agentDefModule.Service())
 
 	// Run migrations (skipped when APP_SKIP_MIGRATIONS=true, e.g. in a
 	// cluster where an init container handles migrations before pods start).
@@ -287,10 +291,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 		log.Info(ctx, "startup", "status", "skipping migrations (APP_SKIP_MIGRATIONS=true)")
 	}
 
-	// Seed agent store catalog (only inserts if table is empty)
-	log.Info(ctx, "startup", "status", "seeding agent store catalog")
-	if err := agentStoreModule.SeedCatalog(ctx); err != nil {
-		return fmt.Errorf("seeding agent catalog: %w", err)
+	// Seed template catalog (only inserts if table is empty)
+	log.Info(ctx, "startup", "status", "seeding template catalog")
+	if err := templatesModule.SeedCatalog(ctx); err != nil {
+		return fmt.Errorf("seeding template catalog: %w", err)
 	}
 
 	// -------------------------------------------------------------------------
@@ -480,7 +484,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// All agents (including the default assistant) live in the database.
 	// In the unified model, both simple and composed agents are AgentDefinitions.
 	agentProvider := newUserAwareAgentProvider(
-		agentStoreModule.AgentDefinitionRepo(),
+		agentDefModule.Repo(),
 	)
 
 	// -------------------------------------------------------------------------
@@ -647,7 +651,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 		userProfile:    userProfileModule,
 		aiSettings:     aiSettingsModule,
 		pluginSettings: pluginSettingsModule,
-		agentStore:     agentStoreModule,
+		agentDef:       agentDefModule,
+		templates:      templatesModule,
 		knowledge:      knowledgeModule,
 		mcp:            mcpModule,
 		a2a:            a2aModule,
@@ -764,7 +769,10 @@ type routeModules struct {
 	pluginSettings interface {
 		RegisterRoutes(chi.Router, *auth.Middleware)
 	}
-	agentStore interface {
+	agentDef interface {
+		RegisterRoutes(chi.Router, *auth.Middleware)
+	}
+	templates interface {
 		RegisterRoutes(chi.Router, *auth.Middleware)
 	}
 	knowledge interface {
@@ -809,7 +817,8 @@ func registerRoutes(
 	mods.resources.RegisterRoutes(r, authMW)
 	mods.filesystem.RegisterRoutes(r, authMW)
 	mods.permissions.RegisterRoutes(r, authMW)
-	mods.agentStore.RegisterRoutes(r, authMW)
+	mods.agentDef.RegisterRoutes(r, authMW)
+	mods.templates.RegisterRoutes(r, authMW)
 	mods.userProfile.RegisterRoutes(r, authMW)
 	mods.aiSettings.RegisterRoutes(r, authMW)
 	mods.pluginSettings.RegisterRoutes(r, authMW)

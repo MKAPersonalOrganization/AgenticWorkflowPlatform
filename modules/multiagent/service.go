@@ -2,7 +2,7 @@ package multiagent
 
 import (
 	"aicompass/foundation/logger"
-	"aicompass/modules/agentstore"
+	"aicompass/modules/agentdefinition"
 	"context"
 	"fmt"
 )
@@ -19,13 +19,13 @@ const (
 type service struct {
 	log      *logger.Logger
 	repo     WorkflowDefinitionRepository
-	agentDef agentstore.AgentDefinitionRepository
+	agentDef agentdefinition.AgentDefinitionRepository
 }
 
 func newService(
 	log *logger.Logger,
 	repo WorkflowDefinitionRepository,
-	agentDef agentstore.AgentDefinitionRepository,
+	agentDef agentdefinition.AgentDefinitionRepository,
 ) *service {
 	return &service{
 		log:      log,

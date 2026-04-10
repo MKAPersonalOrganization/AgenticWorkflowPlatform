@@ -1,4 +1,4 @@
-package agentstore
+package agentdefinition
 
 import (
 	"context"

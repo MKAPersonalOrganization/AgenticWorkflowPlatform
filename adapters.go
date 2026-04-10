@@ -4,7 +4,7 @@ import (
 	"aicompass/adapters/adkgo"
 	"aicompass/foundation/agent"
 	"aicompass/modules/a2a"
-	"aicompass/modules/agentstore"
+	"aicompass/modules/agentdefinition"
 	"aicompass/modules/chat/chatcontracts"
 	"aicompass/modules/filesystem"
 	"aicompass/modules/knowledge/edgequake"
@@ -269,11 +269,11 @@ func mapFileStat(s *filesystem.FileStat) *fsplugin.FileStat {
 // ──────────────────────────────────────────────────────────────────────────────
 
 type userAwareAgentProvider struct {
-	repo agentstore.AgentDefinitionRepository
+	repo agentdefinition.AgentDefinitionRepository
 }
 
 func newUserAwareAgentProvider(
-	repo agentstore.AgentDefinitionRepository,
+	repo agentdefinition.AgentDefinitionRepository,
 ) *userAwareAgentProvider {
 	return &userAwareAgentProvider{repo: repo}
 }
@@ -321,7 +321,7 @@ func (p *userAwareAgentProvider) ListForUser(ctx context.Context, userID string)
 	return agents, nil
 }
 
-func (p *userAwareAgentProvider) agentFromDefinition(def *agentstore.AgentDefinition) agent.Agent {
+func (p *userAwareAgentProvider) agentFromDefinition(def *agentdefinition.AgentDefinition) agent.Agent {
 	cfg := agent.Config{
 		Name:         def.ID,
 		Description:  def.Description,
@@ -406,7 +406,7 @@ func parseAgentSchema(jsonStr string) *agent.Schema {
 
 // toAgentModelConfig converts the agentstore model config to the foundation type.
 // Returns nil when no per-agent config is set (falls back to user global settings).
-func toAgentModelConfig(src *agentstore.AgentModelConfig) *agent.AgentModelConfig {
+func toAgentModelConfig(src *agentdefinition.AgentModelConfig) *agent.AgentModelConfig {
 	if src == nil {
 		return nil
 	}
@@ -422,7 +422,7 @@ func toAgentModelConfig(src *agentstore.AgentModelConfig) *agent.AgentModelConfi
 
 // toAgentModelOverride converts the agentstore model override to the foundation type.
 // Returns nil when no override is set (falls back to user global provider/model).
-func toAgentModelOverride(src *agentstore.AgentModelOverride) *agent.AgentModelOverride {
+func toAgentModelOverride(src *agentdefinition.AgentModelOverride) *agent.AgentModelOverride {
 	if src == nil {
 		return nil
 	}
@@ -432,8 +432,8 @@ func toAgentModelOverride(src *agentstore.AgentModelOverride) *agent.AgentModelO
 	}
 }
 
-// convertCompositionNode recursively maps agentstore.CompositionNode to agent.WorkflowNodeInfo.
-func convertCompositionNode(n *agentstore.CompositionNode) agent.WorkflowNodeInfo {
+// convertCompositionNode recursively maps agentdefinition.CompositionNode to agent.WorkflowNodeInfo.
+func convertCompositionNode(n *agentdefinition.CompositionNode) agent.WorkflowNodeInfo {
 	if n == nil {
 		return agent.WorkflowNodeInfo{}
 	}

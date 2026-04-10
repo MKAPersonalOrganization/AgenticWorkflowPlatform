@@ -1,11 +1,8 @@
-package agentstore
+package agentdefinition
 
-import (
-	"context"
-	"time"
-)
+import "time"
 
-// AgentCatalogEntry represents a shared, read-only agent template in the agent store.
+// AgentCatalogEntry represents a shared, read-only agent template in the template store.
 // These are available to all users and can be "added" (forked) into a user's personal agents.
 //
 // Entries with a non-empty WorkflowGraphJSON represent multi-agent workflow templates.
@@ -50,29 +47,4 @@ type CatalogSubAgent struct {
 	Description  string `json:"description"`   // Short description
 	SystemPrompt string `json:"system_prompt"` // System prompt for the agent
 	Icon         string `json:"icon"`          // SVG icon markup
-}
-
-// AgentCatalogRepository defines the storage contract for the shared agent catalog.
-type AgentCatalogRepository interface {
-	// List returns catalog entries with optional category filter, paginated.
-	List(ctx context.Context, category string, limit, offset int) ([]AgentCatalogEntry, int, error)
-
-	// Search searches the catalog by query string with full-text search.
-	Search(ctx context.Context, query string, limit, offset int) ([]AgentCatalogEntry, int, error)
-
-	// GetByID retrieves a single catalog entry.
-	GetByID(ctx context.Context, id string) (*AgentCatalogEntry, error)
-
-	// Categories returns the list of distinct categories.
-	Categories(ctx context.Context) ([]string, error)
-
-	// IncrementAddCount atomically increments the add_count for a catalog entry.
-	IncrementAddCount(ctx context.Context, id string) error
-
-	// Seed upserts catalog entries (insert or update on name conflict).
-	Seed(ctx context.Context, entries []AgentCatalogEntry) error
-
-	// DeleteNotIn removes catalog entries whose name is not in the provided list.
-	// Used after Seed to purge entries whose YAML files have been deleted.
-	DeleteNotIn(ctx context.Context, names []string) error
 }

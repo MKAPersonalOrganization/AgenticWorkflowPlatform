@@ -1,4 +1,4 @@
-package agentstore
+package agentdefinition
 
 import (
 	"aicompass/foundation/logger"
@@ -11,10 +11,10 @@ import (
 // storeHandler encapsulates HTTP handlers for agent CRUD and sharing operations.
 type storeHandler struct {
 	log *logger.Logger
-	svc *service
+	svc *Service
 }
 
-func newStoreHandler(log *logger.Logger, svc *service) *storeHandler {
+func newStoreHandler(log *logger.Logger, svc *Service) *storeHandler {
 	return &storeHandler{log: log, svc: svc}
 }
 
@@ -255,7 +255,7 @@ func (h *storeHandler) importYAML(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, isComposed, err := h.svc.ImportFromYAML(r.Context(), user.ID, raw)
+	id, isComposed, err := h.svc.ImportFromCatalogYAML(r.Context(), user.ID, raw)
 	if err != nil {
 		h.log.Error(r.Context(), "import yaml", "error", err)
 		writeJSONError(w, err.Error(), http.StatusBadRequest)

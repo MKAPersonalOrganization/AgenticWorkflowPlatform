@@ -1,6 +1,7 @@
-package agentstore
+package templates
 
 import (
+	"aicompass/modules/agentdefinition"
 	"context"
 	"database/sql"
 	"errors"
@@ -12,7 +13,7 @@ import (
 	"github.com/lib/pq"
 )
 
-// postgresAgentCatalogRepository implements AgentCatalogRepository.
+// postgresAgentCatalogRepository implements agentdefinition.AgentCatalogRepository.
 type postgresAgentCatalogRepository struct {
 	db *sqlx.DB
 }
@@ -21,7 +22,7 @@ func newPostgresAgentCatalogRepository(db *sqlx.DB) *postgresAgentCatalogReposit
 	return &postgresAgentCatalogRepository{db: db}
 }
 
-func (r *postgresAgentCatalogRepository) List(ctx context.Context, category string, limit, offset int) ([]AgentCatalogEntry, int, error) {
+func (r *postgresAgentCatalogRepository) List(ctx context.Context, category string, limit, offset int) ([]agentdefinition.AgentCatalogEntry, int, error) {
 	if limit <= 0 {
 		limit = 50
 	}
@@ -29,7 +30,7 @@ func (r *postgresAgentCatalogRepository) List(ctx context.Context, category stri
 		limit = 100
 	}
 
-	var entries []AgentCatalogEntry
+	var entries []agentdefinition.AgentCatalogEntry
 	var total int
 
 	if category != "" {
@@ -86,7 +87,7 @@ LIMIT $1 OFFSET $2
 	return entries, total, nil
 }
 
-func (r *postgresAgentCatalogRepository) Search(ctx context.Context, query string, limit, offset int) ([]AgentCatalogEntry, int, error) {
+func (r *postgresAgentCatalogRepository) Search(ctx context.Context, query string, limit, offset int) ([]agentdefinition.AgentCatalogEntry, int, error) {
 	if limit <= 0 {
 		limit = 50
 	}
@@ -126,7 +127,7 @@ LIMIT $2 OFFSET $3
 	return entries, total, nil
 }
 
-func (r *postgresAgentCatalogRepository) GetByID(ctx context.Context, id string) (*AgentCatalogEntry, error) {
+func (r *postgresAgentCatalogRepository) GetByID(ctx context.Context, id string) (*agentdefinition.AgentCatalogEntry, error) {
 	query := `
 SELECT id, name, description, system_prompt, category, tags, author_name, icon, featured, add_count,
        COALESCE(workflow_graph::text, '') as workflow_graph,
@@ -135,7 +136,7 @@ SELECT id, name, description, system_prompt, category, tags, author_name, icon, 
 FROM agent_store_catalog
 WHERE id = $1
 `
-	var entry AgentCatalogEntry
+	var entry agentdefinition.AgentCatalogEntry
 	var tags []string
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&entry.ID, &entry.Name, &entry.Description, &entry.SystemPrompt,
@@ -181,7 +182,7 @@ func (r *postgresAgentCatalogRepository) IncrementAddCount(ctx context.Context, 
 	return nil
 }
 
-func (r *postgresAgentCatalogRepository) Seed(ctx context.Context, entries []AgentCatalogEntry) error {
+func (r *postgresAgentCatalogRepository) Seed(ctx context.Context, entries []agentdefinition.AgentCatalogEntry) error {
 	// ON CONFLICT (name) DO UPDATE: every field is overwritten so that editing a
 	// YAML catalog file and redeploying immediately reflects the change in the DB.
 	// add_count and created_at are preserved to avoid resetting popularity counters.
@@ -237,10 +238,10 @@ func (r *postgresAgentCatalogRepository) DeleteNotIn(ctx context.Context, names 
 	return nil
 }
 
-func scanCatalogRows(rows *sql.Rows) ([]AgentCatalogEntry, error) {
-	var entries []AgentCatalogEntry
+func scanCatalogRows(rows *sql.Rows) ([]agentdefinition.AgentCatalogEntry, error) {
+	var entries []agentdefinition.AgentCatalogEntry
 	for rows.Next() {
-		var e AgentCatalogEntry
+		var e agentdefinition.AgentCatalogEntry
 		var tags []string
 		if err := rows.Scan(
 			&e.ID, &e.Name, &e.Description, &e.SystemPrompt,

@@ -1,4 +1,4 @@
-package agentstore
+package agentdefinition
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 // Stored as JSONB in user_agents.model_config. All fields are optional
 // (pointer types); nil means "use the user's global AI settings".
 // Mirrors foundation/agent.AgentModelConfig but is defined here to keep
-// the agentstore module free of foundation imports.
+// the agentdefinition module free of foundation imports.
 // ──────────────────────────────────────────────────────────────────────────────
 
 // AgentModelConfig holds per-agent overrides for LLM generation parameters.

@@ -32,14 +32,14 @@ func (r *PostgresToolRegistryRepository) GetTool(ctx context.Context, id string)
 	const q = `SELECT * FROM tools WHERE id = $1`
 
 	var dest struct {
-		ID          string          `db:"id"`
-		Name        string          `db:"name"`
-		Description string          `db:"description"`
-		Category    string          `db:"category"`
-		ToolSetID   sql.NullString  `db:"tool_set_id"`
-		Metadata    json.RawMessage `db:"metadata"`
-		CreatedAt   sql.NullTime    `db:"created_at"`
-		UpdatedAt   sql.NullTime    `db:"updated_at"`
+		ID          string             `db:"id"`
+		Name        string             `db:"name"`
+		Description sql.NullString     `db:"description"`
+		Category    sql.NullString     `db:"category"`
+		ToolSetID   sql.NullString     `db:"tool_set_id"`
+		Metadata    sql.NullString     `db:"metadata"`
+		CreatedAt   sql.NullTime       `db:"created_at"`
+		UpdatedAt   sql.NullTime       `db:"updated_at"`
 	}
 
 	if err := r.db.GetContext(ctx, &dest, q, id); err != nil {
@@ -50,20 +50,17 @@ func (r *PostgresToolRegistryRepository) GetTool(ctx context.Context, id string)
 	}
 
 	tool := &Tool{
-		ID:          dest.ID,
-		Name:        dest.Name,
-		Description: dest.Description,
-		Category:    dest.Category,
-		CreatedAt:   dest.CreatedAt.Time,
-		UpdatedAt:   dest.UpdatedAt.Time,
+		ID:        dest.ID,
+		Name:      dest.Name,
+		Category:  dest.Category.String,
+		CreatedAt: dest.CreatedAt.Time,
+		UpdatedAt: dest.UpdatedAt.Time,
 	}
-
-	if dest.ToolSetID.Valid {
-		tool.ToolSetID = dest.ToolSetID.String
+	if dest.Description.Valid {
+		tool.Description = dest.Description.String
 	}
-
-	if len(dest.Metadata) > 0 {
-		if err := json.Unmarshal(dest.Metadata, &tool.Metadata); err != nil {
+	if dest.Metadata.Valid {
+		if err := json.Unmarshal([]byte(dest.Metadata.String), &tool.Metadata); err != nil {
 			return nil, fmt.Errorf("unmarshalling metadata: %w", err)
 		}
 	}
@@ -76,14 +73,14 @@ func (r *PostgresToolRegistryRepository) ListTools(ctx context.Context) ([]Tool,
 	const q = `SELECT * FROM tools ORDER BY name`
 
 	var dests []struct {
-		ID          string          `db:"id"`
-		Name        string          `db:"name"`
-		Description string          `db:"description"`
-		Category    string          `db:"category"`
-		ToolSetID   sql.NullString  `db:"tool_set_id"`
-		Metadata    json.RawMessage `db:"metadata"`
-		CreatedAt   sql.NullTime    `db:"created_at"`
-		UpdatedAt   sql.NullTime    `db:"updated_at"`
+		ID          string         `db:"id"`
+		Name        string         `db:"name"`
+		Description sql.NullString `db:"description"`
+		Category    sql.NullString `db:"category"`
+		ToolSetID   sql.NullString `db:"tool_set_id"`
+		Metadata    sql.NullString `db:"metadata"`
+		CreatedAt   sql.NullTime   `db:"created_at"`
+		UpdatedAt   sql.NullTime   `db:"updated_at"`
 	}
 
 	if err := r.db.SelectContext(ctx, &dests, q); err != nil {
@@ -93,20 +90,22 @@ func (r *PostgresToolRegistryRepository) ListTools(ctx context.Context) ([]Tool,
 	tools := make([]Tool, len(dests))
 	for i, dest := range dests {
 		tools[i] = Tool{
-			ID:          dest.ID,
-			Name:        dest.Name,
-			Description: dest.Description,
-			Category:    dest.Category,
-			CreatedAt:   dest.CreatedAt.Time,
-			UpdatedAt:   dest.UpdatedAt.Time,
+			ID:        dest.ID,
+			Name:      dest.Name,
+			Category:  dest.Category.String,
+			CreatedAt: dest.CreatedAt.Time,
+			UpdatedAt: dest.UpdatedAt.Time,
+		}
+		if dest.Description.Valid {
+			tools[i].Description = dest.Description.String
 		}
 
 		if dest.ToolSetID.Valid {
 			tools[i].ToolSetID = dest.ToolSetID.String
 		}
 
-		if len(dest.Metadata) > 0 {
-			if err := json.Unmarshal(dest.Metadata, &tools[i].Metadata); err != nil {
+		if dest.Metadata.Valid {
+			if err := json.Unmarshal([]byte(dest.Metadata.String), &tools[i].Metadata); err != nil {
 				return nil, fmt.Errorf("unmarshalling metadata for tool %s: %w", dest.ID, err)
 			}
 		}
@@ -240,14 +239,14 @@ func (r *PostgresToolRegistryRepository) GetToolSet(ctx context.Context, id stri
 	const q = `SELECT * FROM tool_sets WHERE id = $1`
 
 	var dest struct {
-		ID          string          `db:"id"`
-		Name        string          `db:"name"`
-		Description string          `db:"description"`
-		Category    string          `db:"category"`
-		ToolIDs     pq.StringArray  `db:"tool_ids"`
-		Metadata    json.RawMessage `db:"metadata"`
-		CreatedAt   sql.NullTime    `db:"created_at"`
-		UpdatedAt   sql.NullTime    `db:"updated_at"`
+		ID          string         `db:"id"`
+		Name        string         `db:"name"`
+		Description sql.NullString `db:"description"`
+		Category    sql.NullString `db:"category"`
+		ToolIDs     pq.StringArray `db:"tool_ids"`
+		Metadata    sql.NullString `db:"metadata"`
+		CreatedAt   sql.NullTime   `db:"created_at"`
+		UpdatedAt   sql.NullTime   `db:"updated_at"`
 	}
 
 	if err := r.db.GetContext(ctx, &dest, q, id); err != nil {
@@ -258,17 +257,19 @@ func (r *PostgresToolRegistryRepository) GetToolSet(ctx context.Context, id stri
 	}
 
 	toolSet := &ToolSet{
-		ID:          dest.ID,
-		Name:        dest.Name,
-		Description: dest.Description,
-		Category:    dest.Category,
-		ToolIDs:     []string(dest.ToolIDs),
-		CreatedAt:   dest.CreatedAt.Time,
-		UpdatedAt:   dest.UpdatedAt.Time,
+		ID:        dest.ID,
+		Name:      dest.Name,
+		Category:  dest.Category.String,
+		ToolIDs:   []string(dest.ToolIDs),
+		CreatedAt: dest.CreatedAt.Time,
+		UpdatedAt: dest.UpdatedAt.Time,
+	}
+	if dest.Description.Valid {
+		toolSet.Description = dest.Description.String
 	}
 
-	if len(dest.Metadata) > 0 {
-		if err := json.Unmarshal(dest.Metadata, &toolSet.Metadata); err != nil {
+	if dest.Metadata.Valid {
+		if err := json.Unmarshal([]byte(dest.Metadata.String), &toolSet.Metadata); err != nil {
 			return nil, fmt.Errorf("unmarshalling metadata: %w", err)
 		}
 	}
@@ -281,14 +282,14 @@ func (r *PostgresToolRegistryRepository) ListToolSets(ctx context.Context) ([]To
 	const q = `SELECT * FROM tool_sets ORDER BY name`
 
 	var dests []struct {
-		ID          string          `db:"id"`
-		Name        string          `db:"name"`
-		Description string          `db:"description"`
-		Category    string          `db:"category"`
-		ToolIDs     pq.StringArray  `db:"tool_ids"`
-		Metadata    json.RawMessage `db:"metadata"`
-		CreatedAt   sql.NullTime    `db:"created_at"`
-		UpdatedAt   sql.NullTime    `db:"updated_at"`
+		ID          string         `db:"id"`
+		Name        string         `db:"name"`
+		Description sql.NullString `db:"description"`
+		Category    sql.NullString `db:"category"`
+		ToolIDs     pq.StringArray `db:"tool_ids"`
+		Metadata    sql.NullString `db:"metadata"`
+		CreatedAt   sql.NullTime   `db:"created_at"`
+		UpdatedAt   sql.NullTime   `db:"updated_at"`
 	}
 
 	if err := r.db.SelectContext(ctx, &dests, q); err != nil {
@@ -298,17 +299,19 @@ func (r *PostgresToolRegistryRepository) ListToolSets(ctx context.Context) ([]To
 	toolSets := make([]ToolSet, len(dests))
 	for i, dest := range dests {
 		toolSets[i] = ToolSet{
-			ID:          dest.ID,
-			Name:        dest.Name,
-			Description: dest.Description,
-			Category:    dest.Category,
-			ToolIDs:     []string(dest.ToolIDs),
-			CreatedAt:   dest.CreatedAt.Time,
-			UpdatedAt:   dest.UpdatedAt.Time,
+			ID:        dest.ID,
+			Name:      dest.Name,
+			Category:  dest.Category.String,
+			ToolIDs:   []string(dest.ToolIDs),
+			CreatedAt: dest.CreatedAt.Time,
+			UpdatedAt: dest.UpdatedAt.Time,
+		}
+		if dest.Description.Valid {
+			toolSets[i].Description = dest.Description.String
 		}
 
-		if len(dest.Metadata) > 0 {
-			if err := json.Unmarshal(dest.Metadata, &toolSets[i].Metadata); err != nil {
+		if dest.Metadata.Valid {
+			if err := json.Unmarshal([]byte(dest.Metadata.String), &toolSets[i].Metadata); err != nil {
 				return nil, fmt.Errorf("unmarshalling metadata for tool set %s: %w", dest.ID, err)
 			}
 		}

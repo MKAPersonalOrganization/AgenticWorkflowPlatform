@@ -3,7 +3,7 @@ package multiagent
 import (
 	"aicompass/foundation/auth"
 	"aicompass/foundation/logger"
-	"aicompass/modules/agentstore"
+	"aicompass/modules/agentdefinition"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"
@@ -25,7 +25,7 @@ type Module struct {
 }
 
 // New creates the multiagent module.
-func New(log *logger.Logger, db *sqlx.DB, agentDefRepo agentstore.AgentDefinitionRepository) *Module {
+func New(log *logger.Logger, db *sqlx.DB, agentDefRepo agentdefinition.AgentDefinitionRepository) *Module {
 	repo := newPostgresWorkflowRepository(db)
 	svc := newService(log, repo, agentDefRepo)
 	handler := newWorkflowHandler(log, svc)
