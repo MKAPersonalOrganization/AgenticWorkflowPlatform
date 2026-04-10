@@ -58,3 +58,39 @@ export function trackWorkflowEvent(event, state) {
         }
     }
 }
+
+/**
+ * Track a message for a specific agent in the workflow state.
+ * Creates the agent's message array if it doesn't exist.
+ */
+export function trackAgentMessage(state, agentName, message) {
+    if (!state.agentMessages) state.agentMessages = {};
+    if (!state.agentMessages[agentName]) {
+        state.agentMessages[agentName] = [];
+    }
+    state.agentMessages[agentName].push(message);
+}
+
+/**
+ * Append content to the last message of an agent.
+ */
+export function appendAgentMessageContent(state, agentName, delta) {
+    if (!state.agentMessages || !state.agentMessages[agentName]) return;
+    const messages = state.agentMessages[agentName];
+    const last = messages[messages.length - 1];
+    if (last && last.streaming) {
+        last.content += delta;
+    }
+}
+
+/**
+ * Mark the last message of an agent as complete (not streaming).
+ */
+export function finishAgentMessage(state, agentName) {
+    if (!state.agentMessages || !state.agentMessages[agentName]) return;
+    const messages = state.agentMessages[agentName];
+    const last = messages[messages.length - 1];
+    if (last && last.streaming) {
+        last.streaming = false;
+    }
+}

@@ -11,7 +11,7 @@
  * Transfer policies, output keys, include_contents map to agent config.
  * The last child of a loop gets exit_loop tool automatically (backend).
  */
-import { trackWorkflowEvent } from '../utils/workflow-tracker.js';
+import { trackWorkflowEvent, trackAgentMessage, appendAgentMessageContent, finishAgentMessage } from '../utils/workflow-tracker.js';
 
 export const agentDesigner = () => ({
     // ══════════════════════════════════════════
@@ -149,7 +149,11 @@ export const agentDesigner = () => ({
         activeAgentNames: {},
         completedNodes: {},
         failedNodes: {},
+        agentMessages: {}, // { [agentName]: [{ id, role, content, streaming, timestamp }] }
     },
+
+    /** Which agent's contribution panel is expanded (null = none) */
+    testPanelExpandedAgent: null,
 
     /** Whether the amber play button is active and the panel is visible */
     testModeActive: false,
@@ -194,6 +198,13 @@ export const agentDesigner = () => ({
     // Lifecycle
     // ══════════════════════════════════════════
 
+    init() {
+        // Listen for toggle agent contribution events from workflow tree
+        window.addEventListener('test-panel-toggle-agent', (e) => {
+            this.toggleAgentContribution(e.detail.agentName);
+        });
+    },
+
     async open() {
         this.view = 'list';
         this.searchQuery = '';
@@ -226,7 +237,15 @@ export const agentDesigner = () => ({
             }
             this.testModeActive = false;
             this.testPanelCollapsed = false;
-            this.testPanelMessages = [];
+            this.testWorkflowState = {
+                activeAgentNames: {},
+                completedNodes: {},
+                failedNodes: {},
+                agentMessages: {},
+                userMessages: [],
+                activeWorkflowContext: null
+            };
+            this.testPanelExpandedAgent = null;
             this.testPanelStreaming = false;
             this.testPanelTyping = false;
             this.testPanelInput = '';
@@ -249,6 +268,15 @@ export const agentDesigner = () => ({
         this.testPanelShowEventLog = !this.testPanelShowEventLog;
     },
 
+    /** Toggle the contribution panel for a specific agent */
+    toggleAgentContribution(agentName) {
+        if (this.testPanelExpandedAgent === agentName) {
+            this.testPanelExpandedAgent = null;
+        } else {
+            this.testPanelExpandedAgent = agentName;
+        }
+    },
+
     /**
      * Clear all messages, events and the ephemeral thread ID.
      * Starts a fresh test session on the next send.
@@ -269,13 +297,33 @@ export const agentDesigner = () => ({
     /**
      * Handle keydown in the test panel input.
      * Sends on Enter; Shift+Enter inserts a newline (default).
+     * Stops streaming on Escape.
      * @param {KeyboardEvent} event
      */
     handleTestKeydown(event) {
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
-            this.sendTestMessage();
+            if (this.testPanelStreaming) {
+                this.abortTestMessage();
+            } else {
+                this.sendTestMessage();
+            }
+        } else if (event.key === 'Escape' && this.testPanelStreaming) {
+            event.preventDefault();
+            this.abortTestMessage();
         }
+    },
+
+    /**
+     * Abort the currently streaming conversation.
+     */
+    abortTestMessage() {
+        if (this.testPanelAbortController) {
+            this.testPanelAbortController.abort();
+            this.testPanelAbortController = null;
+        }
+        this.testPanelStreaming = false;
+        this.testPanelTyping = false;
     },
 
     // ══════════════════════════════════════════
@@ -307,18 +355,25 @@ export const agentDesigner = () => ({
             activeAgentNames: {},
             completedNodes: {},
             failedNodes: {},
+            agentMessages: {},
+            userMessages: [],
             activeWorkflowContext: null
         };
+        this.testPanelExpandedAgent = null;
         window.dispatchEvent(new CustomEvent('test-panel-workflow-tracking', { detail: { active: {}, completed: {}, failed: {} }}));
+        window.dispatchEvent(new CustomEvent('test-panel-contributions', { detail: { agentMessages: {}, userMessages: [] }}));
 
-        // Push the user bubble
-        this.testPanelMessages.push({
+        // Store user message in workflow state for contributions display
+        this.testWorkflowState.userMessages.push({
             id: crypto.randomUUID(),
             role: 'user',
             content: message,
-            streaming: false,
             timestamp: new Date().toISOString(),
         });
+        window.dispatchEvent(new CustomEvent('test-panel-contributions', { detail: { 
+            agentMessages: this.testWorkflowState.agentMessages,
+            userMessages: this.testWorkflowState.userMessages 
+        }}));
 
         // Clear the input
         this.testPanelInput = '';
@@ -476,33 +531,44 @@ export const agentDesigner = () => ({
 
         switch (event.type) {
             case 'TEXT_MESSAGE_START': {
-                // Start a new streaming assistant bubble
+                // Start a new streaming message for the currently active agent
+                const agentName = this.testWorkflowState.activeAgentName || 'unknown';
                 this.testPanelTyping = false;
-                this.testPanelMessages.push({
+                trackAgentMessage(this.testWorkflowState, agentName, {
                     id:        event.messageId || crypto.randomUUID(),
                     role:      'assistant',
                     content:   '',
                     streaming: true,
                     timestamp: new Date().toISOString(),
                 });
+                // Auto-expand the agent's contribution panel when they start responding
+                this.testPanelExpandedAgent = agentName;
+                window.dispatchEvent(new CustomEvent('test-panel-contributions', { detail: { 
+                    agentMessages: this.testWorkflowState.agentMessages,
+                    userMessages: this.testWorkflowState.userMessages
+                }}));
                 break;
             }
 
             case 'TEXT_MESSAGE_CONTENT': {
-                // Append token delta to the last streaming message
-                const last = this.testPanelMessages[this.testPanelMessages.length - 1];
-                if (last && last.streaming) {
-                    last.content += event.delta || '';
-                }
+                // Append token delta to the last message of the active agent
+                const agentName = this.testWorkflowState.activeAgentName || 'unknown';
+                appendAgentMessageContent(this.testWorkflowState, agentName, event.delta || '');
+                window.dispatchEvent(new CustomEvent('test-panel-contributions', { detail: { 
+                    agentMessages: this.testWorkflowState.agentMessages,
+                    userMessages: this.testWorkflowState.userMessages
+                }}));
                 break;
             }
 
             case 'TEXT_MESSAGE_END': {
-                // Mark the streaming message as complete
-                const last = this.testPanelMessages[this.testPanelMessages.length - 1];
-                if (last && last.streaming) {
-                    last.streaming = false;
-                }
+                // Mark the last message of the active agent as complete
+                const agentName = this.testWorkflowState.activeAgentName || 'unknown';
+                finishAgentMessage(this.testWorkflowState, agentName);
+                window.dispatchEvent(new CustomEvent('test-panel-contributions', { detail: { 
+                    agentMessages: this.testWorkflowState.agentMessages,
+                    userMessages: this.testWorkflowState.userMessages
+                }}));
                 break;
             }
 
@@ -514,13 +580,18 @@ export const agentDesigner = () => ({
 
             case 'RUN_ERROR': {
                 const errMsg = event.message || event.error || 'Agent run failed';
-                this.testPanelMessages.push({
+                const agentName = this.testWorkflowState.activeAgentName || 'unknown';
+                trackAgentMessage(this.testWorkflowState, agentName, {
                     id:        crypto.randomUUID(),
                     role:      'error',
                     content:   errMsg,
                     streaming: false,
                     timestamp: new Date().toISOString(),
                 });
+                window.dispatchEvent(new CustomEvent('test-panel-contributions', { detail: { 
+                    agentMessages: this.testWorkflowState.agentMessages,
+                    userMessages: this.testWorkflowState.userMessages
+                }}));
                 this.testPanelStreaming = false;
                 this.testPanelTyping   = false;
                 break;

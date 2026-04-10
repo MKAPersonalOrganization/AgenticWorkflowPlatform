@@ -16,6 +16,7 @@ import (
 templ AgentDesignerDialog() {
 	<div
 		x-data="agentDesigner"
+		x-init="init()"
 		@open-agent-designer.window="open()"
 		@open-agent-designer-node.window="open(); $nextTick(() => showEditNodeForm($event.detail))"
 		@open-agent-designer-pipeline.window="open(); $nextTick(() => showEditPipelineForm($event.detail))"
@@ -968,62 +969,14 @@ templ AgentDesignerDialog() {
 							<!-- ── Content area (hidden when collapsed) ── -->
 							<div x-show="!testPanelCollapsed" class="flex flex-1 overflow-hidden min-h-0">
 
-								<!-- ── Messages + Input column ── -->
+								<!-- ── Input column only (responses show in workflow nodes) ── -->
 								<div class="flex flex-col flex-1 overflow-hidden min-h-0">
 
-									<!-- Message list -->
-									<div class="flex-1 overflow-y-auto px-3 py-2 space-y-2 scrollbar-thin min-h-0" style="font-family:'JetBrains Mono','Fira Code',monospace; font-size:11px;">
-
-										<!-- Empty state -->
-										<template x-if="testPanelMessages.length === 0 && !testPanelTyping">
-											<div class="flex flex-col items-center justify-center h-full py-8 gap-2" style="color:#4b5563;">
-												<svg xmlns="http://www.w3.org/2000/svg" class="size-6 opacity-30" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-												<span style="font-size:10px; color:#6b7280;">Send a message to test the agent...</span>
-											</div>
-										</template>
-
-										<!-- Message bubbles -->
-										<template x-for="msg in testPanelMessages" :key="msg.id">
-											<div
-												class="flex w-full"
-												:class="msg.role === 'user' ? 'justify-end' : 'justify-start'"
-											>
-												<div
-													class="max-w-[80%] px-2.5 py-1.5 rounded-lg leading-relaxed whitespace-pre-wrap break-words"
-													:style="msg.role === 'user'
-														? 'background:rgba(245,158,11,0.1); color:#fde68a; border:1px solid rgba(245,158,11,0.2);'
-														: msg.role === 'error'
-															? 'background:rgba(239,68,68,0.1); color:#fca5a5; border:1px solid rgba(239,68,68,0.2);'
-															: 'background:#21262d; color:#e5e7eb; border:1px solid rgba(255,255,255,0.06);'"
-												>
-													<!-- Role label -->
-													<div
-														class="text-[8px] uppercase tracking-widest mb-1 font-semibold"
-														:style="msg.role === 'user' ? 'color:#f59e0b;' : msg.role === 'error' ? 'color:#ef4444;' : 'color:#6b7280;'"
-														x-text="msg.role === 'user' ? 'You' : msg.role === 'error' ? '⚠ Error' : 'Agent'"
-													></div>
-													<!-- Content + streaming cursor -->
-													<span x-text="msg.content"></span>
-													<span
-														x-show="msg.streaming"
-														style="display:inline-block; width:2px; height:12px; background:#6b7280; vertical-align:middle; margin-left:1px; animation:blink 1s step-end infinite;"
-													></span>
-												</div>
-											</div>
-										</template>
-
-										<!-- Typing indicator (before first token arrives) -->
-										<template x-if="testPanelTyping">
-											<div class="flex justify-start">
-												<div class="px-2.5 py-1.5 rounded-lg flex items-center gap-1" style="background:#21262d; border:1px solid rgba(255,255,255,0.06);">
-													<span class="block w-1.5 h-1.5 rounded-full animate-bounce" style="background:#6b7280; animation-delay:0ms;"></span>
-													<span class="block w-1.5 h-1.5 rounded-full animate-bounce" style="background:#6b7280; animation-delay:150ms;"></span>
-													<span class="block w-1.5 h-1.5 rounded-full animate-bounce" style="background:#6b7280; animation-delay:300ms;"></span>
-												</div>
-											</div>
-										</template>
-
-									</div><!-- /message list -->
+									<!-- Empty state -->
+									<div class="flex-1 flex flex-col items-center justify-center py-8 gap-2" style="color:#4b5563;">
+										<svg xmlns="http://www.w3.org/2000/svg" class="size-6 opacity-30" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+										<span style="font-size:10px; color:#6b7280;">Responses appear in workflow nodes</span>
+									</div>
 
 									<!-- ── Input bar ── -->
 									<div class="shrink-0 px-3 pb-2 pt-1.5" style="border-top:1px solid rgba(255,255,255,0.06);">
@@ -1039,16 +992,20 @@ templ AgentDesignerDialog() {
 												@focus="$el.style.borderColor='rgba(245,158,11,0.5)'"
 												@blur="$el.style.borderColor='rgba(255,255,255,0.1)'"
 											/>
-											<!-- Send button -->
+											<!-- Send / Stop button -->
 											<button
-												@click="sendTestMessage()"
-												:disabled="testPanelStreaming || !testPanelInput.trim()"
-												title="Send (Enter)"
+												@click="testPanelStreaming ? abortTestMessage() : sendTestMessage()"
+												:disabled="!testPanelStreaming && !testPanelInput.trim()"
+												:title="testPanelStreaming ? 'Stop (Escape)' : 'Send (Enter)'"
 												class="flex items-center justify-center w-7 h-7 rounded transition-all"
-												:style="(testPanelStreaming || !testPanelInput.trim()) ? 'background:#21262d; color:#6b7280; cursor:not-allowed;' : 'background:rgba(245,158,11,0.15); color:#fbbf24; cursor:pointer;'"
+												:style="testPanelStreaming 
+													? 'background:rgba(239,68,68,0.15); color:#f87171; cursor:pointer;' 
+													: (testPanelInput.trim() 
+														? 'background:rgba(245,158,11,0.15); color:#fbbf24; cursor:pointer;' 
+														: 'background:#21262d; color:#6b7280; cursor:not-allowed;')"
 											>
 												<template x-if="testPanelStreaming">
-													<span class="animate-spin block w-3 h-3 rounded-full" style="border:2px solid #6b7280; border-top-color:transparent;"></span>
+													@icon.CircleStop(icon.Props{Class: "size-3.5"})
 												</template>
 												<template x-if="!testPanelStreaming">
 													@icon.SendHorizontal(icon.Props{Class: "size-3.5"})
@@ -1057,7 +1014,7 @@ templ AgentDesignerDialog() {
 										</div>
 									</div><!-- /input bar -->
 
-								</div><!-- /messages+input column -->
+								</div><!-- /input column -->
 
 								<!-- ── Event log side pane ── -->
 								<template x-if="testPanelShowEventLog">

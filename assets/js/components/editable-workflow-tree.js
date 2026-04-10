@@ -655,6 +655,7 @@ export const editableWorkflowTree = () => {
                         ${node.output_key ? `<div class="ewt-agent-desc">→ ${esc(node.output_key)}</div>` : ''}
                     </div>
                     <div class="ewt-actions">
+                        <button class="ewt-action-btn ewt-contrib-btn" onclick="window.ewtToggleContribution('${esc(name)}')" title="Toggle agent contribution">💬</button>
                         ${isComposed ? `<button class="ewt-action-btn" onclick="window.ewtEditAgent('${node.agent_id}')" title="Edit Workflow">✎</button>` : ''}
                         <button class="ewt-action-btn" onclick="window.ewtMoveUp('${nodeId}')" title="Move up">↑</button>
                         <button class="ewt-action-btn" onclick="window.ewtMoveDown('${nodeId}')" title="Move down">↓</button>
@@ -662,6 +663,8 @@ export const editableWorkflowTree = () => {
                         <button class="ewt-action-btn danger" onclick="window.ewtDeleteNode('${nodeId}')" title="Delete">✕</button>
                     </div>
                 </div>
+                <!-- Agent contribution output (populates during test run) -->
+                <div class="ewt-agent-output" data-agent-name="${esc(name)}" style="display:none;"></div>
             </div>`;
     }
 
@@ -1107,6 +1110,13 @@ export const editableWorkflowTree = () => {
                 }));
             };
 
+            window.ewtToggleContribution = (agentName) => {
+                // Dispatch event to agent designer to toggle contribution panel
+                window.dispatchEvent(new CustomEvent('test-panel-toggle-agent', { 
+                    detail: { agentName: agentName } 
+                }));
+            };
+
             window.ewtAddChild = (parentId, childType) => {
                 const store = Alpine.store('flow');
                 if (store && store.graph && addChildToNode(store.graph, parentId, childType)) {
@@ -1367,6 +1377,64 @@ export const editableWorkflowTree = () => {
                     el.classList.toggle('node-completed', isCompleted);
                     el.classList.toggle('node-failed', isFailed);
                     el.classList.toggle('node-inactive', isInactive);
+                });
+            });
+
+            // Listen for agent contributions and render output inside nodes
+            window.addEventListener('test-panel-contributions', (e) => {
+                const { agentMessages } = e.detail;
+                if (!agentMessages) return;
+
+                // Update each node's output div
+                this.$el.querySelectorAll('.ewt-node[data-node-type="agent"]').forEach(el => {
+                    const agentName = el.getAttribute('data-agent-name');
+                    const nodeLabel = el.getAttribute('data-node-label');
+                    const nameToMatch = agentName || nodeLabel;
+                    
+                    const messages = agentMessages[nameToMatch] || [];
+                    const outputDiv = el.querySelector('.ewt-agent-output');
+                    
+                    if (!outputDiv) return;
+
+                    // Update the contribution button to show it has output
+                    const contribBtn = el.querySelector('.ewt-contrib-btn');
+                    if (contribBtn) {
+                        contribBtn.classList.toggle('has-output', messages.length > 0);
+                    }
+
+                    if (messages.length === 0) {
+                        outputDiv.style.display = 'none';
+                        return;
+                    }
+
+                    // Check if any message is still streaming
+                    const hasStreaming = messages.some(m => m.streaming);
+                    
+                    // Build output HTML
+                    const messagesHtml = messages.map(msg => {
+                        const content = msg.content || '';
+                        const roleLabel = msg.role === 'user' ? 'You' : msg.role === 'error' ? 'Error' : 'Response';
+                        const isError = msg.role === 'error';
+                        const isStreaming = msg.streaming;
+                        
+                        return `<div class="ewt-agent-output-message ${isError ? 'error' : ''}">${esc(content)}${isStreaming ? '<span class="streaming-cursor">▋</span>' : ''}</div>`;
+                    }).join('');
+
+                    outputDiv.innerHTML = `
+                        <div class="ewt-agent-output-header">
+                            <span>${esc(nameToMatch)}</span>
+                            <span class="msg-count">${messages.length} message${messages.length !== 1 ? 's' : ''}</span>
+                        </div>
+                        ${messagesHtml}
+                    `;
+                    
+                    outputDiv.style.display = 'block';
+                    outputDiv.classList.toggle('streaming', hasStreaming);
+                    
+                    // Auto-scroll to bottom if streaming
+                    if (hasStreaming) {
+                        outputDiv.scrollTop = outputDiv.scrollHeight;
+                    }
                 });
             });
 

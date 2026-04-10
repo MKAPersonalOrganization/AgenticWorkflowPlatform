@@ -765,5 +765,108 @@
     filter: grayscale(15%) !important;
     transform: scale(0.97) !important;
   }
+
+  /* ========================================
+   * Agent Output Bubbles (emerging from nodes)
+   * ======================================== */
+  .ewt-agent-output {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--muted);
+    border: 1px solid oklch(from var(--primary) l c h / 20%);
+    font-size: 10px;
+    line-height: 1.5;
+    color: var(--foreground);
+    max-height: 120px;
+    overflow-y: auto;
+    animation: outputSlideDown 0.3s ease-out;
+    position: relative;
+  }
+
+  .ewt-agent-output::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 16px;
+    width: 10px;
+    height: 10px;
+    background: var(--muted);
+    border-left: 1px solid oklch(from var(--primary) l c h / 20%);
+    border-top: 1px solid oklch(from var(--primary) l c h / 20%);
+    transform: rotate(45deg);
+  }
+
+  .ewt-agent-output.streaming {
+    border-color: oklch(from var(--primary) l c h / 40%);
+    background: oklch(from var(--primary) l c h / 5%);
+  }
+
+  .ewt-agent-output.streaming::after {
+    content: '▋';
+    display: inline-block;
+    margin-left: 2px;
+    color: var(--primary);
+    animation: stream-cursor-blink 0.85s ease-in-out infinite;
+  }
+
+  .ewt-agent-output-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid oklch(from var(--primary) l c h / 10%);
+  }
+
+  .ewt-agent-output-header span {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--primary);
+  }
+
+  .ewt-agent-output-header .msg-count {
+    font-size: 8px;
+    color: oklch(from var(--primary) l c h / 60%);
+    font-weight: normal;
+  }
+
+  .ewt-agent-output-message {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .ewt-agent-output-message.error {
+    color: var(--destructive);
+  }
+
+  @keyframes outputSlideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Contribution toggle button */
+  .ewt-contrib-btn {
+    opacity: 0.6;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+
+  .ewt-contrib-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+
+  .ewt-contrib-btn.has-output {
+    opacity: 1;
+    color: var(--primary);
+  }
 }
 
