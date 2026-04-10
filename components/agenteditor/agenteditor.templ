@@ -125,18 +125,42 @@ templ AgentDesignerDialog() {
 								<template x-if="!loading">
 									<div>
 										<template x-if="filteredAgents.length === 0">
-											<div class="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
-												@icon.Workflow(icon.Props{Class: "size-12 opacity-20"})
+											<div class="flex flex-col items-center justify-center py-12 gap-4">
+												<!-- Decorative icon ring -->
+												<div class="relative">
+													<div class="size-20 rounded-full bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center ring-1 ring-primary/10">
+														@icon.Workflow(icon.Props{Class: "size-8 opacity-30 text-primary"})
+													</div>
+													<!-- Floating dots -->
+													<div class="absolute -top-1 -right-2 size-2.5 rounded-full bg-emerald-400/30 animate-pulse"></div>
+													<div class="absolute -bottom-1 -left-3 size-2 rounded-full bg-indigo-400/30 animate-pulse" style="animation-delay: 0.5s"></div>
+													<div class="absolute top-1 -left-2 size-1.5 rounded-full bg-amber-400/30 animate-pulse" style="animation-delay: 1s"></div>
+												</div>
 												<template x-if="searchQuery">
 													<div class="text-center">
-														<p class="text-sm font-medium">{ i18n.T(ctx, "No agents found") }</p>
-														<p class="text-xs mt-1">{ i18n.T(ctx, "Try a different search term.") }</p>
+														<p class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "No agents found") }</p>
+														<p class="text-xs mt-1 text-muted-foreground">{ i18n.T(ctx, "Try a different search term.") }</p>
 													</div>
 												</template>
 												<template x-if="!searchQuery">
-													<div class="text-center">
-														<p class="text-sm font-medium">{ i18n.T(ctx, "No agents yet") }</p>
-														<p class="text-xs mt-1">{ i18n.T(ctx, "Create your first agent to get started.") }</p>
+													<div class="text-center max-w-xs">
+														<p class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Build your first AI agent") }</p>
+														<p class="text-xs mt-1.5 text-muted-foreground leading-relaxed">{ i18n.T(ctx, "Create a single agent with custom instructions, or orchestrate multiple agents in a workflow.") }</p>
+														<!-- Quick action steps -->
+														<div class="mt-5 space-y-2.5">
+															<button
+																@click="view = 'typeSelect'"
+																class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm"
+															>
+																@icon.Plus(icon.Props{Class: "size-3.5"})
+																{ i18n.T(ctx, "Create an Agent") }
+															</button>
+															<div class="flex items-center gap-3 text-[10px] text-muted-foreground justify-center pt-1">
+																<span class="flex items-center gap-1"><span class="size-1.5 rounded-full bg-emerald-400/60 inline-block"></span> Single Agent</span>
+																<span class="flex items-center gap-1"><span class="size-1.5 rounded-full bg-indigo-400/60 inline-block"></span> Workflow</span>
+																<span class="flex items-center gap-1"><span class="size-1.5 rounded-full bg-amber-400/60 inline-block"></span> Import YAML</span>
+															</div>
+														</div>
 													</div>
 												</template>
 											</div>
@@ -145,15 +169,22 @@ templ AgentDesignerDialog() {
 										<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
 											<template x-for="ag in filteredAgents" :key="ag.id">
 												<div
-													class="group relative rounded-xl border border-border hover:border-primary/30 hover:shadow-sm transition-all duration-200 cursor-pointer overflow-hidden bg-card"
+													class="group relative rounded-xl border border-border hover:border-primary/40 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer overflow-hidden bg-card"
+													:class="ag.isComposed ? 'hover:border-indigo-400/40 hover:shadow-indigo-500/5' : 'hover:shadow-primary/5'"
 													@click="ag.isComposed ? showEditPipelineForm(ag) : showEditNodeForm(ag)"
 												>
-													<div class="p-4">
+													<!-- Subtle gradient overlay on hover -->
+													<div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+														:class="ag.isComposed
+															? 'bg-gradient-to-br from-indigo-500/5 via-transparent to-transparent'
+															: 'bg-gradient-to-br from-primary/5 via-transparent to-transparent'">
+													</div>
+													<div class="relative p-4">
 														<div class="flex items-start gap-3">
 															<!-- Agent Icon -->
 															<div
-																class="size-10 rounded-lg flex items-center justify-center shrink-0 [&_svg]:size-5"
-																:class="ag.isComposed ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'bg-primary/10 text-primary'"
+																class="size-10 rounded-lg flex items-center justify-center shrink-0 [&_svg]:size-5 ring-1 ring-border/50 group-hover:ring-primary/20 transition-all duration-200"
+																:class="ag.isComposed ? 'bg-gradient-to-br from-indigo-500/15 to-indigo-500/5 text-indigo-600 dark:text-indigo-400 group-hover:ring-indigo-400/30' : 'bg-gradient-to-br from-primary/15 to-primary/5 text-primary'"
 															>
 																<template x-if="ag.isComposed">
 																	@icon.GitBranch(icon.Props{Class: "size-5"})
@@ -163,7 +194,7 @@ templ AgentDesignerDialog() {
 																</template>
 															</div>
 															<div class="flex-1 min-w-0">
-																<h3 class="text-sm font-semibold text-foreground truncate" x-text="ag.name"></h3>
+																<h3 class="text-sm font-semibold text-foreground truncate group-hover:text-primary/80 transition-colors" x-text="ag.name"></h3>
 																<p class="text-xs text-muted-foreground mt-0.5 line-clamp-2" x-text="ag.description || 'No description'"></p>
 															</div>
 														</div>
@@ -236,37 +267,54 @@ templ AgentDesignerDialog() {
 								<button
 									type="button"
 									@click="showCreateNodeForm()"
-									class="group flex flex-col items-center gap-4 p-6 rounded-xl border-2 border-border hover:border-primary/50 hover:shadow-md bg-card transition-all duration-200 text-center cursor-pointer"
+									class="group relative flex flex-col items-center gap-4 p-6 rounded-xl border-2 border-border hover:border-emerald-400/50 hover:shadow-lg hover:shadow-emerald-500/5 hover:-translate-y-0.5 bg-card transition-all duration-200 text-center cursor-pointer overflow-hidden"
 								>
-									<div class="size-14 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+									<!-- Gradient overlay -->
+									<div class="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+									<div class="relative size-14 rounded-2xl bg-gradient-to-br from-emerald-500/15 to-emerald-500/5 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 group-hover:shadow-md transition-all duration-200 ring-1 ring-emerald-500/20 group-hover:ring-emerald-400/40">
 										@icon.Bot(icon.Props{Class: "size-7"})
 									</div>
-									<div>
+									<div class="relative">
 										<h4 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Single Agent") }</h4>
-										<p class="text-xs text-muted-foreground mt-1.5 leading-relaxed">{ i18n.T(ctx, "An AI agent with custom instructions, tools, and knowledge bases.") }</p>
+										<p class="text-xs text-muted-foreground mt-1.5 leading-relaxed max-w-[220px]">{ i18n.T(ctx, "An AI agent with custom instructions, tools, and knowledge bases.") }</p>
+									</div>
+									<!-- Feature pills -->
+									<div class="relative flex flex-wrap gap-1 mt-1 justify-center">
+										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">System Prompt</span>
+										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/50">Tools</span>
+										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/50">Knowledge</span>
 									</div>
 								</button>
 								<!-- Workflow Card -->
 								<button
 									type="button"
 									@click="showCreatePipelineForm()"
-									class="group flex flex-col items-center gap-4 p-6 rounded-xl border-2 border-border hover:border-indigo-500/50 hover:shadow-md bg-card transition-all duration-200 text-center cursor-pointer"
+									class="group relative flex flex-col items-center gap-4 p-6 rounded-xl border-2 border-border hover:border-indigo-400/50 hover:shadow-lg hover:shadow-indigo-500/5 hover:-translate-y-0.5 bg-card transition-all duration-200 text-center cursor-pointer overflow-hidden"
 								>
-									<div class="size-14 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+									<!-- Gradient overlay -->
+									<div class="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+									<div class="relative size-14 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-indigo-500/5 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-110 group-hover:shadow-md transition-all duration-200 ring-1 ring-indigo-500/20 group-hover:ring-indigo-400/40">
 										@icon.GitBranch(icon.Props{Class: "size-7"})
 									</div>
-									<div>
+									<div class="relative">
 										<h4 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Multi-Agent Workflow") }</h4>
-										<p class="text-xs text-muted-foreground mt-1.5 leading-relaxed">{ i18n.T(ctx, "Orchestrate multiple agents working together in sequence, parallel, or loops.") }</p>
+										<p class="text-xs text-muted-foreground mt-1.5 leading-relaxed max-w-[220px]">{ i18n.T(ctx, "Orchestrate multiple agents working together in sequence, parallel, or loops.") }</p>
+									</div>
+									<!-- Feature pills -->
+									<div class="relative flex flex-wrap gap-1 mt-1 justify-center">
+										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">Sequential</span>
+										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/50">Parallel</span>
+										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/50">Loops</span>
 									</div>
 								</button>
 							</div>
 							<button
 								type="button"
 								@click="showImportYamlView()"
-								class="text-sm font-medium text-primary hover:underline"
+								class="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors group"
 							>
-								{ i18n.T(ctx, "Import YAML") }
+								@icon.Upload(icon.Props{Class: "size-3.5 group-hover:-translate-y-0.5 transition-transform"})
+								{ i18n.T(ctx, "Import from YAML") }
 							</button>
 						</div>
 					</div>
@@ -994,35 +1042,45 @@ templ AgentDesignerDialog() {
 					<template x-if="testModeActive">
 						<!-- Outer wrapper: height animates between 280px and 40px -->
 						<div
-							class="shrink-0 flex flex-col border-t border-primary/20 overflow-hidden transition-all duration-200 ease-in-out"
+							class="shrink-0 flex flex-col border-t border-primary/20 overflow-hidden transition-all duration-300 ease-in-out"
 							:style="testPanelCollapsed ? 'height:40px' : 'height:280px'"
-							class="bg-background"
+							class="bg-gradient-to-t from-background to-background/95"
 						>
 							<!-- ── Panel header bar (always visible, 40px) ── -->
-							<div class="flex items-center gap-2 px-3 shrink-0 border-b border-border" style="height:40px;" class="bg-muted/50">
+							<div class="flex items-center gap-2 px-3 shrink-0 border-b border-border/50" style="height:40px;" class="bg-muted/30">
 								<!-- Play icon + label -->
-								<span class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-primary">
-									<svg xmlns="http://www.w3.org/2000/svg" class="size-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+								<span class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-amber-500">
+									<span class="size-4 rounded bg-amber-500/15 flex items-center justify-center">
+										<svg xmlns="http://www.w3.org/2000/svg" class="size-2.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+									</span>
 									Test Panel
 								</span>
 								<!-- Agent name badge -->
 								<span
-									class="text-[9px] px-1.5 py-0.5 rounded font-mono"
-									style="background:oklch(from var(--primary) l c h / 10%); color:var(--primary);"
+									class="text-[9px] px-2 py-0.5 rounded-md font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
 									x-text="editingPipeline?.name || editingAgent?.name || 'Agent'"
 								></span>
 								<!-- Thread indicator -->
 								<span
 									x-show="testPanelThreadId"
-									class="text-[8px] font-mono text-muted-foreground hidden sm:block"
-									x-text="'thread: ' + (testPanelThreadId ? testPanelThreadId.slice(0,8) + '…' : '')"
-								></span>
+									class="text-[8px] font-mono text-muted-foreground hidden sm:flex items-center gap-1"
+								>
+									@icon.Hash(icon.Props{Class: "size-2.5"})
+									<span x-text="'thread: ' + (testPanelThreadId ? testPanelThreadId.slice(0,8) + '…' : '')"></span>
+								</span>
 								<span class="flex-1"></span>
+								<!-- Streaming indicator -->
+								<template x-if="testPanelStreaming">
+									<span class="flex items-center gap-1.5 text-[9px] text-amber-500 font-medium">
+										<span class="size-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+										Streaming
+									</span>
+								</template>
 								<!-- Event log toggle -->
 								<button
 									@click="toggleTestEventLog()"
 									title="Toggle event log"
-									class="flex items-center justify-center w-6 h-6 rounded text-[10px] transition-colors hover:bg-muted"
+									class="flex items-center justify-center w-6 h-6 rounded text-[10px] transition-colors hover:bg-muted/60"
 									:class="testPanelShowEventLog ? 'text-primary' : 'text-muted-foreground'"
 								>
 									@icon.Terminal(icon.Props{Class: "size-3"})
@@ -1031,7 +1089,7 @@ templ AgentDesignerDialog() {
 								<button
 									@click="clearTestSession()"
 									title="Clear test session"
-									class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+									class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-muted-foreground hover:text-destructive hover:bg-muted/60 transition-colors"
 								>
 									@icon.Trash2(icon.Props{Class: "size-3"})
 								</button>
@@ -1039,7 +1097,7 @@ templ AgentDesignerDialog() {
 								<button
 									@click="toggleTestPanel()"
 									:title="testPanelCollapsed ? 'Expand test panel' : 'Collapse test panel'"
-									class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+									class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
 								>
 									<span class="transition-transform duration-200 inline-flex" :class="testPanelCollapsed ? '' : 'rotate-180'">
 										@icon.ChevronDown(icon.Props{Class: "size-3"})
@@ -1055,36 +1113,34 @@ templ AgentDesignerDialog() {
 
 									<!-- Empty state -->
 									<div class="flex-1 flex flex-col items-center justify-center py-8 gap-3 text-muted-foreground">
-										<svg xmlns="http://www.w3.org/2000/svg" class="size-8 opacity-40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-											<path d="M12 20h9"/>
-											<path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
-										</svg>
-										<span class="text-xs">Responses appear in workflow nodes</span>
+										<div class="size-10 rounded-xl bg-muted/40 flex items-center justify-center ring-1 ring-border/30">
+											@icon.MessageSquare(icon.Props{Class: "size-5 opacity-40"})
+										</div>
+										<span class="text-xs">Send a message to test the agent</span>
+										<span class="text-[10px] text-muted-foreground/60">Responses stream directly in the workflow nodes above</span>
 									</div>
 
 									<!-- ── Input bar ── -->
-									<div class="shrink-0 px-3 pb-2 pt-1.5 border-t border-border">
+									<div class="shrink-0 px-3 pb-2 pt-1.5 border-t border-border/50">
 										<div class="flex items-center gap-2">
 											<input
 												x-model="testPanelInput"
 												@keydown="handleTestKeydown($event)"
 												:disabled="testPanelStreaming"
 												placeholder="Message the agent... (Enter to send)"
-												class="flex-1 rounded px-2.5 py-1.5 text-xs bg-background text-foreground outline-none disabled:opacity-50 transition-colors border border-input"
-												@focus="$el.classList.add('border-primary', 'ring-1', 'ring-primary')"
-												@blur="$el.classList.remove('border-primary', 'ring-1', 'ring-primary')"
+												class="flex-1 rounded-lg px-3 py-2 text-xs bg-background text-foreground outline-none disabled:opacity-50 transition-all border border-input focus:border-primary/50 focus:ring-1 focus:ring-primary/30"
 											/>
 											<!-- Send / Stop button -->
 											<button
 												@click="testPanelStreaming ? abortTestMessage() : sendTestMessage()"
 												:disabled="!testPanelStreaming && !testPanelInput.trim()"
 												:title="testPanelStreaming ? 'Stop (Escape)' : 'Send (Enter)'"
-												class="flex items-center justify-center w-8 h-8 rounded-md transition-all hover:scale-105 active:scale-95"
-												:class="testPanelStreaming 
-													? 'bg-destructive/10 text-destructive hover:bg-destructive/20' 
-													: (testPanelInput.trim() 
-														? 'bg-primary text-primary-foreground hover:bg-primary/90' 
-														: 'bg-muted text-muted-foreground cursor-not-allowed opacity-50')"
+												class="flex items-center justify-center w-9 h-9 rounded-lg transition-all hover:scale-105 active:scale-95 disabled:hover:scale-100"
+												:class="testPanelStreaming
+													? 'bg-destructive/10 text-destructive hover:bg-destructive/20 ring-1 ring-destructive/30'
+													: (testPanelInput.trim()
+														? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm'
+														: 'bg-muted text-muted-foreground/40 cursor-not-allowed opacity-50')"
 											>
 												<template x-if="testPanelStreaming">
 													@icon.CircleStop(icon.Props{Class: "size-4"})
@@ -1210,18 +1266,41 @@ templ AgentDesignerDialog() {
 		<div class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
 			<template x-for="t in toasts" :key="t.id">
 				<div
-					class="pointer-events-auto max-w-xs px-4 py-2.5 rounded-lg shadow-lg text-xs font-medium transition-all duration-200 flex items-center gap-2"
+					class="pointer-events-auto max-w-xs px-4 py-3 rounded-xl shadow-lg text-xs font-medium transition-all duration-300 flex items-center gap-2.5 backdrop-blur-sm"
 					:class="{
-						'bg-emerald-600 text-white': t.type === 'success',
-						'bg-red-600 text-white': t.type === 'error',
-						'bg-sky-600 text-white': t.type === 'info',
-						'bg-amber-600 text-white': t.type === 'warning',
-						'opacity-0 translate-y-2': t.leaving,
-						'opacity-100 translate-y-0': !t.leaving,
+						'bg-emerald-600/95 text-white': t.type === 'success',
+						'bg-red-600/95 text-white': t.type === 'error',
+						'bg-sky-600/95 text-white': t.type === 'info',
+						'bg-amber-600/95 text-white': t.type === 'warning',
+						'opacity-0 translate-y-4 scale-95': t.leaving,
+						'opacity-100 translate-y-0 scale-100': !t.leaving,
 					}"
+					x-show="t.visible"
+					x-transition:enter="transition-all duration-300 ease-out"
+					x-transition:enter-start="opacity-0 translate-y-4 scale-95"
+					x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+					x-transition:leave="transition-all duration-200 ease-in"
+					x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+					x-transition:leave-end="opacity-0 translate-y-4 scale-95"
 				>
-					<span x-text="t.message"></span>
-					<button @click="dismissToast(t.id)" class="ml-1 opacity-70 hover:opacity-100 shrink-0">&times;</button>
+					<!-- Success icon -->
+					<template x-if="t.type === 'success'">
+						@icon.CircleCheck(icon.Props{Class: "size-4 shrink-0"})
+					</template>
+					<!-- Error icon -->
+					<template x-if="t.type === 'error'">
+						@icon.CircleX(icon.Props{Class: "size-4 shrink-0"})
+					</template>
+					<!-- Info icon -->
+					<template x-if="t.type === 'info'">
+						@icon.Info(icon.Props{Class: "size-4 shrink-0"})
+					</template>
+					<!-- Warning icon -->
+					<template x-if="t.type === 'warning'">
+						@icon.TriangleAlert(icon.Props{Class: "size-4 shrink-0"})
+					</template>
+					<span class="flex-1" x-text="t.message"></span>
+					<button @click="dismissToast(t.id)" class="opacity-70 hover:opacity-100 shrink-0 transition-opacity">&times;</button>
 				</div>
 			</template>
 		</div>
@@ -1231,80 +1310,97 @@ templ AgentDesignerDialog() {
 // agentNodeForm renders the form fields for creating/editing a single agent.
 templ agentNodeForm() {
 	<!-- Identity Section -->
-	<div class="space-y-3">
-		<div class="flex items-center gap-2 pb-1">
-			@icon.Bot(icon.Props{Class: "size-3.5 text-muted-foreground"})
-			<span class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{ i18n.T(ctx, "Identity") }</span>
+	<div class="rounded-xl border border-border bg-card overflow-hidden">
+		<div class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary/5 to-transparent border-b border-border/50">
+			<div class="size-6 rounded-md bg-primary/10 flex items-center justify-center">
+				@icon.Bot(icon.Props{Class: "size-3.5 text-primary"})
+			</div>
+			<span class="text-xs font-semibold text-foreground">{ i18n.T(ctx, "Identity") }</span>
+			<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Basic information about this agent") }</span>
 		</div>
-		<div class="space-y-1.5">
-			@label.Label(label.Props{Class: "text-xs"}) {
-				{ i18n.T(ctx, "Name") }
-				<span class="text-destructive">*</span>
-			}
-			@input.Input(input.Props{
-				Placeholder: i18n.T(ctx, "e.g., Writing Coach, Code Reviewer..."),
-				Class:       "h-8 text-sm",
-				Attributes: templ.Attributes{
-					"x-model":   "form.name",
-					"maxlength": "100",
-				},
-			})
-		</div>
-		<div class="space-y-1.5">
-			@label.Label(label.Props{Class: "text-xs"}) {
-				{ i18n.T(ctx, "Description") }
-			}
-			@input.Input(input.Props{
-				Placeholder: i18n.T(ctx, "Brief description of what this agent does..."),
-				Class:       "h-8 text-sm",
-				Attributes: templ.Attributes{
-					"x-model":   "form.description",
-					"maxlength": "500",
-				},
-			})
+		<div class="p-4 space-y-4">
+			<div class="space-y-1.5">
+				@label.Label(label.Props{Class: "text-xs"}) {
+					{ i18n.T(ctx, "Name") }
+					<span class="text-destructive">*</span>
+				}
+				@input.Input(input.Props{
+					Placeholder: i18n.T(ctx, "e.g., Writing Coach, Code Reviewer..."),
+					Class:       "h-9 text-sm",
+					Attributes: templ.Attributes{
+						"x-model":   "form.name",
+						"maxlength": "100",
+					},
+				})
+			</div>
+			<div class="space-y-1.5">
+				@label.Label(label.Props{Class: "text-xs"}) {
+					{ i18n.T(ctx, "Description") }
+				}
+				@input.Input(input.Props{
+					Placeholder: i18n.T(ctx, "Brief description of what this agent does..."),
+					Class:       "h-9 text-sm",
+					Attributes: templ.Attributes{
+						"x-model":   "form.description",
+						"maxlength": "500",
+					},
+				})
+			</div>
 		</div>
 	</div>
 	<!-- Instructions Section -->
-	<div class="space-y-3 pt-2 border-t border-border/50">
-		<div class="flex items-center gap-2 pb-1">
-			@icon.FileText(icon.Props{Class: "size-3.5 text-muted-foreground"})
-			<span class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{ i18n.T(ctx, "Instructions") }</span>
+	<div class="rounded-xl border border-border bg-card overflow-hidden">
+		<div class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500/5 to-transparent border-b border-border/50">
+			<div class="size-6 rounded-md bg-amber-500/10 flex items-center justify-center">
+				@icon.FileText(icon.Props{Class: "size-3.5 text-amber-600 dark:text-amber-400"})
+			</div>
+			<span class="text-xs font-semibold text-foreground">{ i18n.T(ctx, "Instructions") }</span>
+			<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Define the agent's behavior") }</span>
 		</div>
-		<div class="space-y-1.5">
+		<div class="p-4 space-y-3">
 			@textarea.Textarea(textarea.Props{
 				Placeholder: i18n.T(ctx, "Define this agent's role, expertise, and behavior..."),
-				Class:       "min-h-[120px] resize-y text-sm",
-				Rows:        5,
+				Class:       "min-h-[140px] resize-y text-sm leading-relaxed",
+				Rows:        6,
 				Attributes: templ.Attributes{
 					"x-model": "form.systemPrompt",
 				},
 			})
-			<p class="text-[10px] text-muted-foreground">
+			<p class="text-[10px] text-muted-foreground leading-relaxed">
+				@icon.Info(icon.Props{Class: "size-3 inline me-0.5"})
 				{ i18n.T(ctx, "Describe the agent's role, expertise, and behavior. Use {variable_name} to reference data from other agents in a workflow.") }
 			</p>
 		</div>
 	</div>
 	<!-- Multi-Agent Orchestration Section -->
-	<div class="border border-border rounded-lg">
+	<div class="rounded-xl border border-border bg-card overflow-hidden">
 		<button
 			type="button"
 			@click="showOrchestration = !showOrchestration"
-			class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
+			class="flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent/30 transition-colors"
+			:class="showOrchestration ? 'bg-gradient-to-r from-indigo-500/5 to-transparent border-b border-border/50' : ''"
 		>
 			<span class="flex items-center gap-2">
-				@icon.GitBranch(icon.Props{Class: "size-4 text-muted-foreground"})
+				<div class="size-6 rounded-md bg-indigo-500/10 flex items-center justify-center">
+					@icon.GitBranch(icon.Props{Class: "size-3.5 text-indigo-600 dark:text-indigo-400"})
+				</div>
 				{ i18n.T(ctx, "Advanced Settings") }
-				<span class="text-[10px] text-muted-foreground" x-text="orchestrationSummary"></span>
+				<template x-if="orchestrationSummary">
+					<span class="text-[10px] text-muted-foreground" x-text="orchestrationSummary"></span>
+				</template>
 			</span>
 			<span class="transition-transform duration-200" :class="showOrchestration ? 'rotate-180' : ''">
 				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
 			</span>
 		</button>
-		<div x-show="showOrchestration" x-collapse class="px-3 pb-3 border-t border-border pt-3 space-y-4">
-			<p class="text-[11px] text-muted-foreground">
-				{ i18n.T(ctx, "These settings control how this agent behaves when used as part of a multi-agent workflow.") }
-			</p>
-			@orchestrationFields()
+		<div x-show="showOrchestration" x-collapse>
+			<div class="p-4 space-y-5 border-t border-border/50">
+				<p class="text-xs text-muted-foreground leading-relaxed">
+					@icon.Info(icon.Props{Class: "size-3.5 inline me-1 text-indigo-500"})
+					{ i18n.T(ctx, "These settings control how this agent behaves when used as part of a multi-agent workflow.") }
+				</p>
+				@orchestrationFields()
+			</div>
 		</div>
 	</div>
 	<!-- Model Override -->
@@ -1484,17 +1580,20 @@ templ shortcutRow(label string, keys string) {
 // modelOverrideSection renders a collapsible panel for selecting a specific
 // provider + model for this agent, overriding the user's global AI settings.
 templ modelOverrideSection() {
-	<div class="border border-border rounded-lg">
+	<div class="rounded-xl border border-border bg-card overflow-hidden">
 		<button
 			type="button"
 			@click="showModelOverride = !showModelOverride"
-			class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
+			class="flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent/30 transition-colors"
+			:class="showModelOverride ? 'bg-gradient-to-r from-violet-500/5 to-transparent border-b border-border/50' : ''"
 		>
 			<span class="flex items-center gap-2">
-				@icon.Cpu(icon.Props{Class: "size-4 text-muted-foreground"})
+				<div class="size-6 rounded-md bg-violet-500/10 flex items-center justify-center">
+					@icon.Cpu(icon.Props{Class: "size-3.5 text-violet-600 dark:text-violet-400"})
+				</div>
 				{ i18n.T(ctx, "Model") }
 				<span
-					class="text-[10px] text-muted-foreground"
+					class="text-[10px] text-muted-foreground font-mono"
 					x-show="form.modelOverride.provider && form.modelOverride.modelName"
 					x-text="form.modelOverride.provider + ' / ' + form.modelOverride.modelName"
 				></span>
@@ -1503,64 +1602,72 @@ templ modelOverrideSection() {
 				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
 			</span>
 		</button>
-		<div x-show="showModelOverride" x-collapse class="px-3 pb-3 border-t border-border pt-3 space-y-3">
-			<p class="text-[11px] text-muted-foreground">
-				{ i18n.T(ctx, "Use a specific AI model for this agent instead of your default. The API key must be configured in Settings.") }
-			</p>
-			<!-- Provider -->
-			<div class="space-y-1.5">
-				<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Provider") }</span>
-				<select
-					class="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-					x-model="form.modelOverride.provider"
-					@change="form.modelOverride.modelName = ''; fetchModelsForProvider($event.target.value)"
+		<div x-show="showModelOverride" x-collapse>
+			<div class="p-4 space-y-4 border-t border-border/50">
+				<p class="text-xs text-muted-foreground leading-relaxed">
+					@icon.Info(icon.Props{Class: "size-3.5 inline me-1 text-violet-500"})
+					{ i18n.T(ctx, "Use a specific AI model for this agent instead of your default. The API key must be configured in Settings.") }
+				</p>
+				<!-- Provider -->
+				<div class="space-y-1.5">
+					<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Provider") }</span>
+					<select
+						class="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+						x-model="form.modelOverride.provider"
+						@change="form.modelOverride.modelName = ''; fetchModelsForProvider($event.target.value)"
+					>
+						<option value="">{ i18n.T(ctx, "— use global default —") }</option>
+						<option value="gemini">Gemini (Google)</option>
+						<option value="openai">OpenAI</option>
+						<option value="anthropic">Anthropic</option>
+					</select>
+				</div>
+				<!-- Model -->
+				<div class="space-y-1.5" x-show="form.modelOverride.provider">
+					<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Model") }</span>
+					<div x-show="providerModelsLoading" class="text-xs text-muted-foreground py-2">{ i18n.T(ctx, "Loading models…") }</div>
+					<div x-show="providerModelsError && !providerModelsLoading" class="text-xs text-destructive py-1" x-text="providerModelsError"></div>
+					<select
+						x-show="!providerModelsLoading"
+						class="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+						x-model="form.modelOverride.modelName"
+					>
+						<option value="">{ i18n.T(ctx, "— select a model —") }</option>
+						<template x-for="m in providerModelOptions" :key="m.id">
+							<option :value="m.id" x-text="m.displayName"></option>
+						</template>
+					</select>
+				</div>
+				<!-- Clear -->
+				<button
+					type="button"
+					x-show="form.modelOverride.provider || form.modelOverride.modelName"
+					@click="form.modelOverride = { provider: '', modelName: '' }; providerModelOptions = []; providerModelsError = ''"
+					class="text-xs text-muted-foreground hover:text-destructive transition-colors inline-flex items-center gap-1"
 				>
-					<option value="">{ i18n.T(ctx, "— use global default —") }</option>
-					<option value="gemini">Gemini (Google)</option>
-					<option value="openai">OpenAI</option>
-					<option value="anthropic">Anthropic</option>
-				</select>
+					@icon.X(icon.Props{Class: "size-3"})
+					{ i18n.T(ctx, "Clear override (use global default)") }
+				</button>
 			</div>
-			<!-- Model -->
-			<div class="space-y-1.5" x-show="form.modelOverride.provider">
-				<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Model") }</span>
-				<div x-show="providerModelsLoading" class="text-xs text-muted-foreground py-2">{ i18n.T(ctx, "Loading models…") }</div>
-				<div x-show="providerModelsError && !providerModelsLoading" class="text-xs text-destructive py-1" x-text="providerModelsError"></div>
-				<select
-					x-show="!providerModelsLoading"
-					class="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-					x-model="form.modelOverride.modelName"
-				>
-					<option value="">{ i18n.T(ctx, "— select a model —") }</option>
-					<template x-for="m in providerModelOptions" :key="m.id">
-						<option :value="m.id" x-text="m.displayName"></option>
-					</template>
-				</select>
-			</div>
-			<!-- Clear -->
-			<button
-				type="button"
-				x-show="form.modelOverride.provider || form.modelOverride.modelName"
-				@click="form.modelOverride = { provider: '', modelName: '' }; providerModelOptions = []; providerModelsError = ''"
-				class="text-[11px] text-muted-foreground hover:text-destructive transition-colors"
-			>
-				{ i18n.T(ctx, "Clear override (use global default)") }
-			</button>
 		</div>
 	</div>
 }
 
 // modelSettingsSection renders a collapsible panel for per-agent model generation overrides.
+// modelSettingsSection renders a collapsible panel for per-agent model generation override.
 // All fields are optional; when blank they fall back to the user's global AI settings.
 templ modelSettingsSection() {
-	<div class="border border-border rounded-lg">
+	<div class="rounded-xl border border-border bg-card overflow-hidden">
 		<button
 			type="button"
 			@click="showModelSettings = !showModelSettings"
-			class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
+			class="flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent/30 transition-colors"
+			:class="showModelSettings ? 'bg-gradient-to-r from-rose-500/5 to-transparent border-b border-border/50' : ''"
 		>
 			<span class="flex items-center gap-2">
-				@icon.SlidersHorizontal(icon.Props{Class: "size-4 text-muted-foreground"})
+				<div class="size-6 rounded-md bg-rose-500/10 flex items-center justify-center">
+					@icon.SlidersHorizontal(icon.Props{Class: "size-3.5 text-rose-600 dark:text-rose-400"})
+				</div>
 				{ i18n.T(ctx, "Generation Settings") }
 				<span class="text-[10px] text-muted-foreground" x-show="form.modelConfig.temperature !== null || form.modelConfig.topP !== null || form.modelConfig.topK !== null || form.modelConfig.maxOutputTokens !== null || form.modelConfig.stopSequences.length > 0">
 					{ i18n.T(ctx, "overrides set") }
@@ -1570,10 +1677,12 @@ templ modelSettingsSection() {
 				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
 			</span>
 		</button>
-		<div x-show="showModelSettings" x-collapse class="px-3 pb-3 border-t border-border pt-3 space-y-4">
-			<p class="text-[11px] text-muted-foreground">
-				{ i18n.T(ctx, "Fine-tune how this agent generates responses. Leave blank to use your defaults.") }
-			</p>
+		<div x-show="showModelSettings" x-collapse>
+			<div class="p-4 space-y-5 border-t border-border/50">
+				<p class="text-xs text-muted-foreground leading-relaxed">
+					@icon.Info(icon.Props{Class: "size-3.5 inline me-1 text-rose-500"})
+					{ i18n.T(ctx, "Fine-tune how this agent generates responses. Leave blank to use your defaults.") }
+				</p>
 			<!-- Temperature -->
 			<div class="space-y-1.5">
 				<div class="flex items-center justify-between">
@@ -1671,10 +1780,12 @@ templ modelSettingsSection() {
 			<button
 				type="button"
 				@click="form.modelConfig = { temperature: null, topP: null, topK: null, maxOutputTokens: null, stopSequences: [] }"
-				class="text-[11px] text-muted-foreground hover:text-destructive transition-colors"
+				class="text-xs text-muted-foreground hover:text-destructive transition-colors inline-flex items-center gap-1"
 			>
+				@icon.RotateCcw(icon.Props{Class: "size-3"})
 				{ i18n.T(ctx, "Reset to global defaults") }
 			</button>
+		</div>
 		</div>
 	</div>
 }

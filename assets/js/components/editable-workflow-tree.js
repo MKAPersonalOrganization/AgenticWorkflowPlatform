@@ -82,10 +82,10 @@ export const editableWorkflowTree = () => {
                 position: relative;
                 background-color: var(--background);
                 background-image:
-                    radial-gradient(circle, var(--border) 1px, transparent 1px);
-                background-size: 20px 20px;
+                    radial-gradient(circle, var(--border) 0.8px, transparent 0.8px);
+                background-size: 22px 22px;
                 min-height: 100%;
-                padding: 28px 24px 40px;
+                padding: 32px 28px 48px;
                 width: 100%;
                 box-sizing: border-box;
             }
@@ -130,29 +130,30 @@ export const editableWorkflowTree = () => {
             /* ── Node card ── */
             .ewt-node {
                 position: relative;
-                border-radius: 8px;
+                border-radius: 10px;
                 border: 1px solid var(--border);
                 background: var(--card);
-                background-image: linear-gradient(180deg, oklch(from var(--card) l c h / 0.5) 0%, var(--card) 100%);
-                padding: 10px 12px 10px 15px;
-                transition: border-color 0.12s, box-shadow 0.12s, transform 0.15s ease;
+                background-image: linear-gradient(180deg, oklch(from var(--card) l c h / 0.6) 0%, var(--card) 100%);
+                padding: 12px 14px 12px 16px;
+                transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
                 width: 100%;
                 overflow: hidden;
+                box-shadow: 0 1px 3px oklch(0 0 0 / 6%);
             }
             .ewt-node:hover {
-                border-color: var(--muted-foreground);
-                box-shadow: 0 2px 12px oklch(0 0 0 / 18%);
+                border-color: var(--ewt-color, var(--primary));
+                box-shadow: 0 4px 16px oklch(0 0 0 / 12%), 0 0 0 1px oklch(from var(--ewt-color, var(--primary)) l c h / 10%);
                 transform: translateY(-1px);
             }
             .ewt-node.selected {
                 border-color: var(--ewt-color, var(--primary));
                 box-shadow:
                     0 0 0 1px var(--ewt-color, var(--primary)),
-                    0 4px 16px oklch(from var(--primary) l c h / 15%);
+                    0 4px 20px oklch(from var(--primary) l c h / 20%);
             }
             .ewt-node.drop-target {
                 border-color: #22c55e;
-                box-shadow: 0 0 0 1px #22c55e, 0 0 8px rgba(34, 197, 94, 0.15);
+                box-shadow: 0 0 0 1px #22c55e, 0 0 12px rgba(34, 197, 94, 0.2);
             }
 
             /* ── Left accent bar ── */
@@ -160,11 +161,12 @@ export const editableWorkflowTree = () => {
                 content: '';
                 position: absolute;
                 left: 0;
-                top: 4px;
-                bottom: 4px;
+                top: 6px;
+                bottom: 6px;
                 width: 3px;
                 background: var(--ewt-color, var(--muted-foreground));
-                border-radius: 0 2px 2px 0;
+                border-radius: 0 3px 3px 0;
+                opacity: 0.8;
             }
 
             /* ── Type badge ── */
