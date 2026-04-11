@@ -102,8 +102,7 @@ export const agentDesigner = () => ({
     // UI state
     expanded: false,
     showSubAgents: false,
-    showModelSettings: false,
-    showModelOverride: false,
+    showModelConfig: false,
 
     // Sub-agent selection state
     subAgentDialogOpen: false,
@@ -916,8 +915,7 @@ export const agentDesigner = () => ({
         this.showKnowledgeBases = false;
         this.showFilesystems = false;
         this.showSubAgents = false;
-        this.showModelSettings = false;
-        this.showModelOverride = false;
+        this.showModelConfig = false;
         this.showRequirementsPanel = false;
         this.agentPlugins = [];
         this.agentWorkspaces = [];
@@ -960,8 +958,7 @@ export const agentDesigner = () => ({
         this.showKnowledgeBases = false;
         this.showFilesystems = false;
         this.showSubAgents = false;
-        this.showModelSettings = false;
-        this.showModelOverride = false;
+        this.showModelConfig = false;
         this.showRequirementsPanel = false;
         this.providerModelOptions = [];
         this.providerModelsError = '';

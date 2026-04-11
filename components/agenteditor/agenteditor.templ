@@ -1696,10 +1696,8 @@ templ agentNodeForm() {
 			</div>
 		</div>
 	</div>
-	<!-- Model Override -->
-	@modelOverrideSection()
-	<!-- Model Settings -->
-	@modelSettingsSection()
+	<!-- Model Configuration -->
+	@modelConfigurationSection()
 	<!-- Tools, KBs, Filesystems (edit mode only) -->
 	<template x-if="editingAgent">
 		<div class="space-y-4">
@@ -1752,215 +1750,203 @@ templ shortcutRow(label string, keys string) {
 	</div>
 }
 
-// modelOverrideSection renders a collapsible panel for selecting a specific
-// provider + model for this agent, overriding the user's global AI settings.
-templ modelOverrideSection() {
+// modelConfigurationSection renders a unified panel for per-agent model configuration.
+// It combines provider/model selection (AgentModelOverride) and generation parameters
+// (AgentModelConfig) into one cohesive section, matching the ADK-Go unified config pipeline.
+templ modelConfigurationSection() {
 	<div class="rounded-xl border border-border bg-card overflow-hidden">
 		<button
 			type="button"
-			@click="showModelOverride = !showModelOverride"
+			@click="showModelConfig = !showModelConfig"
 			class="flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent/30 transition-colors"
-			:class="showModelOverride ? 'bg-gradient-to-r from-violet-500/5 to-transparent border-b border-border/50' : ''"
+			:class="showModelConfig ? 'bg-gradient-to-r from-primary/5 to-transparent border-b border-border/50' : ''"
 		>
 			<span class="flex items-center gap-2">
-				<div class="size-6 rounded-md bg-violet-500/10 flex items-center justify-center">
-					@icon.Cpu(icon.Props{Class: "size-3.5 text-violet-600 dark:text-violet-400"})
+				<div class="size-6 rounded-md bg-primary/10 flex items-center justify-center">
+					@icon.Cpu(icon.Props{Class: "size-3.5 text-primary"})
 				</div>
-				{ i18n.T(ctx, "Model") }
+				{ i18n.T(ctx, "Model Configuration") }
 				<span
-					class="text-[10px] text-muted-foreground font-mono"
-					x-show="form.modelOverride.provider && form.modelOverride.modelName"
-					x-text="form.modelOverride.provider + ' / ' + form.modelOverride.modelName"
-				></span>
-			</span>
-			<span class="transition-transform duration-200" :class="showModelOverride ? 'rotate-180' : ''">
-				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
-			</span>
-		</button>
-		<div x-show="showModelOverride" x-collapse>
-			<div class="p-4 space-y-4 border-t border-border/50">
-				<p class="text-xs text-muted-foreground leading-relaxed">
-					@icon.Info(icon.Props{Class: "size-3.5 inline me-1 text-violet-500"})
-					{ i18n.T(ctx, "Use a specific AI model for this agent instead of your default. The API key must be configured in Settings.") }
-				</p>
-				<!-- Provider -->
-				<div class="space-y-1.5">
-					<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Provider") }</span>
-					<select
-						class="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-						x-model="form.modelOverride.provider"
-						@change="form.modelOverride.modelName = ''; fetchModelsForProvider($event.target.value)"
-					>
-						<option value="">{ i18n.T(ctx, "— use global default —") }</option>
-						<option value="gemini">Gemini (Google)</option>
-						<option value="openai">OpenAI</option>
-						<option value="anthropic">Anthropic</option>
-					</select>
-				</div>
-				<!-- Model -->
-				<div class="space-y-1.5" x-show="form.modelOverride.provider">
-					<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Model") }</span>
-					<div x-show="providerModelsLoading" class="text-xs text-muted-foreground py-2">{ i18n.T(ctx, "Loading models…") }</div>
-					<div x-show="providerModelsError && !providerModelsLoading" class="text-xs text-destructive py-1" x-text="providerModelsError"></div>
-					<select
-						x-show="!providerModelsLoading"
-						class="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-						x-model="form.modelOverride.modelName"
-					>
-						<option value="">{ i18n.T(ctx, "— select a model —") }</option>
-						<template x-for="m in providerModelOptions" :key="m.id">
-							<option :value="m.id" x-text="m.displayName"></option>
-						</template>
-					</select>
-				</div>
-				<!-- Clear -->
-				<button
-					type="button"
-					x-show="form.modelOverride.provider || form.modelOverride.modelName"
-					@click="form.modelOverride = { provider: '', modelName: '' }; providerModelOptions = []; providerModelsError = ''"
-					class="text-xs text-muted-foreground hover:text-destructive transition-colors inline-flex items-center gap-1"
+					class="text-[10px] text-muted-foreground"
+					x-show="(form.modelOverride.provider && form.modelOverride.modelName) || form.modelConfig.temperature !== null || form.modelConfig.topP !== null || form.modelConfig.topK !== null || form.modelConfig.maxOutputTokens !== null || form.modelConfig.stopSequences.length > 0"
 				>
-					@icon.X(icon.Props{Class: "size-3"})
-					{ i18n.T(ctx, "Clear override (use global default)") }
-				</button>
-			</div>
-		</div>
-	</div>
-}
-
-// modelSettingsSection renders a collapsible panel for per-agent model generation overrides.
-// modelSettingsSection renders a collapsible panel for per-agent model generation override.
-// All fields are optional; when blank they fall back to the user's global AI settings.
-templ modelSettingsSection() {
-	<div class="rounded-xl border border-border bg-card overflow-hidden">
-		<button
-			type="button"
-			@click="showModelSettings = !showModelSettings"
-			class="flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent/30 transition-colors"
-			:class="showModelSettings ? 'bg-gradient-to-r from-rose-500/5 to-transparent border-b border-border/50' : ''"
-		>
-			<span class="flex items-center gap-2">
-				<div class="size-6 rounded-md bg-rose-500/10 flex items-center justify-center">
-					@icon.SlidersHorizontal(icon.Props{Class: "size-3.5 text-rose-600 dark:text-rose-400"})
-				</div>
-				{ i18n.T(ctx, "Generation Settings") }
-				<span class="text-[10px] text-muted-foreground" x-show="form.modelConfig.temperature !== null || form.modelConfig.topP !== null || form.modelConfig.topK !== null || form.modelConfig.maxOutputTokens !== null || form.modelConfig.stopSequences.length > 0">
-					{ i18n.T(ctx, "overrides set") }
+					<template x-if="form.modelOverride.provider && form.modelOverride.modelName">
+						<span class="font-mono" x-text="' ' + form.modelOverride.provider + '/' + form.modelOverride.modelName"></span>
+					</template>
+					<template x-if="!form.modelOverride.provider || !form.modelOverride.modelName">
+						<span>{ i18n.T(ctx, "overrides set") }</span>
+					</template>
 				</span>
 			</span>
-			<span class="transition-transform duration-200" :class="showModelSettings ? 'rotate-180' : ''">
+			<span class="transition-transform duration-200" :class="showModelConfig ? 'rotate-180' : ''">
 				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
 			</span>
 		</button>
-		<div x-show="showModelSettings" x-collapse>
-			<div class="p-4 space-y-5 border-t border-border/50">
+		<div x-show="showModelConfig" x-collapse>
+			<div class="p-4 space-y-6 border-t border-border/50">
 				<p class="text-xs text-muted-foreground leading-relaxed">
-					@icon.Info(icon.Props{Class: "size-3.5 inline me-1 text-rose-500"})
-					{ i18n.T(ctx, "Fine-tune how this agent generates responses. Leave blank to use your defaults.") }
+					@icon.Info(icon.Props{Class: "size-3.5 inline me-1 text-primary"})
+					{ i18n.T(ctx, "Choose a specific AI model and fine-tune generation parameters for this agent. Leave blank to use your global defaults.") }
 				</p>
-			<!-- Temperature -->
-			<div class="space-y-1.5">
-				<div class="flex items-center justify-between">
-					<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Temperature") }</span>
-					<span class="text-[11px] text-muted-foreground font-mono" x-text="form.modelConfig.temperature !== null && form.modelConfig.temperature !== '' ? form.modelConfig.temperature : '—'"></span>
+
+				<!-- ═══ Model Selection ═══ -->
+				<div class="space-y-3">
+					<h4 class="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold flex items-center gap-1.5">
+						@icon.Layers(icon.Props{Class: "size-3"})
+						{ i18n.T(ctx, "Model") }
+					</h4>
+					<!-- Provider -->
+					<div class="space-y-1.5">
+						<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Provider") }</span>
+						<select
+							class="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+							x-model="form.modelOverride.provider"
+							@change="form.modelOverride.modelName = ''; fetchModelsForProvider($event.target.value)"
+						>
+							<option value="">{ i18n.T(ctx, "— use global default —") }</option>
+							<option value="gemini">Gemini (Google)</option>
+							<option value="openai">OpenAI</option>
+							<option value="anthropic">Anthropic</option>
+						</select>
+					</div>
+					<!-- Model -->
+					<div class="space-y-1.5" x-show="form.modelOverride.provider">
+						<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Model") }</span>
+						<div x-show="providerModelsLoading" class="text-xs text-muted-foreground py-2">{ i18n.T(ctx, "Loading models…") }</div>
+						<div x-show="providerModelsError && !providerModelsLoading" class="text-xs text-destructive py-1" x-text="providerModelsError"></div>
+						<select
+							x-show="!providerModelsLoading"
+							class="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+							x-model="form.modelOverride.modelName"
+						>
+							<option value="">{ i18n.T(ctx, "— select a model —") }</option>
+							<template x-for="m in providerModelOptions" :key="m.id">
+								<option :value="m.id" x-text="m.displayName"></option>
+							</template>
+						</select>
+					</div>
+					<!-- Clear -->
+					<button
+						type="button"
+						x-show="form.modelOverride.provider || form.modelOverride.modelName"
+						@click="form.modelOverride = { provider: '', modelName: '' }; providerModelOptions = []; providerModelsError = ''"
+						class="text-xs text-muted-foreground hover:text-destructive transition-colors inline-flex items-center gap-1"
+					>
+						@icon.X(icon.Props{Class: "size-3"})
+						{ i18n.T(ctx, "Clear override") }
+					</button>
 				</div>
-				<input
-					type="range"
-					min="0"
-					max="2"
-					step="0.05"
-					class="w-full accent-primary"
-					x-model.number="form.modelConfig.temperature"
-				/>
-				<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Lower values give more focused responses, higher values give more creative ones.") }</p>
-			</div>
-			<!-- Max Output Tokens -->
-			<div class="space-y-1.5">
-				<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Max Output Tokens") }</span>
-				@input.Input(input.Props{
-					Type:        "number",
-					Placeholder: i18n.T(ctx, "e.g. 4096 (blank = global default)"),
-					Attributes: templ.Attributes{
-						"x-model.number": "form.modelConfig.maxOutputTokens",
-						"min":            "1",
-						"max":            "65536",
-					},
-				})
-				<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Maximum length of the agent's response (1–65,536 tokens).") }</p>
-			</div>
-			<!-- Advanced: TopP / TopK -->
-			<details class="group">
-				<summary class="text-[11px] text-muted-foreground cursor-pointer select-none list-none flex items-center gap-1 hover:text-foreground transition-colors">
-					<span class="transition-transform group-open:rotate-90">▶</span>
-					{ i18n.T(ctx, "Advanced sampling (TopP / TopK)") }
-				</summary>
-				<div class="mt-3 space-y-3">
-					<!-- TopP -->
+
+				<!-- ═══ Generation Parameters ═══ -->
+				<div class="space-y-4 pt-4 border-t border-border/50">
+					<h4 class="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold flex items-center gap-1.5">
+						@icon.SlidersHorizontal(icon.Props{Class: "size-3"})
+						{ i18n.T(ctx, "Generation Parameters") }
+					</h4>
+					<!-- Temperature -->
 					<div class="space-y-1.5">
 						<div class="flex items-center justify-between">
-							<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Top-P (nucleus sampling)") }</span>
-							<span class="text-[11px] text-muted-foreground font-mono" x-text="form.modelConfig.topP !== null && form.modelConfig.topP !== '' ? form.modelConfig.topP : '—'"></span>
+							<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Temperature") }</span>
+							<span class="text-[11px] text-muted-foreground font-mono" x-text="form.modelConfig.temperature !== null && form.modelConfig.temperature !== '' ? form.modelConfig.temperature : '—'"></span>
 						</div>
 						<input
 							type="range"
 							min="0"
-							max="1"
-							step="0.01"
+							max="2"
+							step="0.05"
 							class="w-full accent-primary"
-							x-model.number="form.modelConfig.topP"
+							x-model.number="form.modelConfig.temperature"
 						/>
-						<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Controls diversity. 0.9 means the model considers the top 90% most likely words.") }</p>
+						<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Lower = focused, higher = creative.") }</p>
 					</div>
-					<!-- TopK -->
+					<!-- Max Output Tokens -->
 					<div class="space-y-1.5">
-						<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Top-K") }</span>
+						<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Max Output Tokens") }</span>
 						@input.Input(input.Props{
 							Type:        "number",
-							Placeholder: i18n.T(ctx, "e.g. 40 (blank = model default)"),
+							Placeholder: i18n.T(ctx, "e.g. 4096 (blank = global default)"),
 							Attributes: templ.Attributes{
-								"x-model.number": "form.modelConfig.topK",
+								"x-model.number": "form.modelConfig.maxOutputTokens",
 								"min":            "1",
+								"max":            "65536",
 							},
 						})
-						<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Limits the model to choosing from the top K most likely words.") }</p>
+						<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Maximum response length (1–65,536 tokens).") }</p>
 					</div>
+					<!-- Advanced: TopP / TopK -->
+					<details class="group">
+						<summary class="text-[11px] text-muted-foreground cursor-pointer select-none list-none flex items-center gap-1 hover:text-foreground transition-colors">
+							<span class="transition-transform group-open:rotate-90">▶</span>
+							{ i18n.T(ctx, "Advanced sampling (TopP / TopK)") }
+						</summary>
+						<div class="mt-3 space-y-3">
+							<!-- TopP -->
+							<div class="space-y-1.5">
+								<div class="flex items-center justify-between">
+									<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Top-P (nucleus sampling)") }</span>
+									<span class="text-[11px] text-muted-foreground font-mono" x-text="form.modelConfig.topP !== null && form.modelConfig.topP !== '' ? form.modelConfig.topP : '—'"></span>
+								</div>
+								<input
+									type="range"
+									min="0"
+									max="1"
+									step="0.01"
+									class="w-full accent-primary"
+									x-model.number="form.modelConfig.topP"
+								/>
+								<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Controls diversity. 0.9 = top 90% most likely words.") }</p>
+							</div>
+							<!-- TopK -->
+							<div class="space-y-1.5">
+								<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Top-K") }</span>
+								@input.Input(input.Props{
+									Type:        "number",
+									Placeholder: i18n.T(ctx, "e.g. 40 (blank = model default)"),
+									Attributes: templ.Attributes{
+										"x-model.number": "form.modelConfig.topK",
+										"min":            "1",
+									},
+								})
+								<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Limits the model to the top K most likely words.") }</p>
+							</div>
+						</div>
+					</details>
+					<!-- Stop Sequences -->
+					<div class="space-y-1.5">
+						<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Stop Sequences") }</span>
+						<div class="flex flex-wrap gap-1 min-h-7 p-1.5 rounded-md border border-input bg-background">
+							<template x-for="(seq, idx) in form.modelConfig.stopSequences" :key="idx">
+								<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-[11px] font-mono">
+									<span x-text="seq"></span>
+									<button type="button" @click="form.modelConfig.stopSequences.splice(idx, 1)" class="text-muted-foreground hover:text-foreground leading-none">&times;</button>
+								</span>
+							</template>
+							<input
+								type="text"
+								class="flex-1 min-w-[120px] bg-transparent text-[11px] font-mono outline-none placeholder:text-muted-foreground"
+								placeholder={ i18n.T(ctx, "Type and press Enter…") }
+								@keydown.enter.prevent="
+									const v = $event.target.value.trim();
+									if (v && !form.modelConfig.stopSequences.includes(v)) {
+										form.modelConfig.stopSequences.push(v);
+									}
+									$event.target.value = '';
+								"
+							/>
+						</div>
+						<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Stops generation on any of these strings. Enter to add.") }</p>
+					</div>
+					<!-- Reset button -->
+					<button
+						type="button"
+						@click="form.modelConfig = { temperature: null, topP: null, topK: null, maxOutputTokens: null, stopSequences: [] }"
+						class="text-xs text-muted-foreground hover:text-destructive transition-colors inline-flex items-center gap-1"
+					>
+						@icon.RotateCcw(icon.Props{Class: "size-3"})
+						{ i18n.T(ctx, "Reset all to global defaults") }
+					</button>
 				</div>
-			</details>
-			<!-- Stop Sequences -->
-			<div class="space-y-1.5">
-				<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Stop Sequences") }</span>
-				<div class="flex flex-wrap gap-1 min-h-7 p-1.5 rounded-md border border-input bg-background">
-					<template x-for="(seq, idx) in form.modelConfig.stopSequences" :key="idx">
-						<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-[11px] font-mono">
-							<span x-text="seq"></span>
-							<button type="button" @click="form.modelConfig.stopSequences.splice(idx, 1)" class="text-muted-foreground hover:text-foreground leading-none">&times;</button>
-						</span>
-					</template>
-					<input
-						type="text"
-						class="flex-1 min-w-[120px] bg-transparent text-[11px] font-mono outline-none placeholder:text-muted-foreground"
-						placeholder={ i18n.T(ctx, "Type and press Enter…") }
-						@keydown.enter.prevent="
-							const v = $event.target.value.trim();
-							if (v && !form.modelConfig.stopSequences.includes(v)) {
-								form.modelConfig.stopSequences.push(v);
-							}
-							$event.target.value = '';
-						"
-					/>
-				</div>
-				<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "The agent will stop generating when it encounters any of these strings. Press Enter to add.") }</p>
 			</div>
-			<!-- Reset button -->
-			<button
-				type="button"
-				@click="form.modelConfig = { temperature: null, topP: null, topK: null, maxOutputTokens: null, stopSequences: [] }"
-				class="text-xs text-muted-foreground hover:text-destructive transition-colors inline-flex items-center gap-1"
-			>
-				@icon.RotateCcw(icon.Props{Class: "size-3"})
-				{ i18n.T(ctx, "Reset to global defaults") }
-			</button>
-		</div>
 		</div>
 	</div>
 }
