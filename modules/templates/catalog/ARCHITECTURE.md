@@ -24,6 +24,7 @@ Each entry in the catalog demonstrates a specific set of ADK-Go workflow feature
 | Academic Research | ✓ | | | | ✓ | |
 | Marketing Agency | ✓ | | | | ✓ | |
 | Short Movie Agent | ✓ | | | | ✓ | |
+| Context Control | | | | | ✓ | |
 | Customer Support Triage | ✓ | | | | | |
 
 ---
@@ -617,7 +618,39 @@ flowchart TD
 
 ---
 
-## 17. Customer Support Triage
+## 17. Context Control
+
+**Source:** ADK Python — `deep-search` (report_composer)
+
+**What it demonstrates:** An agent with `include_contents="none"` receives no conversation history — it operates only on explicitly injected state via `{variable}` placeholders. This isolates the agent from irrelevant prior context, reduces token cost, prevents hallucination from stale conversation history, and forces deterministic behaviour based solely on provided data.
+
+```mermaid
+flowchart LR
+    User([Topic]) --> P["PlannerAgent\noutput_key: research_plan"]
+    P --> R["ResearcherAgent\noutput_key: findings"]
+    R --> C["ComposerAgent\ninclude_contents='none'\nreads {research_plan}\nand {findings}\noutput_key: final_report"]
+    H[(Conversation History)] -.->|BLOCKED| C
+    C --> Out([Final Report])
+```
+
+**Key state variables**
+
+| Key | Written by | Read by |
+|---|---|---|
+| `research_plan` | PlannerAgent | ResearcherAgent, ComposerAgent |
+| `findings` | ResearcherAgent | ComposerAgent |
+| `final_report` | ComposerAgent | — |
+
+**ADK features used**
+- `include_contents: none` — ComposerAgent receives NO conversation history
+- `{variable}` injection — all context is explicitly provided via state keys
+- **Cost efficiency** — no need to send long conversation history to the LLM
+- **Focus** — agent works only with explicitly provided data
+- **Determinism** — reduces hallucination from irrelevant conversation context
+
+---
+
+## 18. Customer Support Triage
 
 **Source:** ADK samples — `workflow-concurrent_research_writer` (conditional routing simplified)
 

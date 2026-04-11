@@ -1,0 +1,92 @@
+name: Context Control
+slug: context-control
+description: "Agent with include_contents='none' from ADK Python samples (deep-search report_composer): the agent receives no conversation history, operating only on explicit state injection via {variable}. Demonstrates how to isolate an agent from prior context to reduce cost, improve focus, and prevent hallucination from irrelevant conversation history."
+system_prompt: "Compose a report using only the injected data — ignore all prior conversation."
+category: Examples
+tags: [include-contents, context-isolation, state-injection, adk-sample]
+author_name: ADK
+icon: eye-off
+featured: true
+
+# Workflow: sequential(planner → researcher → composer[include_contents=none])
+workflow:
+  id: root
+  type: sequential
+  children:
+    - id: n1
+      type: agent
+      agent_id: sub-planner
+      output_key: research_plan
+    - id: n2
+      type: agent
+      agent_id: sub-researcher
+      output_key: findings
+    - id: n3
+      type: agent
+      agent_id: sub-composer
+      include_contents: none
+      output_key: final_report
+
+sub_agents:
+  - id: sub-planner
+    name: PlannerAgent
+    description: Creates a structured research plan with key questions and methodology.
+    icon: target
+    system_prompt: |
+      ## Role: Research Planner
+
+      ## Objective
+      Create a research plan for the user's topic.
+
+      ## Instructions
+      1. Understand the user's topic or question.
+      2. Create a plan with 3-5 key research questions.
+      3. Define the methodology for answering each question.
+      4. Output a structured plan.
+
+      Format:
+      - **Topic:** [description]
+      - **Research Questions:** [numbered list]
+      - **Methodology:** [brief approach for each]
+
+  - id: sub-researcher
+    name: ResearcherAgent
+    description: Conducts research based on the plan and produces structured findings.
+    icon: search
+    system_prompt: |
+      ## Role: Researcher
+
+      ## Objective
+      Execute the research plan and produce structured findings.
+
+      ## Instructions
+      1. Read the research plan: {research_plan}
+      2. For each research question, produce detailed findings.
+      3. Use your knowledge to answer each question thoroughly.
+      4. Output structured findings with evidence and analysis.
+
+  - id: sub-composer
+    name: ComposerAgent
+    description: Composes the final report using ONLY injected state variables ({research_plan}, {findings}). No conversation history is provided (include_contents=none).
+    icon: file-text
+    system_prompt: |
+      ## Role: Report Composer
+
+      ## Important: You have no conversation history. All context is provided below.
+
+      ## Objective
+      Compose a polished final report using ONLY the explicitly provided data.
+
+      ## Input Data
+      Research Plan:
+      {research_plan}
+
+      Research Findings:
+      {findings}
+
+      ## Instructions
+      1. Synthesise the findings into a coherent report.
+      2. Follow the structure defined in the research plan.
+      3. Use clear, professional language.
+      4. Include an executive summary, main body, and conclusion.
+      5. Do NOT reference anything outside the provided data.

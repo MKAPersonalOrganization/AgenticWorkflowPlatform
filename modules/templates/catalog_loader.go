@@ -35,6 +35,7 @@ type yamlWorkflowNode struct {
 	Type           string             `yaml:"type"` // agent | sequential | parallel | loop | conditional
 	AgentID        string             `yaml:"agent_id,omitempty"`
 	OutputKey      string             `yaml:"output_key,omitempty"`
+	IncludeContents string            `yaml:"include_contents,omitempty"`
 	MaxIterations  int                `yaml:"max_iterations,omitempty"`
 	AllowEarlyExit bool               `yaml:"allow_early_exit,omitempty"`
 	Condition      string             `yaml:"condition,omitempty"` // for conditional routing branches
@@ -149,6 +150,9 @@ func (n *yamlWorkflowNode) toMap() map[string]interface{} {
 	}
 	if n.OutputKey != "" {
 		m["output_key"] = n.OutputKey
+	}
+	if n.IncludeContents != "" {
+		m["include_contents"] = n.IncludeContents
 	}
 	if n.MaxIterations > 0 {
 		m["max_iterations"] = n.MaxIterations
