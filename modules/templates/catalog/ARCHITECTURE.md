@@ -8,7 +8,7 @@ Each entry in the catalog demonstrates a specific set of ADK-Go workflow feature
 
 | Agent | Sequential | Parallel | Loop | allow\_early\_exit | State Injection | Nested Workflows |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
-| City Time Report | ✓ | | | | ✓ | |
+| Sequential Workflow | ✓ | | | | ✓ | |
 | LLM Auditor | ✓ | | | | | |
 | Podcast Transcript | ✓ | | | | ✓ | |
 | Parallel Broadcast | ✓ | ✓ | | | ✓ | ✓ |
@@ -18,10 +18,11 @@ Each entry in the catalog demonstrates a specific set of ADK-Go workflow feature
 | Academic Research | ✓ | | | | ✓ | |
 | Marketing Agency | ✓ | | | | ✓ | |
 | Short Movie Agent | ✓ | | | | ✓ | |
+| Customer Support Triage | ✓ | | | | | |
 
 ---
 
-## 1. City Time Report
+## 1. Sequential Workflow
 
 **Source:** ADK Python — `workflows-sequential`
 

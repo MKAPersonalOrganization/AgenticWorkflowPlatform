@@ -1,5 +1,5 @@
-name: City Time Report
-slug: city-time-report
+name: Sequential Workflow
+slug: sequential-workflow
 description: "Minimal sequential workflow from ADK Python samples (workflows-sequential): city_generator_agent picks a random city and stores it as {city}, then city_report_agent writes a friendly sentence reporting the current local time there. Demonstrates the simplest possible sequential state-passing pattern."
 system_prompt: "Pick a random city and report what time it is there right now."
 category: Examples
