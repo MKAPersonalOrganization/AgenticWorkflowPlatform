@@ -10,7 +10,6 @@ Each entry in the catalog demonstrates a specific set of ADK-Go workflow feature
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 | Sequential Workflow | ✓ | | | | ✓ | |
 | Implicit State | ✓ | | | | | |
-| Podcast Transcript | ✓ | | | | ✓ | |
 | Parallel Workflow | ✓ | ✓ | | | ✓ | |
 | Sequential Inside Parallel | ✓ | ✓ | | | ✓ | ✓ |
 | Parallel Inside Sequential | ✓ | ✓ | | | ✓ | |
@@ -18,16 +17,9 @@ Each entry in the catalog demonstrates a specific set of ADK-Go workflow feature
 | Loop with Exit | | | ✓ | ✓ | ✓ | |
 | Sequential Inside Loop | | ✓ | ✓ | ✓ | ✓ | |
 | Parallel Inside Loop Inside Sequential | ✓ | ✓ | ✓ | | ✓ | ✓ |
-| Story Teller | ✓ | ✓ | ✓ | | ✓ | ✓ |
-| Blog Writer | ✓ | | ✓ | ✓ | ✓ | |
-| Iterative Deep Research | ✓ | | ✓ | ✓ | ✓ | |
-| Academic Research | ✓ | | | | ✓ | |
-| Marketing Agency | ✓ | | | | ✓ | |
-| Short Movie Agent | ✓ | | | | ✓ | |
 | Context Control | | | | | ✓ | |
 | Output Schema | | | | | ✓ | |
 | Agent Isolation | | | | | | |
-| Customer Support Triage | ✓ | | | | | |
 
 ---
 
@@ -78,35 +70,7 @@ flowchart TD
 
 ---
 
-## 3. Podcast Transcript Generator
-
-**Source:** ADK Python — `podcast_transcript_agent`
-
-**What it demonstrates:** A three-stage sequential pipeline with explicit `output_key` handoffs. Each agent reads the previous agent's output via named state injection, building up structured data across three steps.
-
-```mermaid
-flowchart TD
-    User([Content or Research Paper]) --> A["PodcastTopicsAgent\nExtracts main topic +\n5 subtopics as JSON"]
-    A -->|"output_key: podcast_topics"| B["PodcastEpisodePlannerAgent\nCreates 5-segment episode outline\nreads {podcast_topics}"]
-    B -->|"output_key: podcast_episode_plan"| C["PodcastTranscriptWriterAgent\nWrites full Host / Expert script\nreads {podcast_episode_plan}\nand {podcast_topics}"]
-    C --> Out([Complete podcast script])
-```
-
-**Key state variables**
-
-| Key | Written by | Read by |
-|---|---|---|
-| `podcast_topics` | PodcastTopicsAgent | PodcastEpisodePlannerAgent, PodcastTranscriptWriterAgent |
-| `podcast_episode_plan` | PodcastEpisodePlannerAgent | PodcastTranscriptWriterAgent |
-
-**ADK features used**
-- `type: sequential` workflow node
-- Multiple `output_key` declarations — each agent publishes a named result
-- `{variable}` injection referencing keys from **earlier, non-adjacent** agents (transcript reads both `podcast_topics` and `podcast_episode_plan`)
-
----
-
-## 4. Parallel Workflow
+## 3. Parallel Workflow
 
 **Source:** ADK Python — `parallel_task_decomposition_execution`
 
@@ -146,7 +110,7 @@ flowchart TD
 
 ---
 
-## 5. Sequential Inside Parallel
+## 4. Sequential Inside Parallel
 
 **Source:** ADK Python — `parallel_task_decomposition_execution`
 
@@ -196,7 +160,7 @@ flowchart TD
 
 ---
 
-## 6. Parallel Inside Sequential
+## 5. Parallel Inside Sequential
 
 **Source:** ADK samples — `claim-adjudication-agent`, `nexshift-agent` (simplified)
 
@@ -239,7 +203,7 @@ flowchart TD
 
 ---
 
-## 7. Loop Workflow
+## 6. Loop Workflow
 
 **Source:** ADK samples — `story_teller` (simplified)
 
@@ -273,7 +237,7 @@ flowchart TD
 
 ---
 
-## 8. Loop with Exit
+## 7. Loop with Exit
 
 **Source:** ADK samples — `blog-writer`, `iterative-deep-research` (simplified)
 
@@ -306,7 +270,7 @@ flowchart TD
 
 ---
 
-## 9. Sequential Inside Loop
+## 8. Sequential Inside Loop
 
 **Source:** ADK Python — `image-scoring`, `on-brand-genmedia` (simplified)
 
@@ -355,7 +319,7 @@ flowchart TD
 
 ---
 
-## 10. Parallel Inside Loop Inside Sequential
+## 9. Parallel Inside Loop Inside Sequential
 
 **Source:** ADK Python — `story_teller` (simplified)
 
@@ -399,228 +363,7 @@ flowchart TD
 
 ---
 
-## 11. Story Teller
-
-**Source:** ADK Python — `story_teller`
-
-**What it demonstrates:** The most deeply nested workflow in the catalog. A sequential root contains a loop whose body is itself a sequential containing a parallel. Shows how state written by the outermost agents (`enhanced_prompt`) is readable deep inside a nested loop-parallel structure, and how `{variable?}` handles the first-iteration case before state is initialised.
-
-```mermaid
-flowchart TD
-    User([Story Idea]) --> PE["PromptEnhancerAgent\nExpands idea into rich premise\noutput_key: enhanced_prompt\ninit current_story = Chapter 1"]
-
-    PE --> LOOP
-
-    subgraph LOOP [Loop — 3 iterations, fixed]
-        direction TB
-        subgraph SEQ [Sequential per iteration]
-            direction TB
-            subgraph PAR [Parallel — both writers run concurrently]
-                CW["CreativeStoryTellerAgent\nreads {enhanced_prompt?} {current_story?}\noutput_key: creative_chapter_candidate"]
-                FW["FocusedStoryTellerAgent\nreads {enhanced_prompt?} {current_story?}\noutput_key: focused_chapter_candidate"]
-            end
-            PAR --> CR["CritiqueAgent\npicks best chapter, appends to story\noutput_key: current_story"]
-        end
-    end
-
-    LOOP -->|after 3 chapters| ED["EditorAgent\npolishes final draft\nreads {current_story}\noutput_key: final_story"]
-    ED --> Out([Polished multi-chapter story])
-```
-
-**Key state variables**
-
-| Key | Written by | Read by |
-|---|---|---|
-| `enhanced_prompt` | PromptEnhancerAgent | CreativeWriter, FocusedWriter, CritiqueAgent |
-| `current_story` | PromptEnhancerAgent (init) then CritiqueAgent (each iteration) | CreativeWriter, FocusedWriter, CritiqueAgent, EditorAgent |
-| `creative_chapter_candidate` | CreativeStoryTellerAgent | CritiqueAgent |
-| `focused_chapter_candidate` | FocusedStoryTellerAgent | CritiqueAgent |
-| `final_story` | EditorAgent | — |
-
-**ADK features used**
-- `type: loop` with fixed `max_iterations: 3` and `allow_early_exit: false`
-- `type: parallel` nested inside `type: sequential` nested inside `type: loop`
-- `{variable?}` optional injection — iteration 1 runs before `current_story` is populated by `CritiqueAgent`; the `?` suffix returns an empty string instead of erroring
-- State **accumulation** across loop iterations — `current_story` grows with each chapter
-
----
-
-## 12. Blog Writer
-
-**Source:** ADK Python — `blog-writer`
-
-**What it demonstrates:** Two back-to-back `allow_early_exit` loops, each containing a worker agent followed by a validation agent. The validator checks whether the expected state key was populated and calls `exit_loop` if it was, skipping remaining iterations. Shows the "retry-until-success" pattern without hard-coding a fixed iteration count.
-
-```mermaid
-flowchart TD
-    User([Blog Topic]) --> PL
-
-    subgraph PL [Planning Loop — max 3, allow_early_exit]
-        BP["BlogPlannerAgent\nWrites outline\noutput_key: blog_outline"] --> OC["OutlineValidationChecker\nchecks blog_outline key\ncalls exit_loop if present"]
-        OC -->|blog_outline missing — retry| BP
-    end
-
-    PL -->|blog_outline exists — exit_loop called| WL
-
-    subgraph WL [Writing Loop — max 3, allow_early_exit]
-        BW["BlogWriterAgent\nWrites full article\noutput_key: blog_post"] --> PC["BlogPostValidationChecker\nchecks blog_post key\ncalls exit_loop if present"]
-        PC -->|blog_post missing — retry| BW
-    end
-
-    WL -->|"blog_post exists — exit_loop called"| BE["BlogEditorAgent\nPolishes the article\nreads {blog_post}"]
-    BE --> SM["SocialMediaWriterAgent\nTwitter + LinkedIn posts\nreads {blog_post}"]
-    SM --> Out([Blog post + social media posts])
-```
-
-**Key state variables**
-
-| Key | Written by | Read by |
-|---|---|---|
-| `blog_outline` | BlogPlannerAgent | BlogWriterAgent, OutlineValidationChecker |
-| `blog_post` | BlogWriterAgent | BlogEditorAgent, SocialMediaWriterAgent, BlogPostValidationChecker |
-| `social_media_posts` | SocialMediaWriterAgent | — |
-
-**ADK features used**
-- `allow_early_exit: true` — the last agent in the loop body receives the `exit_loop` tool
-- Validation agent pattern — a lightweight agent that inspects state and calls `exit_loop` when ready
-- Two independent loops in the same sequential workflow
-
----
-
-## 13. Iterative Deep Research
-
-**Source:** ADK samples — `iterative-deep-research`
-
-**What it demonstrates:** A single `allow_early_exit` loop where the last agent in the loop body grades research quality. If it passes, it calls `exit_loop` and the workflow advances to the report composer. If it fails, it provides gap-filling feedback and the loop re-runs. Shows iterative refinement driven by LLM judgement rather than a fixed counter.
-
-```mermaid
-flowchart TD
-    User([Research Topic]) --> PG["PlanGenerator\n5 action-oriented research goals\noutput_key: research_plan"]
-    PG --> SP["SectionPlanner\n4-6 section report outline\noutput_key: research_outline"]
-    SP --> SR["SectionResearcher\nInitial comprehensive pass\noutput_key: research_findings"]
-
-    SR --> LOOP
-
-    subgraph LOOP [Refinement Loop — max 3, allow_early_exit]
-        ES["EnhancedSearchExecutor\nFills identified gaps\nreads {research_evaluation?}\noutput_key: research_findings"] --> RE["ResearchEvaluator\nGrades: pass or fail\npass → calls exit_loop\nfail → provides gap list\noutput_key: research_evaluation"]
-        RE -->|fail — loop continues| ES
-    end
-
-    LOOP -->|pass — exit_loop called| RC["ReportComposer\nWrites polished report\nreads {research_findings}\noutput_key: final_report"]
-    RC --> Out([Final research report])
-```
-
-**Key state variables**
-
-| Key | Written by | Read by |
-|---|---|---|
-| `research_plan` | PlanGenerator | SectionPlanner, SectionResearcher |
-| `research_outline` | SectionPlanner | SectionResearcher |
-| `research_findings` | SectionResearcher, EnhancedSearchExecutor | EnhancedSearchExecutor, ResearchEvaluator, ReportComposer |
-| `research_evaluation` | ResearchEvaluator | EnhancedSearchExecutor |
-| `final_report` | ReportComposer | — |
-
-**ADK features used**
-- `allow_early_exit: true` — `ResearchEvaluator` (last agent in loop body) receives the `exit_loop` tool
-- **LLM-driven loop termination** — the exit decision is based on qualitative assessment, not a fixed counter
-- State **overwrite** across iterations — `research_findings` is replaced each iteration with the improved version
-- `{research_evaluation?}` — optional on the first iteration (no prior evaluation exists yet)
-
----
-
-## 14. Academic Research Assistant
-
-**Source:** ADK Python — `academic-research`
-
-**What it demonstrates:** A coordinator-style sequential pipeline where each agent adds a new layer of analysis on top of the previous agent's output. The final agent reads two upstream state keys (`seminal_paper` and `recent_citing_papers`) that were produced by non-adjacent agents.
-
-```mermaid
-flowchart TD
-    User([Seminal Paper]) --> CO["AcademicCoordinatorAgent\nExtracts title, authors, abstract,\nsummary, innovations, references\noutput_key: seminal_paper"]
-    CO --> WS["AcademicWebSearchAgent\nFinds citing papers from\ncurrent and previous year\nreads {seminal_paper?}\noutput_key: recent_citing_papers"]
-    WS --> NR["AcademicNewResearchAgent\nSynthesises 10+ future research directions\nreads {seminal_paper?}\nand {recent_citing_papers?}"]
-    NR --> Out([Future research directions])
-```
-
-**Key state variables**
-
-| Key | Written by | Read by |
-|---|---|---|
-| `seminal_paper` | AcademicCoordinatorAgent | AcademicWebSearchAgent, AcademicNewResearchAgent |
-| `recent_citing_papers` | AcademicWebSearchAgent | AcademicNewResearchAgent |
-
-**ADK features used**
-- `type: sequential` with three agents
-- A downstream agent reading state from **two prior agents** simultaneously
-- `{variable?}` optional injection — coordinator output may be partial if the user has not yet provided the paper
-
----
-
-## 15. Marketing Agency
-
-**Source:** ADK Python — `marketing-agency`
-
-**What it demonstrates:** A five-agent sequential pipeline where each specialist builds on the brand identity established in the first step. The `domain_create_output` key acts as the shared brand anchor read by all downstream agents. Shows how a single upstream state key can be consumed by multiple non-adjacent agents in a long chain.
-
-```mermaid
-flowchart TD
-    User([Brand Keywords]) --> CO["MarketingCoordinatorAgent\nCollects brand concept and keywords"]
-    CO --> DC["DomainCreateAgent\n10 available domain names\noutput_key: domain_create_output"]
-    DC --> WC["WebsiteCreateAgent\nFull HTML / CSS / JS site\nreads {domain_create_output?}\noutput_key: website_create_output"]
-    WC --> MC["MarketingCreateAgent\nCampaign strategy report\nreads {domain_create_output?}\noutput_key: marketing_create_output"]
-    MC --> LC["LogoCreateAgent\nLogo design concept\nreads {domain_create_output?}\noutput_key: logo_create_output"]
-    LC --> Out([Complete digital brand identity])
-```
-
-**Key state variables**
-
-| Key | Written by | Read by |
-|---|---|---|
-| `domain_create_output` | DomainCreateAgent | WebsiteCreateAgent, MarketingCreateAgent, LogoCreateAgent |
-| `website_create_output` | WebsiteCreateAgent | — |
-| `marketing_create_output` | MarketingCreateAgent | — |
-| `logo_create_output` | LogoCreateAgent | — |
-
-**ADK features used**
-- `type: sequential` with five agents
-- **Fan-out state reading** — one state key (`domain_create_output`) is read by three separate downstream agents
-- `{variable?}` optional injection — graceful handling if domain step produced no output
-
----
-
-## 16. Short Movie Agent
-
-**Source:** ADK Python — `short-movie-agents`
-
-**What it demonstrates:** A linear five-agent creative pipeline where each agent transforms the previous output into a new representation — from concept to story to screenplay to storyboard to video production notes. Each transformation step reads the accumulated creative assets from state.
-
-```mermaid
-flowchart TD
-    User([Story Concept]) --> DIR["DirectorAgent\nGathers concept and guides the pipeline"]
-    DIR --> ST["StoryAgent\nScout Leader campfire narrative\nwith character descriptions\noutput_key: story"]
-    ST --> SC["ScreenplayAgent\nStandard screenplay format\nslugs + action lines + dialogue\nreads {story}\noutput_key: screenplay"]
-    SC --> SB["StoryboardAgent\nScene-by-scene visual panel descriptions\nreads {screenplay} and {story?}\noutput_key: storyboard"]
-    SB --> VID["VideoAgent\nShot-by-shot production notes\nreads {screenplay} {storyboard?} {story?}"]
-    VID --> Out([Movie production package])
-```
-
-**Key state variables**
-
-| Key | Written by | Read by |
-|---|---|---|
-| `story` | StoryAgent | ScreenplayAgent, StoryboardAgent, VideoAgent |
-| `screenplay` | ScreenplayAgent | StoryboardAgent, VideoAgent |
-| `storyboard` | StoryboardAgent | VideoAgent |
-
-**ADK features used**
-- `type: sequential` with five agents
-- **Accumulating context** — VideoAgent reads three separate upstream state keys simultaneously
-- `{variable?}` optional injection — later agents degrade gracefully if an earlier step produced no output
-- Sequential creative transformation — each agent produces a distinct artifact format from the same underlying narrative
-
----
-
-## 17. Context Control
+## 10. Context Control
 
 **Source:** ADK Python — `deep-search` (report_composer)
 
@@ -652,7 +395,7 @@ flowchart LR
 
 ---
 
-## 19. Output Schema
+## 11. Output Schema
 
 **Source:** ADK Python — `deep-search` (research_evaluator with Feedback schema), `travel-concierge` (planning with Itinerary/HotelsSelection schemas)
 
@@ -706,7 +449,7 @@ flowchart LR
 
 ---
 
-## 20. Agent Isolation
+## 12. Agent Isolation
 
 **Source:** ADK Python — `deep-search` (research_evaluator)
 
@@ -738,36 +481,6 @@ flowchart LR
 
 ---
 
-## 21. Customer Support Triage
-
-**Source:** ADK samples — `workflow-concurrent_research_writer` (conditional routing simplified)
-
-**What it demonstrates:** An evaluator classifies incoming messages and routes to the matching specialist branch. Only one branch executes per request. A wildcard (`*`) fallback catches any unclassified messages.
-
-```mermaid
-flowchart TD
-    User([Customer Message]) --> E["ClassifierAgent\noutputs: technical / billing / general"]
-    E -->|"category=technical"| T["TechSupportAgent"]
-    E -->|"category=billing"| B["BillingAgent"]
-    E -->|"category=*"| G["GeneralSupportAgent"]
-    T --> Out([Specialised Response])
-    B --> Out([Specialised Response])
-    G --> Out([Specialised Response])
-```
-
-**Key state variables**
-
-| Key | Written by | Read by |
-|---|---|---|
-| `category` | ClassifierAgent | Conditional routing node |
-
-**ADK features used**
-- `type: conditional` workflow node
-- `condition` on branch agents — only matching branch executes
-- Wildcard (`*`) fallback for unclassified messages
-
----
-
 ## Workflow Type Reference
 
 ```mermaid
@@ -776,7 +489,6 @@ flowchart LR
     S["type: sequential\nRuns children in order\nChildren share session state"]
     P["type: parallel\nRuns all children concurrently\nChildren share session state"]
     L["type: loop\nRepeats its child workflow\nmax_iterations + allow_early_exit"]
-    C["type: conditional\nEvaluates and routes\nOnly one branch executes"]
 ```
 
 ### State injection syntax
