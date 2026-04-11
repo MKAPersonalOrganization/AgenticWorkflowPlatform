@@ -43,10 +43,9 @@ type catalogEntryResponse struct {
 
 // catalogListResponse is the response for listing/searching catalog entries.
 type catalogListResponse struct {
-	Entries         []catalogEntryResponse `json:"entries"`
-	Total           int                    `json:"total"`
-	Categories      []string               `json:"categories,omitempty"`
-	AddedCatalogIDs []string               `json:"addedCatalogIds"`
+	Entries    []catalogEntryResponse `json:"entries"`
+	Total      int                    `json:"total"`
+	Categories []string               `json:"categories,omitempty"`
 }
 
 func toCatalogResponse(e *agentdefinition.AgentCatalogEntry) catalogEntryResponse {
@@ -96,17 +95,10 @@ func (h *catalogHandler) list(w http.ResponseWriter, r *http.Request) {
 		categories = []string{}
 	}
 
-	addedIDs, err := h.agentRepo.ListAddedCatalogIDs(r.Context(), user.ID)
-	if err != nil {
-		h.log.Error(r.Context(), "failed to list added catalog IDs", "error", err)
-		addedIDs = []string{}
-	}
-
 	resp := catalogListResponse{
-		Entries:         make([]catalogEntryResponse, 0, len(entries)),
-		Total:           total,
-		Categories:      categories,
-		AddedCatalogIDs: addedIDs,
+		Entries:    make([]catalogEntryResponse, 0, len(entries)),
+		Total:      total,
+		Categories: categories,
 	}
 	for i := range entries {
 		resp.Entries = append(resp.Entries, toCatalogResponse(&entries[i]))
@@ -143,16 +135,9 @@ func (h *catalogHandler) search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	addedIDs, err := h.agentRepo.ListAddedCatalogIDs(r.Context(), user.ID)
-	if err != nil {
-		h.log.Error(r.Context(), "failed to list added catalog IDs", "error", err)
-		addedIDs = []string{}
-	}
-
 	resp := catalogListResponse{
-		Entries:         make([]catalogEntryResponse, 0, len(entries)),
-		Total:           total,
-		AddedCatalogIDs: addedIDs,
+		Entries: make([]catalogEntryResponse, 0, len(entries)),
+		Total:   total,
 	}
 	for i := range entries {
 		resp.Entries = append(resp.Entries, toCatalogResponse(&entries[i]))
@@ -160,6 +145,11 @@ func (h *catalogHandler) search(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+// addToMyAgentsRequest represents the optional request body for adding a catalog entry.
+type addToMyAgentsRequest struct {
+	Name string `json:"name"`
 }
 
 // addToMyAgents handles POST /v1/agent-catalog/{id}/add
@@ -179,6 +169,12 @@ func (h *catalogHandler) addToMyAgents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Parse optional request body for custom name
+	var req addToMyAgentsRequest
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&req)
+	}
+
 	entry, err := h.catalog.GetByID(r.Context(), catalogID)
 	if err != nil {
 		h.log.Error(r.Context(), "catalog entry not found", "id", catalogID, "error", err)
@@ -186,25 +182,15 @@ func (h *catalogHandler) addToMyAgents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exists, err := h.agentRepo.ExistsByCatalogID(r.Context(), user.ID, catalogID)
-	if err != nil {
-		h.log.Error(r.Context(), "failed to check duplicate", "error", err, "catalogID", catalogID)
-		http.Error(w, "Failed to add agent", http.StatusInternalServerError)
-		return
-	}
-	if exists {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusConflict)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error":  "already_added",
-			"detail": "You have already added this agent.",
-		})
-		return
+	// Use custom name if provided, otherwise fall back to template name
+	agentName := entry.Name
+	if req.Name != "" {
+		agentName = req.Name
 	}
 
 	// ── Composed catalog entry: create sub-agents + composed agent ──
 	if entry.IsWorkflow() {
-		agentID, forkErr := h.forkComposedCatalogEntry(r.Context(), user.ID, catalogID, entry)
+		agentID, forkErr := h.forkComposedCatalogEntry(r.Context(), user.ID, catalogID, entry, agentName)
 		if forkErr != nil {
 			h.log.Error(r.Context(), "failed to fork composed catalog entry", "error", forkErr, "catalogID", catalogID)
 			http.Error(w, "Failed to add agent", http.StatusInternalServerError)
@@ -217,7 +203,7 @@ func (h *catalogHandler) addToMyAgents(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]string{
 			"id":     agentID,
-			"name":   entry.Name,
+			"name":   agentName,
 			"status": "added",
 		})
 		return
@@ -226,7 +212,7 @@ func (h *catalogHandler) addToMyAgents(w http.ResponseWriter, r *http.Request) {
 	// ── Simple agent catalog entry ──
 	agent := &agentdefinition.AgentDefinition{
 		UserID:          user.ID,
-		Name:            entry.Name,
+		Name:            agentName,
 		Description:     entry.Description,
 		SystemPrompt:    entry.SystemPrompt,
 		Icon:            entry.Icon,
@@ -256,6 +242,7 @@ func (h *catalogHandler) forkComposedCatalogEntry(
 	ctx context.Context,
 	userID, catalogID string,
 	entry *agentdefinition.AgentCatalogEntry,
+	customName string,
 ) (string, error) {
-	return h.importer.ImportComposedFromCatalogEntry(ctx, userID, entry, catalogID)
+	return h.importer.ImportComposedFromCatalogEntry(ctx, userID, entry, catalogID, customName)
 }

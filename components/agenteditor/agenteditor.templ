@@ -521,11 +521,6 @@ templ AgentDesignerDialog() {
 														<div class="flex-1 min-w-0">
 															<div class="flex items-center gap-2">
 																<h3 class="text-sm font-semibold text-foreground truncate" x-text="entry.name"></h3>
-																<template x-if="catalogAddedIds.includes(entry.id)">
-																	@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "text-[8px] px-1.5 py-0 h-4"}) {
-																		{ i18n.T(ctx, "Forked") }
-																	}
-																</template>
 															</div>
 															<p class="text-xs text-muted-foreground mt-0.5 line-clamp-2" x-text="entry.description || 'No description'"></p>
 															<!-- Category + Tags -->
@@ -545,29 +540,16 @@ templ AgentDesignerDialog() {
 														<template x-if="catalogAddingIds.includes(entry.id)">
 															<span class="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground">
 																<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
-																{ i18n.T(ctx, "Adding...") }
+																{ i18n.T(ctx, "Forking...") }
 															</span>
 														</template>
-														<template x-if="catalogAddedIds.includes(entry.id)">
-															@button.Button(button.Props{
-																Variant: button.VariantGhost,
-																Size:    button.SizeSm,
-																Class:   "gap-1.5 text-xs",
-																Attributes: templ.Attributes{
-																	"@click": "addFromStore(entry)",
-																},
-															}) {
-																@icon.Pencil(icon.Props{Class: "size-3.5"})
-																{ i18n.T(ctx, "Open in Designer") }
-															}
-														</template>
-														<template x-if="!catalogAddedIds.includes(entry.id) && !catalogAddingIds.includes(entry.id)">
+														<template x-if="!catalogAddingIds.includes(entry.id)">
 															@button.Button(button.Props{
 																Variant: button.VariantDefault,
 																Size:    button.SizeSm,
 																Class:   "gap-1.5 text-xs bg-amber-500 hover:bg-amber-600 text-white border-amber-500",
 																Attributes: templ.Attributes{
-																	"@click": "addFromStore(entry)",
+																	"@click": "promptForForkName(entry)",
 																},
 															}) {
 																@icon.GitBranch(icon.Props{Class: "size-3.5"})
@@ -581,6 +563,99 @@ templ AgentDesignerDialog() {
 									</div>
 								</div>
 							</template>
+						</div>
+					</div>
+				</template>
+				<!-- ═══════════════════════════════════════════ -->
+				<!-- FORK NAME DIALOG                          -->
+				<!-- ═══════════════════════════════════════════ -->
+				<template x-if="showForkNameDialog">
+					<div>
+						<!-- Backdrop -->
+						<div
+							x-show="showForkNameDialog"
+							x-transition:enter="transition ease-out duration-200"
+							x-transition:enter-start="opacity-0"
+							x-transition:enter-end="opacity-100"
+							x-transition:leave="transition ease-in duration-150"
+							x-transition:leave-start="opacity-100"
+							x-transition:leave-end="opacity-0"
+							@click="cancelForkNameDialog()"
+							class="fixed inset-0 z-[60] bg-black/40 backdrop-blur-[3px]"
+						></div>
+						<!-- Content -->
+						<div
+							x-show="showForkNameDialog"
+							x-transition:enter="transition ease-out duration-200"
+							x-transition:enter-start="opacity-0 scale-[0.97]"
+							x-transition:enter-end="opacity-100 scale-100"
+							x-transition:leave="transition ease-in duration-150"
+							x-transition:leave-start="opacity-100 scale-100"
+							x-transition:leave-end="opacity-0 scale-[0.97]"
+							@keydown.escape.window="cancelForkNameDialog()"
+							class="fixed z-[60] left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] bg-background rounded-2xl border border-border/60 shadow-modern-xl w-full max-w-md"
+						>
+							<!-- Header -->
+							<div class="flex items-center justify-between px-5 pt-5 pb-0">
+								<div class="flex items-center gap-2.5">
+									<div class="size-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400">
+										@icon.GitBranch(icon.Props{Class: "size-4"})
+									</div>
+									<div>
+										<h3 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Name Your Agent") }</h3>
+										<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Choose a name for your new agent") }</p>
+									</div>
+								</div>
+								<button type="button" @click="cancelForkNameDialog()" class="size-8 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground">
+									@icon.X(icon.Props{Class: "size-4"})
+								</button>
+							</div>
+							<!-- Body -->
+							<div class="px-5 py-4 space-y-4">
+								<div class="space-y-1.5">
+									<label class="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">{ i18n.T(ctx, "Agent Name") }</label>
+									<input
+										type="text"
+										x-model="forkNameInput"
+										@keydown.enter="confirmForkName()"
+										placeholder={ i18n.T(ctx, "Enter agent name") }
+										class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
+										autofocus
+									/>
+								</div>
+								<template x-if="forkNameEntry?.description">
+									<div class="space-y-1">
+										<label class="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">{ i18n.T(ctx, "Description") }</label>
+										<p class="text-xs text-muted-foreground leading-relaxed" x-text="forkNameEntry.description"></p>
+									</div>
+								</template>
+							</div>
+							<!-- Footer -->
+							<div class="px-5 py-3 border-t border-border/50 bg-muted/50 flex items-center justify-end gap-2">
+								@button.Button(button.Props{
+									Variant: button.VariantGhost,
+									Class:   "h-8 px-3 text-xs",
+									Attributes: templ.Attributes{
+										"@click": "cancelForkNameDialog()",
+									},
+								}) {
+									{ i18n.T(ctx, "Cancel") }
+								}
+								@button.Button(button.Props{
+									Variant: button.VariantDefault,
+									Class:   "h-8 px-4 text-xs gap-1.5 bg-amber-500 hover:bg-amber-600 text-white border-amber-500",
+									Attributes: templ.Attributes{
+										"@click":    "confirmForkName()",
+										":disabled": "forkNameAdding || !forkNameInput.trim()",
+									},
+								}) {
+									<span x-show="!forkNameAdding">{ i18n.T(ctx, "Fork & Edit") }</span>
+									<span x-show="forkNameAdding" class="flex items-center gap-1.5">
+										<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
+										{ i18n.T(ctx, "Creating...") }
+									</span>
+								}
+							</div>
 						</div>
 					</div>
 				</template>

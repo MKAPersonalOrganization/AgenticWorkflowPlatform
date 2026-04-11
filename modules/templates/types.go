@@ -32,5 +32,5 @@ type AgentCatalogRepository interface {
 
 // ComposedAgentImporter creates sub-agents and a composed parent from a catalog entry.
 type ComposedAgentImporter interface {
-	ImportComposedFromCatalogEntry(ctx context.Context, userID string, entry *agentdefinition.AgentCatalogEntry, sourceCatalogID string) (string, error)
+	ImportComposedFromCatalogEntry(ctx context.Context, userID string, entry *agentdefinition.AgentCatalogEntry, sourceCatalogID string, customName string) (string, error)
 }

@@ -75,7 +75,7 @@ func (s *Service) ImportFromCatalogYAML(ctx context.Context, userID string, yaml
 		return "", false, fmt.Errorf("YAML must include name")
 	}
 	if entry.IsWorkflow() {
-		id, wErr := s.ImportComposedFromCatalogEntry(ctx, userID, &entry, "")
+		id, wErr := s.ImportComposedFromCatalogEntry(ctx, userID, &entry, "", "")
 		if wErr != nil {
 			return "", false, wErr
 		}
@@ -98,7 +98,7 @@ func (s *Service) ImportFromCatalogYAML(ctx context.Context, userID string, yaml
 }
 
 // ImportComposedFromCatalogEntry creates a composed agent from a catalog entry.
-func (s *Service) ImportComposedFromCatalogEntry(ctx context.Context, userID string, entry *AgentCatalogEntry, sourceCatalogID string) (string, error) {
+func (s *Service) ImportComposedFromCatalogEntry(ctx context.Context, userID string, entry *AgentCatalogEntry, sourceCatalogID string, customName string) (string, error) {
 	var subAgents []CatalogSubAgent
 	if entry.SubAgentsJSON != "" {
 		if err := json.Unmarshal([]byte(entry.SubAgentsJSON), &subAgents); err != nil {
@@ -132,9 +132,14 @@ func (s *Service) ImportComposedFromCatalogEntry(ctx context.Context, userID str
 		return "", fmt.Errorf("invalid workflow graph: %w", err)
 	}
 
+	agentName := entry.Name
+	if customName != "" {
+		agentName = customName
+	}
+
 	composed := &AgentDefinition{
 		UserID:          userID,
-		Name:            entry.Name,
+		Name:            agentName,
 		Description:     entry.Description,
 		SystemPrompt:    entry.SystemPrompt,
 		Icon:            entry.Icon,

@@ -30,8 +30,13 @@ export const agentDesigner = () => ({
     catalogSelectedCategory: '',
     catalogLoading: false,
     catalogAddingIds: [],
-    catalogAddedIds: [],
     catalogTotal: 0,
+
+    // Fork name dialog state
+    showForkNameDialog: false,
+    forkNameEntry: null,
+    forkNameInput: '',
+    forkNameAdding: false,
 
     importYamlText: '',
     importYamlURL: '',
@@ -690,7 +695,6 @@ export const agentDesigner = () => ({
                 const data = await response.json();
                 this.catalogEntries = data.entries || [];
                 this.catalogCategories = data.categories || [];
-                this.catalogAddedIds = data.addedCatalogIds || [];
                 this.catalogTotal = data.total || 0;
             }
         } catch (err) {
@@ -736,21 +740,54 @@ export const agentDesigner = () => ({
         return entries;
     },
 
+    /** Open the fork name dialog for a catalog entry */
+    promptForForkName(entry) {
+        if (this.catalogAddingIds.includes(entry.id)) return;
+        this.forkNameEntry = entry;
+        this.forkNameInput = entry.name || '';
+        this.showForkNameDialog = true;
+    },
+
+    /** Cancel the fork name dialog */
+    cancelForkNameDialog() {
+        this.showForkNameDialog = false;
+        this.forkNameEntry = null;
+        this.forkNameInput = '';
+    },
+
+    /** Confirm fork with the user-provided name */
+    async confirmForkName() {
+        const name = this.forkNameInput.trim();
+        if (!name) {
+            this.showToast('Agent name is required', 'error');
+            return;
+        }
+        if (!this.forkNameEntry) return;
+
+        const entry = this.forkNameEntry;
+        this.forkNameAdding = true;
+        this.showForkNameDialog = false;
+
+        await this.addFromStore(entry, name);
+
+        this.forkNameAdding = false;
+        this.forkNameEntry = null;
+        this.forkNameInput = '';
+    },
+
     /** Fork a template from the catalog */
-    async addFromStore(entry) {
-        if (this.catalogAddedIds.includes(entry.id)) return;
+    async addFromStore(entry, customName) {
         if (this.catalogAddingIds.includes(entry.id)) return;
         this.catalogAddingIds.push(entry.id);
         try {
+            const body = customName ? { name: customName } : {};
             const response = await fetch(`/v1/agent-catalog/${entry.id}/add`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                body: customName ? JSON.stringify(body) : undefined,
             });
             if (response.ok) {
                 const data = await response.json();
-                if (!this.catalogAddedIds.includes(entry.id)) {
-                    this.catalogAddedIds.push(entry.id);
-                }
 
                 // Fetch the full agent definition directly using the returned ID
                 const agentId = data.id;
@@ -767,39 +804,16 @@ export const agentDesigner = () => ({
                         } else {
                             this.showEditNodeForm(fullAgent);
                         }
-                        this.showToast('Template added — editing now', 'success', 3000);
+                        this.showToast('Template forked — editing now', 'success', 3000);
                         return;
                     }
                 }
                 // Fallback: go to list view
                 this.view = 'list';
-            } else if (response.status === 409) {
-                if (!this.catalogAddedIds.includes(entry.id)) {
-                    this.catalogAddedIds.push(entry.id);
-                }
-                // Already forked — find it in our agents list by matching catalog source ID or name
-                const existing = this.allAgents.find(a => a.sourceCatalogId === entry.id || a.source_catalog_id === entry.id) ||
-                    this.agents.find(a => a.sourceCatalogId === entry.id || a.source_catalog_id === entry.id) ||
-                    this.allAgents.find(a => a.name === entry.name) ||
-                    this.agents.find(a => a.name === entry.name);
-                if (existing) {
-                    // Fetch full definition
-                    const fullAgent = await this.fetchAgentById(existing.id);
-                    console.log('[addFromStore] existing agent:', fullAgent);
-                    if (fullAgent) {
-                        if (fullAgent.isComposed || fullAgent.is_composed) {
-                            this.showEditPipelineForm(fullAgent);
-                        } else {
-                            this.showEditNodeForm(fullAgent);
-                        }
-                        return;
-                    }
-                }
-                this.view = 'list';
             } else {
                 const errData = await response.text();
-                console.error('Failed to add template:', response.status, errData);
-                this.showToast('Failed to add template', 'error');
+                console.error('Failed to fork template:', response.status, errData);
+                this.showToast('Failed to fork template', 'error');
             }
         } catch (err) {
             console.error('Failed to add template:', err);
