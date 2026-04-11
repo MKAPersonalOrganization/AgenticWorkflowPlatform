@@ -1003,7 +1003,7 @@ export const agentDesigner = () => ({
                 description: this.form.description.trim(),
                 systemPrompt: this.form.systemPrompt.trim(),
                 // Node mode → no graph (simple LLM agent → llmagent.New)
-                subAgents: this.form.subAgents.filter(sa => sa.name && sa.name.trim()),
+                subAgents: this.form.subAgents.filter(sa => sa.agent_id && sa.agent_id.trim()),
                 disallowTransferToParent: this.form.disallowTransferToParent || false,
                 disallowTransferToPeers: this.form.disallowTransferToPeers || false,
                 outputKey: this.form.outputKey.trim(),
