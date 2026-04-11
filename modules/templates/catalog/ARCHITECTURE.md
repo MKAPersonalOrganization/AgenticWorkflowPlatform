@@ -13,6 +13,7 @@ Each entry in the catalog demonstrates a specific set of ADK-Go workflow feature
 | Podcast Transcript | ✓ | | | | ✓ | |
 | Parallel Workflow | ✓ | ✓ | | | ✓ | |
 | Sequential Inside Parallel | ✓ | ✓ | | | ✓ | ✓ |
+| Parallel Inside Sequential | ✓ | ✓ | | | ✓ | |
 | Loop Workflow | | | ✓ | | ✓ | |
 | Loop with Exit | | | ✓ | ✓ | ✓ | |
 | Story Teller | ✓ | ✓ | ✓ | | ✓ | ✓ |
@@ -190,7 +191,50 @@ flowchart TD
 
 ---
 
-## 6. Loop Workflow
+## 6. Parallel Inside Sequential
+
+**Source:** ADK samples — `claim-adjudication-agent`, `nexshift-agent` (simplified)
+
+**What it demonstrates:** A sequential root where **one step is a parallel node**. An intake analyst processes input first, then three specialist analysts (technical, business, risk) evaluate the topic concurrently, then a synthesiser combines all findings into a final report. The outer composition is sequential; the middle step is parallel.
+
+```mermaid
+flowchart TD
+    User([Topic]) --> A["IntakeAnalystAgent\noutput_key: topic_brief"]
+    A --> PAR
+
+    subgraph PAR [Parallel — 3 analysts run concurrently]
+        direction TB
+        T["TechnicalAnalystAgent\nreads {topic_brief}\noutput_key: technical_assessment"]
+        B["BusinessAnalystAgent\nreads {topic_brief}\noutput_key: business_assessment"]
+        R["RiskAnalystAgent\nreads {topic_brief}\noutput_key: risk_assessment"]
+    end
+
+    T --> S["SynthesiserAgent\nreads all 3 assessments\noutput_key: final_report"]
+    B --> S
+    R --> S
+    S --> Out([Unified Report])
+```
+
+**Key state variables**
+
+| Key | Written by | Read by |
+|---|---|---|
+| `topic_brief` | IntakeAnalystAgent | All three parallel analysts |
+| `technical_assessment` | TechnicalAnalystAgent | SynthesiserAgent |
+| `business_assessment` | BusinessAnalystAgent | SynthesiserAgent |
+| `risk_assessment` | RiskAnalystAgent | SynthesiserAgent |
+| `final_report` | SynthesiserAgent | — |
+
+**ADK features used**
+- `type: sequential` as the root composition — agents run in order
+- `type: parallel` as one step in the sequence — analysts run concurrently
+- Multiple `output_key` declarations — each analyst publishes a named result
+- Downstream agent (Synthesiser) reads **all three** parallel outputs simultaneously
+- `{variable?}` optional injection — handles case where a branch may not produce output
+
+---
+
+## 7. Loop Workflow
 
 **Source:** ADK samples — `story_teller` (simplified)
 
@@ -224,7 +268,7 @@ flowchart TD
 
 ---
 
-## 7. Loop with Exit
+## 8. Loop with Exit
 
 **Source:** ADK samples — `blog-writer`, `iterative-deep-research` (simplified)
 
@@ -257,7 +301,7 @@ flowchart TD
 
 ---
 
-## 8. Story Teller
+## 9. Story Teller
 
 **Source:** ADK Python — `story_teller`
 
@@ -303,7 +347,7 @@ flowchart TD
 
 ---
 
-## 9. Blog Writer
+## 10. Blog Writer
 
 **Source:** ADK Python — `blog-writer`
 
@@ -345,7 +389,7 @@ flowchart TD
 
 ---
 
-## 10. Iterative Deep Research
+## 11. Iterative Deep Research
 
 **Source:** ADK samples — `iterative-deep-research`
 
@@ -386,7 +430,7 @@ flowchart TD
 
 ---
 
-## 11. Academic Research Assistant
+## 12. Academic Research Assistant
 
 **Source:** ADK Python — `academic-research`
 
@@ -414,7 +458,7 @@ flowchart TD
 
 ---
 
-## 12. Marketing Agency
+## 13. Marketing Agency
 
 **Source:** ADK Python — `marketing-agency`
 
@@ -446,7 +490,7 @@ flowchart TD
 
 ---
 
-## 13. Short Movie Agent
+## 14. Short Movie Agent
 
 **Source:** ADK Python — `short-movie-agents`
 
@@ -478,7 +522,7 @@ flowchart TD
 
 ---
 
-## 14. Customer Support Triage
+## 15. Customer Support Triage
 
 **Source:** ADK samples — `workflow-concurrent_research_writer` (conditional routing simplified)
 
