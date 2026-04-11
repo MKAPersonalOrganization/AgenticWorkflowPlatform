@@ -12,6 +12,8 @@ Each entry in the catalog demonstrates a specific set of ADK-Go workflow feature
 | LLM Auditor | ✓ | | | | | |
 | Podcast Transcript | ✓ | | | | ✓ | |
 | Parallel Workflow | ✓ | ✓ | | | ✓ | |
+| Loop Workflow | | | ✓ | | ✓ | |
+| Loop with Exit | | | ✓ | ✓ | ✓ | |
 | Story Teller | ✓ | ✓ | ✓ | | ✓ | ✓ |
 | Blog Writer | ✓ | | ✓ | ✓ | ✓ | |
 | Iterative Deep Research | ✓ | | ✓ | ✓ | ✓ | |
@@ -137,7 +139,74 @@ flowchart TD
 
 ---
 
-## 5. Story Teller
+## 5. Loop Workflow
+
+**Source:** ADK samples — `story_teller` (simplified)
+
+**What it demonstrates:** A fixed-iteration loop where a single agent runs exactly `max_iterations` times with no early exit. Each iteration reads the previous output via `{refined_concept?}` and improves it. Shows the simplest loop pattern.
+
+```mermaid
+flowchart TD
+    User([Concept]) --> LOOP
+
+    subgraph LOOP [Loop — exactly 3 iterations, no early exit]
+        direction TB
+        A["RefinementAgent\nreads {refined_concept?}\noutput_key: refined_concept"]
+        A -->|iteration 1| A
+        A -->|iteration 2| A
+        A -->|iteration 3| Exit
+    end
+
+    Exit --> Out([Final refined concept])
+```
+
+**Key state variables**
+
+| Key | Written by | Read by |
+|---|---|---|
+| `refined_concept` | RefinementAgent (each iteration) | RefinementAgent (next iteration via `{refined_concept?}`) |
+
+**ADK features used**
+- `type: loop` with `max_iterations: 3` and `allow_early_exit: false`
+- `{variable?}` optional injection — first iteration has no prior version
+- State **overwrite** across iterations — each refinement replaces the previous one
+
+---
+
+## 6. Loop with Exit
+
+**Source:** ADK samples — `blog-writer`, `iterative-deep-research` (simplified)
+
+**What it demonstrates:** A loop with `allow_early_exit: true` where a writer agent produces a draft and a checker agent validates quality. The checker calls the `exit_loop` tool when the draft meets standards, skipping remaining iterations. Shows the "retry-until-good" pattern.
+
+```mermaid
+flowchart TD
+    User([Topic]) --> LOOP
+
+    subgraph LOOP [Loop — max 3 iterations, allow_early_exit]
+        direction TB
+        A["DraftWriterAgent\nwrites draft\noutput_key: draft"] --> B["QualityCheckerAgent\ncalls exit_loop if draft passes"]
+        B -->|draft rejected — retry| A
+        B -->|draft approved — exit_loop| Exit
+    end
+
+    Exit --> Out([Approved draft])
+```
+
+**Key state variables**
+
+| Key | Written by | Read by |
+|---|---|---|
+| `draft` | DraftWriterAgent | QualityCheckerAgent |
+
+**ADK features used**
+- `type: loop` with `allow_early_exit: true` — the last agent in the loop body receives the `exit_loop` tool
+- Validation agent pattern — a lightweight agent that inspects state and calls `exit_loop` when ready
+- LLM-driven loop termination — exit is based on quality judgment, not a fixed counter
+
+---
+
+## 7. Story Teller
 
 **Source:** ADK Python — `story_teller`
 
@@ -183,7 +252,7 @@ flowchart TD
 
 ---
 
-## 6. Blog Writer
+## 8. Blog Writer
 
 **Source:** ADK Python — `blog-writer`
 
@@ -225,7 +294,7 @@ flowchart TD
 
 ---
 
-## 7. Iterative Deep Research
+## 9. Iterative Deep Research
 
 **Source:** ADK samples — `iterative-deep-research`
 
@@ -266,7 +335,7 @@ flowchart TD
 
 ---
 
-## 8. Academic Research Assistant
+## 10. Academic Research Assistant
 
 **Source:** ADK Python — `academic-research`
 
@@ -294,7 +363,7 @@ flowchart TD
 
 ---
 
-## 9. Marketing Agency
+## 11. Marketing Agency
 
 **Source:** ADK Python — `marketing-agency`
 
@@ -326,7 +395,7 @@ flowchart TD
 
 ---
 
-## 10. Short Movie Agent
+## 12. Short Movie Agent
 
 **Source:** ADK Python — `short-movie-agents`
 
@@ -358,6 +427,36 @@ flowchart TD
 
 ---
 
+## 13. Customer Support Triage
+
+**Source:** ADK samples — `workflow-concurrent_research_writer` (conditional routing simplified)
+
+**What it demonstrates:** An evaluator classifies incoming messages and routes to the matching specialist branch. Only one branch executes per request. A wildcard (`*`) fallback catches any unclassified messages.
+
+```mermaid
+flowchart TD
+    User([Customer Message]) --> E["ClassifierAgent\noutputs: technical / billing / general"]
+    E -->|"category=technical"| T["TechSupportAgent"]
+    E -->|"category=billing"| B["BillingAgent"]
+    E -->|"category=*"| G["GeneralSupportAgent"]
+    T --> Out([Specialised Response])
+    B --> Out([Specialised Response])
+    G --> Out([Specialised Response])
+```
+
+**Key state variables**
+
+| Key | Written by | Read by |
+|---|---|---|
+| `category` | ClassifierAgent | Conditional routing node |
+
+**ADK features used**
+- `type: conditional` workflow node
+- `condition` on branch agents — only matching branch executes
+- Wildcard (`*`) fallback for unclassified messages
+
+---
+
 ## Workflow Type Reference
 
 ```mermaid
@@ -366,6 +465,7 @@ flowchart LR
     S["type: sequential\nRuns children in order\nChildren share session state"]
     P["type: parallel\nRuns all children concurrently\nChildren share session state"]
     L["type: loop\nRepeats its child workflow\nmax_iterations + allow_early_exit"]
+    C["type: conditional\nEvaluates and routes\nOnly one branch executes"]
 ```
 
 ### State injection syntax

@@ -1235,7 +1235,9 @@ export const editableWorkflowTree = () => {
                 if (field && nodeId && field !== 'agent_id' && field !== 'a2a_connector_id' && store && store.graph) {
                     const node = findNodeById(store.graph, nodeId);
                     if (node) {
-                        node[field] = e.target.value;
+                        let value = e.target.value;
+                        if (field === 'max_iterations') value = parseInt(value) || 1;
+                        node[field] = value;
                         if (window.__ewtOnChange) window.__ewtOnChange(store.graph);
                     }
                 }

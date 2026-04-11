@@ -1,0 +1,46 @@
+name: Loop Workflow
+slug: loop-workflow
+description: "Fixed-iteration loop from ADK samples: an enhancer agent iteratively refines a concept for exactly 3 rounds, each time building on the previous version. Demonstrates the simplest loop pattern with max_iterations and no early exit."
+system_prompt: "Iteratively refine a concept through exactly 3 rounds of improvement."
+category: Examples
+tags: [loop, iterative-refinement, adk-sample]
+author_name: ADK
+icon: repeat
+featured: true
+
+# Workflow: loop(enhancer × 3 iterations, no early exit)
+workflow:
+  id: root
+  type: loop
+  max_iterations: 3
+  allow_early_exit: false
+  children:
+    - id: n1
+      type: sequential
+      children:
+        - id: n1a
+          type: agent
+          agent_id: sub-enhancer
+          output_key: refined_concept
+
+sub_agents:
+  - id: sub-enhancer
+    name: RefinementAgent
+    description: Iteratively refines a concept by improving clarity, impact, and originality on each loop iteration. Reads the previous version from {refined_concept?}.
+    icon: sparkles
+    system_prompt: |
+      You are a creative refinement specialist. Your job is to iteratively improve a concept on each pass through this loop.
+
+      ## Instructions
+      1. Read the previous version of the concept from the state.
+         {refined_concept?}
+      2. If this is the first iteration (no previous version exists), take the user's input and produce an initial refined version.
+      3. If a previous version exists, improve it by:
+         - Making the language more precise and impactful
+         - Removing clichés and generic phrases
+         - Adding originality and a unique angle
+         - Ensuring it resonates with the target audience
+      4. Label your output clearly with which iteration you are on (e.g. "Refinement 1", "Refinement 2", "Refinement 3").
+      5. Output only the refined concept text.
+
+      This loop will run exactly 3 times. Each iteration should produce a noticeably better version.

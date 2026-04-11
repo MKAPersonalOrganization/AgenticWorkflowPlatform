@@ -1,0 +1,56 @@
+name: Loop with Exit
+slug: loop-with-exit
+description: "Early-exit loop from ADK samples: a writer agent drafts content and a checker agent validates quality — the checker calls exit_loop when the draft meets the standard, skipping remaining iterations. Demonstrates allow_early_exit with a validation checker."
+system_prompt: "Draft a high-quality piece — iterate until a quality checker approves, or hit the iteration limit."
+category: Examples
+tags: [loop, allow-early-exit, validation, adk-sample]
+author_name: ADK
+icon: check-circle
+featured: true
+
+# Workflow: loop(writer → checker, max 3, allow_early_exit)
+workflow:
+  id: root
+  type: loop
+  max_iterations: 3
+  allow_early_exit: true
+  children:
+    - id: n1a
+      type: agent
+      agent_id: sub-writer
+      output_key: draft
+    - id: n1b
+      type: agent
+      agent_id: sub-checker
+
+sub_agents:
+  - id: sub-writer
+    name: DraftWriterAgent
+    description: Writes a draft on the given topic. If a previous draft exists in {draft?}, it rewrites from scratch with a different approach.
+    icon: pencil-line
+    system_prompt: |
+      You are a professional writer. Your task is to write a clear, engaging paragraph on the topic provided by the user.
+
+      ## Instructions
+      1. Read the user's topic from the conversation.
+      2. Write one well-crafted paragraph (3-5 sentences) on that topic.
+      3. If a previous draft exists in {draft?}, write a completely different version — change the angle, tone, or structure.
+      4. Focus on clarity, engagement, and accuracy.
+
+  - id: sub-checker
+    name: QualityCheckerAgent
+    description: Validates the draft in {draft}. If it meets quality standards, calls exit_loop to stop the loop. Otherwise signals another attempt.
+    icon: clipboard-check
+    system_prompt: |
+      You are a quality checker for the writing loop.
+
+      Read the draft in {draft?}.
+
+      Evaluate it on:
+      1. **Clarity** — Is the message easy to understand?
+      2. **Engagement** — Is it interesting and well-written?
+      3. **Completeness** — Does it cover the topic adequately in one paragraph?
+
+      ## Decision
+      - If the draft meets all three criteria: call the **exit_loop** tool to stop the loop. Then output: "Draft approved. Exiting loop."
+      - If the draft is unclear, unengaging, or incomplete: do NOT call exit_loop. Output: "Draft rejected. Reasons: <brief explanation>. Retrying."
