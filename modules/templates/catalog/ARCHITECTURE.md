@@ -12,6 +12,7 @@ Each entry in the catalog demonstrates a specific set of ADK-Go workflow feature
 | LLM Auditor | ✓ | | | | | |
 | Podcast Transcript | ✓ | | | | ✓ | |
 | Parallel Workflow | ✓ | ✓ | | | ✓ | |
+| Sequential Inside Parallel | ✓ | ✓ | | | ✓ | ✓ |
 | Loop Workflow | | | ✓ | | ✓ | |
 | Loop with Exit | | | ✓ | ✓ | ✓ | |
 | Story Teller | ✓ | ✓ | ✓ | | ✓ | ✓ |
@@ -139,7 +140,57 @@ flowchart TD
 
 ---
 
-## 5. Loop Workflow
+## 5. Sequential Inside Parallel
+
+**Source:** ADK Python — `parallel_task_decomposition_execution`
+
+**What it demonstrates:** Three parallel branches where **each branch is itself a sequential pipeline** (drafter → publisher). The email branch drafts then publishes; the Slack branch drafts then publishes; the Calendar branch extracts events then publishes. All three branches run concurrently.
+
+```mermaid
+flowchart TD
+    User([Announcement Topic]) --> E["MessageEnhancerAgent\noutput_key: enhanced_message"]
+    E -->|"enhanced_message"| PAR
+
+    subgraph PAR [Parallel — all 3 branches run concurrently]
+        direction TB
+        subgraph EMAIL [Email — Sequential Pipeline]
+            D1["EmailDrafterAgent\nreads {enhanced_message}"] -->|"drafted_email"| P1["EmailPublisherAgent\noutput_key: email_publication_result"]
+        end
+        subgraph SLACK [Slack — Sequential Pipeline]
+            D2["SlackDrafterAgent\nreads {enhanced_message}"] -->|"drafted_slack_message"| P2["SlackPublisherAgent\noutput_key: slack_publication_result"]
+        end
+        subgraph CAL [Calendar — Sequential Pipeline]
+            D3["EventExtractorAgent\nreads {enhanced_message}"] -->|"event_details"| P3["CalendarPublisherAgent\noutput_key: calendar_creation_result"]
+        end
+    end
+
+    P1 --> SUM[SummaryAgent]
+    P2 --> SUM
+    P3 --> SUM
+    SUM --> Out([Broadcast summary])
+```
+
+**Key state variables**
+
+| Key | Written by | Read by |
+|---|---|---|
+| `enhanced_message` | MessageEnhancerAgent | All three drafter/extractor agents |
+| `drafted_email` | EmailDrafterAgent | EmailPublisherAgent (same branch) |
+| `drafted_slack_message` | SlackDrafterAgent | SlackPublisherAgent (same branch) |
+| `event_details` | EventExtractorAgent | CalendarPublisherAgent (same branch) |
+| `email_publication_result` | EmailPublisherAgent | SummaryAgent |
+| `slack_publication_result` | SlackPublisherAgent | SummaryAgent |
+| `calendar_creation_result` | CalendarPublisherAgent | SummaryAgent |
+
+**ADK features used**
+- `type: parallel` node — all child branches start simultaneously
+- `type: sequential` inside each parallel branch — drafter → publisher pipeline
+- State isolation within branches — each branch has its own state keys
+- `{variable?}` optional injection in SummaryAgent — results may not exist if a branch fails
+
+---
+
+## 6. Loop Workflow
 
 **Source:** ADK samples — `story_teller` (simplified)
 
@@ -173,7 +224,7 @@ flowchart TD
 
 ---
 
-## 6. Loop with Exit
+## 7. Loop with Exit
 
 **Source:** ADK samples — `blog-writer`, `iterative-deep-research` (simplified)
 
@@ -206,7 +257,7 @@ flowchart TD
 
 ---
 
-## 7. Story Teller
+## 8. Story Teller
 
 **Source:** ADK Python — `story_teller`
 
@@ -252,7 +303,7 @@ flowchart TD
 
 ---
 
-## 8. Blog Writer
+## 9. Blog Writer
 
 **Source:** ADK Python — `blog-writer`
 
@@ -294,7 +345,7 @@ flowchart TD
 
 ---
 
-## 9. Iterative Deep Research
+## 10. Iterative Deep Research
 
 **Source:** ADK samples — `iterative-deep-research`
 
@@ -335,7 +386,7 @@ flowchart TD
 
 ---
 
-## 10. Academic Research Assistant
+## 11. Academic Research Assistant
 
 **Source:** ADK Python — `academic-research`
 
@@ -363,7 +414,7 @@ flowchart TD
 
 ---
 
-## 11. Marketing Agency
+## 12. Marketing Agency
 
 **Source:** ADK Python — `marketing-agency`
 
@@ -395,7 +446,7 @@ flowchart TD
 
 ---
 
-## 12. Short Movie Agent
+## 13. Short Movie Agent
 
 **Source:** ADK Python — `short-movie-agents`
 
@@ -427,7 +478,7 @@ flowchart TD
 
 ---
 
-## 13. Customer Support Triage
+## 14. Customer Support Triage
 
 **Source:** ADK samples — `workflow-concurrent_research_writer` (conditional routing simplified)
 
