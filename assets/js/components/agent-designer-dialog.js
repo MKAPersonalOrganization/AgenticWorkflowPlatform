@@ -101,7 +101,6 @@ export const agentDesigner = () => ({
 
     // UI state
     expanded: false,
-    showOrchestration: false,
     showSubAgents: false,
     showModelSettings: false,
     showModelOverride: false,
@@ -916,7 +915,6 @@ export const agentDesigner = () => ({
         this.showTools = false;
         this.showKnowledgeBases = false;
         this.showFilesystems = false;
-        this.showOrchestration = false;
         this.showSubAgents = false;
         this.showModelSettings = false;
         this.showModelOverride = false;
@@ -961,7 +959,6 @@ export const agentDesigner = () => ({
         this.showTools = false;
         this.showKnowledgeBases = false;
         this.showFilesystems = false;
-        this.showOrchestration = false;
         this.showSubAgents = false;
         this.showModelSettings = false;
         this.showModelOverride = false;
@@ -1102,18 +1099,6 @@ export const agentDesigner = () => ({
         if (this.loadingFilesystems) return '';
         const enabled = this.agentFilesystems.filter(fs => fs.enabled).length;
         return `${enabled}/${this.agentFilesystems.length}`;
-    },
-
-    get orchestrationSummary() {
-        const flags = [];
-        if (this.form.disallowTransferToParent) flags.push('no escalation');
-        if (this.form.disallowTransferToPeers) flags.push('no delegation');
-        if (this.form.outputKey) flags.push('output: ' + this.form.outputKey);
-        if (this.form.includeContents === 'none') flags.push('fresh context');
-        if (this.form.globalInstruction) flags.push('shared instructions');
-        if (this.form.inputSchema) flags.push('input schema');
-        if (this.form.outputSchema) flags.push('output schema');
-        return flags.length ? flags.join(' · ') : '';
     },
 
     // Sub-Agent Management
