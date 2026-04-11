@@ -955,13 +955,9 @@ export const alpineflowPalette = () => ({
 export const alpineflowPropertyPanel = () => ({
     node: null,
     showAdvanced: false,
-    showTools: false,
     loadingMetadata: false,
 
-    // Tool management - local state like other dialogs
-    showAddToolDialog: false,
-    availableTools: [],
-    loadingAvailableTools: false,
+    // Tool metadata (fetched for display counts)
     agentPlugins: [],
     loadingTools: false,
 
@@ -971,8 +967,6 @@ export const alpineflowPropertyPanel = () => ({
             const store = Alpine.store('flow');
             this.node = store.selectedId ? store.nodeById(store.selectedId) : null;
             this.showAdvanced = false;
-            this.showTools = false;
-            this.showAddToolDialog = false;
             this.agentPlugins = [];
 
             if (this.node?.type === 'agent' && this.node?.agent_id) {
@@ -1018,108 +1012,35 @@ export const alpineflowPropertyPanel = () => ({
         return this.configuredPlugins.reduce((sum, p) => sum + (p.tools?.length || 0), 0);
     },
 
-    // Open add tool dialog
-    async openAddToolDialog() {
-        if (!this.node?.agent_id) return;
-        this.showAddToolDialog = true;
-        this.loadingAvailableTools = true;
-        this.availableTools = [];
-
-        try {
-            const response = await fetch(`/v1/plugins?agent_id=${encodeURIComponent(this.node.agent_id)}`);
-            if (response.ok) {
-                const data = await response.json();
-                this.availableTools = data.plugins || [];
-            }
-        } catch (err) {
-            console.error('Failed to fetch available tools:', err);
-        } finally {
-            this.loadingAvailableTools = false;
-        }
+    // Subagent management
+    get subAgentsList() {
+        const agent = this.selectedAgent;
+        return agent?.subAgents || [];
     },
 
-    closeAddToolDialog() {
-        this.showAddToolDialog = false;
-        this.availableTools = [];
+    get subAgentCount() {
+        return this.subAgentsList.length;
     },
 
-    // Check if a plugin from availableTools is attached
-    isToolAttached(pluginId) {
-        const plugin = this.agentPlugins.find(p => p.id === pluginId);
-        return plugin ? this.isPluginAttached(plugin) : false;
+    getSubAgentName(agentId) {
+        const agent = (Alpine.store('flow').agents || []).find(a => a.id === agentId);
+        return agent ? agent.name : agentId;
     },
 
-    async attachToolSet(plugin) {
-        if (!this.node?.agent_id || !plugin?.id) return;
-
-        try {
-            const response = await fetch(`/v1/agents/${encodeURIComponent(this.node.agent_id)}/toolsets/${encodeURIComponent(plugin.id)}/requirements`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'allow' }),
-            });
-            if (response.ok) {
-                const existingPlugin = this.agentPlugins.find(p => p.id === plugin.id);
-                if (existingPlugin) {
-                    existingPlugin.requirement_config = { action: 'allow' };
-                }
-                const availablePlugin = this.availableTools.find(p => p.id === plugin.id);
-                if (availablePlugin) {
-                    availablePlugin.requirement_config = { action: 'allow' };
-                }
-            }
-        } catch (err) {
-            console.error('Failed to attach toolset:', err);
-        }
+    // Knowledge bases count
+    get kbCount() {
+        const agentId = this.node?.agent_id;
+        if (!agentId) return 0;
+        const kbs = Alpine.store('flow').getKBs(agentId);
+        return kbs.length;
     },
 
-    async detachToolSet(plugin) {
-        if (!this.node?.agent_id || !plugin?.id) return;
-
-        try {
-            const response = await fetch(`/v1/agents/${encodeURIComponent(this.node.agent_id)}/toolsets/${encodeURIComponent(plugin.id)}/requirements`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'block' }),
-            });
-            if (response.ok) {
-                const existingPlugin = this.agentPlugins.find(p => p.id === plugin.id);
-                if (existingPlugin) {
-                    existingPlugin.requirement_config = { action: 'block' };
-                }
-            }
-        } catch (err) {
-            console.error('Failed to detach toolset:', err);
-        }
-    },
-
-    // Granular tool-level controls
-    isToolBlocked(plugin, tool) {
-        return tool?.requirement_config?.action === 'block';
-    },
-
-    async toggleTool(plugin, tool) {
-        if (!this.node?.agent_id || !plugin?.id || !tool?.id) return;
-
-        const newAction = this.isToolBlocked(plugin, tool) ? 'allow' : 'block';
-        try {
-            const response = await fetch(`/v1/agents/${encodeURIComponent(this.node.agent_id)}/toolsets/${encodeURIComponent(plugin.id)}/tools/${encodeURIComponent(tool.id)}/requirements`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: newAction }),
-            });
-            if (response.ok) {
-                tool.requirement_config = tool.requirement_config || {};
-                tool.requirement_config.action = newAction;
-            }
-        } catch (err) {
-            console.error('Failed to toggle tool:', err);
-        }
-    },
-
-    getToolEnabledCount(plugin) {
-        if (!plugin.tools) return 0;
-        return plugin.tools.filter(t => t.requirement_config?.action !== 'block').length;
+    // Filesystems count
+    get fsCount() {
+        const agentId = this.node?.agent_id;
+        if (!agentId) return 0;
+        const fss = Alpine.store('flow').getFilesystems(agentId);
+        return fss.length;
     },
 
     get agents()     { return Alpine.store('flow').agents     || []; },
@@ -1238,23 +1159,5 @@ export const alpineflowPropertyPanel = () => ({
         } catch {
             return 'invalid JSON';
         }
-    },
-
-    // Tool permission helpers
-    isPluginEnabled(plugin) {
-        const action = plugin?.requirement_config?.action;
-        return action === 'allow' || action === 'require_confirmation';
-    },
-    isToolEnabled(plugin, tool) {
-        const action = tool?.requirement_config?.action;
-        return action === 'allow' || action === 'require_confirmation';
-    },
-    isToolBlocked(plugin, tool) {
-        const action = tool?.requirement_config?.action;
-        return action === 'block';
-    },
-    getPluginEnabledCount(plugin) {
-        if (!plugin.tools) return 0;
-        return plugin.tools.filter(t => t.requirement_config?.action !== 'block').length;
     },
 });

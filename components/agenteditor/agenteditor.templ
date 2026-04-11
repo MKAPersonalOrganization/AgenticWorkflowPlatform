@@ -1031,159 +1031,66 @@ templ AgentDesignerDialog() {
 														</div>
 													</div>
 
-													<!-- Tools -->
+													<!-- Agent Configuration Summary -->
 													<div class="border-t pt-2 border-border">
-														<div class="flex items-center justify-between">
+														<div class="flex items-center justify-between mb-2">
+															<h4 class="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold">
+																@icon.Settings(icon.Props{Class: "size-3 inline me-0.5"})
+																Agent Configuration
+															</h4>
 															<button
-																@click="showTools = !showTools"
-																class="flex items-center gap-1.5 text-[9px] uppercase tracking-widest text-muted-foreground font-semibold hover:text-foreground transition-colors py-1"
+																@click="editAgent()"
+																class="text-[9px] text-indigo-400 hover:text-indigo-300 font-medium transition-colors px-2 py-0.5 rounded border border-indigo-400/30 hover:border-indigo-400/60 hover:bg-indigo-500/5"
 															>
-																@icon.Blocks(icon.Props{Class: "size-3"})
-																Tools
-																<span x-show="toolCount > 0" class="text-[8px] px-1 py-0.5 rounded bg-primary/20 text-primary" x-text="toolCount + ' tool' + (toolCount !== 1 ? 's' : '')"></span>
-																<span class="transition-transform text-[6px]" :class="showTools ? 'rotate-180' : ''">▼</span>
-															</button>
-															<button
-																@click="openAddToolDialog()"
-																class="text-[9px] text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
-															>
-																+ Add
+																@icon.Pencil(icon.Props{Class: "size-2.5 inline me-1"})
+																Edit Agent
 															</button>
 														</div>
-														<div x-show="showTools" x-collapse class="pt-2 space-y-2">
-															<!-- Loading state -->
-															<template x-if="loadingMetadata">
-																<div class="space-y-1.5">
-																	<template x-for="i in 2" :key="i">
-																		<div class="flex items-center gap-2 p-2 rounded-lg animate-pulse bg-muted">
-																		<div class="size-4 rounded bg-muted-foreground"></div>
-																		<div class="flex-1 h-3 bg-muted-foreground rounded"></div>
-																		</div>
-																	</template>
-																</div>
-															</template>
-															<!-- No tools configured -->
-															<template x-if="!loadingMetadata && configuredPlugins.length === 0">
-<div class="text-[10px] text-muted-foreground italic py-3 text-center">
-																No tools attached. Click + Add to attach tools.
-															</div>
-															</template>
-															<!-- Configured tool list -->
-															<template x-for="plugin in configuredPlugins" :key="plugin.id">
-<div class="rounded-lg overflow-hidden bg-muted border-border">
-																		<div class="flex items-center gap-2 px-2 py-1.5">
-																			@icon.Blocks(icon.Props{Class: "size-3 text-muted-foreground shrink-0"})
-																			<span class="text-[10px] font-medium text-foreground flex-1 truncate" x-text="plugin.name"></span>
-																			<span class="text-[8px] text-muted-foreground" x-text="getToolEnabledCount(plugin) + '/' + plugin.tools?.length"></span>
-																		<button
-																			@click="detachToolSet(plugin)"
-																			title="Detach tool"
-																			class="shrink-0 w-5 h-5 rounded text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors text-[10px]"
-																		>
-																			✕
-																		</button>
-																	</div>
-																	<!-- Individual tools -->
-																	<template x-if="plugin.tools && plugin.tools.length > 0">
-																		<div class="border-t border-white/5">
-																			<template x-for="tool in plugin.tools" :key="tool.id">
-																				<div class="flex items-center gap-2 px-2 py-1.5 border-b border-white/5 last:border-0" :class="isToolBlocked(plugin, tool) ? 'opacity-50' : ''">
-																					<span class="w-3 shrink-0"></span>
-																					<span class="text-[9px] text-muted-foreground flex-1 truncate" :class="isToolBlocked(plugin, tool) ? 'line-through' : ''" x-text="tool.name"></span>
-																					<button
-																						@click="toggleTool(plugin, tool)"
-																						type="button"
-																						role="switch"
-																						:aria-checked="!isToolBlocked(plugin, tool)"
-																						class="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
-																						:class="isToolBlocked(plugin, tool) ? 'bg-gray-600' : 'bg-indigo-500'"
-																					>
-																						<span class="pointer-events-none inline-block size-3 rounded-full bg-background shadow ring-0 transition-transform duration-200" :class="isToolBlocked(plugin, tool) ? 'translate-x-0' : 'translate-x-3'"></span>
-																					</button>
-																				</div>
-																			</template>
-																		</div>
-																	</template>
-																</div>
-															</template>
-														</div>
-													</div>
 
-													<!-- Add Tool Dialog -->
-													<div
-														x-show="showAddToolDialog"
-														x-transition:enter="transition ease-out duration-200"
-														x-transition:enter-start="opacity-0"
-														x-transition:enter-end="opacity-100"
-														x-transition:leave="transition ease-in duration-150"
-														x-transition:leave-start="opacity-100"
-														x-transition:leave-end="opacity-0"
-														@click.self="closeAddToolDialog()"
-														class="fixed inset-0 z-50 bg-black/40 backdrop-blur-[3px]"
-													></div>
-													<div
-														x-show="showAddToolDialog"
-														x-transition:enter="transition ease-out duration-200"
-														x-transition:enter-start="opacity-0 scale-[0.97]"
-														x-transition:enter-end="opacity-100 scale-100"
-														x-transition:leave="transition ease-in duration-150"
-														x-transition:leave-start="opacity-100 scale-100"
-														x-transition:leave-end="opacity-0 scale-[0.97]"
-														@keydown.escape.window="closeAddToolDialog()"
-														class="fixed z-50 left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] bg-background rounded-2xl border border-border/60 shadow-modern-xl w-full max-w-md"
-													>
-														<!-- Header -->
-														<div class="flex items-center justify-between px-5 pt-5 pb-0">
-															<div class="flex items-center gap-2.5">
-																<div class="size-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-																	@icon.Blocks(icon.Props{Class: "size-4"})
-																</div>
-																<div>
-																	<h3 class="text-sm font-semibold text-foreground">Add Tools</h3>
-																</div>
-															</div>
-															<button
-																type="button"
-																@click="closeAddToolDialog()"
-																class="size-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-															>
-																@icon.X(icon.Props{Class: "size-4"})
-															</button>
-														</div>
-														<!-- Body -->
-														<div class="px-5 py-4 max-h-80 overflow-y-auto">
-															<template x-if="loadingAvailableTools">
-																<div class="space-y-2">
-																	<template x-for="i in 3" :key="i">
-																		<div class="h-12 rounded-lg animate-pulse bg-muted"></div>
-																	</template>
-																</div>
-															</template>
-															<template x-if="!loadingAvailableTools && availableTools.length === 0">
-																<div class="text-sm text-muted-foreground py-6 text-center">No tools available</div>
-															</template>
-															<div x-show="!loadingAvailableTools" class="space-y-2">
-																<template x-for="plugin in availableTools" :key="plugin.id">
-																	<div
-																		class="flex items-center gap-3 p-3 rounded-lg border border-border transition-colors cursor-pointer hover:border-primary/50"
-																		:class="isToolAttached(plugin.id) ? 'opacity-50' : ''"
-																		@click="!isToolAttached(plugin.id) && attachToolSet(plugin)"
-																	>
-																		@icon.Blocks(icon.Props{Class: "size-4 text-muted-foreground shrink-0"})
-																		<div class="flex-1 min-w-0">
-																			<p class="text-sm font-medium text-foreground truncate" x-text="plugin.name"></p>
-																			<p class="text-xs text-muted-foreground truncate" x-text="plugin.tools?.length + ' tool' + (plugin.tools?.length !== 1 ? 's' : '')"></p>
-																		</div>
-																		<template x-if="isToolAttached(plugin.id)">
-																			<span class="shrink-0 text-xs text-emerald-500 font-medium">Attached</span>
-																		</template>
-																		<template x-if="!isToolAttached(plugin.id)">
-																			<span class="shrink-0 text-xs text-primary font-medium">+ Add</span>
-																		</template>
+														<!-- Loading state -->
+														<template x-if="loadingMetadata">
+															<div class="space-y-1.5">
+																<template x-for="i in 3" :key="i">
+																	<div class="flex items-center gap-2 p-2 rounded-lg animate-pulse bg-muted">
+																		<div class="size-4 rounded bg-muted-foreground/20"></div>
+																		<div class="flex-1 h-3 bg-muted-foreground/20 rounded"></div>
 																	</div>
 																</template>
 															</div>
-														</div>
+														</template>
+
+														<!-- Configuration summary -->
+														<template x-if="!loadingMetadata">
+															<div class="space-y-1.5">
+																<!-- Tools -->
+																<div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/50">
+																	@icon.Blocks(icon.Props{Class: "size-3 text-muted-foreground shrink-0"})
+																	<span class="text-[10px] text-muted-foreground flex-1">Tools</span>
+																	<span class="text-[10px] font-semibold text-foreground" x-text="toolCount + ' tool' + (toolCount !== 1 ? 's' : '')"></span>
+																</div>
+
+																<!-- Subagents -->
+																<div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/50">
+																	@icon.Users(icon.Props{Class: "size-3 text-muted-foreground shrink-0"})
+																	<span class="text-[10px] text-muted-foreground flex-1">Subagents</span>
+																	<span class="text-[10px] font-semibold text-foreground" x-text="subAgentCount + ' agent' + (subAgentCount !== 1 ? 's' : '')"></span>
+																</div>
+
+																<!-- Knowledge Bases -->
+																<div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/50">
+																	@icon.BookOpenText(icon.Props{Class: "size-3 text-muted-foreground shrink-0"})
+																	<span class="text-[10px] text-muted-foreground flex-1">Knowledge Bases</span>
+																	<span class="text-[10px] font-semibold text-foreground" x-text="kbCount + ' KB' + (kbCount !== 1 ? 's' : '')"></span>
+																</div>
+
+																<!-- Filesystems -->
+																<div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/50">
+																	@icon.FolderOpen(icon.Props{Class: "size-3 text-muted-foreground shrink-0"})
+																	<span class="text-[10px] text-muted-foreground flex-1">Filesystems</span>
+																	<span class="text-[10px] font-semibold text-foreground" x-text="fsCount + ' FS' + (fsCount !== 1 ? 's' : '')"></span>
+																</div>
+															</div>
+														</template>
 													</div>
 
 													<!-- Advanced Section -->
