@@ -824,6 +824,20 @@ export const alpineflowNode = (nodeId) => ({
 
     get outputKeyBadge() { return this.n.output_key ? '→ ' + this.n.output_key : ''; },
 
+    get isCoordinatorNode() {
+        const n = this.n;
+        if (n.type !== 'agent' || !n.agent_id) return false;
+        const agent = (Alpine.store('flow').agents || []).find(a => a.id === n.agent_id);
+        return agent && agent.subAgents && agent.subAgents.length > 0;
+    },
+
+    get subAgentCount() {
+        const n = this.n;
+        if (n.type !== 'agent' || !n.agent_id) return 0;
+        const agent = (Alpine.store('flow').agents || []).find(a => a.id === n.agent_id);
+        return agent && agent.subAgents ? agent.subAgents.length : 0;
+    },
+
     // ── Drag to reposition (with 4px threshold) ──────────────────────────────
     onHeaderMouseDown(e) {
         if (e.button !== 0) return;
@@ -1068,6 +1082,11 @@ export const alpineflowPropertyPanel = () => ({
         const n = this.node;
         if (!n || n.type !== 'agent' || !n.agent_id) return null;
         return (Alpine.store('flow').agents || []).find(a => a.id === n.agent_id) || null;
+    },
+
+    get isCoordinator() {
+        const agent = this.selectedAgent;
+        return agent && agent.subAgents && agent.subAgents.length > 0;
     },
 
     get selectedConnector() {
