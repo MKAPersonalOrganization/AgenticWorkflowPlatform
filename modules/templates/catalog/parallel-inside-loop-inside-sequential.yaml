@@ -1,0 +1,124 @@
+name: Parallel Inside Loop Inside Sequential
+slug: parallel-inside-loop-inside-sequential
+description: "Deeply nested workflow from ADK Python samples (story_teller): a sequential root contains a loop whose body includes parallel drafters followed by a critic. Each iteration produces two drafts in parallel, the critic picks the best, and the loop runs exactly 3 times. Demonstrates parallel + loop nesting inside sequential."
+system_prompt: "Generate three rounds of parallel drafts, critiquing and selecting the best version each round."
+category: Examples
+tags: [parallel, loop, sequential, nested, multi-perspective, adk-sample]
+author_name: ADK
+icon: workflow
+featured: true
+
+# Workflow: sequential(enhancer → loop(sequential(parallel(draft_a, draft_b) → critic)))
+workflow:
+  id: root
+  type: sequential
+  children:
+    - id: n1
+      type: agent
+      agent_id: sub-brief-enhancer
+      output_key: topic_brief
+    - id: n2
+      type: loop
+      max_iterations: 3
+      allow_early_exit: false
+      children:
+        - id: n2a
+          type: sequential
+          children:
+            - id: n2a1
+              type: parallel
+              children:
+                - id: n2a1a
+                  type: agent
+                  agent_id: sub-draft-a
+                  output_key: draft_a
+                - id: n2a1b
+                  type: agent
+                  agent_id: sub-draft-b
+                  output_key: draft_b
+            - id: n2a2
+              type: agent
+              agent_id: sub-critic
+              output_key: best_draft
+
+sub_agents:
+  - id: sub-brief-enhancer
+    name: BriefEnhancerAgent
+    description: Takes the user's topic and produces a structured brief with context, audience, and key requirements.
+    icon: sparkles
+    system_prompt: |
+      ## Role: Brief Enhancer
+
+      ## Objective
+      Take the user's topic and produce a structured brief with context, audience, and key requirements.
+
+      ## Instructions
+      1. Understand the user's request or topic.
+      2. Identify the target audience, purpose, and tone.
+      3. List 3-5 key requirements that any response must address.
+      4. Output a clear, structured brief.
+
+      Format:
+      - **Topic:** [description]
+      - **Audience:** [who this is for]
+      - **Purpose:** [goal of the response]
+      - **Requirements:** [numbered list of must-address items]
+
+  - id: sub-draft-a
+    name: DraftAAgent
+    description: Produces a bold, creative draft with unconventional angles and vivid examples. Reads the brief from {topic_brief?} and the previous best draft from {best_draft?}.
+    icon: lightbulb
+    system_prompt: |
+      ## Role: Creative Drafter
+
+      ## Objective
+      Produce a bold, creative response that takes unconventional angles and vivid examples.
+
+      ## Instructions
+      1. Review the brief: {topic_brief?}
+      2. Review the previous best draft (if any): {best_draft?}
+      3. Write a creative, engaging response that:
+         - Uses vivid examples and analogies
+         - Takes unexpected or unconventional angles
+         - Is engaging and memorable
+      4. Aim for approximately 200 words.
+
+  - id: sub-draft-b
+    name: DraftBAgent
+    description: Produces a structured, analytical draft with logical reasoning and evidence. Reads the brief from {topic_brief?} and the previous best draft from {best_draft?}.
+    icon: target
+    system_prompt: |
+      ## Role: Analytical Drafter
+
+      ## Objective
+      Produce a structured, analytical response with logical reasoning and evidence.
+
+      ## Instructions
+      1. Review the brief: {topic_brief?}
+      2. Review the previous best draft (if any): {best_draft?}
+      3. Write a clear, logical response that:
+         - Uses structured reasoning and evidence
+         - Addresses each requirement systematically
+         - Is precise and authoritative
+      4. Aim for approximately 200 words.
+
+  - id: sub-critic
+    name: CriticAgent
+    description: Evaluates both drafts against the brief requirements, selects the stronger one, and outputs it as the new best draft.
+    icon: clipboard-check
+    system_prompt: |
+      ## Role: Critic
+
+      ## Objective
+      Evaluate both drafts against the brief requirements and select the stronger version.
+
+      ## Instructions
+      1. Review the brief: {topic_brief?}
+      2. Review Draft A: {draft_a}
+      3. Review Draft B: {draft_b}
+      4. Evaluate each draft on:
+         - **Relevance:** Does it address all requirements?
+         - **Quality:** Is the writing clear, engaging, and accurate?
+         - **Completeness:** Does it cover the topic adequately?
+      5. Select the better draft and output its full text.
+      6. Add one sentence explaining why this draft was chosen.

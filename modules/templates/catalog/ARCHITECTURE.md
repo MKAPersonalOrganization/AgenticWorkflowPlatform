@@ -16,6 +16,7 @@ Each entry in the catalog demonstrates a specific set of ADK-Go workflow feature
 | Parallel Inside Sequential | ✓ | ✓ | | | ✓ | |
 | Loop Workflow | | | ✓ | | ✓ | |
 | Loop with Exit | | | ✓ | ✓ | ✓ | |
+| Parallel Inside Loop Inside Sequential | ✓ | ✓ | ✓ | | ✓ | ✓ |
 | Story Teller | ✓ | ✓ | ✓ | | ✓ | ✓ |
 | Blog Writer | ✓ | | ✓ | ✓ | ✓ | |
 | Iterative Deep Research | ✓ | | ✓ | ✓ | ✓ | |
@@ -301,7 +302,51 @@ flowchart TD
 
 ---
 
-## 9. Story Teller
+## 9. Parallel Inside Loop Inside Sequential
+
+**Source:** ADK Python — `story_teller` (simplified)
+
+**What it demonstrates:** The most deeply nested composition in the catalog. A sequential root contains a loop whose body is itself a sequential containing a parallel. Two drafters run concurrently, a critic selects the best, and the loop repeats exactly 3 times — each iteration building on the previous best draft.
+
+```mermaid
+flowchart TD
+    User([Topic]) --> A["BriefEnhancerAgent\noutput_key: topic_brief"]
+    A --> LOOP
+
+    subgraph LOOP [Loop — exactly 3 iterations, no early exit]
+        direction TB
+        subgraph SEQ [Sequential per iteration]
+            direction TB
+            subgraph PAR [Parallel — 2 drafters run concurrently]
+                DA["DraftAAgent (Creative)\nreads {topic_brief?} {best_draft?}\noutput_key: draft_a"]
+                DB["DraftBAgent (Analytical)\nreads {topic_brief?} {best_draft?}\noutput_key: draft_b"]
+            end
+            PAR --> C["CriticAgent\nevaluates both drafts\npicks best\noutput_key: best_draft"]
+        end
+    end
+
+    LOOP --> Out([Best draft after 3 rounds])
+```
+
+**Key state variables**
+
+| Key | Written by | Read by |
+|---|---|---|
+| `topic_brief` | BriefEnhancerAgent | DraftA, DraftB, Critic (all iterations) |
+| `draft_a` | DraftAAgent (each iteration) | CriticAgent (same iteration) |
+| `draft_b` | DraftBAgent (each iteration) | CriticAgent (same iteration) |
+| `best_draft` | CriticAgent (each iteration) | DraftA, DraftB (next iteration via `{best_draft?}`) |
+
+**ADK features used**
+- `type: loop` with `max_iterations: 3` and `allow_early_exit: false`
+- `type: parallel` nested inside `type: sequential` nested inside `type: loop`
+- `{variable?}` optional injection — first iteration has no prior `{best_draft}`
+- State **overwrite** across iterations — `best_draft` is replaced each round with the selected version
+- State **fan-out** — `topic_brief` is read by all agents at every depth
+
+---
+
+## 10. Story Teller
 
 **Source:** ADK Python — `story_teller`
 
@@ -347,7 +392,7 @@ flowchart TD
 
 ---
 
-## 10. Blog Writer
+## 11. Blog Writer
 
 **Source:** ADK Python — `blog-writer`
 
@@ -389,7 +434,7 @@ flowchart TD
 
 ---
 
-## 11. Iterative Deep Research
+## 12. Iterative Deep Research
 
 **Source:** ADK samples — `iterative-deep-research`
 
@@ -430,7 +475,7 @@ flowchart TD
 
 ---
 
-## 12. Academic Research Assistant
+## 13. Academic Research Assistant
 
 **Source:** ADK Python — `academic-research`
 
@@ -458,7 +503,7 @@ flowchart TD
 
 ---
 
-## 13. Marketing Agency
+## 14. Marketing Agency
 
 **Source:** ADK Python — `marketing-agency`
 
@@ -490,7 +535,7 @@ flowchart TD
 
 ---
 
-## 14. Short Movie Agent
+## 15. Short Movie Agent
 
 **Source:** ADK Python — `short-movie-agents`
 
@@ -522,7 +567,7 @@ flowchart TD
 
 ---
 
-## 15. Customer Support Triage
+## 16. Customer Support Triage
 
 **Source:** ADK samples — `workflow-concurrent_research_writer` (conditional routing simplified)
 
