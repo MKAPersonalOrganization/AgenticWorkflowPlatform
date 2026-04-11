@@ -44,7 +44,7 @@ templ AgentDesignerDialog() {
 								</span>
 							}
 							@dialog.Description() {
-								{ i18n.T(ctx, "Create and manage AI agents and multi-agent workflows.") }
+								{ i18n.T(ctx, "Create AI agents and orchestrate workflows.") }
 							}
 						</div>
 						<div class="flex items-center gap-1">
@@ -264,7 +264,7 @@ templ AgentDesignerDialog() {
 						</div>
 						<div class="flex-1 flex flex-col items-center justify-center p-8 gap-6 overflow-y-auto">
 							<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-lg">
-								<!-- Single Agent Card -->
+								<!-- LLM Agent Card -->
 								<button
 									type="button"
 									@click="showCreateNodeForm()"
@@ -276,17 +276,17 @@ templ AgentDesignerDialog() {
 										@icon.Bot(icon.Props{Class: "size-7"})
 									</div>
 									<div class="relative">
-										<h4 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Single Agent") }</h4>
-										<p class="text-xs text-muted-foreground mt-1.5 leading-relaxed max-w-[220px]">{ i18n.T(ctx, "An AI agent with custom instructions, tools, and knowledge bases.") }</p>
+										<h4 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "LLM Agent") }</h4>
+										<p class="text-xs text-muted-foreground mt-1.5 leading-relaxed max-w-[220px]">{ i18n.T(ctx, "An AI agent with custom instructions, tools, and the ability to delegate to sub-agents.") }</p>
 									</div>
 									<!-- Feature pills -->
 									<div class="relative flex flex-wrap gap-1 mt-1 justify-center">
 										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">System Prompt</span>
 										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/50">Tools</span>
-										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/50">Knowledge</span>
+										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/50">Sub-agents</span>
 									</div>
 								</button>
-								<!-- Workflow Card -->
+								<!-- Workflow Orchestrator Card -->
 								<button
 									type="button"
 									@click="showCreatePipelineForm()"
@@ -298,14 +298,14 @@ templ AgentDesignerDialog() {
 										@icon.GitBranch(icon.Props{Class: "size-7"})
 									</div>
 									<div class="relative">
-										<h4 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Multi-Agent Workflow") }</h4>
-										<p class="text-xs text-muted-foreground mt-1.5 leading-relaxed max-w-[220px]">{ i18n.T(ctx, "Orchestrate multiple agents working together in sequence, parallel, or loops.") }</p>
+										<h4 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Workflow Orchestrator") }</h4>
+										<p class="text-xs text-muted-foreground mt-1.5 leading-relaxed max-w-[220px]">{ i18n.T(ctx, "Orchestrate multiple agents with sequential, parallel, loop, or conditional execution.") }</p>
 									</div>
 									<!-- Feature pills -->
 									<div class="relative flex flex-wrap gap-1 mt-1 justify-center">
 										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">Sequential</span>
 										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/50">Parallel</span>
-										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/50">Loops</span>
+										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/50">Conditional</span>
 									</div>
 								</button>
 								<!-- From Template Card -->
@@ -1568,7 +1568,7 @@ templ agentNodeForm() {
 			<div class="p-4 space-y-3 border-t border-border/50">
 				<p class="text-xs text-muted-foreground leading-relaxed">
 					@icon.Info(icon.Props{Class: "size-3.5 inline me-1 text-violet-500"})
-					{ i18n.T(ctx, "Select existing agents from your library to act as specialists under this coordinator.") }
+					{ i18n.T(ctx, "This agent will act as a coordinator, delegating tasks to specialist sub-agents. The coordinator LLM decides which sub-agent to use based on conversation context.") }
 				</p>
 				
 				<button type="button" @click="openSubAgentDialog()" class="w-full text-center text-xs text-primary hover:text-primary/80 py-1.5 border border-dashed border-border rounded-lg hover:border-primary/40 transition-colors">
@@ -1650,7 +1650,7 @@ templ agentNodeForm() {
 				<div class="size-6 rounded-md bg-indigo-500/10 flex items-center justify-center">
 					@icon.GitBranch(icon.Props{Class: "size-3.5 text-indigo-600 dark:text-indigo-400"})
 				</div>
-				{ i18n.T(ctx, "Advanced Settings") }
+				{ i18n.T(ctx, "Workflow Behavior") }
 				<template x-if="orchestrationSummary">
 					<span class="text-[10px] text-muted-foreground" x-text="orchestrationSummary"></span>
 				</template>
@@ -1663,7 +1663,7 @@ templ agentNodeForm() {
 			<div class="p-4 space-y-5 border-t border-border/50">
 				<p class="text-xs text-muted-foreground leading-relaxed">
 					@icon.Info(icon.Props{Class: "size-3.5 inline me-1 text-indigo-500"})
-					{ i18n.T(ctx, "These settings control how this agent behaves when used as part of a multi-agent workflow.") }
+					{ i18n.T(ctx, "These settings control how this agent delegates tasks, shares context, and behaves within a multi-agent workflow.") }
 				</p>
 				@orchestrationFields()
 			</div>
