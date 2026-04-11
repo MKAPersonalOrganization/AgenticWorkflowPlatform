@@ -1,9 +1,9 @@
-name: LLM Auditor
-slug: llm-auditor
-description: "Fact-checks an LLM-generated answer with web search, then minimally revises any inaccuracies. critic_agent identifies and verifies every claim; reviser_agent corrects them while preserving the original style. From ADK Python & Go samples."
+name: Implicit State
+slug: implicit-state
+description: "Fact-checks an LLM-generated answer with web search, then minimally revises any inaccuracies. critic_agent identifies and verifies every claim; reviser_agent corrects them while preserving the original style. Demonstrates implicit state passing via conversation history — no output_key needed. From ADK Python & Go samples."
 system_prompt: "Verify and improve an LLM-generated answer: a critic identifies and web-checks every claim, then a reviser corrects inaccuracies."
 category: Examples
-tags: [sequential, fact-checking, web-search, adk-sample]
+tags: [sequential, implicit-state, conversation-history, fact-checking, web-search, adk-sample]
 author_name: ADK
 icon: clipboard-check
 featured: true

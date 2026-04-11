@@ -9,7 +9,7 @@ Each entry in the catalog demonstrates a specific set of ADK-Go workflow feature
 | Agent | Sequential | Parallel | Loop | allow\_early\_exit | State Injection | Nested Workflows |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 | Sequential Workflow | ✓ | | | | ✓ | |
-| LLM Auditor | ✓ | | | | | |
+| Implicit State | ✓ | | | | | |
 | Podcast Transcript | ✓ | | | | ✓ | |
 | Parallel Workflow | ✓ | ✓ | | | ✓ | |
 | Sequential Inside Parallel | ✓ | ✓ | | | ✓ | ✓ |
@@ -58,7 +58,7 @@ flowchart TD
 
 ---
 
-## 2. LLM Auditor
+## 2. Implicit State
 
 **Source:** ADK Python + Go — `llm-auditor`
 
