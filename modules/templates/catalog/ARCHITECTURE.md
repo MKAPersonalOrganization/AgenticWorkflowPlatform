@@ -11,7 +11,7 @@ Each entry in the catalog demonstrates a specific set of ADK-Go workflow feature
 | Sequential Workflow | ✓ | | | | ✓ | |
 | LLM Auditor | ✓ | | | | | |
 | Podcast Transcript | ✓ | | | | ✓ | |
-| Parallel Broadcast | ✓ | ✓ | | | ✓ | ✓ |
+| Parallel Workflow | ✓ | ✓ | | | ✓ | |
 | Story Teller | ✓ | ✓ | ✓ | | ✓ | ✓ |
 | Blog Writer | ✓ | | ✓ | ✓ | ✓ | |
 | Iterative Deep Research | ✓ | | ✓ | ✓ | ✓ | |
@@ -97,33 +97,27 @@ flowchart TD
 
 ---
 
-## 4. Parallel Announcement Broadcast
+## 4. Parallel Workflow
 
 **Source:** ADK Python — `parallel_task_decomposition_execution`
 
-**What it demonstrates:** A sequential root wrapping a `type: parallel` node whose three branches are themselves `type: sequential` sub-pipelines. Shows how parallel branches can share state written by a preceding sequential agent, and how their results are collected into a final summary.
+**What it demonstrates:** A sequential root wrapping a `type: parallel` node whose three child agents run concurrently — each independently drafting content for Email, Slack, and Calendar from the same upstream state — and a summary agent collects the results. This is the purest fan-out/fan-in pattern with no nested sequential branches.
 
 ```mermaid
 flowchart TD
     User([Announcement Topic]) --> E["MessageEnhancerAgent\nResearches and enriches the topic"]
     E -->|"output_key: enhanced_message"| PAR
 
-    subgraph PAR [Parallel — all three branches run concurrently]
+    subgraph PAR [Parallel — all three agents run concurrently]
         direction TB
-        subgraph EMAIL [Email Branch]
-            D1["EmailDrafterAgent\nreads {enhanced_message}"] -->|"output_key: drafted_email"| P1["EmailPublisherAgent\nreads {drafted_email}"]
-        end
-        subgraph SLACK [Slack Branch]
-            D2["SlackDrafterAgent\nreads {enhanced_message}"] -->|"output_key: drafted_slack_message"| P2["SlackPublisherAgent\nreads {drafted_slack_message}"]
-        end
-        subgraph CAL [Calendar Branch]
-            D3["EventExtractorAgent\nreads {enhanced_message}"] -->|"output_key: event_details"| P3["CalendarPublisherAgent\nreads {event_details}"]
-        end
+        D1["EmailDrafterAgent\nreads {enhanced_message}\noutput_key: drafted_email"]
+        D2["SlackDrafterAgent\nreads {enhanced_message}\noutput_key: drafted_slack_message"]
+        D3["EventDetailsExtractorAgent\nreads {enhanced_message}\noutput_key: event_details"]
     end
 
-    P1 -->|email_publication_result| SUM[SummaryAgent\nreads all three results]
-    P2 -->|slack_publication_result| SUM
-    P3 -->|calendar_creation_result| SUM
+    D1 --> SUM[SummaryAgent\nreads all three results]
+    D2 --> SUM
+    D3 --> SUM
     SUM --> Out([Broadcast summary])
 ```
 
@@ -131,17 +125,14 @@ flowchart TD
 
 | Key | Written by | Read by |
 |---|---|---|
-| `enhanced_message` | MessageEnhancerAgent | All three drafter/extractor agents |
-| `drafted_email` | EmailDrafterAgent | EmailPublisherAgent |
-| `drafted_slack_message` | SlackDrafterAgent | SlackPublisherAgent |
-| `event_details` | EventExtractorAgent | CalendarPublisherAgent |
-| `email_publication_result` | EmailPublisherAgent | SummaryAgent |
-| `slack_publication_result` | SlackPublisherAgent | SummaryAgent |
-| `calendar_creation_result` | CalendarPublisherAgent | SummaryAgent |
+| `enhanced_message` | MessageEnhancerAgent | All three parallel drafter/extractor agents |
+| `drafted_email` | EmailDrafterAgent | SummaryAgent |
+| `drafted_slack_message` | SlackDrafterAgent | SummaryAgent |
+| `event_details` | EventDetailsExtractorAgent | SummaryAgent |
 
 **ADK features used**
-- `type: parallel` node — all child workflows start simultaneously and share the same session state
-- Nested `type: sequential` inside `type: parallel` — each branch is its own pipeline
+- `type: parallel` node — all child agents start simultaneously and share the same session state
+- Each parallel child is a single `type: agent` node (no nesting)
 - `{variable?}` optional injection in SummaryAgent — results may not exist if a branch fails
 
 ---
