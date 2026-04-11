@@ -81,6 +81,7 @@ export const agentDesigner = () => ({
         description: '',
         systemPrompt: '',
         graph: null,
+        subAgents: [],
         disallowTransferToParent: false,
         disallowTransferToPeers: false,
         outputKey: '',
@@ -101,8 +102,12 @@ export const agentDesigner = () => ({
     // UI state
     expanded: false,
     showOrchestration: false,
+    showSubAgents: false,
     showModelSettings: false,
     showModelOverride: false,
+
+    // Sub-agent selection state
+    subAgentDialogOpen: false,
 
     providerModelOptions: [],  // populated dynamically when a provider is selected
     providerModelsLoading: false,
@@ -891,6 +896,7 @@ export const agentDesigner = () => ({
             description: '',
             systemPrompt: '',
             graph: null,
+            subAgents: [],
             disallowTransferToParent: false,
             disallowTransferToPeers: false,
             outputKey: '',
@@ -911,6 +917,7 @@ export const agentDesigner = () => ({
         this.showKnowledgeBases = false;
         this.showFilesystems = false;
         this.showOrchestration = false;
+        this.showSubAgents = false;
         this.showModelSettings = false;
         this.showModelOverride = false;
         this.showRequirementsPanel = false;
@@ -931,6 +938,7 @@ export const agentDesigner = () => ({
             description: agent.description || '',
             systemPrompt: agent.systemPrompt || '',
             graph: null, // Node mode = simple LLM agent, no composition graph
+            subAgents: agent.subAgents ? agent.subAgents.map(sa => ({...sa})) : [],
             disallowTransferToParent: agent.disallowTransferToParent || false,
             disallowTransferToPeers: agent.disallowTransferToPeers || false,
             outputKey: agent.outputKey || '',
@@ -954,6 +962,7 @@ export const agentDesigner = () => ({
         this.showKnowledgeBases = false;
         this.showFilesystems = false;
         this.showOrchestration = false;
+        this.showSubAgents = false;
         this.showModelSettings = false;
         this.showModelOverride = false;
         this.showRequirementsPanel = false;
@@ -994,6 +1003,7 @@ export const agentDesigner = () => ({
                 description: this.form.description.trim(),
                 systemPrompt: this.form.systemPrompt.trim(),
                 // Node mode → no graph (simple LLM agent → llmagent.New)
+                subAgents: this.form.subAgents.filter(sa => sa.name && sa.name.trim()),
                 disallowTransferToParent: this.form.disallowTransferToParent || false,
                 disallowTransferToPeers: this.form.disallowTransferToPeers || false,
                 outputKey: this.form.outputKey.trim(),
@@ -1104,6 +1114,35 @@ export const agentDesigner = () => ({
         if (this.form.inputSchema) flags.push('input schema');
         if (this.form.outputSchema) flags.push('output schema');
         return flags.length ? flags.join(' · ') : '';
+    },
+
+    // Sub-Agent Management
+    get availableAgentsForSubAgent() {
+        const currentId = this.editingAgent?.id;
+        const selectedIds = new Set((this.form.subAgents || []).map(sa => sa.agent_id));
+        return this.allAgents.filter(a => a.id !== currentId && !selectedIds.has(a.id));
+    },
+    openSubAgentDialog() {
+        this.subAgentDialogOpen = true;
+    },
+    toggleSubAgentFromDialog(agentId) {
+        if (!this.form.subAgents) this.form.subAgents = [];
+        const idx = this.form.subAgents.findIndex(sa => sa.agent_id === agentId);
+        if (idx > -1) {
+            this.form.subAgents.splice(idx, 1);
+        } else {
+            this.form.subAgents.push({ agent_id: agentId, output_key: '' });
+        }
+    },
+    isAgentSelected(agentId) {
+        return (this.form.subAgents || []).some(sa => sa.agent_id === agentId);
+    },
+    removeSubAgent(index) {
+        if (this.form.subAgents) this.form.subAgents.splice(index, 1);
+    },
+    getAgentName(agentId) {
+        const agent = this.allAgents.find(a => a.id === agentId);
+        return agent ? agent.name : 'Unknown Agent';
     },
 
     async fetchModelsForProvider(provider) {

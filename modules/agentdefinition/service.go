@@ -52,6 +52,18 @@ func (s *Service) create(ctx context.Context, agent *AgentDefinition) error {
 		}
 	}
 
+	// Validate coordinator sub-agents if present.
+	if len(agent.SubAgents) > 0 {
+		if agent.Graph != nil {
+			return fmt.Errorf("an agent cannot have both a composition graph and inline sub_agents")
+		}
+		for i, sa := range agent.SubAgents {
+			if sa.AgentID == "" {
+				return fmt.Errorf("sub_agents[%d]: agent_id is required", i)
+			}
+		}
+	}
+
 	s.log.Info(ctx, "creating agent definition",
 		"userID", agent.UserID,
 		"name", agent.Name,
@@ -178,6 +190,18 @@ func (s *Service) update(ctx context.Context, agent *AgentDefinition) error {
 	if agent.Graph != nil {
 		if err := s.validateGraph(ctx, agent.Graph, agent.UserID); err != nil {
 			return fmt.Errorf("invalid composition: %w", err)
+		}
+	}
+
+	// Validate coordinator sub-agents if present.
+	if len(agent.SubAgents) > 0 {
+		if agent.Graph != nil {
+			return fmt.Errorf("an agent cannot have both a composition graph and inline sub_agents")
+		}
+		for i, sa := range agent.SubAgents {
+			if sa.AgentID == "" {
+				return fmt.Errorf("sub_agents[%d]: agent_id is required", i)
+			}
 		}
 	}
 

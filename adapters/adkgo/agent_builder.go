@@ -79,6 +79,9 @@ type llmAgentParams struct {
 	afterToolCallbacks   []llmagent.AfterToolCallback
 	onToolErrorCallbacks []llmagent.OnToolErrorCallback
 
+	// SubAgents for coordinator pattern (LLM agent with children for peer transfers).
+	subAgents []agent.Agent
+
 	// Optional workflow node overrides (nil for regular agents)
 	nodeOverride *fagent.WorkflowNodeInfo
 }
@@ -101,6 +104,7 @@ func buildLLMAgent(p llmAgentParams) (agent.Agent, error) {
 		BeforeToolCallbacks:   p.beforeToolCallbacks,
 		AfterToolCallbacks:    p.afterToolCallbacks,
 		OnToolErrorCallbacks:  p.onToolErrorCallbacks,
+		SubAgents:             p.subAgents,
 	}
 
 	// Apply agent config defaults.

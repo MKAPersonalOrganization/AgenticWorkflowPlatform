@@ -338,6 +338,24 @@ func (p *userAwareAgentProvider) agentFromDefinition(def *agentdefinition.AgentD
 		ModelConfig:       toAgentModelConfig(def.ModelConfig),
 		ModelOverride:     toAgentModelOverride(def.ModelOverride),
 	}
+
+	// Coordinator pattern: populate SubAgents by resolving AgentID references.
+	if len(def.SubAgents) > 0 {
+		subAgents := make([]agent.Agent, 0, len(def.SubAgents))
+		for _, ref := range def.SubAgents {
+			if ref.AgentID == "" {
+				continue
+			}
+			subDef, err := p.repo.GetByID(context.Background(), ref.AgentID, def.UserID)
+			if err != nil {
+				// Skip invalid references.
+				continue
+			}
+			subAgents = append(subAgents, p.agentFromDefinition(subDef))
+		}
+		cfg.SubAgents = subAgents
+	}
+
 	a := newConfigAgent(cfg)
 
 	// Composed agents (those with a graph) also implement WorkflowAgent.

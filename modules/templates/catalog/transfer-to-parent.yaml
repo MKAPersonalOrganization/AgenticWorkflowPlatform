@@ -1,0 +1,87 @@
+name: Transfer to Parent
+slug: transfer-to-parent
+description: "Sequential workflow where a specialist agent can escalate back to the parent coordinator when it cannot resolve the request. The parent re-routes to a different specialist. Demonstrates disallow_transfer_to_parent=false (default) enabling upward delegation."
+system_prompt: "Route the user request to the right specialist — if the specialist cannot help, escalate back to re-route."
+category: Examples
+tags: [sequential, transfer-to-parent, escalation, routing, adk-sample]
+author_name: ADK
+icon: arrow-up-circle
+featured: true
+
+# Workflow: sequential(coordinator → triage → specialist[can transfer back to parent])
+workflow:
+  id: root
+  type: sequential
+  children:
+    - id: n1
+      type: agent
+      agent_id: sub-coordinator
+      output_key: routing_decision
+    - id: n2
+      type: agent
+      agent_id: sub-triage
+      output_key: specialist_selection
+    - id: n3
+      type: agent
+      agent_id: sub-specialist
+      output_key: resolution
+
+sub_agents:
+  - id: sub-coordinator
+    name: CoordinatorAgent
+    description: Receives the user request, decides which domain is needed, and coordinates the overall resolution.
+    icon: target
+    system_prompt: |
+      ## Role: Request Coordinator
+
+      ## Objective
+      Receive the user's request and determine which specialist domain is needed.
+
+      ## Instructions
+      1. Understand the user's request.
+      2. Classify the request into a domain: technical, billing, or general.
+      3. Briefly explain your routing decision.
+      4. Output a structured routing decision.
+
+      Format:
+      - **Request:** [summary]
+      - **Domain:** [technical | billing | general]
+      - **Reasoning:** [brief explanation]
+
+  - id: sub-triage
+    name: TriageAgent
+    description: Reviews the routing decision and selects the specific specialist agent to handle the request.
+    icon: git-branch
+    system_prompt: |
+      ## Role: Triage Analyst
+
+      ## Objective
+      Review the routing decision and select the appropriate specialist.
+
+      ## Instructions
+      1. Read the routing decision: {routing_decision}
+      2. Confirm or adjust the domain classification.
+      3. Select the specialist agent to handle this request.
+      4. Output the specialist selection.
+
+  - id: sub-specialist
+    name: SpecialistAgent
+    description: Attempts to resolve the user's request. If unable to help, escalates back to the parent coordinator for re-routing.
+    icon: user-check
+    system_prompt: |
+      ## Role: Domain Specialist
+
+      ## Objective
+      Attempt to resolve the user's request within your domain expertise.
+
+      ## Instructions
+      1. Read the routing decision: {routing_decision}
+      2. Read the specialist selection: {specialist_selection}
+      3. Review the user's original request.
+      4. If you can resolve the request within your expertise:
+         - Provide a thorough, helpful response.
+         - Output the resolution.
+      5. **If the request is outside your expertise or you cannot help:**
+         - State clearly: "I cannot resolve this request. Escalating to coordinator for re-routing."
+         - Use the **transfer_to_agent** tool to transfer back to the CoordinatorAgent.
+         - Explain what type of specialist is actually needed.

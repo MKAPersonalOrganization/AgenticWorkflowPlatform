@@ -1048,3 +1048,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_memory_entries_session_event
 -- Memory access is now controlled by plugin permissions (agentmemory toolset)
 -- rather than a per-agent boolean flag.
 ALTER TABLE user_agents DROP COLUMN IF EXISTS memory_enabled;
+
+-- Version: 1.73
+-- Description: Add sub_agents JSONB column for coordinator pattern (LlmAgent with SubAgents).
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS sub_agents JSONB;

@@ -340,6 +340,32 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 				beforeToolCBs = append(beforeToolCBs, buildConfirmationCallback(r.confirmChecker, agentName, req.UserID, ""))
 			}
 
+			// Build ADK-Go sub-agents for coordinator pattern (LLM agent with SubAgents).
+			var adkSubAgents []agent.Agent
+			if agentCfg != nil && len(agentCfg.SubAgents) > 0 {
+				for _, subA := range agentCfg.SubAgents {
+					cfgurable, ok := subA.(fagent.Configurable)
+					if !ok {
+						continue
+					}
+					subCfg := cfgurable.Config()
+					subAdk, sErr := buildLLMAgent(llmAgentParams{
+						name:       subCfg.Name,
+						foundAgent: subA,
+						agentCfg:   extractAgentConfig(subA),
+						llm:        llm,
+						genCfg:     genCfg,
+						tools:      nil,
+						prompt:     subCfg.SystemPrompt,
+					})
+					if sErr != nil {
+						yield(nil, fmt.Errorf("building coordinator sub-agent %q: %w", subCfg.Name, sErr))
+						return
+					}
+					adkSubAgents = append(adkSubAgents, subAdk)
+				}
+			}
+
 			var aErr error
 			adkAgent, aErr = buildLLMAgent(llmAgentParams{
 				name:                 agentName,
@@ -355,6 +381,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 				beforeToolCallbacks:  beforeToolCBs,
 				afterToolCallbacks:   afterToolCBs,
 				onToolErrorCallbacks: onToolErrorCBs,
+				subAgents:            adkSubAgents,
 			})
 			if aErr != nil {
 				yield(nil, fmt.Errorf("creating adk-go agent: %w", aErr))

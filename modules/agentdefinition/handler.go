@@ -45,6 +45,7 @@ type createRequest struct {
 	SystemPrompt             string                     `json:"systemPrompt"`
 	Icon                     string                     `json:"icon"`
 	Graph                    *CompositionNode           `json:"graph,omitempty"`
+	SubAgents                []*SubAgentRef           `json:"subAgents,omitempty"`
 	DisallowTransferToParent bool                       `json:"disallowTransferToParent"`
 	DisallowTransferToPeers  bool                       `json:"disallowTransferToPeers"`
 	OutputKey                string                     `json:"outputKey"`
@@ -62,6 +63,7 @@ type updateRequest struct {
 	SystemPrompt             string                     `json:"systemPrompt"`
 	Icon                     string                     `json:"icon"`
 	Graph                    *CompositionNode           `json:"graph"`
+	SubAgents                []*SubAgentRef           `json:"subAgents,omitempty"`
 	DisallowTransferToParent bool                       `json:"disallowTransferToParent"`
 	DisallowTransferToPeers  bool                       `json:"disallowTransferToPeers"`
 	OutputKey                string                     `json:"outputKey"`
@@ -74,27 +76,29 @@ type updateRequest struct {
 }
 
 type agentResponse struct {
-	ID                       string              `json:"id"`
-	Name                     string              `json:"name"`
-	Description              string              `json:"description"`
-	SystemPrompt             string              `json:"systemPrompt"`
-	Icon                     string              `json:"icon"`
-	SourceCatalogID          string              `json:"sourceCatalogId,omitempty"`
-	Graph                    *CompositionNode    `json:"graph,omitempty"`
-	IsComposed               bool                `json:"isComposed"`
-	DisallowTransferToParent bool                `json:"disallowTransferToParent"`
-	DisallowTransferToPeers  bool                `json:"disallowTransferToPeers"`
-	OutputKey                string              `json:"outputKey,omitempty"`
-	IncludeContents          string              `json:"includeContents,omitempty"`
-	GlobalInstruction        string              `json:"globalInstruction,omitempty"`
-	InputSchema              string              `json:"inputSchema,omitempty"`
-	OutputSchema             string              `json:"outputSchema,omitempty"`
-	ModelConfig              *AgentModelConfig   `json:"modelConfig,omitempty"`
-	ModelOverride            *AgentModelOverride `json:"modelOverride,omitempty"`
-	ShareToken               string              `json:"shareToken,omitempty"`
-	Visibility               string              `json:"visibility,omitempty"`
-	CreatedAt                string              `json:"createdAt"`
-	UpdatedAt                string              `json:"updatedAt"`
+	ID                       string                   `json:"id"`
+	Name                     string                   `json:"name"`
+	Description              string                   `json:"description"`
+	SystemPrompt             string                   `json:"systemPrompt"`
+	Icon                     string                   `json:"icon"`
+	SourceCatalogID          string                   `json:"sourceCatalogId,omitempty"`
+	Graph                    *CompositionNode         `json:"graph,omitempty"`
+	IsComposed               bool                     `json:"isComposed"`
+	IsCoordinator            bool                     `json:"isCoordinator"`
+	SubAgents                []*SubAgentRef           `json:"subAgents,omitempty"`
+	DisallowTransferToParent bool                     `json:"disallowTransferToParent"`
+	DisallowTransferToPeers  bool                     `json:"disallowTransferToPeers"`
+	OutputKey                string                   `json:"outputKey,omitempty"`
+	IncludeContents          string                   `json:"includeContents,omitempty"`
+	GlobalInstruction        string                   `json:"globalInstruction,omitempty"`
+	InputSchema              string                   `json:"inputSchema,omitempty"`
+	OutputSchema             string                   `json:"outputSchema,omitempty"`
+	ModelConfig              *AgentModelConfig        `json:"modelConfig,omitempty"`
+	ModelOverride            *AgentModelOverride      `json:"modelOverride,omitempty"`
+	ShareToken               string                   `json:"shareToken,omitempty"`
+	Visibility               string                   `json:"visibility,omitempty"`
+	CreatedAt                string                   `json:"createdAt"`
+	UpdatedAt                string                   `json:"updatedAt"`
 }
 
 type listResponse struct {
@@ -148,6 +152,8 @@ func toAgentResponse(a *AgentDefinition) agentResponse {
 		SourceCatalogID:          a.SourceCatalogID,
 		Graph:                    a.Graph,
 		IsComposed:               a.IsComposed(),
+		IsCoordinator:            a.IsCoordinator(),
+		SubAgents:                a.SubAgents,
 		DisallowTransferToParent: a.DisallowTransferToParent,
 		DisallowTransferToPeers:  a.DisallowTransferToPeers,
 		OutputKey:                a.OutputKey,
@@ -192,6 +198,7 @@ func (h *storeHandler) create(w http.ResponseWriter, r *http.Request) {
 		SystemPrompt:             req.SystemPrompt,
 		Icon:                     agentIconOrDefault(req.Icon),
 		Graph:                    req.Graph,
+		SubAgents:                req.SubAgents,
 		DisallowTransferToParent: req.DisallowTransferToParent,
 		DisallowTransferToPeers:  req.DisallowTransferToPeers,
 		OutputKey:                req.OutputKey,
@@ -316,6 +323,7 @@ func (h *storeHandler) update(w http.ResponseWriter, r *http.Request) {
 		SystemPrompt:             req.SystemPrompt,
 		Icon:                     iconValue,
 		Graph:                    req.Graph,
+		SubAgents:                req.SubAgents,
 		DisallowTransferToParent: req.DisallowTransferToParent,
 		DisallowTransferToPeers:  req.DisallowTransferToPeers,
 		OutputKey:                req.OutputKey,

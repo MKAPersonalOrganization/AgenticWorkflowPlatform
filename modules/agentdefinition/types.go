@@ -91,6 +91,14 @@ type AgentDefinition struct {
 	Graph     *CompositionNode `json:"graph,omitempty" db:"-"`
 	GraphJSON string           `json:"-" db:"graph"`
 
+	// ── Coordinator Sub-Agents ──
+	// SubAgents holds inline sub-agent definitions. When non-empty, this agent
+	// acts as a coordinator: an LlmAgent whose SubAgents are populated directly,
+	// enabling peer-to-peer transfers without a workflow wrapper.
+	// Mutually exclusive with Graph.
+	SubAgents     []*SubAgentRef           `json:"sub_agents,omitempty" db:"-"`
+	SubAgentsJSON string                 `json:"-" db:"sub_agents"`
+
 	// ── Multi-Agent Orchestration (used when this agent participates as a sub-agent) ──
 
 	DisallowTransferToParent bool   `json:"disallow_transfer_to_parent" db:"disallow_transfer_to_parent"`
@@ -183,6 +191,55 @@ func (a *AgentDefinition) UnmarshalModelConfig() error {
 	}
 	a.ModelConfig = &mc
 	return nil
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// CoordinatorSubAgent — inline sub-agent definition for coordinator pattern
+//
+// When an AgentDefinition has non-nil SubAgents, it is a coordinator: an
+// LlmAgent whose SubAgents are populated directly from these definitions.
+// This enables peer-to-peer transfers without a workflow wrapper.
+// ──────────────────────────────────────────────────────────────────────────────
+
+// SubAgentRef references an existing agent to be used as a sub-agent.
+type SubAgentRef struct {
+	// AgentID is the UUID of the referenced AgentDefinition.
+	AgentID string `json:"agent_id"`
+	// OutputKey is an optional key to store the sub-agent's result in session state.
+	OutputKey string `json:"output_key,omitempty"`
+}
+
+// MarshalSubAgents serializes SubAgents to SubAgentsJSON for storage.
+func (a *AgentDefinition) MarshalSubAgents() error {
+	if len(a.SubAgents) == 0 {
+		a.SubAgentsJSON = ""
+		return nil
+	}
+	b, err := json.Marshal(a.SubAgents)
+	if err != nil {
+		return fmt.Errorf("marshalling sub_agents: %w", err)
+	}
+	a.SubAgentsJSON = string(b)
+	return nil
+}
+
+// UnmarshalSubAgents deserializes SubAgentsJSON into SubAgents.
+func (a *AgentDefinition) UnmarshalSubAgents() error {
+	if a.SubAgentsJSON == "" || a.SubAgentsJSON == "null" {
+		a.SubAgents = nil
+		return nil
+	}
+	var subs []*SubAgentRef
+	if err := json.Unmarshal([]byte(a.SubAgentsJSON), &subs); err != nil {
+		return fmt.Errorf("unmarshalling sub_agents: %w", err)
+	}
+	a.SubAgents = subs
+	return nil
+}
+
+// IsCoordinator returns true if this agent has inline sub-agent definitions.
+func (a *AgentDefinition) IsCoordinator() bool {
+	return len(a.SubAgents) > 0
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
