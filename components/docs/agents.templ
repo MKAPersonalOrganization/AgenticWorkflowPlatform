@@ -199,24 +199,23 @@ templ docsCustomAgents() {
 	}
 }
 
-// ─── Multi-Agent Orchestration ───────────────────────────────────────────────
+// ─── Workflow Orchestration ──────────────────────────────────────────────────
 templ docsMultiAgentOrchestration() {
-	@docsSection("multi-agent", "Multi-Agent Orchestration", iconGitBranch, "text-indigo-500") {
+	@docsSection("multi-agent", "Workflow Orchestration", iconGitBranch, "text-indigo-500") {
 		<p>
-			Compass.AI supports <strong>composing multiple agents into coordinated teams</strong> that solve
-			complex, multi-step problems no single agent can handle. Built on Google's
-			<strong>Agent Development Kit (ADK)</strong>, the orchestration engine supports four composition
-			patterns — sequential, parallel, loop, and free-form delegation — all configurable from a
-			visual tree builder in the UI.
+			Compass.AI supports <strong>composing multiple agents into coordinated workflows</strong> that solve
+			complex, multi-step problems. Built on proven agent orchestration patterns, the engine supports four composition
+			patterns — sequential, parallel, loop, and conditional routing — all configurable from a
+			visual builder in the UI.
 		</p>
-		<h3>Why Multi-Agent?</h3>
+		<h3>Why Workflow Orchestration?</h3>
 		<p>
-			Single agents work well for focused tasks. But real-world workflows require 
+			Individual LM agents work well for focused tasks. But real-world workflows require
 			<strong>
 				specialization
 				and coordination
 			</strong>: a research agent gathers data, an analyst extracts insights, and a
-			writer produces the final report. Multi-agent orchestration lets you build these pipelines
+			writer produces the final report. Workflow orchestration lets you build these pipelines
 			visually, with each agent owning a specific domain and passing structured results downstream.
 		</p>
 		<h3>Composition Patterns</h3>
@@ -232,7 +231,8 @@ templ docsMultiAgentOrchestration() {
 				@docsTableRow("Sequential", "Agents execute one after another. Each receives the prior agent's output.", "Research → Analysis → Report pipelines")
 				@docsTableRow("Parallel", "All child agents execute simultaneously. Results are collected and merged.", "Running multiple analysts on the same dataset at once")
 				@docsTableRow("Loop", "Re-executes child agents until an exit condition is met or max iterations reached.", "Iterative refinement: draft → review → revise cycles")
-				@docsTableRow("LLM (Delegation)", "A parent LLM agent dynamically decides which sub-agents to call using transfer_to_agent.", "Open-ended triage: user query routed to the best specialist")
+				@docsTableRow("Conditional", "An evaluator agent analyzes input and routes to the appropriate specialist branch.", "Sentiment-based routing: positive → happy agent, negative → empathetic agent")
+				@docsTableRow("Coordinator", "An LM agent delegates to sub-agents dynamically based on conversation context.", "Open-ended triage: user query routed to the best specialist")
 			</tbody>
 		}
 		<h3>Transfer Policies</h3>
