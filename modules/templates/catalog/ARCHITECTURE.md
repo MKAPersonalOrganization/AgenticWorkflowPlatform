@@ -16,6 +16,7 @@ Each entry in the catalog demonstrates a specific set of ADK-Go workflow feature
 | Parallel Inside Sequential | ✓ | ✓ | | | ✓ | |
 | Loop Workflow | | | ✓ | | ✓ | |
 | Loop with Exit | | | ✓ | ✓ | ✓ | |
+| Sequential Inside Loop | | ✓ | ✓ | ✓ | ✓ | |
 | Parallel Inside Loop Inside Sequential | ✓ | ✓ | ✓ | | ✓ | ✓ |
 | Story Teller | ✓ | ✓ | ✓ | | ✓ | ✓ |
 | Blog Writer | ✓ | | ✓ | ✓ | ✓ | |
@@ -302,7 +303,56 @@ flowchart TD
 
 ---
 
-## 9. Parallel Inside Loop Inside Sequential
+## 9. Sequential Inside Loop
+
+**Source:** ADK Python — `image-scoring`, `on-brand-genmedia` (simplified)
+
+**What it demonstrates:** An outer sequential pipeline wraps a loop: a planner first produces structured requirements, then a loop runs a sequential generate-score-check pipeline that iterates until quality is met, and finally an editor polishes the approved output into its final form.
+
+```mermaid
+flowchart TD
+    User([Topic]) --> P["PlannerAgent\noutput_key: requirements"]
+    P --> LOOP
+
+    subgraph LOOP [Loop — max 5 iterations, allow_early_exit]
+        direction TB
+        subgraph SEQ [Sequential per iteration]
+            direction TB
+            PG["PromptGeneratorAgent\nreads {requirements} {output_score?}\noutput_key: generation_prompt"] --> OC["OutputCreatorAgent\nreads {generation_prompt}\noutput_key: generated_output"]
+            OC --> S["ScorerAgent\nevaluates output\noutput_key: output_score"]
+        end
+        SEQ --> C["QualityCheckerAgent\nexits if score >= 8.0"]
+        C -->|score < 8.0 — retry| PG
+        C -->|score >= 8.0 — exit_loop| Exit
+    end
+
+    Exit --> E["EditorAgent\npolishes final version\nreads {generated_output}\noutput_key: final_output"]
+    E --> Out([Final polished output])
+```
+
+**Key state variables**
+
+| Key | Written by | Read by |
+|---|---|---|
+| `requirements` | PlannerAgent | PromptGeneratorAgent (all iterations) |
+| `generation_prompt` | PromptGeneratorAgent (each iteration) | OutputCreatorAgent, ScorerAgent |
+| `generated_output` | OutputCreatorAgent (each iteration) | ScorerAgent, EditorAgent |
+| `output_score` | ScorerAgent (each iteration) | QualityCheckerAgent, PromptGeneratorAgent (next iteration) |
+| `final_output` | EditorAgent | — |
+
+**ADK features used**
+- `type: sequential` as the root composition — planner → loop → editor
+- `type: loop` with `max_iterations: 5` and `allow_early_exit: true`
+- `type: sequential` as the loop body — three agents run in order each iteration
+- `{variable?}` optional injection — first iteration has no prior score or prompt
+- State **overwrite** across iterations — each refinement replaces the previous prompt and output
+- `allow_early_exit: true` — QualityCheckerAgent (last in loop body) receives the `exit_loop` tool
+- **Feedback loop** — PromptGeneratorAgent reads the previous score to refine its prompt
+- **Outer sequential** — PlannerAgent sets up requirements before the loop, EditorAgent polishes after
+
+---
+
+## 10. Parallel Inside Loop Inside Sequential
 
 **Source:** ADK Python — `story_teller` (simplified)
 
@@ -346,7 +396,7 @@ flowchart TD
 
 ---
 
-## 10. Story Teller
+## 11. Story Teller
 
 **Source:** ADK Python — `story_teller`
 
@@ -392,7 +442,7 @@ flowchart TD
 
 ---
 
-## 11. Blog Writer
+## 12. Blog Writer
 
 **Source:** ADK Python — `blog-writer`
 
@@ -434,7 +484,7 @@ flowchart TD
 
 ---
 
-## 12. Iterative Deep Research
+## 13. Iterative Deep Research
 
 **Source:** ADK samples — `iterative-deep-research`
 
@@ -475,7 +525,7 @@ flowchart TD
 
 ---
 
-## 13. Academic Research Assistant
+## 14. Academic Research Assistant
 
 **Source:** ADK Python — `academic-research`
 
@@ -503,7 +553,7 @@ flowchart TD
 
 ---
 
-## 14. Marketing Agency
+## 15. Marketing Agency
 
 **Source:** ADK Python — `marketing-agency`
 
@@ -535,7 +585,7 @@ flowchart TD
 
 ---
 
-## 15. Short Movie Agent
+## 16. Short Movie Agent
 
 **Source:** ADK Python — `short-movie-agents`
 
@@ -567,7 +617,7 @@ flowchart TD
 
 ---
 
-## 16. Customer Support Triage
+## 17. Customer Support Triage
 
 **Source:** ADK samples — `workflow-concurrent_research_writer` (conditional routing simplified)
 
