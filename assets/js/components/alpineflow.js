@@ -42,10 +42,6 @@ export function createFlowNode(type, opts = {}) {
             id, type: 'agent',
             label: opts.label || '',
             agent_id: opts.agent_id || '',
-            output_key: '',
-            disallow_transfer_to_parent: null,
-            disallow_transfer_to_peers: null,
-            include_contents: '',
             x: opts.x || 0, y: opts.y || 0,
         };
     }
@@ -54,7 +50,6 @@ export function createFlowNode(type, opts = {}) {
             id, type: 'remote',
             label: opts.label || '',
             a2a_connector_id: opts.a2a_connector_id || '',
-            output_key: '',
             x: opts.x || 0, y: opts.y || 0,
         };
     }
@@ -822,8 +817,6 @@ export const alpineflowNode = (nodeId) => ({
         return `${childCount} step${childCount !== 1 ? 's' : ''}`;
     },
 
-    get outputKeyBadge() { return this.n.output_key ? '→ ' + this.n.output_key : ''; },
-
     get isCoordinatorNode() {
         const n = this.n;
         if (n.type !== 'agent' || !n.agent_id) return false;
@@ -968,7 +961,6 @@ export const alpineflowPalette = () => ({
 // ─── Property Panel Component ─────────────────────────────────────────────────
 export const alpineflowPropertyPanel = () => ({
     node: null,
-    showAdvanced: false,
     loadingMetadata: false,
 
     // Tool metadata (fetched for display counts)
@@ -980,7 +972,6 @@ export const alpineflowPropertyPanel = () => ({
             if (!Alpine.store('flow')) return;
             const store = Alpine.store('flow');
             this.node = store.selectedId ? store.nodeById(store.selectedId) : null;
-            this.showAdvanced = false;
             this.agentPlugins = [];
 
             if (this.node?.type === 'agent' && this.node?.agent_id) {
@@ -1147,36 +1138,5 @@ export const alpineflowPropertyPanel = () => ({
     },
     get isConditionalBranch() {
         return this.isConditionalChild && this.parentInfo?.index > 0;
-    },
-
-    hasInputSchema() {
-        return this.node?.input_schema && this.node.input_schema.trim() !== '';
-    },
-    hasOutputSchema() {
-        return this.node?.output_schema && this.node.output_schema.trim() !== '';
-    },
-    getInputSchemaPreview() {
-        const schema = this.node?.input_schema;
-        if (!schema) return '';
-        try {
-            const obj = JSON.parse(schema);
-            if (obj.properties) {
-                const keys = Object.keys(obj.properties);
-                return keys.length > 0 ? `params: ${keys.join(', ')}` : 'any';
-            }
-            return 'valid JSON';
-        } catch {
-            return 'invalid JSON';
-        }
-    },
-    getOutputSchemaPreview() {
-        const schema = this.node?.output_schema;
-        if (!schema) return '';
-        try {
-            const obj = JSON.parse(schema);
-            return obj.type || 'valid JSON';
-        } catch {
-            return 'invalid JSON';
-        }
     },
 });

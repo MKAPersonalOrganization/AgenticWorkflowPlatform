@@ -456,18 +456,14 @@ func convertCompositionNode(n *agentdefinition.CompositionNode) agent.WorkflowNo
 		return agent.WorkflowNodeInfo{}
 	}
 	info := agent.WorkflowNodeInfo{
-		ID:                       n.ID,
-		Type:                     string(n.Type),
-		Label:                    n.Label,
-		AgentID:                  n.AgentID,
-		A2AConnectorID:           n.A2AConnectorID,
-		OutputKey:                n.OutputKey,
-		MaxIterations:            n.MaxIterations,
-		AllowEarlyExit:           n.AllowEarlyExit,
-		DisallowTransferToParent: n.DisallowTransferToParent,
-		DisallowTransferToPeers:  n.DisallowTransferToPeers,
-		IncludeContents:          n.IncludeContents,
-		Condition:                n.Condition,
+		ID:             n.ID,
+		Type:           string(n.Type),
+		Label:          n.Label,
+		AgentID:        n.AgentID,
+		A2AConnectorID: n.A2AConnectorID,
+		MaxIterations:  n.MaxIterations,
+		AllowEarlyExit: n.AllowEarlyExit,
+		Condition:      n.Condition,
 	}
 	if len(n.Children) > 0 {
 		info.Children = make([]agent.WorkflowNodeInfo, len(n.Children))

@@ -1017,47 +1017,6 @@ templ AgentDesignerDialog() {
 														</div>
 													</template>
 
-													<!-- Output Variable -->
-													<div>
-														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">
-															@icon.Key(icon.Props{Class: "size-3 inline me-0.5"})
-															Output Variable
-														</label>
-														<input :value="node.output_key" @input="set('output_key', $event.target.value)" type="text" placeholder="e.g. research_results" class="w-full text-[11px] font-mono rounded-lg px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border"/>
-														<p class="text-[9px] text-muted-foreground mt-1">{ i18n.T(ctx, "Saves output so other agents can use it via {variable_name}") }</p>
-													</div>
-
-													<!-- Conversation History -->
-													<div>
-														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">
-															@icon.MessageSquare(icon.Props{Class: "size-3 inline me-0.5"})
-															{ i18n.T(ctx, "History") }
-														</label>
-														<select :value="node.include_contents||'default'" @change="set('include_contents', $event.target.value)" class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border">
-															<option value="default">{ i18n.T(ctx, "Include history") }</option>
-															<option value="none">{ i18n.T(ctx, "Fresh context only") }</option>
-														</select>
-														<p class="text-[9px] text-muted-foreground mt-1">{ i18n.T(ctx, "Fresh = agent sees only the current message") }</p>
-													</div>
-
-													<!-- Delegation Control -->
-													<div>
-														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-2">
-															@icon.ArrowRightLeft(icon.Props{Class: "size-3 inline me-0.5"})
-															{ i18n.T(ctx, "Delegation") }
-														</label>
-														<div class="space-y-1.5">
-															<label class="flex items-center gap-2 cursor-pointer group">
-																<input type="checkbox" :checked="node.disallow_transfer_to_parent" @change="setBool('disallow_transfer_to_parent', $event.target.checked)" class="rounded accent-primary"/>
-																<span class="text-[10px] text-muted-foreground group-hover:text-foreground transition-colors">{ i18n.T(ctx, "Prevent escalation to parent") }</span>
-															</label>
-															<label class="flex items-center gap-2 cursor-pointer group">
-																<input type="checkbox" :checked="node.disallow_transfer_to_peers" @change="setBool('disallow_transfer_to_peers', $event.target.checked)" class="rounded accent-primary"/>
-																<span class="text-[10px] text-muted-foreground group-hover:text-foreground transition-colors">{ i18n.T(ctx, "Prevent delegation to siblings") }</span>
-															</label>
-														</div>
-													</div>
-
 													<!-- Agent Configuration Summary -->
 													<div class="border-t pt-2 border-border">
 														<div class="flex items-center justify-between mb-2">
@@ -1119,49 +1078,6 @@ templ AgentDesignerDialog() {
 															</div>
 														</template>
 													</div>
-
-													<!-- Advanced Section -->
-													<div class="border-t pt-2 border-border">
-														<button
-															@click="showAdvanced = !showAdvanced"
-															class="flex items-center justify-between w-full text-[9px] uppercase tracking-widest text-muted-foreground font-semibold hover:text-foreground transition-colors py-1"
-														>
-															<span>Advanced (Schema)</span>
-															<span class="transition-transform" :class="showAdvanced ? 'rotate-180' : ''">▼</span>
-														</button>
-														<div x-show="showAdvanced" x-collapse class="space-y-2 pt-2">
-															<!-- Input Schema -->
-															<div>
-																<div class="flex items-center justify-between mb-1">
-																	<label class="text-[8px] text-muted-foreground font-semibold">Input Schema</label>
-																	<span x-show="hasInputSchema()" class="text-[8px] px-1 py-0.5 rounded bg-green-500/15 text-green-400" x-text="getInputSchemaPreview()"></span>
-																</div>
-																<textarea
-																	:value="node.input_schema || ''"
-																	@input="set('input_schema', $event.target.value)"
-																	rows="3"
-																	placeholder='{"type":"object","properties":{"topic":...}}'
-																	class="w-full text-[10px] font-mono rounded-lg px-2 py-1.5 text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary/40 resize-none bg-background border-border"
-																></textarea>
-																<p class="text-[8px] text-muted-foreground mt-0.5">{ i18n.T(ctx, "Defines the input format when another agent calls this one") }</p>
-															</div>
-															<!-- Output Schema -->
-															<div>
-																<div class="flex items-center justify-between mb-1">
-																	<label class="text-[8px] text-muted-foreground font-semibold">Output Schema</label>
-																	<span x-show="hasOutputSchema()" class="text-[8px] px-1 py-0.5 rounded bg-green-500/15 text-green-400" x-text="getOutputSchemaPreview()"></span>
-																</div>
-																<textarea
-																	:value="node.output_schema || ''"
-																	@input="set('output_schema', $event.target.value)"
-																	rows="3"
-																	placeholder='{"type":"object","properties":{"summary":...}}'
-																	class="w-full text-[10px] font-mono rounded-lg px-2 py-1.5 text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary/40 resize-none bg-background border-border"
-																></textarea>
-																<p class="text-[8px] text-muted-foreground mt-0.5">{ i18n.T(ctx, "Forces the agent to respond in a specific JSON format") }</p>
-															</div>
-														</div>
-													</div>
 												</div>
 											</template>
 
@@ -1176,10 +1092,6 @@ templ AgentDesignerDialog() {
 																<option :value="conn.id" x-text="conn.name || conn.id"></option>
 															</template>
 														</select>
-													</div>
-													<div>
-														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">{ i18n.T(ctx, "Output Variable") }</label>
-														<input :value="node.output_key" @input="set('output_key', $event.target.value)" type="text" placeholder="e.g. remote_result" class="w-full text-[11px] font-mono rounded-lg px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border"/>
 													</div>
 												</div>
 											</template>

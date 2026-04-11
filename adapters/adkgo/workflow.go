@@ -428,10 +428,9 @@ func buildConditionalNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeIn
 // It uses the same tool resolution, prompt building, and middleware pipeline
 // as the regular single-agent path in Run().
 //
-// Transfer policies are resolved with this precedence:
-//  1. Workflow node override (DisallowTransferToParent/Peers in WorkflowNodeInfo)
-//  2. AgentDefinition default (stored in DB)
-//  3. ADK-Go default (allow all transfers)
+// Transfer policies, output keys, and schemas are read from the agent's own
+// config (stored on AgentDefinition). Composition nodes only carry structural
+// information — agent-level config belongs on the agent definition itself.
 func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, isLastInLoop bool, parentCtx *agentPositionCtx) (agent.Agent, error) {
 	if node.AgentID == "" {
 		return nil, fmt.Errorf("node %q: agent node requires agent_id", node.ID)
@@ -571,7 +570,6 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 		beforeToolCallbacks:  beforeToolCBs,
 		afterToolCallbacks:   afterToolCBs,
 		onToolErrorCallbacks: onToolErrorCBs,
-		nodeOverride:         node,
 	})
 }
 

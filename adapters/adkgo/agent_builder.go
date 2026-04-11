@@ -50,10 +50,9 @@ func foundationSchemaToGenAI(s *fagent.Schema) *genai.Schema {
 // the workflow leaf-agent path (workflow.go) use this helper, eliminating the
 // duplication that previously existed between Run() and buildLeafAgent().
 //
-// Precedence for overrideable fields (highest wins):
-//  1. Workflow node override (WorkflowNodeInfo fields)
-//  2. Agent config default (Config fields)
-//  3. ADK-Go default (zero value)
+// Transfer policies, output keys, and schemas are read from the agent's own
+// config (stored on AgentDefinition). Composition nodes only carry structural
+// information (type, children, position) — not agent-level configuration.
 //
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -81,9 +80,6 @@ type llmAgentParams struct {
 
 	// SubAgents for coordinator pattern (LLM agent with children for peer transfers).
 	subAgents []agent.Agent
-
-	// Optional workflow node overrides (nil for regular agents)
-	nodeOverride *fagent.WorkflowNodeInfo
 }
 
 // buildLLMAgent creates an ADK-Go llmagent from the resolved parameters.
@@ -118,25 +114,6 @@ func buildLLMAgent(p llmAgentParams) (agent.Agent, error) {
 
 		if p.agentCfg.IncludeContents == fagent.IncludeContentsNone {
 			cfg.IncludeContents = llmagent.IncludeContentsNone
-		}
-	}
-
-	// Apply workflow node overrides (higher precedence than config defaults).
-	if n := p.nodeOverride; n != nil {
-		if n.DisallowTransferToParent != nil {
-			cfg.DisallowTransferToParent = *n.DisallowTransferToParent
-		}
-		if n.DisallowTransferToPeers != nil {
-			cfg.DisallowTransferToPeers = *n.DisallowTransferToPeers
-		}
-		switch n.IncludeContents {
-		case "none":
-			cfg.IncludeContents = llmagent.IncludeContentsNone
-		case "default":
-			cfg.IncludeContents = llmagent.IncludeContentsDefault
-		}
-		if n.OutputKey != "" {
-			cfg.OutputKey = n.OutputKey
 		}
 	}
 
