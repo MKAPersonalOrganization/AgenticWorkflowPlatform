@@ -25,6 +25,7 @@ Each entry in the catalog demonstrates a specific set of ADK-Go workflow feature
 | Marketing Agency | ✓ | | | | ✓ | |
 | Short Movie Agent | ✓ | | | | ✓ | |
 | Context Control | | | | | ✓ | |
+| Output Schema | | | | | ✓ | |
 | Agent Isolation | | | | | | |
 | Customer Support Triage | ✓ | | | | | |
 
@@ -651,7 +652,61 @@ flowchart LR
 
 ---
 
-## 18. Agent Isolation
+## 19. Output Schema
+
+**Source:** ADK Python — `deep-search` (research_evaluator with Feedback schema), `travel-concierge` (planning with Itinerary/HotelsSelection schemas)
+
+**What it demonstrates:** An agent with `output_schema` set to a JSON Schema forces the LLM to return strictly typed structured data instead of free-form text. When set, the agent can only reply with matching JSON — no tool use, no RAG, no agent transfer. This enables reliable downstream processing of agent output.
+
+```mermaid
+flowchart LR
+    User([Input Text]) --> E["DataExtractorAgent\noutput_schema: {title, summary,\ntags, entities}\noutput_key: structured_data"]
+    E -->|"strict JSON"| S[(Session State:\nstructured_data = JSON)]
+    S -->|"injected as\n{structured_data}"| F["ReportFormatterAgent\nproduces readable report\noutput_key: formatted_report"]
+    F --> Out([Formatted Report])
+```
+
+**Key state variables**
+
+| Key | Written by | Read by |
+|---|---|---|
+| `structured_data` | DataExtractorAgent (strict JSON) | ReportFormatterAgent |
+| `formatted_report` | ReportFormatterAgent | — |
+
+**ADK features used**
+- `output_schema` — forces the LLM to return JSON matching the schema
+- When `output_schema` is set, the agent **cannot** use tools, RAG, or transfer to other agents
+- Enables reliable downstream processing — the formatter knows the exact structure
+- Reduces parsing errors — the model is constrained by the schema
+- Common schema types: `object` with required properties, `array` of typed items, `enum` fields
+
+**Example output_schema:**
+```json
+{
+  "type": "object",
+  "required": ["title", "summary", "tags", "entities"],
+  "properties": {
+    "title": {"type": "string"},
+    "summary": {"type": "string"},
+    "tags": {"type": "array", "items": {"type": "string"}},
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type"],
+        "properties": {
+          "name": {"type": "string"},
+          "type": {"type": "string", "enum": ["person", "organization", "location"]}
+        }
+      }
+    }
+  }
+}
+```
+
+---
+
+## 20. Agent Isolation
 
 **Source:** ADK Python — `deep-search` (research_evaluator)
 
@@ -683,7 +738,7 @@ flowchart LR
 
 ---
 
-## 19. Customer Support Triage
+## 21. Customer Support Triage
 
 **Source:** ADK samples — `workflow-concurrent_research_writer` (conditional routing simplified)
 

@@ -36,6 +36,7 @@ type yamlWorkflowNode struct {
 	AgentID                  string             `yaml:"agent_id,omitempty"`
 	OutputKey                string             `yaml:"output_key,omitempty"`
 	IncludeContents          string             `yaml:"include_contents,omitempty"`
+	OutputSchema             string             `yaml:"output_schema,omitempty"`
 	DisallowTransferToParent bool               `yaml:"disallow_transfer_to_parent,omitempty"`
 	DisallowTransferToPeers  bool               `yaml:"disallow_transfer_to_peers,omitempty"`
 	MaxIterations            int                `yaml:"max_iterations,omitempty"`
@@ -155,6 +156,9 @@ func (n *yamlWorkflowNode) toMap() map[string]interface{} {
 	}
 	if n.IncludeContents != "" {
 		m["include_contents"] = n.IncludeContents
+	}
+	if n.OutputSchema != "" {
+		m["output_schema"] = n.OutputSchema
 	}
 	if n.DisallowTransferToParent {
 		m["disallow_transfer_to_parent"] = true
