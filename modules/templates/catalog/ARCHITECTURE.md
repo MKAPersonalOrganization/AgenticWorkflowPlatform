@@ -25,6 +25,7 @@ Each entry in the catalog demonstrates a specific set of ADK-Go workflow feature
 | Marketing Agency | ✓ | | | | ✓ | |
 | Short Movie Agent | ✓ | | | | ✓ | |
 | Context Control | | | | | ✓ | |
+| Agent Isolation | | | | | | |
 | Customer Support Triage | ✓ | | | | | |
 
 ---
@@ -650,7 +651,39 @@ flowchart LR
 
 ---
 
-## 18. Customer Support Triage
+## 18. Agent Isolation
+
+**Source:** ADK Python — `deep-search` (research_evaluator)
+
+**What it demonstrates:** An agent with `disallow_transfer_to_parent` and `disallow_transfer_to_peers` set to `true` is constrained from making routing decisions. It can only produce its output — it cannot delegate back to the parent agent or transfer to sibling agents. This is critical for quality assurance, evaluation, and compliance agents that should not interact with the rest of the system.
+
+```mermaid
+flowchart LR
+    User([Topic]) --> R["ResearcherAgent\noutput_key: findings"]
+    R --> E["EvaluatorAgent\ndisallow_transfer_to_parent=true\ndisallow_transfer_to_peers=true\noutput_key: evaluation"]
+    E --> X["ExecutorAgent\nacts on verdict\noutput_key: final_output"]
+    E -.->|"transfer blocked"| Parent
+    E -.->|"transfer blocked"| Sibling
+```
+
+**Key state variables**
+
+| Key | Written by | Read by |
+|---|---|---|
+| `findings` | ResearcherAgent | EvaluatorAgent, ExecutorAgent |
+| `evaluation` | EvaluatorAgent | ExecutorAgent |
+| `final_output` | ExecutorAgent | — |
+
+**ADK features used**
+- `disallow_transfer_to_parent: true` — EvaluatorAgent cannot delegate back to parent
+- `disallow_transfer_to_peers: true` — EvaluatorAgent cannot transfer to sibling agents
+- **Prevents hallucination** — isolated agent cannot accidentally route to unrelated agents
+- **Enforces role boundaries** — evaluator can only evaluate, not fix or re-research
+- **Security** — prevents LLM from escaping its intended scope
+
+---
+
+## 19. Customer Support Triage
 
 **Source:** ADK samples — `workflow-concurrent_research_writer` (conditional routing simplified)
 

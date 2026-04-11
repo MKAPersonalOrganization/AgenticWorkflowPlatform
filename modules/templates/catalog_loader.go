@@ -31,15 +31,17 @@ type yamlCatalogSpec struct {
 }
 
 type yamlWorkflowNode struct {
-	ID             string             `yaml:"id"`
-	Type           string             `yaml:"type"` // agent | sequential | parallel | loop | conditional
-	AgentID        string             `yaml:"agent_id,omitempty"`
-	OutputKey      string             `yaml:"output_key,omitempty"`
-	IncludeContents string            `yaml:"include_contents,omitempty"`
-	MaxIterations  int                `yaml:"max_iterations,omitempty"`
-	AllowEarlyExit bool               `yaml:"allow_early_exit,omitempty"`
-	Condition      string             `yaml:"condition,omitempty"` // for conditional routing branches
-	Children       []yamlWorkflowNode `yaml:"children,omitempty"`
+	ID                       string             `yaml:"id"`
+	Type                     string             `yaml:"type"` // agent | sequential | parallel | loop | conditional
+	AgentID                  string             `yaml:"agent_id,omitempty"`
+	OutputKey                string             `yaml:"output_key,omitempty"`
+	IncludeContents          string             `yaml:"include_contents,omitempty"`
+	DisallowTransferToParent bool               `yaml:"disallow_transfer_to_parent,omitempty"`
+	DisallowTransferToPeers  bool               `yaml:"disallow_transfer_to_peers,omitempty"`
+	MaxIterations            int                `yaml:"max_iterations,omitempty"`
+	AllowEarlyExit           bool               `yaml:"allow_early_exit,omitempty"`
+	Condition                string             `yaml:"condition,omitempty"` // for conditional routing branches
+	Children                 []yamlWorkflowNode `yaml:"children,omitempty"`
 }
 
 type yamlSubAgent struct {
@@ -153,6 +155,12 @@ func (n *yamlWorkflowNode) toMap() map[string]interface{} {
 	}
 	if n.IncludeContents != "" {
 		m["include_contents"] = n.IncludeContents
+	}
+	if n.DisallowTransferToParent {
+		m["disallow_transfer_to_parent"] = true
+	}
+	if n.DisallowTransferToPeers {
+		m["disallow_transfer_to_peers"] = true
 	}
 	if n.MaxIterations > 0 {
 		m["max_iterations"] = n.MaxIterations

@@ -1,0 +1,97 @@
+name: Agent Isolation
+slug: agent-isolation
+description: "Agents with disallow_transfer_to_parent and disallow_transfer_to_peers from ADK Python samples (deep-search research_evaluator): the evaluator agent is isolated from making routing decisions — it can only produce its output, not transfer to parent or sibling agents. Demonstrates how to constrain LLM behaviour in multi-agent systems."
+system_prompt: "Evaluate research findings and produce a quality assessment — do not delegate or transfer to other agents."
+category: Examples
+tags: [agent-isolation, disallow-transfer, quality-assurance, adk-sample]
+author_name: ADK
+icon: shield-alert
+featured: true
+
+# Workflow: sequential(researcher → evaluator[isolated] → executor)
+workflow:
+  id: root
+  type: sequential
+  children:
+    - id: n1
+      type: agent
+      agent_id: sub-researcher
+      output_key: findings
+    - id: n2
+      type: agent
+      agent_id: sub-evaluator
+      disallow_transfer_to_parent: true
+      disallow_transfer_to_peers: true
+      output_key: evaluation
+    - id: n3
+      type: agent
+      agent_id: sub-executor
+      output_key: final_output
+
+sub_agents:
+  - id: sub-researcher
+    name: ResearcherAgent
+    description: Conducts initial research and produces structured findings.
+    icon: search
+    system_prompt: |
+      ## Role: Researcher
+
+      ## Objective
+      Conduct research on the user's topic and produce structured findings.
+
+      ## Instructions
+      1. Understand the user's topic or question.
+      2. Use your knowledge to research and analyse the topic.
+      3. Produce structured findings with evidence, analysis, and conclusions.
+      4. Cover all relevant aspects comprehensively.
+
+  - id: sub-evaluator
+    name: EvaluatorAgent
+    description: Evaluates research quality against strict criteria. Isolated — cannot transfer to parent or peers. Produces a pass/fail verdict with feedback.
+    icon: clipboard-check
+    system_prompt: |
+      ## Role: Quality Evaluator
+
+      ## Objective
+      Evaluate the research findings against strict quality criteria.
+
+      ## Important: You are isolated. Do not delegate or transfer to any other agent.
+
+      ## Instructions
+      1. Read the research findings: {findings}
+      2. Evaluate on:
+         - **Comprehensiveness:** Are all aspects of the topic covered?
+         - **Depth:** Is the analysis sufficiently detailed?
+         - **Clarity:** Are explanations clear and well-structured?
+         - **Evidence:** Are claims supported by reasoning or data?
+      3. Produce a verdict:
+         - **Grade:** pass or fail
+         - **Comment:** Detailed explanation of the evaluation
+         - **If fail:** List 3-5 specific areas for improvement
+
+      Format:
+      - Grade: pass/fail
+      - Strengths: [bullet points]
+      - Weaknesses: [bullet points, if any]
+      - Recommendations: [numbered list, if fail]
+
+  - id: sub-executor
+    name: ExecutorAgent
+    description: Acts on the evaluation. If pass, produces the final output. If fail, produces improvement guidance.
+    icon: play
+    system_prompt: |
+      ## Role: Executor
+
+      ## Objective
+      Act on the evaluation verdict to produce the final output.
+
+      ## Instructions
+      1. Read the evaluation: {evaluation}
+      2. Read the original findings: {findings}
+      3. If the grade is **pass**:
+         - Produce a polished final output synthesising the findings
+         - Format as a clear, professional report
+      4. If the grade is **fail**:
+         - Summarise the key issues identified by the evaluator
+         - Provide specific guidance for what needs to be improved
+         - Suggest a refined research approach
