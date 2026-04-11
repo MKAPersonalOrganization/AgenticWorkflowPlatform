@@ -957,8 +957,15 @@ templ AgentDesignerDialog() {
 													<template x-if="selectedAgent">
 <div class="rounded-lg overflow-hidden bg-muted border-border">
 															<!-- Agent name header -->
-															<div class="px-2.5 py-2 bg-muted/50 border-b border-border">
-																<span class="text-[10px] font-semibold text-foreground truncate" x-text="selectedAgent.name"></span>
+															<div class="px-2.5 py-2 bg-muted/50 border-b border-border flex items-center justify-between">
+																<span class="text-[10px] font-semibold text-foreground truncate flex-1" x-text="selectedAgent.name"></span>
+																<!-- Coordinator badge -->
+																<template x-if="isCoordinator">
+																	<span class="shrink-0 ml-2 text-[8px] px-1.5 py-0.5 rounded-full bg-violet-500/15 text-violet-600 dark:text-violet-400 border border-violet-500/20 flex items-center gap-1">
+																		@icon.Users(icon.Props{Class: "size-2.5"})
+																		<span x-text="selectedAgent.subAgents?.length + ' sub'"></span>
+																	</span>
+																</template>
 															</div>
 															<!-- Model -->
 																<template x-if="selectedAgent.modelOverride && selectedAgent.modelOverride.modelName">
@@ -973,9 +980,29 @@ templ AgentDesignerDialog() {
 																	<p class="text-[10px] text-muted-foreground leading-relaxed line-clamp-2" x-text="selectedAgent.description"></p>
 																</div>
 															</template>
+															<!-- Subagents team hierarchy -->
+															<template x-if="isCoordinator">
+																<div class="px-2.5 py-2 border-b border-border">
+																	<div class="text-[8px] uppercase tracking-widest text-violet-500 font-semibold mb-1.5 flex items-center gap-1">
+																		@icon.Users(icon.Props{Class: "size-2.5"})
+																		Team
+																	</div>
+																	<div class="space-y-1">
+																		<template x-for="subAgent in selectedAgent.subAgents" :key="subAgent.agent_id">
+																			<div class="flex items-center gap-1.5 px-2 py-1 rounded bg-background border border-violet-500/20 text-[9px]">
+																				<span class="text-[8px] flex-shrink-0">🤖</span>
+																				<span class="flex-1 min-w-0 truncate text-foreground font-medium" x-text="getSubAgentName(subAgent.agent_id)"></span>
+																				<template x-if="subAgent.output_key">
+																					<span class="text-[8px] font-mono text-violet-600 dark:text-violet-400 flex-shrink-0" x-text="'→'+subAgent.output_key"></span>
+																				</template>
+																			</div>
+																		</template>
+																	</div>
+																</div>
+															</template>
 															<!-- Agent Config Summary -->
 															<div class="px-2.5 py-2">
-																<div class="flex items-center gap-2 text-[9px] text-muted-foreground">
+																<div class="flex items-center gap-2 text-[9px] text-muted-foreground flex-wrap">
 																	<template x-if="selectedAgent.output_key">
 																		<span class="flex items-center gap-1">
 																			@icon.Key(icon.Props{Class: "size-2.5"})

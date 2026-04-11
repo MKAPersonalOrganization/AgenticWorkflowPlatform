@@ -207,6 +207,83 @@ export const editableWorkflowTree = () => {
                 line-height: 1.3;
                 margin-top: 3px;
             }
+            .ewt-coordinator-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 3px;
+                font-size: 9px;
+                font-weight: 500;
+                color: #8b5cf6;
+                background: rgba(139, 92, 246, 0.1);
+                border: 1px solid rgba(139, 92, 246, 0.2);
+                border-radius: 9999px;
+                padding: 1px 6px;
+                margin-top: 4px;
+                line-height: 1.4;
+            }
+            .ewt-coordinator-badge-icon {
+                font-size: 8px;
+            }
+            .ewt-subagents-container {
+                margin-top: 6px;
+                padding: 6px;
+                background: rgba(139, 92, 246, 0.04);
+                border: 1px dashed rgba(139, 92, 246, 0.25);
+                border-radius: 6px;
+            }
+            .ewt-subagents-header {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                margin-bottom: 5px;
+                font-size: 9px;
+                font-weight: 600;
+                color: #8b5cf6;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+            }
+            .ewt-subagents-icon {
+                font-size: 10px;
+            }
+            .ewt-subagents-list {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+            .ewt-subagent-card {
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                padding: 4px 6px;
+                background: var(--background);
+                border: 1px solid rgba(139, 92, 246, 0.2);
+                border-radius: 4px;
+                font-size: 9px;
+                transition: all 0.15s ease;
+            }
+            .ewt-subagent-card:hover {
+                border-color: rgba(139, 92, 246, 0.4);
+                background: rgba(139, 92, 246, 0.06);
+            }
+            .ewt-subagent-card-icon {
+                font-size: 8px;
+                flex-shrink: 0;
+            }
+            .ewt-subagent-card-name {
+                flex: 1;
+                min-width: 0;
+                color: var(--foreground);
+                font-weight: 500;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .ewt-subagent-card-key {
+                font-size: 8px;
+                color: #8b5cf6;
+                font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+                flex-shrink: 0;
+            }
 
             /* ── Parallel fork/join ── */
             .ewt-fork-join {
@@ -615,7 +692,15 @@ export const editableWorkflowTree = () => {
         const selectedAgent = agents.find(a => a.id === node.agent_id);
         const name = node.agent_id ? (selectedAgent?.name || 'Unknown') : 'No agent selected';
         const isComposed = selectedAgent?.isComposed || false;
-        const agentOptions = agents.map(a => 
+        const isCoordinator = selectedAgent?.subAgents && selectedAgent.subAgents.length > 0;
+        const subAgentCount = selectedAgent?.subAgents?.length || 0;
+        
+        // Debug: log coordinator agents
+        if (isCoordinator) {
+            console.log('[EW] Coordinator agent:', name, 'with', subAgentCount, 'sub-agents:', selectedAgent.subAgents);
+        }
+        
+        const agentOptions = agents.map(a =>
             `<option value="${a.id}" ${node.agent_id === a.id ? 'selected' : ''}>${esc(a.name)}${a.isComposed ? ' (Workflow)' : ''}</option>`
         ).join('');
 
@@ -655,6 +740,25 @@ export const editableWorkflowTree = () => {
                                        data-node-id="${nodeId}" />
                             </div>` : ''}
                         ${node.output_key ? `<div class="ewt-agent-desc">→ ${esc(node.output_key)}</div>` : ''}
+                        ${isCoordinator ? `
+                            <div class="ewt-subagents-container">
+                                <div class="ewt-subagents-header">
+                                    <span class="ewt-subagents-icon">👥</span>
+                                    <span class="ewt-subagents-label">${subAgentCount} sub-agent${subAgentCount !== 1 ? 's' : ''}</span>
+                                </div>
+                                <div class="ewt-subagents-list">
+                                    ${selectedAgent.subAgents.map((sa, idx) => {
+                                        const subAgent = agents.find(a => a.id === sa.agent_id);
+                                        const subName = subAgent?.name || 'Unknown agent';
+                                        return `<div class="ewt-subagent-card">
+                                            <div class="ewt-subagent-card-icon">🤖</div>
+                                            <div class="ewt-subagent-card-name">${esc(subName)}</div>
+                                            ${sa.output_key ? `<div class="ewt-subagent-card-key">→ ${esc(sa.output_key)}</div>` : ''}
+                                        </div>`;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
                     </div>
                     <div class="ewt-actions">
                         <button type="button" class="ewt-action-btn ewt-contrib-btn" data-agent-toggle="${esc(name)}" title="Toggle agent output">💬</button>
