@@ -192,8 +192,8 @@ templ docsMultiAgentOrchestration() {
 	@docsSection("multi-agent", "Workflow Orchestration", iconGitBranch, "text-indigo-500") {
 		<p>
 			Compass.AI supports <strong>composing multiple agents into coordinated workflows</strong> that solve
-			complex, multi-step problems. Built on proven agent orchestration patterns, the engine supports four composition
-			patterns — sequential, parallel, loop, and conditional routing — all configurable from a
+			complex, multi-step problems. Built on proven agent orchestration patterns, the engine supports five composition
+			patterns — sequential, parallel, loop, conditional routing, and coordinator delegation — all configurable from a
 			visual builder in the UI.
 		</p>
 		<h3>Why Workflow Orchestration?</h3>
@@ -318,9 +318,9 @@ templ docsMultiAgentOrchestration() {
 templ docsUserProfile() {
 	@docsSection("personalized-profile", "Personalized Profile", iconUser, "text-amber-500") {
 		<p>
-			The Personalized Profile is a powerful adaptation feature that makes Compass.AI truly yours.
-			By defining your work preferences, every AI agent automatically adjusts its approach to
-			match how you work best.
+			The Personalized Profile lets you define your work preferences so every AI agent
+			automatically adjusts its approach to match how you work best.
+			Access it from the account settings menu (click your avatar in the bottom-left corner).
 		</p>
 		<h3>Profile Fields</h3>
 		@docsTable() {
@@ -332,10 +332,10 @@ templ docsUserProfile() {
 				</tr>
 			</thead>
 			<tbody>
-				@docsTableRow("Work Style", "How you prefer to absorb and process information", "Visual thinker, hands-on, detail-oriented")
-				@docsTableRow("Goals", "What you are working toward", "Ship new features, improve system design")
+				@docsTableRow("Learning Style", "How you prefer to absorb and process information", "Visual thinker, hands-on, detail-oriented")
+				@docsTableRow("Struggles", "Areas where you need extra help", "Complex math, abstract concepts")
 				@docsTableRow("Strengths", "Subjects or skills you are good at", "Problem solving, creative thinking")
-				@docsTableRow("Preferences", "How you want the AI to respond", "Concise summaries, code examples")
+				@docsTableRow("Goals", "What you are working toward", "Ship new features, improve system design")
 			</tbody>
 		}
 		<h3>How It Works</h3>
@@ -345,10 +345,10 @@ templ docsUserProfile() {
 			and adjusts its communication accordingly.
 		</p>
 		<ol class="list-decimal list-inside space-y-2 my-4">
-			<li>Navigate to <strong>Profile</strong> in the sidebar</li>
-			<li>Fill in your work style, goals, strengths, and preferences</li>
-			<li>Save your profile -- changes apply to all future conversations immediately</li>
-			<li>Every agent now adapts its responses based on your profile</li>
+			<li>Open the account settings menu (avatar icon, bottom-left of the sidebar)</li>
+			<li>Click <strong>Profile</strong> to open the profile dialog</li>
+			<li>Fill in your learning style, struggles, strengths, and goals</li>
+			<li>Save — changes apply to all future conversations immediately</li>
 		</ol>
 		<h3>Adaptive Communication</h3>
 		<p>
@@ -362,10 +362,10 @@ templ docsUserProfile() {
 				<strong>Hands-on workers</strong> get interactive examples and actionable steps
 			</li>
 			<li>
-				<strong>Preferences</strong> trigger specific formatting like code blocks or concise lists
+				<strong>Strengths</strong> allow agents to reference known concepts for faster communication
 			</li>
 			<li>
-				<strong>Strengths</strong> allow agents to reference known concepts for faster communication
+				<strong>Goals</strong> help agents align their responses with your broader objectives
 			</li>
 		</ul>
 		@docsInfoBox("Privacy") {
