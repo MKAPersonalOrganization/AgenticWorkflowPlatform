@@ -377,6 +377,42 @@ func (h *storeHandler) delete(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
 }
 
+// deleteAll handles DELETE /v1/agent-definitions
+func (h *storeHandler) deleteAll(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	agents, err := h.svc.listByUser(r.Context(), user.ID)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to list agents for bulk delete", "error", err)
+		http.Error(w, "Failed to list agents", http.StatusInternalServerError)
+		return
+	}
+
+	deleted := 0
+	failed := 0
+	for i := range agents {
+		if err := h.svc.delete(r.Context(), agents[i].ID, user.ID); err != nil {
+			h.log.Error(r.Context(), "failed to delete agent during bulk delete",
+				"agentID", agents[i].ID, "error", err)
+			failed++
+		} else {
+			deleted++
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":   "completed",
+		"deleted":  deleted,
+		"failed":   failed,
+		"total":    len(agents),
+	})
+}
+
 // list handles GET /v1/agent-definitions
 func (h *storeHandler) list(w http.ResponseWriter, r *http.Request) {
 	user := shared.GetUserFromContext(r.Context())

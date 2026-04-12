@@ -1075,6 +1075,37 @@ export const agentDesigner = () => ({
         }
     },
 
+    confirmDeleteAll() {
+        this.view = 'deleteAll';
+    },
+
+    async deleteAllAgents() {
+        this.saving = true;
+        try {
+            const response = await fetch('/v1/agent-definitions', {
+                method: 'DELETE',
+            });
+            if (response.ok) {
+                const result = await response.json();
+                await this.fetchAgents();
+                this.view = 'list';
+                if (result.failed === 0) {
+                    this.showToast(`Deleted ${result.deleted} agents`, 'success', 3000);
+                } else {
+                    this.showToast(`Deleted ${result.deleted}, ${result.failed} failed`, 'error', 3000);
+                }
+                window.dispatchEvent(new CustomEvent('agents-updated'));
+            } else {
+                this.showToast('Failed to delete agents', 'error');
+            }
+        } catch (err) {
+            console.error('Failed to delete all agents:', err);
+            this.showToast('Failed to delete agents', 'error');
+        } finally {
+            this.saving = false;
+        }
+    },
+
     // ══════════════════════════════════════════
     // Tools, Knowledge Bases, Filesystems
     // ══════════════════════════════════════════
