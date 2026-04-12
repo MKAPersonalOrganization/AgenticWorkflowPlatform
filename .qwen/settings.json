@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(go *)",
-      "Bash(rm *)"
+      "Bash(rm *)",
+      "Bash(do *)",
+      "Bash(done)"
     ]
   },
   "$version": 3
