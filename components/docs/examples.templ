@@ -57,9 +57,9 @@ templ docsSequentialExamples() {
 			<code>city</code>, then a report agent writes a friendly sentence about the local time there.
 			This is the reference implementation for the <code>OutputKey → &#123;variable&#125;</code> pattern.
 		</p>
-		@wfSequential([]wfNode{
-			{Type: "agent", Name: "CityGenerator", Subtitle: "output: city"},
-			{Type: "agent", Name: "CityReport", Subtitle: "reads {city}"},
+		@wfSequential([]wfAgent{
+			{Name: "CityGenerator", Subtitle: "output: city"},
+			{Name: "CityReport", Subtitle: "reads {city}"},
 		})
 		@docsTable() {
 			<thead>
@@ -82,9 +82,9 @@ templ docsSequentialExamples() {
 			<strong>conversation history</strong> — no explicit <code>output_key</code>. The critic's response
 			— including all verdicts — is automatically part of the context the reviser receives.
 		</p>
-		@wfSequential([]wfNode{
-			{Type: "agent", Name: "Critic", Subtitle: "identifies claims, assigns verdicts"},
-			{Type: "agent", Name: "Reviser", Subtitle: "reads full conversation → corrected answer"},
+		@wfSequential([]wfAgent{
+			{Name: "Critic", Subtitle: "identifies claims, assigns verdicts"},
+			{Name: "Reviser", Subtitle: "reads full conversation → corrected answer"},
 		})
 		@wfConceptBadges([]string{"implicit state", "conversation history", "no output_key needed"})
 	}
@@ -105,12 +105,12 @@ templ docsParallelExamples() {
 			drafting an email, a Slack message, and a calendar event — and a summary agent collects the results.
 			This is the purest fan-out/fan-in pattern.
 		</p>
-		@wfParallelSequential([]wfNode{
-			{Type: "agent", Name: "EmailDrafter", Subtitle: "output: drafted_email"},
-			{Type: "agent", Name: "SlackDrafter", Subtitle: "output: drafted_slack_message"},
-			{Type: "agent", Name: "EventExtractor", Subtitle: "output: event_details"},
-		}, []wfNode{
-			{Type: "agent", Name: "SummaryAgent", Subtitle: "reads all three → broadcast"},
+		@wfParallelSequential([]wfAgent{
+			{Name: "EmailDrafter", Subtitle: "output: drafted_email"},
+			{Name: "SlackDrafter", Subtitle: "output: drafted_slack_message"},
+			{Name: "EventExtractor", Subtitle: "output: event_details"},
+		}, []wfAgent{
+			{Name: "SummaryAgent", Subtitle: "reads all three → broadcast"},
 		})
 		@docsTable() {
 			<thead>
@@ -137,9 +137,9 @@ templ docsParallelExamples() {
 			Label: "Parallel (3 branches)",
 			RootType: "parallel",
 			Nodes: []wfNestedNode{
-				{Node: wfNode{Type: "agent", Name: "EmailDrafter"}, Children: []wfNestedNode{{Node: wfNode{Type: "agent", Name: "EmailPublisher"}}}},
-				{Node: wfNode{Type: "agent", Name: "SlackDrafter"}, Children: []wfNestedNode{{Node: wfNode{Type: "agent", Name: "SlackPublisher"}}}},
-				{Node: wfNode{Type: "agent", Name: "EventExtractor"}, Children: []wfNestedNode{{Node: wfNode{Type: "agent", Name: "CalendarPublisher"}}}},
+				{Node: wfAgent{Name: "EmailDrafter"}, Children: []wfNestedNode{{Node: wfNode{Name: "EmailPublisher"}}}},
+				{Node: wfAgent{Name: "SlackDrafter"}, Children: []wfNestedNode{{Node: wfNode{Name: "SlackPublisher"}}}},
+				{Node: wfAgent{Name: "EventExtractor"}, Children: []wfNestedNode{{Node: wfNode{Name: "CalendarPublisher"}}}},
 			},
 		})
 		@wfConceptBadges([]string{"sequential inside parallel", "state isolation per branch", "nested composition"})
@@ -153,13 +153,13 @@ templ docsParallelExamples() {
 		@wfNested(wfNestedGroup{
 			Label: "Sequential → Parallel → Sequential",
 			Nodes: []wfNestedNode{
-				{Node: wfNode{Type: "agent", Name: "IntakeAnalyst", Subtitle: "output: topic_brief"}},
-				{Node: wfNode{Type: "parallel", Name: "Analysis Group"}, Children: []wfNestedNode{
-					{Node: wfNode{Type: "agent", Name: "TechnicalAnalyst", Subtitle: "output: tech_assessment"}},
-					{Node: wfNode{Type: "agent", Name: "BusinessAnalyst", Subtitle: "output: biz_assessment"}},
-					{Node: wfNode{Type: "agent", Name: "RiskAnalyst", Subtitle: "output: risk_assessment"}},
+				{Node: wfNode{Name: "IntakeAnalyst", Subtitle: "output: topic_brief"}},
+				{Type: "parallel", Node: wfAgent{Name: "Analysis Group"}, Children: []wfNestedNode{
+					{Node: wfNode{Name: "TechnicalAnalyst", Subtitle: "output: tech_assessment"}},
+					{Node: wfNode{Name: "BusinessAnalyst", Subtitle: "output: biz_assessment"}},
+					{Node: wfNode{Name: "RiskAnalyst", Subtitle: "output: risk_assessment"}},
 				}},
-				{Node: wfNode{Type: "agent", Name: "Synthesiser", Subtitle: "reads all 3 → final_report"}},
+				{Node: wfNode{Name: "Synthesiser", Subtitle: "reads all 3 → final_report"}},
 			},
 		})
 		@wfConceptBadges([]string{"parallel as one step in sequence", "multiple output_keys", "context fan-in"})
@@ -182,7 +182,7 @@ templ docsLoopExamples() {
 			via <code>&#123;refined_concept?&#125;</code> and improves it. Shows the simplest loop pattern.
 		</p>
 		@wfLoop(wfLoopGroup{
-			Nodes:   []wfNode{{Type: "agent", Name: "RefinementAgent", Subtitle: "reads {refined_concept?} → improves"}},
+			Agents:   []wfAgent{{Name: "RefinementAgent", Subtitle: "reads {refined_concept?} → improves"}},
 			MaxIter: "3",
 		})
 		@wfConceptBadges([]string{"loop node", "max_iterations: 3", "allow_early_exit: false", "state overwrite"})
@@ -194,9 +194,9 @@ templ docsLoopExamples() {
 			meets standards, skipping remaining iterations. Shows the "retry-until-good" pattern.
 		</p>
 		@wfLoop(wfLoopGroup{
-			Nodes: []wfNode{
-				{Type: "agent", Name: "DraftWriter", Subtitle: "produces draft"},
-				{Type: "agent", Name: "QualityChecker", Subtitle: "calls exit_loop if passes"},
+			Agents: []wfAgent{
+				{Name: "DraftWriter", Subtitle: "produces draft"},
+				{Name: "QualityChecker", Subtitle: "calls exit_loop if passes"},
 			},
 			EarlyExit: true,
 		})
@@ -211,13 +211,13 @@ templ docsLoopExamples() {
 		@wfNested(wfNestedGroup{
 			Label: "Sequential → Loop → Sequential",
 			Nodes: []wfNestedNode{
-				{Node: wfNode{Type: "agent", Name: "PlannerAgent", Subtitle: "output: requirements"}},
-				{Node: wfNode{Type: "loop", Name: "Generate → Score → Check"}, Children: []wfNestedNode{
-					{Node: wfNode{Type: "agent", Name: "Generator", Subtitle: "output: draft"}},
-					{Node: wfNode{Type: "agent", Name: "Scorer", Subtitle: "score ≥ 8 → exit_loop"}},
-					{Node: wfNode{Type: "agent", Name: "Checker", Subtitle: "early exit decision"}},
+				{Node: wfNode{Name: "PlannerAgent", Subtitle: "output: requirements"}},
+				{Type: "loop", Node: wfAgent{Name: "Generate → Score → Check"}, Children: []wfNestedNode{
+					{Node: wfNode{Name: "Generator", Subtitle: "output: draft"}},
+					{Node: wfNode{Name: "Scorer", Subtitle: "score ≥ 8 → exit_loop"}},
+					{Node: wfNode{Name: "Checker", Subtitle: "early exit decision"}},
 				}},
-				{Node: wfNode{Type: "agent", Name: "EditorAgent", Subtitle: "reads {generated_output} → final"}},
+				{Node: wfNode{Name: "EditorAgent", Subtitle: "reads {generated_output} → final"}},
 			},
 		})
 		@wfConceptBadges([]string{"sequential → loop → sequential", "feedback loop", "nested composition"})
@@ -231,13 +231,13 @@ templ docsLoopExamples() {
 		@wfNested(wfNestedGroup{
 			Label: "Sequential → Loop (3 iter) → Sequential → Parallel",
 			Nodes: []wfNestedNode{
-				{Node: wfNode{Type: "agent", Name: "BriefEnhancer", Subtitle: "output: topic_brief"}},
-				{Node: wfNode{Type: "loop", Name: "Draft → Critic Loop"}, Children: []wfNestedNode{
-					{Node: wfNode{Type: "parallel", Name: "Draft Agents"}, Children: []wfNestedNode{
-						{Node: wfNode{Type: "agent", Name: "DraftA"}},
-						{Node: wfNode{Type: "agent", Name: "DraftB"}},
+				{Node: wfNode{Name: "BriefEnhancer", Subtitle: "output: topic_brief"}},
+				{Type: "loop", Node: wfAgent{Name: "Draft → Critic Loop"}, Children: []wfNestedNode{
+					{Type: "parallel", Node: wfAgent{Name: "Draft Agents"}, Children: []wfNestedNode{
+						{Node: wfNode{Name: "DraftA"}},
+						{Node: wfNode{Name: "DraftB"}},
 					}},
-					{Node: wfNode{Type: "agent", Name: "Critic", Subtitle: "selects best_draft"}},
+					{Node: wfNode{Name: "Critic", Subtitle: "selects best_draft"}},
 				}},
 			},
 		})
@@ -267,7 +267,7 @@ templ docsConditionalExamples() {
 			output executes. A branch with <code>condition: "*"</code> acts as a fallback.
 		</p>
 		@wfConditional(wfConditionalGroup{
-			Evaluator: wfNode{Type: "agent", Name: "Classifier", Subtitle: "output: category"},
+			Evaluator: wfNode{Name: "Classifier", Subtitle: "output: category"},
 			OutputKey: "category",
 			Branches: []wfBranch{
 				{Label: "Branch A", Condition: "value_a", Color: "emerald"},
@@ -292,7 +292,7 @@ templ docsConditionalExamples() {
 			they escalate back to the coordinator for re-routing.
 		</p>
 		@wfConditional(wfConditionalGroup{
-			Evaluator: wfNode{Type: "agent", Name: "TriageAgent", Subtitle: "output: specialist_selection"},
+			Evaluator: wfNode{Name: "TriageAgent", Subtitle: "output: specialist_selection"},
 			OutputKey: "specialist_selection",
 			Branches: []wfBranch{
 				{Label: "TechSpecialist", Condition: "technical", Color: "emerald"},
@@ -330,10 +330,10 @@ templ docsAdvancedExamples() {
 			only on explicitly injected state via <code>&#123;variable&#125;</code> placeholders. This isolates the agent
 			from irrelevant prior context, reduces token cost, and prevents hallucination from stale history.
 		</p>
-		@wfSequential([]wfNode{
-			{Type: "agent", Name: "PlannerAgent", Subtitle: "output: research_plan"},
-			{Type: "agent", Name: "ResearcherAgent", Subtitle: "output: findings"},
-			{Type: "agent", Name: "Composer", Subtitle: "include_contents=none, reads {research_plan}+{findings}"},
+		@wfSequential([]wfAgent{
+			{Name: "PlannerAgent", Subtitle: "output: research_plan"},
+			{Name: "ResearcherAgent", Subtitle: "output: findings"},
+			{Name: "Composer", Subtitle: "include_contents=none, reads {research_plan}+{findings}"},
 		})
 		@wfConceptBadges([]string{"include_contents: none", "explicit state only", "cost efficiency"})
 		<!-- Output Schema -->
@@ -343,9 +343,9 @@ templ docsAdvancedExamples() {
 			typed structured data instead of free-form text. When set, the agent can only reply with matching
 			JSON — no tool use, no RAG, no agent transfer.
 		</p>
-		@wfSequential([]wfNode{
-			{Type: "agent", Name: "DataExtractor", Subtitle: "output_schema: object → structured_data"},
-			{Type: "agent", Name: "ReportFormatter", Subtitle: "reads {structured_data}"},
+		@wfSequential([]wfAgent{
+			{Name: "DataExtractor", Subtitle: "output_schema: object → structured_data"},
+			{Name: "ReportFormatter", Subtitle: "reads {structured_data}"},
 		})
 		@wfConceptBadges([]string{"output_schema", "forced JSON", "no tools/RAG/transfer when schema set"})
 		<!-- Agent Isolation -->
@@ -356,10 +356,10 @@ templ docsAdvancedExamples() {
 			routing decisions. It can only produce its output — it cannot delegate back to the parent or
 			transfer to siblings. Critical for quality assurance and compliance agents.
 		</p>
-		@wfSequential([]wfNode{
-			{Type: "agent", Name: "Researcher", Subtitle: "output: findings"},
-			{Type: "agent", Name: "Evaluator", Subtitle: "isolated → evaluation"},
-			{Type: "agent", Name: "Executor", Subtitle: "reads {evaluation}+{findings}"},
+		@wfSequential([]wfAgent{
+			{Name: "Researcher", Subtitle: "output: findings"},
+			{Name: "Evaluator", Subtitle: "isolated → evaluation"},
+			{Name: "Executor", Subtitle: "reads {evaluation}+{findings}"},
 		})
 		@wfConceptBadges([]string{"disallow_transfer_to_parent", "disallow_transfer_to_peers", "role boundaries"})
 		<!-- Transfer to Parent -->
@@ -368,10 +368,10 @@ templ docsAdvancedExamples() {
 			A sequential workflow where a specialist agent can escalate back to the parent coordinator
 			when it cannot resolve the request. The parent re-routes to a different specialist.
 		</p>
-		@wfSequential([]wfNode{
-			{Type: "agent", Name: "Coordinator", Subtitle: "output: routing_decision"},
-			{Type: "agent", Name: "TriageAgent", Subtitle: "output: specialist_selection"},
-			{Type: "agent", Name: "Specialist", Subtitle: "can transfer to parent → resolution or escalation"},
+		@wfSequential([]wfAgent{
+			{Name: "Coordinator", Subtitle: "output: routing_decision"},
+			{Name: "TriageAgent", Subtitle: "output: specialist_selection"},
+			{Name: "Specialist", Subtitle: "can transfer to parent → resolution or escalation"},
 		})
 		@wfConceptBadges([]string{"transfer_to_parent", "escalation", "re-routing"})
 		<!-- Transfer to Peers -->
@@ -380,9 +380,9 @@ templ docsAdvancedExamples() {
 			A single LLM root agent with child agents, using the <code>transfer_to_agent</code> tool to
 			route between peers. No workflow graph — the LLM decides which agent handles the request.
 		</p>
-		@wfSequential([]wfNode{
-			{Type: "agent", Name: "RootAgent", Subtitle: "transfer_to_agent tool → routes to peer"},
-			{Type: "agent", Name: "PeerAgent A ∥ PeerAgent B ∥ PeerAgent C", Subtitle: "specialists"},
+		@wfSequential([]wfAgent{
+			{Name: "RootAgent", Subtitle: "transfer_to_agent tool → routes to peer"},
+			{Name: "PeerAgent A ∥ PeerAgent B ∥ PeerAgent C", Subtitle: "specialists"},
 		})
 		@wfConceptBadges([]string{"coordinator pattern", "LLM-driven routing", "no workflow graph"})
 	}
