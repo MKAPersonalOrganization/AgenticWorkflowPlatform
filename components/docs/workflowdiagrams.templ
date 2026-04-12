@@ -1,0 +1,289 @@
+package docs
+
+// ─── Workflow Diagram Components ─────────────────────────────────────────────
+//
+// Professional static workflow diagrams using the same visual language as the
+// interactive UI: type-specific colors, icon badges, and structured node cards.
+//
+// Colors: Sequential=blue, Parallel=amber, Loop=purple, Conditional=red, Agent=emerald
+// ─────────────────────────────────────────────────────────────────────────────
+
+type wfNode struct {
+	Type     string   // "agent", "sequential", "parallel", "loop", "conditional"
+	Name     string
+	Subtitle string
+	Badges   []string
+}
+
+type wfBranch struct {
+	Label     string
+	Condition string
+	Color     string
+}
+
+type wfLoopGroup struct {
+	Nodes     []wfNode
+	MaxIter   string
+	EarlyExit bool
+}
+
+type wfConditionalGroup struct {
+	Evaluator wfNode
+	OutputKey string
+	Branches  []wfBranch
+}
+
+type wfNestedGroup struct {
+	Label string
+	Nodes []wfNestedNode
+}
+
+type wfNestedNode struct {
+	Node     wfNode
+	Children []wfNestedNode
+}
+
+// ─── Sequential pipeline ─────────────────────────────────────────────────────
+
+templ wfSequential(nodes []wfNode) {
+	<div class="my-6 overflow-x-auto rounded-xl border border-border/60 bg-card/50 p-4">
+		<div class="flex items-center gap-2 mb-4">
+			<span class="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400">Sequential</span>
+		</div>
+		<div class="flex flex-wrap items-center gap-2">
+			for i, n := range nodes {
+				@wfAgentCard(n)
+				if i < len(nodes)-1 {
+					<span class="text-muted-foreground flex-shrink-0">&#8594;</span>
+				}
+			}
+		</div>
+	</div>
+}
+
+// ─── Parallel + Sequential ───────────────────────────────────────────────────
+
+templ wfParallelSequential(branches []wfNode, after []wfNode) {
+	<div class="my-6 overflow-x-auto rounded-xl border border-border/60 bg-card/50 p-4">
+		<div class="flex items-center gap-2 mb-4">
+			<span class="inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400">Parallel</span>
+		</div>
+		<div class="flex items-stretch gap-3">
+			<div class="w-0.5 bg-border self-stretch flex-shrink-0 rounded-full"></div>
+			<div class="flex flex-col gap-3 flex-1">
+				for _, b := range branches {
+					@wfAgentCard(b)
+				}
+			</div>
+			<div class="w-0.5 bg-border self-stretch flex-shrink-0 rounded-full"></div>
+			if len(after) > 0 {
+				<div class="flex items-center gap-2 pl-3">
+					for i, n := range after {
+						@wfAgentCard(n)
+						if i < len(after)-1 {
+							<span class="text-muted-foreground flex-shrink-0">&#8594;</span>
+						}
+					}
+				</div>
+			}
+		</div>
+	</div>
+}
+
+// ─── Loop ────────────────────────────────────────────────────────────────────
+
+templ wfLoop(group wfLoopGroup) {
+	<div class="my-6 overflow-x-auto rounded-xl border border-border/60 bg-card/50 p-4">
+		<div class="flex items-center gap-2 mb-4">
+			<span class="inline-flex items-center gap-1.5 rounded-full border border-purple-500/20 bg-purple-500/10 px-3 py-1 text-[11px] font-semibold text-purple-600 dark:text-purple-400">Loop</span>
+			if group.MaxIter != "" {
+				<span class="inline-flex items-center rounded-full border border-border bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">max: { group.MaxIter }</span>
+			}
+			if group.EarlyExit {
+				<span class="inline-flex items-center rounded-full border border-rose-500/20 bg-rose-500/10 px-2.5 py-0.5 text-[11px] font-medium text-rose-600 dark:text-rose-400">early exit</span>
+			}
+		</div>
+		<div class="rounded-lg border-[1.5px] border-dashed border-purple-500/30 bg-purple-500/[3%] p-4 relative">
+			<span class="absolute -top-[9px] right-3 text-[9px] font-bold px-1.5 py-0.5 rounded bg-background text-foreground border border-border">&#8634; repeat</span>
+			<div class="flex flex-wrap items-center gap-2">
+				for i, n := range group.Nodes {
+					@wfAgentCard(n)
+					if i < len(group.Nodes)-1 {
+						<span class="text-muted-foreground flex-shrink-0">&#8594;</span>
+					}
+				}
+			</div>
+			<div class="mt-2 text-center text-[10px] text-muted-foreground">
+				&#8617; loop back
+				if group.EarlyExit {
+					<span class="text-rose-500"> &#183; exit_loop (done)</span>
+				}
+			</div>
+		</div>
+	</div>
+}
+
+// ─── Conditional routing ─────────────────────────────────────────────────────
+
+templ wfConditional(group wfConditionalGroup) {
+	<div class="my-6 overflow-x-auto rounded-xl border border-border/60 bg-card/50 p-4">
+		<div class="flex items-center gap-2 mb-4">
+			<span class="inline-flex items-center gap-1.5 rounded-full border border-red-500/20 bg-red-500/10 px-3 py-1 text-[11px] font-semibold text-red-600 dark:text-red-400">Conditional</span>
+			if group.OutputKey != "" {
+				<span class="inline-flex items-center rounded-full border border-border bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">output_key: { group.OutputKey }</span>
+			}
+		</div>
+		<div class="flex flex-wrap items-start gap-3">
+			@wfAgentCard(group.Evaluator)
+			<span class="flex items-center pt-4 text-muted-foreground flex-shrink-0">&#8594;</span>
+			<div class="flex-1 min-w-[200px]">
+				<div class="rounded-lg border-[1.5px] border-dotted border-red-500/25 bg-red-500/[3%] p-3 relative">
+					<span class="absolute -top-[9px] left-3 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-background text-red-500 border border-border">route</span>
+					<div class="flex flex-col gap-2 mt-1">
+						for _, b := range group.Branches {
+							<div class={ "rounded-lg border px-3 py-2 bg-background shadow-sm", "border-" + b.Color + "-500/30" }>
+								<div class="flex items-center gap-2">
+									<span class="text-xs font-medium text-foreground">{ b.Label }</span>
+									<span class="text-[10px] text-muted-foreground ml-auto">condition: { b.Condition }</span>
+								</div>
+							</div>
+						}
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// ─── Nested composition ──────────────────────────────────────────────────────
+
+templ wfNested(group wfNestedGroup) {
+	<div class="my-6 overflow-x-auto rounded-xl border border-border/60 bg-card/50 p-4">
+		<div class="flex items-center gap-2 mb-4">
+			<span class="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-[11px] font-semibold text-muted-foreground">{ group.Label }</span>
+		</div>
+		<div class="space-y-3">
+			for _, n := range group.Nodes {
+				@wfNestedNodeRender(n)
+			}
+		</div>
+	</div>
+}
+
+templ wfNestedNodeRender(n wfNestedNode) {
+	@wfAgentCardWithChildren(n.Node, n.Children)
+}
+
+templ wfAgentCardWithChildren(node wfNode, children []wfNestedNode) {
+	<div class={ "rounded-lg border bg-background px-3 py-2.5", wfNodeBorder(node.Type) }>
+		<div class="flex items-center gap-2">
+			@wfNodeIcon(node.Type)
+			<span class="text-xs font-medium text-foreground">{ node.Name }</span>
+			if node.Subtitle != "" {
+				<span class="text-[10px] text-muted-foreground ml-auto">{ node.Subtitle }</span>
+			}
+		</div>
+		if len(node.Badges) > 0 {
+			<div class="flex gap-1.5 mt-1.5 flex-wrap">
+				for _, b := range node.Badges {
+					@wfConceptBadge(b)
+				}
+			</div>
+		}
+		if len(children) > 0 {
+			<div class="ml-6 mt-3 space-y-2 border-l-2 border-border/50 pl-4">
+				for _, c := range children {
+					@wfNestedNodeRender(c)
+				}
+			</div>
+		}
+	</div>
+}
+
+// ─── Agent card ──────────────────────────────────────────────────────────────
+
+templ wfAgentCard(n wfNode) {
+	<div class={ "rounded-lg border bg-background px-3 py-2.5 min-w-[140px] max-w-[220px] flex-shrink-0", wfNodeBorder(n.Type) }>
+		<div class="flex items-center gap-2">
+			@wfNodeIcon(n.Type)
+			<div class="min-w-0">
+				<div class="text-xs font-medium text-foreground truncate">{ n.Name }</div>
+				if n.Subtitle != "" {
+					<div class="text-[10px] text-muted-foreground truncate">{ n.Subtitle }</div>
+				}
+			</div>
+		</div>
+		if len(n.Badges) > 0 {
+			<div class="flex gap-1.5 mt-1.5 flex-wrap">
+				for _, b := range n.Badges {
+					@wfConceptBadge(b)
+				}
+			</div>
+		}
+	</div>
+}
+
+// ─── Icon ────────────────────────────────────────────────────────────────────
+
+templ wfNodeIcon(nodeType string) {
+	switch nodeType {
+	case "sequential":
+		<svg class="size-3.5 text-blue-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+	case "parallel":
+		<svg class="size-3.5 text-amber-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v18"/><path d="M16 3v18"/></svg>
+	case "loop":
+		<svg class="size-3.5 text-purple-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+	case "conditional":
+		<svg class="size-3.5 text-red-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="m8 3-5 5 5 5"/><path d="m3 12 6 6 6-6"/><path d="m9 18 6-6-6-6"/></svg>
+	default:
+		<svg class="size-3.5 text-emerald-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h20"/><path d="M9 14h6"/><path d="M10 18h4"/></svg>
+	}
+}
+
+// ─── Border color ────────────────────────────────────────────────────────────
+
+func wfNodeBorder(t string) string {
+	switch t {
+	case "sequential":
+		return "border-blue-500/30"
+	case "parallel":
+		return "border-amber-500/30"
+	case "loop":
+		return "border-purple-500/30"
+	case "conditional":
+		return "border-red-500/30"
+	default:
+		return "border-emerald-500/30"
+	}
+}
+
+// ─── Concept badge ───────────────────────────────────────────────────────────
+
+templ wfConceptBadge(text string) {
+	<span class="inline-flex items-center rounded-full border border-border bg-muted px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground">{ text }</span>
+}
+
+templ wfConceptBadges(concepts []string) {
+	<div class="my-3 flex items-center gap-1.5 flex-wrap">
+		for _, c := range concepts {
+			@wfConceptBadge(c)
+		}
+	</div>
+}
+
+// ─── Legacy compatibility ────────────────────────────────────────────────────
+
+func patternColor(pattern string) string {
+	switch pattern {
+	case "sequential":
+		return "bg-blue-600"
+	case "parallel":
+		return "bg-emerald-600"
+	case "loop", "loop (early exit)":
+		return "bg-rose-500"
+	case "conditional":
+		return "bg-red-500"
+	default:
+		return "bg-slate-600"
+	}
+}

@@ -57,9 +57,9 @@ templ docsSequentialExamples() {
 			<code>city</code>, then a report agent writes a friendly sentence about the local time there.
 			This is the reference implementation for the <code>OutputKey → &#123;variable&#125;</code> pattern.
 		</p>
-		@workflowDiagram("sequential", []string{
-			"CityGeneratorAgent → city",
-			"CityReportAgent → {city} → single sentence report",
+		@wfSequential([]wfNode{
+			{Type: "agent", Name: "CityGenerator", Subtitle: "output: city"},
+			{Type: "agent", Name: "CityReport", Subtitle: "reads {city}"},
 		})
 		@docsTable() {
 			<thead>
@@ -74,7 +74,7 @@ templ docsSequentialExamples() {
 				@docsTableRow("CityReportAgent", "{city}", "final report")
 			</tbody>
 		}
-		@conceptBadges([]string{"output_key", "{variable} templates", "2-agent chain"})
+		@wfConceptBadges([]string{"output_key", "{variable} templates", "2-agent chain"})
 		<!-- Implicit State -->
 		<h3>Implicit State: Critic → Reviser</h3>
 		<p>
@@ -82,11 +82,11 @@ templ docsSequentialExamples() {
 			<strong>conversation history</strong> — no explicit <code>output_key</code>. The critic's response
 			— including all verdicts — is automatically part of the context the reviser receives.
 		</p>
-		@workflowDiagram("sequential", []string{
-			"CriticAgent → identifies claims, assigns verdicts",
-			"ReviserAgent → reads full conversation → corrected answer",
+		@wfSequential([]wfNode{
+			{Type: "agent", Name: "Critic", Subtitle: "identifies claims, assigns verdicts"},
+			{Type: "agent", Name: "Reviser", Subtitle: "reads full conversation → corrected answer"},
 		})
-		@conceptBadges([]string{"implicit state", "conversation history", "no output_key needed"})
+		@wfConceptBadges([]string{"implicit state", "conversation history", "no output_key needed"})
 	}
 }
 
@@ -105,10 +105,13 @@ templ docsParallelExamples() {
 			drafting an email, a Slack message, and a calendar event — and a summary agent collects the results.
 			This is the purest fan-out/fan-in pattern.
 		</p>
-		@workflowDiagramParallel(
-			[]string{"EmailDrafter → drafted_email", "SlackDrafter → drafted_slack_message", "EventExtractor → event_details"},
-			[]string{"SummaryAgent → reads all three → broadcast summary"},
-		)
+		@wfParallelSequential([]wfNode{
+			{Type: "agent", Name: "EmailDrafter", Subtitle: "output: drafted_email"},
+			{Type: "agent", Name: "SlackDrafter", Subtitle: "output: drafted_slack_message"},
+			{Type: "agent", Name: "EventExtractor", Subtitle: "output: event_details"},
+		}, []wfNode{
+			{Type: "agent", Name: "SummaryAgent", Subtitle: "reads all three → broadcast"},
+		})
 		@docsTable() {
 			<thead>
 				<tr>
@@ -123,18 +126,22 @@ templ docsParallelExamples() {
 				@docsTableRow("SummaryAgent", "{drafted_email?} + {drafted_slack_message?} + {event_details?}", "final summary")
 			</tbody>
 		}
-		@conceptBadges([]string{"parallel node", "fan-out/fan-in", "optional {key?} injection"})
+		@wfConceptBadges([]string{"parallel node", "fan-out/fan-in", "optional {key?} injection"})
 		<!-- Sequential Inside Parallel -->
 		<h3>Sequential Inside Parallel</h3>
 		<p>
 			Three parallel branches where <strong>each branch is itself a sequential pipeline</strong>
 			(drafter → publisher). All three branches run concurrently. This demonstrates nested composition.
 		</p>
-		@workflowDiagramParallel(
-			[]string{"EmailDrafter → EmailPublisher", "SlackDrafter → SlackPublisher", "EventExtractor → CalendarPublisher"},
-			[]string{"SummaryAgent → reads all results → broadcast"},
-		)
-		@conceptBadges([]string{"sequential inside parallel", "state isolation per branch", "nested composition"})
+		@wfNested(wfNestedGroup{
+			Label: "Parallel (3 branches)",
+			Nodes: []wfNestedNode{
+				{Node: wfNode{Type: "agent", Name: "EmailDrafter"}, Children: []wfNestedNode{{Node: wfNode{Type: "agent", Name: "EmailPublisher"}}}},
+				{Node: wfNode{Type: "agent", Name: "SlackDrafter"}, Children: []wfNestedNode{{Node: wfNode{Type: "agent", Name: "SlackPublisher"}}}},
+				{Node: wfNode{Type: "agent", Name: "EventExtractor"}, Children: []wfNestedNode{{Node: wfNode{Type: "agent", Name: "CalendarPublisher"}}}},
+			},
+		})
+		@wfConceptBadges([]string{"sequential inside parallel", "state isolation per branch", "nested composition"})
 		<!-- Parallel Inside Sequential -->
 		<h3>Parallel Inside Sequential</h3>
 		<p>
@@ -142,12 +149,19 @@ templ docsParallelExamples() {
 			input first, then three specialist analysts evaluate the topic concurrently, then a synthesiser
 			combines all findings into a final report.
 		</p>
-		@workflowDiagram("sequential", []string{
-			"IntakeAnalyst → topic_brief",
-			"Parallel: TechnicalAnalyst ∥ BusinessAnalyst ∥ RiskAnalyst",
-			"Synthesiser → reads all 3 assessments → final_report",
+		@wfNested(wfNestedGroup{
+			Label: "Sequential → Parallel → Sequential",
+			Nodes: []wfNestedNode{
+				{Node: wfNode{Type: "agent", Name: "IntakeAnalyst", Subtitle: "output: topic_brief"}},
+				{Node: wfNode{Type: "parallel", Name: "Analysis Group"}, Children: []wfNestedNode{
+					{Node: wfNode{Type: "agent", Name: "TechnicalAnalyst", Subtitle: "output: tech_assessment"}},
+					{Node: wfNode{Type: "agent", Name: "BusinessAnalyst", Subtitle: "output: biz_assessment"}},
+					{Node: wfNode{Type: "agent", Name: "RiskAnalyst", Subtitle: "output: risk_assessment"}},
+				}},
+				{Node: wfNode{Type: "agent", Name: "Synthesiser", Subtitle: "reads all 3 → final_report"}},
+			},
 		})
-		@conceptBadges([]string{"parallel as one step in sequence", "multiple output_keys", "context fan-in"})
+		@wfConceptBadges([]string{"parallel as one step in sequence", "multiple output_keys", "context fan-in"})
 	}
 }
 
@@ -157,7 +171,7 @@ templ docsLoopExamples() {
 		<p>
 			<strong>Loop workflows</strong> repeat a set of agents until a quality condition is met or a maximum
 			iteration count is reached. The most common pattern is <strong>generate → evaluate → refine</strong>:
-			a generator produceses content, an evaluator checks quality, and if unsatisfied it provides
+			a generator produces content, an evaluator checks quality, and if unsatisfied it provides
 			feedback for the next pass.
 		</p>
 		<!-- Fixed-Iteration Loop -->
@@ -166,8 +180,11 @@ templ docsLoopExamples() {
 			A single agent runs exactly 3 times with no early exit. Each iteration reads the previous output
 			via <code>&#123;refined_concept?&#125;</code> and improves it. Shows the simplest loop pattern.
 		</p>
-		@workflowDiagramLoop()
-		@conceptBadges([]string{"loop node", "max_iterations: 3", "allow_early_exit: false", "state overwrite"})
+		@wfLoop(wfLoopGroup{
+			Nodes:   []wfNode{{Type: "agent", Name: "RefinementAgent", Subtitle: "reads {refined_concept?} → improves"}},
+			MaxIter: "3",
+		})
+		@wfConceptBadges([]string{"loop node", "max_iterations: 3", "allow_early_exit: false", "state overwrite"})
 		<!-- Loop with Early Exit -->
 		<h3>Loop with Early Exit: Draft → Check</h3>
 		<p>
@@ -175,11 +192,14 @@ templ docsLoopExamples() {
 			checker agent validates quality. The checker calls the <code>exit_loop</code> tool when the draft
 			meets standards, skipping remaining iterations. Shows the "retry-until-good" pattern.
 		</p>
-		@workflowDiagram("loop (early exit)", []string{
-			"DraftWriter → draft",
-			"QualityChecker → calls exit_loop if draft passes",
+		@wfLoop(wfLoopGroup{
+			Nodes: []wfNode{
+				{Type: "agent", Name: "DraftWriter", Subtitle: "produces draft"},
+				{Type: "agent", Name: "QualityChecker", Subtitle: "calls exit_loop if passes"},
+			},
+			EarlyExit: true,
 		})
-		@conceptBadges([]string{"allow_early_exit: true", "exit_loop tool", "validation pattern"})
+		@wfConceptBadges([]string{"allow_early_exit: true", "exit_loop tool", "validation pattern"})
 		<!-- Sequential Inside Loop -->
 		<h3>Sequential Inside Loop</h3>
 		<p>
@@ -187,12 +207,19 @@ templ docsLoopExamples() {
 			a sequential generate-score-check pipeline that iterates until quality is met, and finally an
 			editor polishes the approved output.
 		</p>
-		@workflowDiagram("sequential", []string{
-			"PlannerAgent → requirements",
-			"Loop (generate → create → score → check, early exit if score ≥ 8)",
-			"EditorAgent → reads {generated_output} → final_output",
+		@wfNested(wfNestedGroup{
+			Label: "Sequential → Loop → Sequential",
+			Nodes: []wfNestedNode{
+				{Node: wfNode{Type: "agent", Name: "PlannerAgent", Subtitle: "output: requirements"}},
+				{Node: wfNode{Type: "loop", Name: "Generate → Score → Check"}, Children: []wfNestedNode{
+					{Node: wfNode{Type: "agent", Name: "Generator", Subtitle: "output: draft"}},
+					{Node: wfNode{Type: "agent", Name: "Scorer", Subtitle: "score ≥ 8 → exit_loop"}},
+					{Node: wfNode{Type: "agent", Name: "Checker", Subtitle: "early exit decision"}},
+				}},
+				{Node: wfNode{Type: "agent", Name: "EditorAgent", Subtitle: "reads {generated_output} → final"}},
+			},
 		})
-		@conceptBadges([]string{"sequential → loop → sequential", "feedback loop", "nested composition"})
+		@wfConceptBadges([]string{"sequential → loop → sequential", "feedback loop", "nested composition"})
 		<!-- Parallel Inside Loop Inside Sequential -->
 		<h3>Parallel Inside Loop Inside Sequential</h3>
 		<p>
@@ -200,12 +227,20 @@ templ docsLoopExamples() {
 			itself a sequential containing a parallel. Two drafters run concurrently, a critic selects the
 			best, and the loop repeats exactly 3 times.
 		</p>
-		@workflowDiagram("sequential", []string{
-			"BriefEnhancer → topic_brief",
-			"Loop (3 iterations): Parallel(DraftA ∥ DraftB) → Critic → best_draft",
-			"Output: best draft after 3 rounds",
+		@wfNested(wfNestedGroup{
+			Label: "Sequential → Loop (3 iter) → Sequential → Parallel",
+			Nodes: []wfNestedNode{
+				{Node: wfNode{Type: "agent", Name: "BriefEnhancer", Subtitle: "output: topic_brief"}},
+				{Node: wfNode{Type: "loop", Name: "Draft → Critic Loop"}, Children: []wfNestedNode{
+					{Node: wfNode{Type: "parallel", Name: "Draft Agents"}, Children: []wfNestedNode{
+						{Node: wfNode{Type: "agent", Name: "DraftA"}},
+						{Node: wfNode{Type: "agent", Name: "DraftB"}},
+					}},
+					{Node: wfNode{Type: "agent", Name: "Critic", Subtitle: "selects best_draft"}},
+				}},
+			},
 		})
-		@conceptBadges([]string{"sequential → loop → sequential → parallel", "state fan-out", "deepest nesting"})
+		@wfConceptBadges([]string{"sequential → loop → sequential → parallel", "state fan-out", "deepest nesting"})
 		@docsInfoBox("Loop vs. Sequential Retry") {
 			<p>
 				Loops are different from re-running a sequential pipeline. Inside a loop, <strong>conversation history persists</strong>
@@ -230,8 +265,16 @@ templ docsConditionalExamples() {
 			each with a <code>condition</code> field. Only the branch whose condition matches the evaluator's
 			output executes. A branch with <code>condition: "*"</code> acts as a fallback.
 		</p>
-		@workflowDiagramConditional()
-		@conceptBadges([]string{"conditional node", "evaluator + branches", "output_key matching", "fallback (*)"})
+		@wfConditional(wfConditionalGroup{
+			Evaluator: wfNode{Type: "agent", Name: "Classifier", Subtitle: "output: category"},
+			OutputKey: "category",
+			Branches: []wfBranch{
+				{Label: "Branch A", Condition: "value_a", Color: "emerald"},
+				{Label: "Branch B", Condition: "value_b", Color: "amber"},
+				{Label: "Fallback", Condition: "*", Color: "slate"},
+			},
+		})
+		@wfConceptBadges([]string{"conditional node", "evaluator + branches", "output_key matching", "fallback (*)"})
 		@docsInfoBox("How Matching Works") {
 			<p>
 				The evaluator's output is read from session state using the <code>output_key</code> field.
@@ -247,10 +290,14 @@ templ docsConditionalExamples() {
 			then a conditional router sends it to the right specialist. If the specialist can't help,
 			they escalate back to the coordinator for re-routing.
 		</p>
-		@workflowDiagramConditionalExample("TriageAgent", "specialist_selection", []conditionalBranch{
-			{label: "TechSpecialist", condition: "technical", color: "emerald"},
-			{label: "BillingSpecialist", condition: "billing", color: "amber"},
-			{label: "GeneralSpecialist", condition: "*", color: "slate"},
+		@wfConditional(wfConditionalGroup{
+			Evaluator: wfNode{Type: "agent", Name: "TriageAgent", Subtitle: "output: specialist_selection"},
+			OutputKey: "specialist_selection",
+			Branches: []wfBranch{
+				{Label: "TechSpecialist", Condition: "technical", Color: "emerald"},
+				{Label: "BillingSpecialist", Condition: "billing", Color: "amber"},
+				{Label: "GeneralSpecialist", Condition: "*", Color: "slate"},
+			},
 		})
 		@docsTable() {
 			<thead>
@@ -268,7 +315,7 @@ templ docsConditionalExamples() {
 				@docsTableRow("GeneralSpecialist", "Handles everything else", "* (fallback)")
 			</tbody>
 		}
-		@conceptBadges([]string{"triage pattern", "3 branches + fallback", "escalation to parent"})
+		@wfConceptBadges([]string{"triage pattern", "3 branches + fallback", "escalation to parent"})
 	}
 }
 
@@ -282,12 +329,12 @@ templ docsAdvancedExamples() {
 			only on explicitly injected state via <code>&#123;variable&#125;</code> placeholders. This isolates the agent
 			from irrelevant prior context, reduces token cost, and prevents hallucination from stale history.
 		</p>
-		@workflowDiagram("sequential", []string{
-			"PlannerAgent → research_plan",
-			"ResearcherAgent → findings",
-			"ComposerAgent (include_contents=none) → reads {research_plan} + {findings} → final_report",
+		@wfSequential([]wfNode{
+			{Type: "agent", Name: "PlannerAgent", Subtitle: "output: research_plan"},
+			{Type: "agent", Name: "ResearcherAgent", Subtitle: "output: findings"},
+			{Type: "agent", Name: "Composer", Subtitle: "include_contents=none, reads {research_plan}+{findings}"},
 		})
-		@conceptBadges([]string{"include_contents: none", "explicit state only", "cost efficiency"})
+		@wfConceptBadges([]string{"include_contents: none", "explicit state only", "cost efficiency"})
 		<!-- Output Schema -->
 		<h3>Output Schema: Structured Data Extraction</h3>
 		<p>
@@ -295,11 +342,11 @@ templ docsAdvancedExamples() {
 			typed structured data instead of free-form text. When set, the agent can only reply with matching
 			JSON — no tool use, no RAG, no agent transfer.
 		</p>
-		@workflowDiagram("sequential", []string{
-			"DataExtractorAgent (output_schema: object) → structured_data",
-			"ReportFormatterAgent → reads {structured_data} → formatted_report",
+		@wfSequential([]wfNode{
+			{Type: "agent", Name: "DataExtractor", Subtitle: "output_schema: object → structured_data"},
+			{Type: "agent", Name: "ReportFormatter", Subtitle: "reads {structured_data}"},
 		})
-		@conceptBadges([]string{"output_schema", "forced JSON", "no tools/RAG/transfer when schema set"})
+		@wfConceptBadges([]string{"output_schema", "forced JSON", "no tools/RAG/transfer when schema set"})
 		<!-- Agent Isolation -->
 		<h3>Agent Isolation: Researcher → Evaluator → Executor</h3>
 		<p>
@@ -308,35 +355,35 @@ templ docsAdvancedExamples() {
 			routing decisions. It can only produce its output — it cannot delegate back to the parent or
 			transfer to siblings. Critical for quality assurance and compliance agents.
 		</p>
-		@workflowDiagram("sequential", []string{
-			"ResearcherAgent → findings",
-			"EvaluatorAgent (isolated) → evaluation",
-			"ExecutorAgent → reads {evaluation} + {findings} → final_output",
+		@wfSequential([]wfNode{
+			{Type: "agent", Name: "Researcher", Subtitle: "output: findings"},
+			{Type: "agent", Name: "Evaluator", Subtitle: "isolated → evaluation"},
+			{Type: "agent", Name: "Executor", Subtitle: "reads {evaluation}+{findings}"},
 		})
-		@conceptBadges([]string{"disallow_transfer_to_parent", "disallow_transfer_to_peers", "role boundaries"})
+		@wfConceptBadges([]string{"disallow_transfer_to_parent", "disallow_transfer_to_peers", "role boundaries"})
 		<!-- Transfer to Parent -->
 		<h3>Transfer to Parent: Escalation Pattern</h3>
 		<p>
 			A sequential workflow where a specialist agent can escalate back to the parent coordinator
 			when it cannot resolve the request. The parent re-routes to a different specialist.
 		</p>
-		@workflowDiagram("sequential", []string{
-			"CoordinatorAgent → routing_decision",
-			"TriageAgent → specialist_selection",
-			"SpecialistAgent (can transfer to parent) → resolution or escalation",
+		@wfSequential([]wfNode{
+			{Type: "agent", Name: "Coordinator", Subtitle: "output: routing_decision"},
+			{Type: "agent", Name: "TriageAgent", Subtitle: "output: specialist_selection"},
+			{Type: "agent", Name: "Specialist", Subtitle: "can transfer to parent → resolution or escalation"},
 		})
-		@conceptBadges([]string{"transfer_to_parent", "escalation", "re-routing"})
+		@wfConceptBadges([]string{"transfer_to_parent", "escalation", "re-routing"})
 		<!-- Transfer to Peers -->
 		<h3>Transfer to Peers: Coordinator Pattern</h3>
 		<p>
 			A single LLM root agent with child agents, using the <code>transfer_to_agent</code> tool to
 			route between peers. No workflow graph — the LLM decides which agent handles the request.
 		</p>
-		@workflowDiagram("coordinator", []string{
-			"RootAgent (transfer_to_agent tool) → routes to peer",
-			"PeerAgent A ∥ PeerAgent B ∥ PeerAgent C",
+		@wfSequential([]wfNode{
+			{Type: "agent", Name: "RootAgent", Subtitle: "transfer_to_agent tool → routes to peer"},
+			{Type: "agent", Name: "PeerAgent A ∥ PeerAgent B ∥ PeerAgent C", Subtitle: "specialists"},
 		})
-		@conceptBadges([]string{"coordinator pattern", "LLM-driven routing", "no workflow graph"})
+		@wfConceptBadges([]string{"coordinator pattern", "LLM-driven routing", "no workflow graph"})
 	}
 }
 
@@ -407,181 +454,3 @@ templ docsDesignYourOwn() {
 	}
 }
 
-// ─── Visual helpers ──────────────────────────────────────────────────────────
-
-// workflowDiagram renders an ASCII-style sequential pipeline as styled boxes.
-templ workflowDiagram(pattern string, steps []string) {
-	<div class="my-6 overflow-x-auto rounded-lg border border-border bg-muted/30 p-4">
-		<div class="flex items-center gap-1 mb-3">
-			@statusBadge(pattern, patternColor(pattern))
-		</div>
-		<div class="flex flex-wrap items-center gap-2 font-mono text-xs">
-			for i, step := range steps {
-				<div class="rounded-md border border-border bg-background px-3 py-2 text-foreground shadow-sm">
-					{ step }
-				</div>
-				if i < len(steps)-1 {
-					<span class="text-muted-foreground select-none">→</span>
-				}
-			}
-		</div>
-	</div>
-}
-
-// workflowDiagramParallel renders a parallel fan-in pattern.
-templ workflowDiagramParallel(parallelSteps []string, sequentialSteps []string) {
-	<div class="my-6 overflow-x-auto rounded-lg border border-border bg-muted/30 p-4">
-		<div class="flex items-center gap-1 mb-3">
-			@statusBadge("parallel", "bg-emerald-600")
-			@statusBadge("→ sequential", "bg-blue-600")
-		</div>
-		<!-- Parallel branches -->
-		<div class="flex items-start gap-4 mb-3">
-			<div class="space-y-2">
-				for _, step := range parallelSteps {
-					<div class="rounded-md border border-emerald-500/40 bg-emerald-500/5 px-3 py-2 font-mono text-xs text-foreground shadow-sm">
-						{ step }
-					</div>
-				}
-			</div>
-			<div class="flex flex-col items-center justify-center self-stretch">
-				<div class="h-full w-px bg-border"></div>
-				<span class="text-muted-foreground select-none my-1 text-xs">fan-in →</span>
-				<div class="h-full w-px bg-border"></div>
-			</div>
-			<!-- Sequential after merge -->
-			<div class="flex flex-wrap items-center gap-2 self-center">
-				for i, step := range sequentialSteps {
-					<div class="rounded-md border border-border bg-background px-3 py-2 font-mono text-xs text-foreground shadow-sm">
-						{ step }
-					</div>
-					if i < len(sequentialSteps)-1 {
-						<span class="text-muted-foreground select-none">→</span>
-					}
-				}
-			</div>
-		</div>
-	</div>
-}
-
-// workflowDiagramLoop renders the self-evaluation loop pattern.
-templ workflowDiagramLoop() {
-	<div class="my-6 overflow-x-auto rounded-lg border border-border bg-muted/30 p-4">
-		<div class="flex items-center gap-1 mb-3">
-			@statusBadge("loop", "bg-rose-500")
-			@statusBadge("max_iterations", "bg-slate-600")
-		</div>
-		<div class="flex flex-wrap items-center gap-3 font-mono text-xs">
-			<div class="rounded-lg border border-rose-500/40 bg-rose-500/5 p-3 space-y-2">
-				<div class="rounded-md border border-border bg-background px-3 py-2 shadow-sm">
-					Agent — produce or refine
-				</div>
-				<div class="text-center text-muted-foreground select-none">↓</div>
-				<div class="rounded-md border border-border bg-background px-3 py-2 shadow-sm">
-					Checker — evaluate & decide
-				</div>
-				<div class="text-center text-muted-foreground select-none text-[10px] mt-1">
-					↩ loop back (retry) · exit_loop (done)
-				</div>
-			</div>
-		</div>
-	</div>
-}
-
-// conditionalBranch describes a single branch in a conditional diagram.
-type conditionalBranch struct {
-	label     string
-	condition string
-	color     string
-}
-
-// workflowDiagramConditional renders the generic conditional routing pattern.
-templ workflowDiagramConditional() {
-	<div class="my-6 overflow-x-auto rounded-lg border border-border bg-muted/30 p-4">
-		<div class="flex items-center gap-1 mb-3">
-			@statusBadge("conditional", "bg-red-500")
-			@statusBadge("evaluator → branches", "bg-slate-600")
-		</div>
-		<div class="flex flex-wrap items-center gap-3 font-mono text-xs">
-			<div class="rounded-lg border border-red-500/40 bg-red-500/5 p-3 space-y-2">
-				<div class="rounded-md border border-border bg-background px-3 py-2 shadow-sm">
-					Evaluator — classify input
-				</div>
-				<div class="text-center text-muted-foreground select-none text-[10px]">
-					output_key → session state
-				</div>
-			</div>
-			<span class="text-muted-foreground select-none">→</span>
-			<div class="space-y-2">
-				<div class="rounded-md border border-emerald-500/40 bg-emerald-500/5 px-3 py-2 shadow-sm">
-					Branch A <span class="text-muted-foreground">(condition: value_a)</span>
-				</div>
-				<div class="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 shadow-sm">
-					Branch B <span class="text-muted-foreground">(condition: value_b)</span>
-				</div>
-				<div class="rounded-md border border-slate-500/40 bg-slate-500/5 px-3 py-2 shadow-sm">
-					Fallback <span class="text-muted-foreground">(condition: *)</span>
-				</div>
-			</div>
-		</div>
-	</div>
-}
-
-// workflowDiagramConditionalExample renders a concrete conditional routing pattern.
-templ workflowDiagramConditionalExample(evaluator string, outputKey string, branches []conditionalBranch) {
-	<div class="my-6 overflow-x-auto rounded-lg border border-border bg-muted/30 p-4">
-		<div class="flex items-center gap-1 mb-3">
-			@statusBadge("conditional", "bg-red-500")
-			@statusBadge("output_key: " + outputKey, "bg-slate-600")
-		</div>
-		<div class="flex flex-wrap items-center gap-3 font-mono text-xs">
-			<div class="rounded-lg border border-red-500/40 bg-red-500/5 p-3 space-y-2">
-				<div class="rounded-md border border-border bg-background px-3 py-2 shadow-sm">
-					{ evaluator }
-				</div>
-				<div class="text-center text-muted-foreground select-none text-[10px]">
-					→ { outputKey }
-				</div>
-			</div>
-			<span class="text-muted-foreground select-none">→</span>
-			<div class="space-y-2">
-				for _, b := range branches {
-					<div class={ "rounded-md border px-3 py-2 shadow-sm",
-						"border-" + b.color + "-500/40 bg-" + b.color + "-500/5" }>
-						{ b.label }
-						<span class="text-muted-foreground">(condition: { b.condition })</span>
-					</div>
-				}
-			</div>
-		</div>
-	</div>
-}
-
-// conceptBadges renders a row of concept pill badges.
-templ conceptBadges(concepts []string) {
-	<div class="my-3 flex items-center gap-1.5 flex-wrap">
-		for _, c := range concepts {
-			<span class="inline-flex items-center rounded-full border border-border bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
-				{ c }
-			</span>
-		}
-	</div>
-}
-
-// patternColor returns a Tailwind background color for a workflow pattern badge.
-func patternColor(pattern string) string {
-	switch pattern {
-	case "sequential":
-		return "bg-blue-600"
-	case "parallel":
-		return "bg-emerald-600"
-	case "loop", "loop (early exit)":
-		return "bg-rose-500"
-	case "conditional":
-		return "bg-red-500"
-	case "coordinator":
-		return "bg-slate-600"
-	default:
-		return "bg-slate-600"
-	}
-}
