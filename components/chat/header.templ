@@ -1,14 +1,17 @@
 package chat
 
-import "aicompass/components/icon"
+import "aicompass/components/agenteditor"
 import "aicompass/components/button"
 import "aicompass/components/i18n"
+import "aicompass/components/icon"
 
 // Header renders the desktop chat header with action buttons.
 templ Header() {
 	<div class="absolute top-0 z-10 hidden md:flex h-14 w-full items-center justify-between bg-linear-to-b from-background via-background/80 to-transparent backdrop-blur-[2px] p-2 font-semibold">
 		<div class="flex items-center gap-2"></div>
 		<div class="flex items-center gap-2">
+			<!-- Agent Designer -->
+			@agenteditor.AgentDesignerHeaderButton()
 			<!-- Right Side Actions -->
 			<!-- New Chat -->
 			<div x-show="hasMessages || isStreaming" x-cloak>

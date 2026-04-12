@@ -1,5 +1,6 @@
 package pageheader
 
+import "aicompass/components/agenteditor"
 import "aicompass/components/button"
 import "aicompass/components/icon"
 
@@ -38,6 +39,10 @@ templ PageHeader(props ...Props) {
 					{ p.Description }
 				</p>
 			}
+		</div>
+		<!-- Agent Designer -->
+		<div class="hidden md:flex shrink-0">
+			@agenteditor.AgentDesignerHeaderButton()
 		</div>
 	</div>
 }

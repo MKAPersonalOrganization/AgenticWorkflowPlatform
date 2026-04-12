@@ -2632,3 +2632,23 @@ templ AgentDesignerNavButtonTrigger() {
 		}
 	}
 }
+
+// AgentDesignerHeaderButton renders an icon button for the top header bar.
+templ AgentDesignerHeaderButton() {
+	@dialog.Trigger(dialog.TriggerProps{
+		For: "agent-designer-dialog",
+	}) {
+		@button.Button(button.Props{
+			Size:    button.SizeIcon,
+			Variant: button.VariantGhost,
+			Class:   "size-9 text-muted-foreground hover:text-foreground hover:bg-accent/60 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+			Attributes: templ.Attributes{
+				"@click": "$dispatch('open-agent-designer')",
+				"title":  i18n.T(ctx, "Agent Designer"),
+			},
+		}) {
+			@icon.Workflow(icon.Props{Class: "size-5"})
+			<span class="sr-only">{ i18n.T(ctx, "Agent Designer") }</span>
+		}
+	}
+}

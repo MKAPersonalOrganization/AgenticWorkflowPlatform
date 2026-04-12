@@ -2,7 +2,6 @@ package nav
 
 import (
 	a2acomp "aicompass/components/a2a"
-	"aicompass/components/agenteditor"
 	"aicompass/components/button"
 	"aicompass/components/filesystem"
 	"aicompass/components/i18n"
@@ -79,10 +78,6 @@ templ Navbar(props ...NavbarProps) {
 			<!-- Chat History -->
 			<div class="nav-item w-full flex justify-center">
 				@threads.ThreadsButtonTrigger()
-			</div>
-			<!-- Agent Designer -->
-			<div class="nav-item hidden md:flex w-full justify-center">
-				@agenteditor.AgentDesignerNavButtonTrigger()
 			</div>
 			<!-- Group divider -->
 			<div class="w-5 h-px bg-linear-to-r from-transparent via-sidebar-border/50 to-transparent my-1 shrink-0 hidden md:block"></div>

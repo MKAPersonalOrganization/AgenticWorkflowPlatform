@@ -2,6 +2,7 @@ package profile
 
 import (
 	"aicompass/components"
+	"aicompass/components/agenteditor"
 	"aicompass/components/button"
 	"aicompass/components/card"
 	"aicompass/components/icon"
@@ -46,6 +47,10 @@ templ ProfilePage(props ProfilePageProps) {
 				<div class="flex-1">
 					<h1 class="text-3xl font-bold tracking-tight">Personalized Profile</h1>
 					<p class="text-muted-foreground mt-1">Personalize your AI companion experience</p>
+				</div>
+				<!-- Agent Designer -->
+				<div class="hidden md:flex shrink-0">
+					@agenteditor.AgentDesignerHeaderButton()
 				</div>
 			</div>
 			<!-- Profile Form -->
