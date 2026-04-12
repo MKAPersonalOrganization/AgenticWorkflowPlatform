@@ -22,6 +22,7 @@ func nullIfEmpty(s string) sql.NullString {
 // agentSelectColumns is the standard column set for agent queries.
 // graph, model_config, and model_override are included so composed and configured agents are fully loaded.
 const agentSelectColumns = `id, user_id, name, description, system_prompt, icon, source_catalog_id,
+    COALESCE(parent_id, '') as parent_id,
     disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
     global_instruction, COALESCE(input_schema::text, '') as input_schema,
     COALESCE(output_schema::text, '') as output_schema,
@@ -74,10 +75,11 @@ func (r *postgresAgentDefinitionRepository) Create(ctx context.Context, agent *A
 
 	query := `
 INSERT INTO user_agents (id, user_id, name, description, system_prompt, icon, source_catalog_id,
+    parent_id,
     disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
     global_instruction, input_schema, output_schema, graph, sub_agents, model_config, model_override,
     share_token, visibility, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)`
 
 	_, err := r.db.ExecContext(ctx, query,
 		agent.ID,
@@ -87,6 +89,7 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $
 		agent.SystemPrompt,
 		agent.Icon,
 		agent.SourceCatalogID,
+		nullIfEmpty(agent.ParentID),
 		agent.DisallowTransferToParent,
 		agent.DisallowTransferToPeers,
 		agent.OutputKey,
@@ -130,18 +133,19 @@ func (r *postgresAgentDefinitionRepository) Update(ctx context.Context, agent *A
 	query := `
 UPDATE user_agents
 SET name = $1, description = $2, system_prompt = $3,
-    icon = $4, updated_at = $5,
-    disallow_transfer_to_parent = $6, disallow_transfer_to_peers = $7,
-    output_key = $8, include_contents = $9, global_instruction = $10,
-    input_schema = $11, output_schema = $12, graph = $13, sub_agents = $14,
-    model_config = $15, model_override = $16
-WHERE id = $17 AND user_id = $18`
+    icon = $4, parent_id = $5, updated_at = $6,
+    disallow_transfer_to_parent = $7, disallow_transfer_to_peers = $8,
+    output_key = $9, include_contents = $10, global_instruction = $11,
+    input_schema = $12, output_schema = $13, graph = $14, sub_agents = $15,
+    model_config = $16, model_override = $17
+WHERE id = $18 AND user_id = $19`
 
 	result, err := r.db.ExecContext(ctx, query,
 		agent.Name,
 		agent.Description,
 		agent.SystemPrompt,
 		agent.Icon,
+		nullIfEmpty(agent.ParentID),
 		agent.UpdatedAt,
 		agent.DisallowTransferToParent,
 		agent.DisallowTransferToPeers,
@@ -283,6 +287,27 @@ WHERE id = $4 AND user_id = $5`
 	}
 	if rows == 0 {
 		return fmt.Errorf("agent not found or not owned by user")
+	}
+	return nil
+}
+
+// SetParent sets the parent_id on a sub-agent to establish workflow ownership.
+func (r *postgresAgentDefinitionRepository) SetParent(ctx context.Context, agentID, parentID, userID string) error {
+	query := `UPDATE user_agents SET parent_id = $1, updated_at = $2
+WHERE id = $3 AND user_id = $4`
+	_, err := r.db.ExecContext(ctx, query, parentID, time.Now().UTC(), agentID, userID)
+	if err != nil {
+		return fmt.Errorf("setting parent_id: %w", err)
+	}
+	return nil
+}
+
+// DeleteByParent deletes all agents owned by a workflow (parent_id = parentID).
+func (r *postgresAgentDefinitionRepository) DeleteByParent(ctx context.Context, parentID, userID string) error {
+	query := `DELETE FROM user_agents WHERE parent_id = $1 AND user_id = $2`
+	_, err := r.db.ExecContext(ctx, query, parentID, userID)
+	if err != nil {
+		return fmt.Errorf("deleting sub-agents by parent_id: %w", err)
 	}
 	return nil
 }

@@ -91,6 +91,12 @@ type AgentDefinition struct {
 	Graph     *CompositionNode `json:"graph,omitempty" db:"-"`
 	GraphJSON string           `json:"-" db:"graph"`
 
+	// ── Ownership ──
+	// ParentID is the ID of the workflow (composed AgentDefinition) that owns
+	// this agent. Empty for top-level agents. When set, this agent is deleted
+	// when its parent workflow is deleted.
+	ParentID string `json:"parent_id,omitempty" db:"parent_id"`
+
 	// ── Coordinator Sub-Agents ──
 	// SubAgents holds inline sub-agent definitions. When non-empty, this agent
 	// acts as a coordinator: an LlmAgent whose SubAgents are populated directly,
@@ -451,4 +457,10 @@ type AgentDefinitionRepository interface {
 
 	// UpdateShareToken sets or clears the share token for an agent.
 	UpdateShareToken(ctx context.Context, id, userID, token, visibility string) error
+
+	// SetParent sets the parent_id on a sub-agent to establish workflow ownership.
+	SetParent(ctx context.Context, agentID, parentID, userID string) error
+
+	// DeleteByParent deletes all agents owned by a workflow (parent_id = parentID).
+	DeleteByParent(ctx context.Context, parentID, userID string) error
 }

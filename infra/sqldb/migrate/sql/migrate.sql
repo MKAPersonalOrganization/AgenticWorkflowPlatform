@@ -1052,3 +1052,9 @@ ALTER TABLE user_agents DROP COLUMN IF EXISTS memory_enabled;
 -- Version: 1.73
 -- Description: Add sub_agents JSONB column for coordinator pattern (LlmAgent with SubAgents).
 ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS sub_agents JSONB;
+
+-- Version: 1.74
+-- Description: Add parent_id column for workflow ownership. Sub-agents reference
+-- their parent workflow (composed AgentDefinition) so cascade delete works correctly.
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS parent_id VARCHAR(255);
+CREATE INDEX IF NOT EXISTS idx_user_agents_parent_id ON user_agents(parent_id);

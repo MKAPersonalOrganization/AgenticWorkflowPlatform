@@ -114,6 +114,14 @@ func (f *CatalogWorkflowForker) ForkCatalogWorkflow(
 		return "", fmt.Errorf("creating workflow definition: %w", err)
 	}
 
+	// Establish ownership: set parent_id on all sub-agents so cascade delete works.
+	for _, realID := range idMap {
+		if err := f.agentRepo.SetParent(ctx, realID, wfID, userID); err != nil {
+			f.log.Warn(ctx, "failed to set parent_id on sub-agent",
+				"subAgentID", realID, "parentID", wfID, "error", err)
+		}
+	}
+
 	f.log.Info(ctx, "forked catalog workflow",
 		"catalog_id", catalogID, "workflow_id", wf.ID, "sub_agents", len(subs))
 

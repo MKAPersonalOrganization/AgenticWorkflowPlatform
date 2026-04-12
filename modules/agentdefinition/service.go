@@ -171,6 +171,15 @@ func (s *Service) ImportComposedFromCatalogEntry(ctx context.Context, userID str
 	if err := s.repo.Create(ctx, composed); err != nil {
 		return "", fmt.Errorf("creating workflow agent: %w", err)
 	}
+
+	// Establish ownership: set parent_id on all sub-agents so cascade delete works.
+	for _, subID := range idMap {
+		if err := s.repo.SetParent(ctx, subID, composed.ID, userID); err != nil {
+			s.log.Warn(ctx, "failed to set parent_id on sub-agent",
+				"subAgentID", subID, "parentID", composed.ID, "error", err)
+		}
+	}
+
 	return composed.ID, nil
 }
 
@@ -227,14 +236,34 @@ func (s *Service) update(ctx context.Context, agent *AgentDefinition) error {
 	return nil
 }
 
-// delete removes an agent definition.
+// delete removes an agent definition and cascade deletes all owned sub-agents.
 func (s *Service) delete(ctx context.Context, id, userID string) error {
 	s.log.Info(ctx, "deleting agent definition", "agentID", id, "userID", userID)
 
-	if err := s.repo.Delete(ctx, id, userID); err != nil {
-		return fmt.Errorf("deleting agent: %w", err)
+	// Fetch the agent to check if it owns sub-agents via graph references.
+	agent, err := s.repo.GetByID(ctx, id, userID)
+	if err != nil {
+		return fmt.Errorf("fetching agent: %w", err)
 	}
-	return nil
+
+	// If this is a composed agent (has a graph), cascade delete all referenced sub-agents.
+	if agent.Graph != nil {
+		subAgentIDs := agent.Graph.CollectAgentIDs()
+		for _, subID := range subAgentIDs {
+			if err := s.repo.Delete(ctx, subID, userID); err != nil {
+				s.log.Warn(ctx, "failed to delete sub-agent during cascade",
+					"subAgentID", subID, "error", err)
+			}
+		}
+	}
+
+	// Also delete any agents with parent_id = this agent's ID (ownership-based delete).
+	if err := s.repo.DeleteByParent(ctx, id, userID); err != nil {
+		s.log.Warn(ctx, "failed to delete sub-agents by parent_id",
+			"parentID", id, "error", err)
+	}
+
+	return s.repo.Delete(ctx, id, userID)
 }
 
 // getByID retrieves a single agent by ID.
