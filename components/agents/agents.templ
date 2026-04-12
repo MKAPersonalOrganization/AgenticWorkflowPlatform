@@ -537,13 +537,16 @@ templ AgentsDialog() {
 																			<div class="text-[10px] text-muted-foreground truncate" x-text="plugin.tools.length + ' tools'"></div>
 																		</div>
 																	</div>
-																	<!-- Requirement badge -->
-																	<template x-if="plugin.requirement_config && plugin.requirement_config.action === 'block'">
-																		<span class="inline-flex items-center rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">blocked</span>
-																	</template>
-																	<template x-if="plugin.requirement_config && plugin.requirement_config.action === 'require_confirmation'">
-																		<span class="inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning">confirm</span>
-																	</template>
+<!-- Requirement badge — always show state: disabled (no config) / blocked / confirm / (none = enabled) -->
+																<template x-if="!plugin.requirement_config">
+																	<span class="inline-flex items-center rounded-full bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">disabled</span>
+																</template>
+																<template x-if="plugin.requirement_config && plugin.requirement_config.action === 'block'">
+																	<span class="inline-flex items-center rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">blocked</span>
+																</template>
+																<template x-if="plugin.requirement_config && plugin.requirement_config.action === 'require_confirmation'">
+																	<span class="inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning">confirm</span>
+																</template>
 																</div>
 																<!-- Individual tools (collapsible) -->
 																<template x-if="plugin.tools.length > 1">
@@ -551,7 +554,10 @@ templ AgentsDialog() {
 																		<template x-for="tool in plugin.tools" :key="tool.id">
 																			<div class="flex items-center justify-between py-1 px-2 rounded hover:bg-accent/20">
 																				<span class="text-[11px] text-muted-foreground truncate flex-1" x-text="tool.name"></span>
-																				<!-- Tool requirement badge -->
+																				<!-- Tool requirement badge — always show state -->
+																				<template x-if="!tool.requirement_config">
+																					<span class="inline-flex items-center rounded-full bg-muted/50 px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">off</span>
+																				</template>
 																				<template x-if="tool.requirement_config && tool.requirement_config.action === 'block'">
 																					<span class="inline-flex items-center rounded-full bg-destructive/10 px-1.5 py-0.5 text-[9px] font-medium text-destructive">blocked</span>
 																				</template>

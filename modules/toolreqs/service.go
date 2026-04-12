@@ -379,21 +379,24 @@ func (s *Service) GetPermission(ctx context.Context, userID, agentID, toolSetID,
 // rather than the legacy Enabled boolean.
 // =============================================================================
 
-// isToolSetAllowed checks if a tool set is not blocked based on its config action.
+// isToolSetAllowed checks if a tool set is enabled (config action is "allow").
 // Implements [permissionChecker].
+// Note: Disabled by default — no permission record or config means NOT allowed.
 func (s *Service) isToolSetAllowed(ctx context.Context, userID, agentID, toolSetID string) bool {
 	permission, err := s.GetToolSetPermission(ctx, userID, agentID, toolSetID)
 	if err != nil {
-		// No permission record → allowed by default (fail-open).
-		return true
+		// No permission record = NOT allowed (disabled by default)
+		return false
 	}
 	cfg := permission.RequirementConfig()
-	return cfg.Action != RequirementActionBlock
+	// Only "allow" explicitly enables the tool set
+	return cfg.Action == RequirementActionAllow
 }
 
-// isToolAllowed checks if a specific tool is not blocked based on its config action.
+// isToolAllowed checks if a specific tool is enabled (config action is "allow").
 // Falls back to tool-set level when no explicit individual config exists.
 // Implements [permissionChecker].
+// Note: Disabled by default — no individual config falls back to tool-set, which is also disabled by default.
 func (s *Service) isToolAllowed(ctx context.Context, userID, agentID, toolSetID, toolID string) bool {
 	permission, err := s.GetPermission(ctx, userID, agentID, toolSetID, toolID)
 	if err != nil {
@@ -401,11 +404,14 @@ func (s *Service) isToolAllowed(ctx context.Context, userID, agentID, toolSetID,
 		return s.isToolSetAllowed(ctx, userID, agentID, toolSetID)
 	}
 	cfg := permission.RequirementConfig()
-	return cfg.Action != RequirementActionBlock
+	// Only "allow" explicitly enables the tool
+	return cfg.Action == RequirementActionAllow
 }
 
-// getAllowedToolSets returns all tool set IDs whose config action is not "block".
+// getAllowedToolSets returns all tool set IDs whose config action is "allow".
 // Implements [permissionChecker].
+// Note: Tools are disabled by default unless explicitly set to "allow".
+// If no permissions exist or config is missing/empty, the tool set is NOT included (disabled by default).
 func (s *Service) getAllowedToolSets(ctx context.Context, userID, agentID string) ([]string, error) {
 	permissions, err := s.repo.ListToolSetPermissions(ctx, userID, agentID)
 	if err != nil {
@@ -413,10 +419,17 @@ func (s *Service) getAllowedToolSets(ctx context.Context, userID, agentID string
 		return nil, nil
 	}
 
+	// No permissions saved = all tools disabled by default
+	if len(permissions) == 0 {
+		return nil, nil
+	}
+
 	var allowedToolSets []string
 	for _, perm := range permissions {
 		cfg := perm.RequirementConfig()
-		if cfg.Action != RequirementActionBlock {
+		// Only "allow" explicitly enables the tool set
+		// Missing config, empty config, or any other value = disabled
+		if cfg.Action == RequirementActionAllow {
 			allowedToolSets = append(allowedToolSets, perm.ToolSetID)
 		}
 	}

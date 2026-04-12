@@ -2137,7 +2137,7 @@ templ toolsSection() {
 									</div>
 									<!-- Confirm mini-toggle — only visible when plugin is enabled.
 									     Orthogonal to the enable toggle: pauses before each run and asks user. -->
-									<template x-if="plugin.requirement_config?.action !== 'block'">
+									<template x-if="isPluginEnabled(plugin)">
 										<div class="flex items-center gap-1.5 shrink-0">
 											<label
 												class="flex items-center gap-1 cursor-pointer select-none"
@@ -2176,38 +2176,39 @@ templ toolsSection() {
 										</div>
 									</template>
 									<!-- Enable/disable toggle — allow ↔ block -->
+									<!-- Absence of requirement_config means disabled (no tools enabled by default) -->
 									<button
 										type="button"
-										@click.stop="setToolSetAction(plugin, plugin.requirement_config?.action === 'block' ? 'allow' : 'block')"
+										@click.stop="setToolSetAction(plugin, isPluginEnabled(plugin) ? 'block' : 'allow')"
 										role="switch"
-										:aria-checked="plugin.requirement_config?.action !== 'block'"
-										:title="plugin.requirement_config?.action === 'block' ? 'Enable plugin' : 'Disable plugin'"
+										:aria-checked="isPluginEnabled(plugin)"
+										:title="isPluginEnabled(plugin) ? 'Disable plugin' : 'Enable plugin'"
 										class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
-										:class="plugin.requirement_config?.action !== 'block' ? 'bg-primary' : 'bg-input'"
+										:class="isPluginEnabled(plugin) ? 'bg-primary' : 'bg-input'"
 									>
 										<span
 											class="pointer-events-none inline-block size-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200"
-											:class="plugin.requirement_config?.action !== 'block' ? 'translate-x-4' : 'translate-x-0'"
+											:class="isPluginEnabled(plugin) ? 'translate-x-4' : 'translate-x-0'"
 										></span>
 									</button>
 								</div>
 								<!-- Individual tools — shown when plugin is enabled and has multiple tools -->
-								<template x-if="plugin.requirement_config?.action !== 'block' && plugin.tools.length > 1">
+								<template x-if="isPluginEnabled(plugin) && plugin.tools.length > 1">
 									<div class="border-t border-border/50 divide-y divide-border/30 bg-background/40">
 										<template x-for="tool in plugin.tools" :key="tool.id">
 											<div
 												class="flex items-center gap-2 px-2 py-1.5 transition-colors"
-												:class="tool.requirement_config?.action === 'block' ? 'bg-muted/20' : ''"
+												:class="!isToolEnabled(tool) ? 'bg-muted/20' : ''"
 											>
 												<!-- Indent marker + name -->
 												<span class="w-3 shrink-0"></span>
 												<span
 													class="text-[11px] flex-1 min-w-0 truncate transition-colors"
-													:class="tool.requirement_config?.action === 'block' ? 'line-through text-muted-foreground/50' : 'text-muted-foreground'"
+													:class="!isToolEnabled(tool) ? 'line-through text-muted-foreground/50' : 'text-muted-foreground'"
 													x-text="tool.name"
 												></span>
 												<!-- Confirm mini-toggle (only when tool is enabled) -->
-												<template x-if="tool.requirement_config?.action !== 'block'">
+												<template x-if="isToolEnabled(tool)">
 													<div class="flex items-center gap-1 shrink-0">
 														<label
 															class="flex items-center gap-1 cursor-pointer select-none"

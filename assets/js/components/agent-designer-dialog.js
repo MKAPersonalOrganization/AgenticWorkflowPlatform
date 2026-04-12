@@ -166,6 +166,29 @@ export const agentDesigner = () => ({
     propertyPanelVisible: true,
 
     // ══════════════════════════════════════════
+    // Tool / Plugin Helpers
+    // ══════════════════════════════════════════
+
+    /** Check if a plugin is enabled (has requirement_config.action !== 'block', or no config = disabled) */
+    isPluginEnabled(plugin) {
+        // No config = disabled by default for new agents
+        if (!plugin.requirement_config) return false;
+        return plugin.requirement_config.action !== 'block';
+    },
+
+    /** Check if a tool is enabled (has requirement_config.action !== 'block', or no config = disabled) */
+    isToolEnabled(tool) {
+        // No config = disabled by default for new agents
+        if (!tool.requirement_config) return false;
+        return tool.requirement_config.action !== 'block';
+    },
+
+    /** Count enabled plugins */
+    get enabledPluginsCount() {
+        return this.agentPlugins.filter(p => this.isPluginEnabled(p)).length;
+    },
+
+    // ══════════════════════════════════════════
     // Test Panel State
     // ══════════════════════════════════════════
 
@@ -1112,7 +1135,7 @@ export const agentDesigner = () => ({
 
     get toolsSummary() {
         if (this.loadingTools) return '';
-        const blocked = this.agentPlugins.filter(p => p.requirement_config && p.requirement_config.action === 'block').length;
+        const blocked = this.agentPlugins.filter(p => !this.isPluginEnabled(p)).length;
         if (blocked > 0) return `${this.agentPlugins.length - blocked}/${this.agentPlugins.length}`;
         return `${this.agentPlugins.length}`;
     },
