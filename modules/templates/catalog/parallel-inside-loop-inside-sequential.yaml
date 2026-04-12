@@ -37,7 +37,7 @@ workflow:
               type: agent
               agent_id: sub-critic
 
-sub_agents:
+llm_agents:
   - id: sub-brief-enhancer
     name: BriefEnhancerAgent
     description: Takes the user's topic and produces a structured brief with context, audience, and key requirements.

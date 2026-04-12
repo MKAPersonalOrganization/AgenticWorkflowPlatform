@@ -25,7 +25,7 @@ workflow:
       type: agent
       agent_id: sub-executor
 
-sub_agents:
+llm_agents:
   - id: sub-researcher
     name: ResearcherAgent
     description: Conducts initial research and produces structured findings.

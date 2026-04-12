@@ -22,7 +22,7 @@ workflow:
           type: agent
           agent_id: sub-enhancer
 
-sub_agents:
+llm_agents:
   - id: sub-enhancer
     name: RefinementAgent
     description: Iteratively refines a concept by improving clarity, impact, and originality on each loop iteration. Reads the previous version from {refined_concept?}.

@@ -50,7 +50,7 @@ workflow:
       type: agent
       agent_id: sub-summary
 
-sub_agents:
+llm_agents:
   - id: sub-message-enhancer
     name: MessageEnhancerAgent
     description: Content strategist that transforms a brief user topic into a detailed, researched, and informative message to feed all downstream broadcast channels.

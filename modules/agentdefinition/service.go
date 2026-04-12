@@ -112,9 +112,9 @@ func (s *Service) ImportFromCatalogYAML(ctx context.Context, userID string, yaml
 // ImportComposedFromCatalogEntry creates a composed agent from a catalog entry.
 func (s *Service) ImportComposedFromCatalogEntry(ctx context.Context, userID string, entry *AgentCatalogEntry, sourceCatalogID string, customName string) (string, error) {
 	var subAgents []CatalogSubAgent
-	if entry.SubAgentsJSON != "" {
-		if err := json.Unmarshal([]byte(entry.SubAgentsJSON), &subAgents); err != nil {
-			return "", fmt.Errorf("parsing sub_agents: %w", err)
+	if entry.LLMAgentsJSON != "" {
+		if err := json.Unmarshal([]byte(entry.LLMAgentsJSON), &subAgents); err != nil {
+			return "", fmt.Errorf("parsing llm_agents: %w", err)
 		}
 	}
 

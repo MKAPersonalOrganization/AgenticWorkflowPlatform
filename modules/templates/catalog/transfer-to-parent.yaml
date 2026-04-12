@@ -23,7 +23,7 @@ workflow:
       type: agent
       agent_id: sub-specialist
 
-sub_agents:
+llm_agents:
   - id: sub-coordinator
     name: CoordinatorAgent
     description: Receives the user request, decides which domain is needed, and coordinates the overall resolution.

@@ -20,7 +20,7 @@ workflow:
       type: agent
       agent_id: sub-reviser
 
-sub_agents:
+llm_agents:
   - id: sub-critic
     name: CriticAgent
     description: Investigative journalist that extracts every claim from an LLM answer and web-verifies each one, assigning Accurate / Inaccurate / Disputed / Unsupported / Not Applicable verdicts.

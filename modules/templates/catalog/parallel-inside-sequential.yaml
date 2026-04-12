@@ -32,7 +32,7 @@ workflow:
       type: agent
       agent_id: sub-synthesiser
 
-sub_agents:
+llm_agents:
   - id: sub-intake-analyst
     name: IntakeAnalystAgent
     description: Processes the user's topic and produces a structured brief with key facts, context, and evaluation criteria.

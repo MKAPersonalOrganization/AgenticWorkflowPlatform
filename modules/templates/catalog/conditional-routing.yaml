@@ -41,7 +41,7 @@ workflow:
       agent_id: sub-general
       condition: "*"
 
-sub_agents:
+llm_agents:
   - id: sub-classifier
     name: InquiryClassifier
     description: "Classifies user inquiries into categories: technical, billing, or general."

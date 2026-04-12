@@ -8,11 +8,11 @@ author_name: ADK
 icon: arrow-left-right
 featured: true
 
-# Coordinator pattern: single LlmAgent root with sub_agents (no workflow graph).
+# Coordinator pattern: single LlmAgent root with llm_agents (no workflow graph).
 # The LLM uses the transfer_to_agent tool to route between peers.
 workflow: null
 
-sub_agents:
+llm_agents:
   - id: sub-researcher
     name: ResearcherAgent
     description: Researches and analyses topics. Can transfer to WriterAgent if a polished deliverable is needed, or to Analyst Agent if data interpretation is required.

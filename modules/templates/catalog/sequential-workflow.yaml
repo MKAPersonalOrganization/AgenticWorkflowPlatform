@@ -20,7 +20,7 @@ workflow:
       type: agent
       agent_id: sub-city-report
 
-sub_agents:
+llm_agents:
   - id: sub-city-generator
     name: CityGeneratorAgent
     description: Returns the name of a single random city in 'Continent/City' format (e.g. 'America/New_York') for time-zone lookup.

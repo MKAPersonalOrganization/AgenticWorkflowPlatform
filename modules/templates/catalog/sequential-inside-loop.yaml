@@ -40,7 +40,7 @@ workflow:
       type: agent
       agent_id: sub-editor
 
-sub_agents:
+llm_agents:
   - id: sub-planner
     name: PlannerAgent
     description: "Analyses the user topic and produces structured requirements: audience, purpose, tone, and key criteria."

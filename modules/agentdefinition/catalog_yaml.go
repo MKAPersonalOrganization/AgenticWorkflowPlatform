@@ -19,7 +19,7 @@ type yamlCatalogSpec struct {
 	Icon         string            `yaml:"icon"` // named icon (e.g. "bot") or raw SVG
 	Featured     bool              `yaml:"featured"`
 	Workflow     *yamlWorkflowNode `yaml:"workflow"`   // nil for single-agent entries
-	SubAgents    []yamlSubAgent    `yaml:"sub_agents"` // nil for single-agent entries
+	LLMAgents    []yamlSubAgent    `yaml:"llm_agents"` // nil for single-agent entries
 }
 
 type yamlWorkflowNode struct {
@@ -42,7 +42,7 @@ type yamlSubAgent struct {
 }
 
 // ParseCatalogEntryYAML parses one catalog-style YAML document: a single LLM agent
-// or a workflow with optional sub_agents definitions.
+// or a workflow with optional llm_agents definitions.
 func ParseCatalogEntryYAML(data []byte) (AgentCatalogEntry, error) {
 	var spec yamlCatalogSpec
 	if err := yaml.Unmarshal(data, &spec); err != nil {
@@ -77,9 +77,9 @@ func (s *yamlCatalogSpec) toEntry() (AgentCatalogEntry, error) {
 		e.WorkflowGraphJSON = string(graphJSON)
 	}
 
-	if len(s.SubAgents) > 0 {
-		subs := make([]CatalogSubAgent, len(s.SubAgents))
-		for i, sa := range s.SubAgents {
+	if len(s.LLMAgents) > 0 {
+		subs := make([]CatalogSubAgent, len(s.LLMAgents))
+		for i, sa := range s.LLMAgents {
 			subs[i] = CatalogSubAgent{
 				ID:           sa.ID,
 				Name:         sa.Name,
@@ -90,9 +90,9 @@ func (s *yamlCatalogSpec) toEntry() (AgentCatalogEntry, error) {
 		}
 		subsJSON, err := json.Marshal(subs)
 		if err != nil {
-			return e, fmt.Errorf("marshaling sub_agents: %w", err)
+			return e, fmt.Errorf("marshaling llm_agents: %w", err)
 		}
-		e.SubAgentsJSON = string(subsJSON)
+		e.LLMAgentsJSON = string(subsJSON)
 	}
 
 	return e, nil

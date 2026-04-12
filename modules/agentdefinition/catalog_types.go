@@ -6,7 +6,7 @@ import "time"
 // These are available to all users and can be "added" (forked) into a user's personal agents.
 //
 // Entries with a non-empty WorkflowGraphJSON represent multi-agent workflow templates.
-// When forked, the system creates the sub-agents and a workflow definition for the user.
+// When forked, the system creates the llm agents and a workflow definition for the user.
 type AgentCatalogEntry struct {
 	ID           string   `json:"id" db:"id"`
 	Name         string   `json:"name" db:"name"`
@@ -22,13 +22,14 @@ type AgentCatalogEntry struct {
 	// ── Workflow Template (optional) ──
 
 	// WorkflowGraphJSON is a JSON-encoded WorkflowNode tree template.
-	// Agent nodes use placeholder IDs (e.g. "sub-1") that map to SubAgentsJSON.
+	// Agent nodes use placeholder IDs (e.g. "sub-1") that map to LLMAgentsJSON.
 	// When empty, this is a single-agent catalog entry.
 	WorkflowGraphJSON string `json:"-" db:"workflow_graph"`
 
-	// SubAgentsJSON is a JSON-encoded array of CatalogSubAgent definitions.
+	// LLMAgentsJSON is a JSON-encoded array of CatalogSubAgent definitions.
 	// Each entry maps a placeholder ID to the agent's full definition.
-	SubAgentsJSON string `json:"-" db:"sub_agents"`
+	// Note: the DB column is shared with the coordinator pattern (sub_agents).
+	LLMAgentsJSON string `json:"-" db:"sub_agents"`
 
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`

@@ -21,7 +21,7 @@ workflow:
       type: agent
       agent_id: sub-formatter
 
-sub_agents:
+llm_agents:
   - id: sub-extractor
     name: DataExtractorAgent
     description: Extracts structured data from the input text and returns JSON matching the output_schema.

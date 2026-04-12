@@ -142,7 +142,7 @@ WHERE id = $1
 		&entry.ID, &entry.Name, &entry.Description, &entry.SystemPrompt,
 		&entry.Category, pq.Array(&tags), &entry.AuthorName, &entry.Icon,
 		&entry.Featured, &entry.AddCount,
-		&entry.WorkflowGraphJSON, &entry.SubAgentsJSON,
+		&entry.WorkflowGraphJSON, &entry.LLMAgentsJSON,
 		&entry.CreatedAt, &entry.UpdatedAt,
 	)
 	if err != nil {
@@ -208,17 +208,17 @@ ON CONFLICT (name) DO UPDATE SET
 		if id == "" {
 			id = uuid.New().String()
 		}
-		var wfGraph, subAgents interface{}
+		var wfGraph, llmAgents interface{}
 		if e.WorkflowGraphJSON != "" {
 			wfGraph = e.WorkflowGraphJSON
 		}
-		if e.SubAgentsJSON != "" {
-			subAgents = e.SubAgentsJSON
+		if e.LLMAgentsJSON != "" {
+			llmAgents = e.LLMAgentsJSON
 		}
 		_, err := r.db.ExecContext(ctx, query,
 			id, e.Name, e.Description, e.SystemPrompt, e.Category,
 			pq.Array(e.Tags), e.AuthorName, e.Icon, e.Featured,
-			wfGraph, subAgents, now,
+			wfGraph, llmAgents, now,
 		)
 		if err != nil {
 			return fmt.Errorf("seeding catalog entry %q: %w", e.Name, err)
@@ -247,7 +247,7 @@ func scanCatalogRows(rows *sql.Rows) ([]agentdefinition.AgentCatalogEntry, error
 			&e.ID, &e.Name, &e.Description, &e.SystemPrompt,
 			&e.Category, pq.Array(&tags), &e.AuthorName, &e.Icon,
 			&e.Featured, &e.AddCount,
-			&e.WorkflowGraphJSON, &e.SubAgentsJSON,
+			&e.WorkflowGraphJSON, &e.LLMAgentsJSON,
 			&e.CreatedAt, &e.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scanning catalog entry: %w", err)

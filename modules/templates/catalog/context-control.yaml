@@ -24,7 +24,7 @@ workflow:
       agent_id: sub-composer
       include_contents: none
 
-sub_agents:
+llm_agents:
   - id: sub-planner
     name: PlannerAgent
     description: Creates a structured research plan with key questions and methodology.

@@ -43,32 +43,32 @@ func NewCatalogWorkflowForker(
 	}
 }
 
-// ForkCatalogWorkflow creates sub-agents and a workflow definition for the user.
+// ForkCatalogWorkflow creates llm agents and a workflow definition for the user.
 //
 // Process:
-//  1. Parse the sub_agents JSON into individual agent definitions.
-//  2. Create a placeholder workflow ID so sub-agents can reference it.
-//  3. Create each sub-agent as a user_agent (with workflow_id set), building a placeholder→real ID map.
+//  1. Parse the llm_agents JSON into individual agent definitions.
+//  2. Create a placeholder workflow ID so llm agents can reference it.
+//  3. Create each llm agent as a user_agent (with workflow_id set), building a placeholder→real ID map.
 //  4. Parse the workflow_graph JSON into a WorkflowNode tree.
 //  5. Remap all agent_id fields from placeholder IDs to real IDs.
 //  6. Create the workflow_definition with the remapped graph.
 func (f *CatalogWorkflowForker) ForkCatalogWorkflow(
 	ctx context.Context,
-	userID, catalogID, name, description, icon, graphJSON, subAgentsJSON string,
+	userID, catalogID, name, description, icon, graphJSON, llmAgentsJSON string,
 ) (string, error) {
-	// 1. Parse sub-agents.
+	// 1. Parse llm agents.
 	var subs []catalogSubAgent
-	if err := json.Unmarshal([]byte(subAgentsJSON), &subs); err != nil {
-		return "", fmt.Errorf("parsing sub_agents: %w", err)
+	if err := json.Unmarshal([]byte(llmAgentsJSON), &subs); err != nil {
+		return "", fmt.Errorf("parsing llm_agents: %w", err)
 	}
 
-	// 2. Pre-generate the workflow ID so sub-agents can reference it.
+	// 2. Pre-generate the workflow ID so llm agents can reference it.
 	wfID := uuid.New().String()
 
 	// Collect output_key from workflow nodes (legacy templates declare it on nodes).
 	nodeOutputKeys := collectOutputKeysFromJSON([]byte(graphJSON))
 
-	// 3. Create each sub-agent and build ID map.
+	// 3. Create each llm agent and build ID map.
 	idMap := make(map[string]string, len(subs)) // placeholder → real ID
 	for _, sub := range subs {
 		outputKey := sub.OutputKey
@@ -85,10 +85,10 @@ func (f *CatalogWorkflowForker) ForkCatalogWorkflow(
 			WorkflowID:   wfID,
 		}
 		if err := f.agentRepo.Create(ctx, agent); err != nil {
-			return "", fmt.Errorf("creating sub-agent %q: %w", sub.Name, err)
+			return "", fmt.Errorf("creating llm agent %q: %w", sub.Name, err)
 		}
 		idMap[sub.ID] = agent.ID
-		f.log.Info(ctx, "created sub-agent for workflow fork",
+		f.log.Info(ctx, "created llm agent for workflow fork",
 			"placeholder", sub.ID, "real_id", agent.ID, "name", sub.Name)
 	}
 
@@ -114,16 +114,16 @@ func (f *CatalogWorkflowForker) ForkCatalogWorkflow(
 		return "", fmt.Errorf("creating workflow definition: %w", err)
 	}
 
-	// Establish ownership: set parent_id on all sub-agents so cascade delete works.
+	// Establish ownership: set parent_id on all llm agents so cascade delete works.
 	for _, realID := range idMap {
 		if err := f.agentRepo.SetParent(ctx, realID, wfID, userID); err != nil {
-			f.log.Warn(ctx, "failed to set parent_id on sub-agent",
-				"subAgentID", realID, "parentID", wfID, "error", err)
+			f.log.Warn(ctx, "failed to set parent_id on llm agent",
+				"llmAgentID", realID, "parentID", wfID, "error", err)
 		}
 	}
 
 	f.log.Info(ctx, "forked catalog workflow",
-		"catalog_id", catalogID, "workflow_id", wf.ID, "sub_agents", len(subs))
+		"catalog_id", catalogID, "workflow_id", wf.ID, "llm_agents", len(subs))
 
 	return wf.ID, nil
 }

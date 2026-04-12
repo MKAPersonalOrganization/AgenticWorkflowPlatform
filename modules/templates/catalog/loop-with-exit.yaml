@@ -22,7 +22,7 @@ workflow:
       type: agent
       agent_id: sub-checker
 
-sub_agents:
+llm_agents:
   - id: sub-writer
     name: DraftWriterAgent
     description: Writes a draft on the given topic. If a previous draft exists in {draft?}, it rewrites from scratch with a different approach.
