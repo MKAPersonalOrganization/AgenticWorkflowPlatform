@@ -101,11 +101,12 @@ graph TB
             HealthH["<b>Health Handlers</b><br/>Liveness + readiness probes"]
         end
 
-        subgraph Handlers["Handler Layer (27 packages)"]
+        subgraph Handlers["Handler Layer (19 modules)"]
             TaskH["<b>Task Management</b><br/>Command side: send message,<br/>agent run, artifacts, memory,<br/>toolsets, plugins"]
             AGUIH["<b>AGUI Handlers</b><br/>Query side: thread state,<br/>messages, SSE streaming"]
             KnowledgeH["<b>Knowledge Handlers</b><br/>KB UI + API: documents,<br/>workspaces, graph, pipeline"]
             MCPH["<b>MCP Handlers</b><br/>Connector CRUD, OAuth,<br/>connect/disconnect, tool proxy"]
+            MultiAgentH["<b>Multi-Agent Handlers</b><br/>Workflow orchestration,<br/>catalog forking, execution"]
             BillingH["<b>Billing Handlers</b><br/>Stripe intents, status,<br/>webhooks"]
             OtherH["<b>Other Handlers</b><br/>Agent store, catalog, AI settings,<br/>resources, profile, preferences,<br/>statistics, ratings, co-writer"]
         end
@@ -123,8 +124,8 @@ graph TB
             OtherS["<b>Other Services</b><br/>Agent store, AI settings,<br/>permissions, resources,<br/>student profile, title gen"]
         end
 
-        subgraph Plugins["Plugin Layer (9 plugins)"]
-            PluginList["<b>calculator</b> · <b>codebase</b> · <b>cognitive</b><br/><b>document</b> · <b>elicitation</b> · <b>knowledgebase</b><br/><b>library</b> · <b>memory</b> · <b>tts</b>"]
+        subgraph Plugins["Plugin Layer (15 plugins)"]
+            PluginList["<b>agentmemory</b> · <b>artifacts</b> · <b>askuser</b><br/><b>calculator</b> · <b>codebase</b> · <b>cognitive</b><br/><b>document</b> · <b>fsplugin</b> · <b>knowledgebase</b><br/><b>library</b> · <b>planmode</b> · <b>todos</b><br/><b>tracker</b> · <b>tts</b> · <b>websearch</b>"]
         end
 
         subgraph Foundation["Foundation Layer"]
@@ -229,7 +230,7 @@ graph TB
 | **PostgreSQL Event Store** | `infra/eventstore/postgres` | Append-only event log with optimistic concurrency and typed event deserialization. |
 | **Projection Updater** | `infra/projection` | Background worker polling the event store, updating 4 PostgreSQL projections (AGUI, LLM context, payment, statistics) with leader election. |
 | **Redis Broadcaster** | `infra/projection` | Cross-pod event broadcaster via Redis Pub/Sub. Both durable and ephemeral events are broadcast synchronously for zero-latency SSE delivery (ADR-007). |
-| **SQL Repositories** | `infra/sqldb` | 11 PostgreSQL repositories (agent catalog, agent definitions, AI settings, MCP connectors, permissions, resources, student profiles, tool registry, user preferences, workspace permissions) + migration runner. |
+| **SQL Repositories** | `modules/*` | 9 PostgreSQL repositories across modules (agentdefinition, aisettings, filesystem, multiagent, permissions, pluginsettings, resources, toolreqs, userprofile) + migration runner. |
 
 ### Key Architectural Patterns
 

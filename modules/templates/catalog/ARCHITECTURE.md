@@ -6,20 +6,23 @@ Each entry in the catalog demonstrates a specific set of ADK-Go workflow feature
 
 ## Feature Matrix
 
-| Agent | Sequential | Parallel | Loop | allow\_early\_exit | State Injection | Nested Workflows |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| Sequential Workflow | ✓ | | | | ✓ | |
-| Implicit State | ✓ | | | | | |
+| Agent | Sequential | Parallel | Loop | Conditional | allow\_early\_exit | State Injection | Nested Workflows |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Sequential Workflow | ✓ | | | | | ✓ | |
+| Implicit State | ✓ | | | | | | |
 | Parallel Workflow | ✓ | ✓ | | | ✓ | |
 | Sequential Inside Parallel | ✓ | ✓ | | | ✓ | ✓ |
 | Parallel Inside Sequential | ✓ | ✓ | | | ✓ | |
 | Loop Workflow | | | ✓ | | ✓ | |
 | Loop with Exit | | | ✓ | ✓ | ✓ | |
 | Sequential Inside Loop | | ✓ | ✓ | ✓ | ✓ | |
-| Parallel Inside Loop Inside Sequential | ✓ | ✓ | ✓ | | ✓ | ✓ |
+| Parallel Inside Loop Inside Sequential | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Context Control | | | | | ✓ | |
 | Output Schema | | | | | ✓ | |
 | Agent Isolation | | | | | | |
+| Transfer to Parent | ✓ | | | ✓ | |
+| Transfer to Peers | ✓ | | | |
+| Conditional Routing | ✓ | | | ✓ | | ✓ |
 
 ---
 
@@ -504,3 +507,54 @@ flowchart LR
 |---|---|
 | `allow_early_exit: false` | Loop always runs exactly `max_iterations` times |
 | `allow_early_exit: true` | Last agent in the loop body receives the `exit_loop` tool; calling it stops the loop before `max_iterations` is reached |
+
+---
+
+## 13. Transfer to Parent
+
+**Source:** ADK Go — `transfer-to-parent`
+
+**What it demonstrates:** A sequential workflow where a specialist agent can escalate back to the parent coordinator when it cannot resolve the request. The parent re-routes to a different specialist.
+
+**ADK features used**
+- `type: sequential` — coordinator → triage → specialist pipeline
+- `disallow_transfer_to_parent: false` (default) — specialist can transfer back to parent
+- `transfer_to_agent` tool — LLM-driven escalation
+
+---
+
+## 14. Transfer to Peers
+
+**Source:** ADK Go — `transfer-to-peers`
+
+**What it demonstrates:** A coordinator pattern with multiple sub-agents that can transfer horizontally to each other.
+
+**ADK features used**
+- No `workflow` (null) — uses `sub_agents` directly
+- `transfer_to_agent` tool — LLM-driven peer-to-peer routing
+
+---
+
+## 15. Conditional Routing
+
+**Source:** ADK Go — `conditional-routing`
+
+**What it demonstrates:** Routes inquiries based on an evaluator's output with fallback branch.
+
+**ADK features used**
+- `type: conditional` workflow node
+- `output_key` on evaluator agent
+- `condition: value` and `condition: "*"` (fallback)
+
+---
+
+## Workflow Type Reference (Updated)
+
+```mermaid
+flowchart LR
+    A["type: agent"]
+    S["type: sequential"]
+    P["type: parallel"]
+    L["type: loop"]
+    C["type: conditional"]
+```
