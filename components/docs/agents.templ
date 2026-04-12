@@ -311,7 +311,7 @@ templ docsMultiAgentOrchestration() {
 			<tbody>
 				@docsTableRow2("foundation/agent", "Framework-agnostic Config struct: name, system prompt, tools, transfer policy, output key, include contents, global instruction, I/O schemas")
 				@docsTableRow2("modules/agentstore", "Unified AgentDefinition with CompositionNode graph stored as JSONB. Supports per-node overrides of transfer policy and context control.")
-				@docsTableRow2("adapters/adkgo", "Bridges foundation types to Google ADK-Go agents. Resolves precedence: node override > agent definition > default.")
+				@docsTableRow2("adapters/adkgo", "Bridges foundation types to the agent execution engine. Resolves precedence: node override > agent definition > default.")
 				@docsTableRow2("adapters.go", "Composition root. Converts DB models to foundation types and wires everything together.")
 			</tbody>
 		}
@@ -320,8 +320,8 @@ templ docsMultiAgentOrchestration() {
 			take priority over agent-level defaults, which take priority over system defaults. This means
 			the same agent can behave differently depending on where it appears in a workflow.
 		</p>
-		@docsInfoBox("ADK-Go Powered") {
-			<p>The orchestration engine is built on <strong>Google's Agent Development Kit for Go (ADK-Go)</strong>, providing battle-tested agent lifecycle management, tool routing, session state, and streaming event delivery via the AG-UI protocol.</p>
+		@docsInfoBox("Orchestration Engine") {
+			<p>The orchestration engine provides battle-tested agent lifecycle management, tool routing, session state, and streaming event delivery via the AG-UI protocol.</p>
 		}
 	}
 }

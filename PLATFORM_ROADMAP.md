@@ -1,14 +1,14 @@
 # Platform Roadmap: New Features & Refactors
 
-Based on a comprehensive study of ADK-Go v1.0 capabilities versus current platform
+Based on a comprehensive study of the underlying agent framework's capabilities versus current platform
 integration. Organized by impact and effort.
 
 ---
 
 ## 1. Agent Memory Service (Cross-Session Knowledge)
 
-**What ADK-Go offers:**
-ADK-Go ships a `memory.Service` with two methods — `AddSessionToMemory()` and
+**What the framework provides:**
+The framework provides a `memory.Service` with two methods — `AddSessionToMemory()` and
 `SearchMemory()` — plus two companion tools: `loadmemorytool` (auto-search on
 each turn) and `preloadmemorytool` (pre-fetch at session start). The in-memory
 implementation uses keyword-based search; the interface allows embedding-backed
@@ -37,8 +37,8 @@ personal assistants need this.
 
 ## 2. Artifact Service (Versioned File Management)
 
-**What ADK-Go offers:**
-`artifact.Service` provides Save/Load/Delete/List/Versions/GetArtifactVersion
+**What the framework provides:**
+The framework's artifact service provides Save/Load/Delete/List/Versions/GetArtifactVersion
 with in-memory and GCS backends. Agents can create, read, and version files
 during execution. The `loadartifactstool` lets agents pull artifacts by name.
 
@@ -63,10 +63,10 @@ generators, data analyzers, content creators).
 
 ## 3. Instruction Templating with Session State
 
-**What ADK-Go offers:**
+**What the framework provides:**
 System prompts support `{key}` placeholders that resolve from session state at
 runtime. Optional keys use `{key?}` (omitted if missing). Artifact references
-use `{artifact.name}`. This is handled by `util/instructionutil.InjectSessionState`.
+use `{artifact.name}`. This is handled by the framework's instruction utility.
 
 **What we have today:** Static system prompts. No dynamic variable injection.
 
@@ -86,10 +86,10 @@ dynamically.
 
 ## 4. Dynamic Instruction Providers
 
-**What ADK-Go offers:**
-`InstructionProvider func(ctx ReadonlyContext) string` generates instructions at
+**What the framework provides:**
+An instruction provider function(ctx ReadonlyContext) string` generates instructions at
 runtime based on session state, user ID, time of day, etc. Separate from the
-static `Instruction` field.
+static instruction field.
 
 **What we have today:** `InstructionFunc` in foundation Config, but it is not
 exposed to no-code users.
@@ -110,7 +110,7 @@ agents.
 
 ## 5. State Scopes in the UI
 
-**What ADK-Go offers:**
+**What the framework provides:**
 Three state scopes via key prefixes:
 - `app:` — shared across all users and sessions (app-wide config)
 - `user:` — shared across sessions for one user (user preferences)
@@ -133,7 +133,7 @@ state (e.g., a knowledge base that all users' agents can access).
 
 ## 6. Toolsets (Dynamic Tool Collections)
 
-**What ADK-Go offers:**
+**What the framework provides:**
 `tool.Toolset` interface returns different tools based on context (agent name,
 session state, user role). Tools can appear/disappear dynamically per turn.
 
@@ -145,7 +145,7 @@ once. No per-turn dynamic tool availability.
   state keys (e.g., "only show `submit_order` tool when state `cart_items` > 0").
 - Expose this in the agent designer as "Tool Conditions" — a simple rules UI:
   "Show tool X when state key Y equals Z."
-- Wire through `llmagent.Config.Toolsets` instead of static `Tools`.
+- Wire through the agent configuration's dynamic toolsets instead of static tools.
 
 **Impact:** Medium — makes agents smarter about when to offer capabilities.
 Prevents LLMs from calling tools in wrong contexts.
@@ -154,7 +154,7 @@ Prevents LLMs from calling tools in wrong contexts.
 
 ## 7. Long-Running Tool Support
 
-**What ADK-Go offers:**
+**What the framework provides:**
 Tools can set `IsLongRunning: true`. The framework returns a resource ID
 immediately, tracks the tool in `LongRunningToolIDs`, and the client polls for
 completion. This enables async operations (file processing, API calls that take
@@ -167,7 +167,7 @@ stream.
 - Add an `IsLongRunning` flag to the tool configuration in the agent designer.
 - In the chat UI, show a progress indicator for long-running tools with a
   polling mechanism.
-- Map `LongRunningToolIDs` in event translation to a "pending tools" UI state.
+- Map long-running tool IDs in event translation to a "pending tools" UI state.
 - Backend: implement a simple job queue (Redis or DB) for async tool execution.
 
 **Impact:** Medium — enables agents to trigger slow operations (data pipelines,
@@ -177,7 +177,7 @@ document generation, external API calls) without freezing the conversation.
 
 ## 8. Plugin System for Users
 
-**What ADK-Go offers:**
+**What the framework provides:**
 Full plugin lifecycle: `OnUserMessage`, `BeforeRun`, `AfterRun`, `OnEvent`,
 plus all agent/model/tool callbacks. Plugins execute sequentially; first
 non-nil result wins.
@@ -193,7 +193,7 @@ plugin configuration.
   - **Rate Limiter** — cap model calls per session/minute.
   - **Audit Logger** — log all agent actions to external sink.
 - Expose as checkboxes in agent settings with per-plugin configuration.
-- Wire through `runner.PluginConfig` at build time.
+- Wire through the runner's plugin configuration at build time.
 
 **Impact:** Medium — provides guardrails and observability without code.
 
@@ -201,7 +201,7 @@ plugin configuration.
 
 ## 9. Agent Evaluation Framework
 
-**What ADK-Go offers:**
+**What the framework provides:**
 Stub routes exist (`ListEvalSets`, `ListEvalResults`) but the framework is
 unimplemented. The conformance testing infrastructure (replay plugin, YAML
 test cases) provides a foundation.
@@ -214,7 +214,7 @@ test cases) provides a foundation.
     calls tool, matches regex, sentiment).
   - Run test suite against agent, collect pass/fail results.
   - Show results in a dashboard with per-test-case breakdown.
-- Leverage ADK-Go's replay infrastructure for deterministic testing.
+- Leverage the framework's replay infrastructure for deterministic testing.
 - Add a "Test" tab in the agent designer alongside "Chat" and "Settings."
 - Support batch evaluation for comparing agent versions.
 
@@ -225,7 +225,7 @@ Without evaluation, prompt engineering is guesswork.
 
 ## 10. BeforeAgentCallback as Guardrails
 
-**What ADK-Go offers:**
+**What the framework provides:**
 `BeforeAgentCallback` runs before agent execution and can short-circuit with
 content or an error. If it returns content, the agent is skipped entirely.
 
@@ -248,7 +248,7 @@ no-code platforms.
 
 ## 11. OpenTelemetry Observability
 
-**What ADK-Go offers:**
+**What the framework provides:**
 Built-in OpenTelemetry integration with spans for `invoke_agent`,
 `generate_content`, `execute_tool`. Attributes include agent name, model, token
 usage, finish reasons.
@@ -257,7 +257,7 @@ usage, finish reasons.
 modelLoggingCallbacks). No distributed tracing.
 
 **Proposed work:**
-- Enable ADK-Go's telemetry layer and export spans to a tracing backend
+- Enable the framework's telemetry layer and export spans to a tracing backend
   (Jaeger, Tempo, or Cloud Trace).
 - Build a "Trace View" in the platform that shows the execution timeline of a
   workflow: which agent ran, which tools were called, token counts, latencies.

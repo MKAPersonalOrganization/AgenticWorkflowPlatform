@@ -212,7 +212,7 @@ templ FileCard(ctx context.Context) {
 }
 
 // ArtifactSavedCard renders a compact notification when an agent creates or
-// updates a versioned artifact via the ADK artifact service.
+// updates a versioned artifact via the artifact service.
 templ ArtifactSavedCard() {
 	<div
 		x-show="message.type === 'artifact_saved'"

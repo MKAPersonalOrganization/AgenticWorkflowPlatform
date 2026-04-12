@@ -47,7 +47,7 @@ templ docsSequentialExamples() {
 		<h3>Code Generation Pipeline</h3>
 		<p>
 			Three-agent pipeline that writes, reviews, and refactors code using explicit state passing.
-			This is the ADK-Go reference for the <code>OutputKey → &#123;variable&#125;</code> pattern.
+			This is the reference implementation for the <code>OutputKey → &#123;variable&#125;</code> pattern.
 		</p>
 		@workflowDiagram("sequential", []string{
 			"CodeWriter → generated_code",
@@ -310,11 +310,11 @@ templ docsLoopExamples() {
 				generator's context on the next iteration, enabling genuine iterative improvement.
 			</p>
 		}
-		<!-- ADK-Go Loop Agent -->
-		<h3>Loop Agent (ADK-Go Example)</h3>
+		<!-- Loop Agent Example -->
+		<h3>Loop Agent Example</h3>
 		<p>
 			The simplest loop example: a single agent runs up to 3 iterations, improving its answer each
-			pass. Calls <code>exit_loop</code> when satisfied. This is the ADK-Go loop primitive.
+			pass. Calls <code>exit_loop</code> when satisfied. This is the core loop primitive.
 		</p>
 		<div class="my-4 flex items-center gap-2 flex-wrap">
 			@statusBadge("loop", "bg-rose-500")

@@ -21,8 +21,8 @@ This package provides framework-agnostic interfaces for building AI agents in th
 ┌─────────────────────────────────────────────────────────────┐
 │                     Adapter Layer                            │
 │              ┌─────────────────────┐                        │
-│              │   adapters/adkgo    │                        │
-│              │   (Google ADK-Go)   │                        │
+│              │   adapters/agent    │                        │
+│              │  (execution engine) │                        │
 │              └─────────────────────┘                        │
 └─────────────────────────────────────────────────────────────┘
                           │
@@ -30,7 +30,7 @@ This package provides framework-agnostic interfaces for building AI agents in th
 ┌─────────────────────────────────────────────────────────────┐
 │                   Framework Layer                            │
 │              ┌─────────────────────┐                        │
-│              │  Google ADK-Go      │                        │
+│              │  Agent Engine       │                        │
 │              └─────────────────────┘                        │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -170,14 +170,14 @@ config := agent.Config{
 }
 
 // Agent definitions are loaded from the database by the agent provider.
-// The ADK-Go adapter in adapters/adkgo/ handles execution.
+// The adapter in adapters/agent/ handles execution.
 ```
 
 ## Adapter
 
-### adkgo/ (ADK-Go)
-Wraps Google's Agent Development Kit for Go. This is the sole supported
-agent execution adapter. It lives in `adapters/adkgo/`.
+### adapters/agent/
+The sole supported agent execution adapter. It lives in `adapters/agent/` and
+translates foundation types into framework-native events for streaming execution.
 
 ## Event Types
 
