@@ -135,6 +135,7 @@ templ docsParallelExamples() {
 		</p>
 		@wfNested(wfNestedGroup{
 			Label: "Parallel (3 branches)",
+			RootType: "parallel",
 			Nodes: []wfNestedNode{
 				{Node: wfNode{Type: "agent", Name: "EmailDrafter"}, Children: []wfNestedNode{{Node: wfNode{Type: "agent", Name: "EmailPublisher"}}}},
 				{Node: wfNode{Type: "agent", Name: "SlackDrafter"}, Children: []wfNestedNode{{Node: wfNode{Type: "agent", Name: "SlackPublisher"}}}},

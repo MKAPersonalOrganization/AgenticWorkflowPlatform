@@ -34,8 +34,9 @@ type wfConditionalGroup struct {
 }
 
 type wfNestedGroup struct {
-	Label string
-	Nodes []wfNestedNode
+	Label    string
+	RootType string   // "sequential" (default), "parallel", "loop"
+	Nodes    []wfNestedNode
 }
 
 type wfNestedNode struct {
@@ -162,41 +163,103 @@ templ wfNested(group wfNestedGroup) {
 		<div class="flex items-center gap-2 mb-4">
 			<span class="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-[11px] font-semibold text-muted-foreground">{ group.Label }</span>
 		</div>
-		<div class="space-y-3">
-			for _, n := range group.Nodes {
-				@wfNestedNodeRender(n)
-			}
-		</div>
+		switch group.RootType {
+		case "parallel":
+			@wfRenderParallelChildren(group.Nodes)
+		case "loop":
+			@wfRenderLoopChildren(wfNestedNode{Children: group.Nodes})
+		default:
+			<div class="flex items-center gap-0">
+				for i, n := range group.Nodes {
+					@wfNestedNodeRender(n)
+					if i < len(group.Nodes)-1 {
+						<span class="text-muted-foreground flex-shrink-0">&#8594;</span>
+					}
+				}
+			</div>
+		}
 	</div>
 }
 
 templ wfNestedNodeRender(n wfNestedNode) {
-	@wfAgentCardWithChildren(n.Node, n.Children)
+	@wfRenderNode(n)
 }
 
-templ wfAgentCardWithChildren(node wfNode, children []wfNestedNode) {
-	<div class={ "rounded-lg border bg-background px-3 py-2.5", wfNodeBorder(node.Type) }>
-		<div class="flex items-center gap-2">
-			@wfNodeIcon(node.Type)
-			<span class="text-xs font-medium text-foreground">{ node.Name }</span>
-			if node.Subtitle != "" {
-				<span class="text-[10px] text-muted-foreground ml-auto">{ node.Subtitle }</span>
+// wfRenderNode renders a nested node using the same visual primitives as the
+// standalone diagrams: arrows for sequential, fork/join for parallel, dashed
+// container for loop, dotted container for conditional.
+templ wfRenderNode(n wfNestedNode) {
+	switch n.Node.Type {
+	case "sequential":
+		@wfRenderSequentialChildren(n.Children)
+	case "parallel":
+		@wfRenderParallelChildren(n.Children)
+	case "loop":
+		@wfRenderLoopChildren(n)
+	case "conditional":
+		@wfRenderConditionalChildren(n)
+	default:
+		@wfAgentCard(n.Node)
+		// Agent nodes with children render children sequentially after the card
+		for _, c := range n.Children {
+			<span class="text-muted-foreground flex-shrink-0">&#8594;</span>
+			@wfRenderNode(c)
+		}
+	}
+}
+
+templ wfRenderSequentialChildren(children []wfNestedNode) {
+	<div class="flex items-center gap-0">
+		for i, c := range children {
+			@wfRenderNode(c)
+			if i < len(children)-1 {
+				<span class="text-muted-foreground flex-shrink-0">&#8594;</span>
+			}
+		}
+	</div>
+}
+
+templ wfRenderParallelChildren(children []wfNestedNode) {
+	<div class="flex items-stretch gap-3">
+		<div class="w-0.5 bg-border self-stretch flex-shrink-0 rounded-full"></div>
+		<div class="flex flex-col gap-3 flex-1">
+			for _, c := range children {
+				@wfRenderNode(c)
 			}
 		</div>
-		if len(node.Badges) > 0 {
-			<div class="flex gap-1.5 mt-1.5 flex-wrap">
-				for _, b := range node.Badges {
-					@wfConceptBadge(b)
+		<div class="w-0.5 bg-border self-stretch flex-shrink-0 rounded-full"></div>
+	</div>
+}
+
+templ wfRenderLoopChildren(n wfNestedNode) {
+	<div class="rounded-lg border-[1.5px] border-dashed border-purple-500/30 bg-purple-500/[3%] p-4 relative">
+		<span class="absolute -top-[9px] right-3 text-[9px] font-bold px-1.5 py-0.5 rounded bg-background text-foreground border border-border">&#8634; repeat</span>
+		<div class="flex items-center gap-0">
+			for i, c := range n.Children {
+				@wfRenderNode(c)
+				if i < len(n.Children)-1 {
+					<span class="text-muted-foreground flex-shrink-0">&#8594;</span>
 				}
+			}
+		</div>
+		<div class="mt-2 text-center text-[10px] text-muted-foreground">&#8617; loop back</div>
+	</div>
+}
+
+templ wfRenderConditionalChildren(n wfNestedNode) {
+	<div class="flex items-start gap-3">
+		@wfAgentCard(n.Node)
+		<span class="flex items-center pt-4 text-muted-foreground flex-shrink-0">&#8594;</span>
+		<div class="flex-1 min-w-[200px]">
+			<div class="rounded-lg border-[1.5px] border-dotted border-red-500/25 bg-red-500/[3%] p-3 relative">
+				<span class="absolute -top-[9px] left-3 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-background text-red-500 border border-border">route</span>
+				<div class="flex flex-col gap-2 mt-1">
+					for _, c := range n.Children {
+						@wfRenderNode(c)
+					}
+				</div>
 			</div>
-		}
-		if len(children) > 0 {
-			<div class="ml-6 mt-3 space-y-2 border-l-2 border-border/50 pl-4">
-				for _, c := range children {
-					@wfNestedNodeRender(c)
-				}
-			</div>
-		}
+		</div>
 	</div>
 }
 
