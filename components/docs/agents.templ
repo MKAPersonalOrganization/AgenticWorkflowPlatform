@@ -4,32 +4,20 @@ package docs
 templ docsAIModels() {
 	@docsSection("ai-models", "AI Models", iconCpu, "text-blue-500") {
 		<p>
-			Compass.AI supports <strong>models from three major AI providers</strong>. Configure your preferred
+			Compass.AI supports <strong>models from OpenAI and Google Gemini</strong>. Configure your preferred
 			model globally in Settings → AI → Chat Model, and all agents automatically use it.
 		</p>
-		<h3>Supported Providers and Models</h3>
+		<h3>Supported Providers</h3>
 		@docsTable() {
 			<thead>
 				<tr>
 					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Provider</th>
-					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Model</th>
-					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Best For</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Description</th>
 				</tr>
 			</thead>
 			<tbody>
-				@docsTableRow("OpenAI", "GPT-4o", "All-rounder, fast, capable, multimodal")
-				@docsTableRow("OpenAI", "GPT-4o-mini", "Quick tasks, cost-effective responses")
-				@docsTableRow("OpenAI", "GPT-4 Turbo", "Complex reasoning, large context window")
-				@docsTableRow("OpenAI", "o1 / o1-mini", "Advanced reasoning and chain-of-thought")
-				@docsTableRow("OpenAI", "o3-mini", "Efficient reasoning at lower cost")
-				@docsTableRow("Anthropic", "Claude Sonnet 4", "Best overall, nuanced, precise, safe")
-				@docsTableRow("Anthropic", "Claude 3.5 Sonnet", "Creative writing, analysis, coding")
-				@docsTableRow("Anthropic", "Claude 3.5 Haiku", "Fast, lightweight tasks")
-				@docsTableRow("Anthropic", "Claude 3 Opus", "Deep analysis, research, complex tasks")
-				@docsTableRow("Google", "Gemini 2.0 Flash", "Fast multimodal reasoning")
-				@docsTableRow("Google", "Gemini 2.0 Flash Lite", "Ultra-fast, cost-effective")
-				@docsTableRow("Google", "Gemini 1.5 Pro", "1M token context window, deep analysis")
-				@docsTableRow("Google", "Gemini 1.5 Flash", "Balanced speed and capability")
+				@docsTableRow2("OpenAI", "GPT family of models — all-rounders with strong reasoning and multimodal capabilities")
+				@docsTableRow2("Google Gemini", "Flash and Pro models — fast, efficient, with large context windows")
 			</tbody>
 		}
 		<h3>Streaming and Real-Time Delivery</h3>
@@ -65,11 +53,11 @@ templ docsAISettings() {
 			Compass.AI cleanly separates the two concerns:
 		</p>
 		<ul class="space-y-2 my-4">
-			<li>• <strong>Layer 1 — Providers</strong> — Store API keys for OpenAI, Anthropic, and Google Gemini. Each provider is configured once and shared across all capabilities.</li>
+			<li>• <strong>Layer 1 — Providers</strong> — Store API keys for OpenAI and Google Gemini. Each provider is configured once and shared across all capabilities.</li>
 			<li>• <strong>Layer 2 — Capabilities</strong> — For each AI function (chat, voice, embedding), choose which of your configured providers and which specific model to use. No re-entering keys.</li>
 		</ul>
 		<p>
-			This means you can use GPT-4o for chat, Claude Sonnet 4 for a different agent, OpenAI TTS for voice, and
+			This means you can use GPT-4o for chat, Gemini Flash for a different agent, OpenAI TTS for voice, and
 			Gemini for embeddings — all at the same time, on the same account. Change your chat model without
 			touching your voice or embedding setup.
 		</p>
@@ -92,7 +80,7 @@ templ docsAISettings() {
 		}
 		<h3>Setup Workflow</h3>
 		<ol class="list-decimal list-inside space-y-2 my-4">
-			<li><strong>Add your providers</strong> — Go to Settings → AI and enter your API keys for OpenAI, Anthropic, or Gemini. Add as many as you like.</li>
+			<li><strong>Add your providers</strong> — Go to Settings → AI and enter your API keys for OpenAI or Gemini. Add as many as you like.</li>
 			<li><strong>Configure each capability</strong> — Under each capability section (Chat Model, Voice, Embedding), pick a provider and model from your already-configured list. No re-entering keys.</li>
 			<li><strong>Fine-tune settings</strong> — Adjust capability-specific options like temperature, max tokens, or voice selection.</li>
 			<li><strong>Start using agents</strong> — Every agent automatically uses the right provider for each capability based on your configuration.</li>
