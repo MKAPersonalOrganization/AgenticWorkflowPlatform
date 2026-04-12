@@ -59,6 +59,12 @@ func newOpenAIModel(modelName, apiKey, baseURL string) *openAIModel {
 	}
 }
 
+// isOpenAIReasoningModel returns true for models that don't support custom temperature.
+// GPT-5 and o1-series models only support temperature=1.
+func isOpenAIReasoningModel(modelName string) bool {
+	return strings.HasPrefix(modelName, "gpt-5") || strings.HasPrefix(modelName, "o1")
+}
+
 func (m *openAIModel) Name() string { return m.modelName }
 
 // GenerateContent converts between genai content format and OpenAI's chat
@@ -87,7 +93,9 @@ func (m *openAIModel) GenerateContent(ctx context.Context, req *adkmodel.LLMRequ
 
 		// Convert tool declarations to OpenAI tools.
 		if req.Config != nil {
-			if req.Config.Temperature != nil {
+			// GPT-5 and o1-series models only support default temperature (1).
+			// Setting custom temperature causes errors.
+			if req.Config.Temperature != nil && !isOpenAIReasoningModel(modelName) {
 				params.Temperature = openai.Float(float64(*req.Config.Temperature))
 			}
 			if req.Config.TopP != nil {
