@@ -42,6 +42,8 @@ export function createFlowNode(type, opts = {}) {
             id, type: 'agent',
             label: opts.label || '',
             agent_id: opts.agent_id || '',
+            output_key: opts.output_key || '',
+            condition: opts.condition || '',
             x: opts.x || 0, y: opts.y || 0,
         };
     }
@@ -1078,6 +1080,33 @@ export const alpineflowPropertyPanel = () => ({
     get isCoordinator() {
         const agent = this.selectedAgent;
         return agent && agent.subAgents && agent.subAgents.length > 0;
+    },
+
+    // ── Conditional routing helpers ────────────────────────────────────────────
+    // The evaluator is the first child of a conditional node. Its output_key
+    // must be set on the AgentDefinition (not the workflow node) for ADK-Go
+    // to write the routing value to session state.
+    get evaluatorNode() {
+        const n = this.node;
+        if (!n || n.type !== 'conditional') return null;
+        return (n.children && n.children.length > 0) ? n.children[0] : null;
+    },
+
+    get evaluatorAgent() {
+        const ev = this.evaluatorNode;
+        if (!ev || ev.type !== 'agent' || !ev.agent_id) return null;
+        return (Alpine.store('flow').agents || []).find(a => a.id === ev.agent_id) || null;
+    },
+
+    get evaluatorHasOutputKey() {
+        const agent = this.evaluatorAgent;
+        return agent && agent.output_key && agent.output_key.trim() !== '';
+    },
+
+    editEvaluatorAgent() {
+        const ag = this.evaluatorAgent;
+        if (!ag) return;
+        window.dispatchEvent(new CustomEvent('open-agent-designer-node', { detail: ag }));
     },
 
     get selectedConnector() {

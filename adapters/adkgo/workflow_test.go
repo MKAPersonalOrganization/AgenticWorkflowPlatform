@@ -586,3 +586,101 @@ func TestMaxNodeLimit(t *testing.T) {
 		t.Error("graph exceeds the 50 node limit")
 	}
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Tests: Conditional routing
+// ──────────────────────────────────────────────────────────────────────────────
+
+func TestConditionalRouting(t *testing.T) {
+	t.Run("conditional node structure is valid", func(t *testing.T) {
+		// This maps to how the UI constructs conditional nodes:
+		// Children[0] = evaluator agent (output_key read from AgentDefinition at runtime)
+		// Children[1:] = branches with condition values
+		// Note: WorkflowNodeInfo.OutputKey is NOT set on the evaluator node in the graph.
+		// buildConditionalNode resolves the AgentDefinition and reads its OutputKey.
+		graph := fagent.WorkflowNodeInfo{
+			ID: "cond-1", Type: "conditional", Label: "Route Inquiry",
+			Children: []fagent.WorkflowNodeInfo{
+				// Evaluator: output_key lives on AgentDefinition, not the node
+				{
+					ID: "node-eval", Type: "agent", AgentID: "classifier",
+				},
+				// Branch 1: condition = "technical"
+				{
+					ID: "node-tech", Type: "agent", AgentID: "tech-support",
+					Condition: "technical",
+				},
+				// Branch 2: condition = "billing"
+				{
+					ID: "node-bill", Type: "agent", AgentID: "billing-agent",
+					Condition: "billing",
+				},
+				// Branch 3: fallback (condition = "*")
+				{
+					ID: "node-fallback", Type: "agent", AgentID: "general-assistant",
+					Condition: "*",
+				},
+			},
+		}
+
+		// Validate structure
+		if len(graph.Children) < 2 {
+			t.Fatal("conditional node requires at least 2 children")
+		}
+
+		// Branches must have condition values
+		for i := 1; i < len(graph.Children); i++ {
+			branch := graph.Children[i]
+			if branch.Condition == "" {
+				t.Errorf("branch %d should have a condition (defaults to '*' at runtime)", i)
+			}
+		}
+
+		// Verify specific conditions
+		if graph.Children[1].Condition != "technical" {
+			t.Errorf("expected branch 1 condition 'technical', got %q", graph.Children[1].Condition)
+		}
+		if graph.Children[2].Condition != "billing" {
+			t.Errorf("expected branch 2 condition 'billing', got %q", graph.Children[2].Condition)
+		}
+		if graph.Children[3].Condition != "*" {
+			t.Errorf("expected branch 3 condition '*', got %q", graph.Children[3].Condition)
+		}
+	})
+
+	t.Run("conditional with composite branch agents", func(t *testing.T) {
+		// Branches can be composite nodes (sequential, parallel)
+		graph := fagent.WorkflowNodeInfo{
+			ID: "cond-2", Type: "conditional",
+			Children: []fagent.WorkflowNodeInfo{
+				// Evaluator: output_key on AgentDefinition at runtime
+				{
+					ID: "eval-1", Type: "agent", AgentID: "intent-classifier",
+				},
+				{
+					ID: "branch-tech", Type: "sequential", Condition: "technical",
+					Children: []fagent.WorkflowNodeInfo{
+						{ID: "tech-1", Type: "agent", AgentID: "diagnose"},
+						{ID: "tech-2", Type: "agent", AgentID: "resolve"},
+					},
+				},
+				{
+					ID: "branch-general", Type: "agent", AgentID: "general",
+					Condition: "*",
+				},
+			},
+		}
+
+		// Composite branch structure
+		techBranch := graph.Children[1]
+		if techBranch.Type != "sequential" {
+			t.Errorf("expected sequential branch, got %q", techBranch.Type)
+		}
+		if techBranch.Condition != "technical" {
+			t.Errorf("expected condition 'technical', got %q", techBranch.Condition)
+		}
+		if len(techBranch.Children) != 2 {
+			t.Errorf("expected 2 children in sequential branch, got %d", len(techBranch.Children))
+		}
+	})
+}

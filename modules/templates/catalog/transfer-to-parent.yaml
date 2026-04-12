@@ -16,15 +16,12 @@ workflow:
     - id: n1
       type: agent
       agent_id: sub-coordinator
-      output_key: routing_decision
     - id: n2
       type: agent
       agent_id: sub-triage
-      output_key: specialist_selection
     - id: n3
       type: agent
       agent_id: sub-specialist
-      output_key: resolution
 
 sub_agents:
   - id: sub-coordinator

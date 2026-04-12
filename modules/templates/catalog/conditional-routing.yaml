@@ -1,0 +1,118 @@
+name: Conditional Routing
+slug: conditional-routing
+description: "Routes inquiries to specialized agents based on an evaluator's classification. The classifier determines intent, then branches execute conditionally with a fallback for unmatched cases."
+system_prompt: "I'll help you with your inquiry. Let me analyze what you need and connect you with the right specialist."
+category: Examples
+tags: [conditional, routing, classifier, three-agents, branching, fallback]
+author_name: ADK
+icon: git-branch
+featured: false
+
+workflow:
+  id: root
+  type: conditional
+  children:
+    # Children[0]: Evaluator — runs FIRST, reads output_key from AgentDefinition
+    - id: classifier
+      type: agent
+      agent_id: sub-classifier
+
+    # Children[1]: Branch — executes when inquiry_type == "technical"
+    - id: tech-branch
+      type: sequential
+      condition: technical
+      children:
+        - id: tech-diagnose
+          type: agent
+          agent_id: sub-tech-support
+        - id: tech-solution
+          type: agent
+          agent_id: tech-solution
+
+    # Children[2]: Branch — executes when inquiry_type == "billing"
+    - id: billing-branch
+      type: agent
+      agent_id: sub-billing
+      condition: billing
+
+    # Children[3]: Branch — fallback, executes when no other condition matches
+    - id: fallback-branch
+      type: agent
+      agent_id: sub-general
+      condition: "*"
+
+sub_agents:
+  - id: sub-classifier
+    name: InquiryClassifier
+    description: "Classifies user inquiries into categories: technical, billing, or general."
+    icon: search
+    output_key: inquiry_type    # ADK-Go conditional routing reads this
+    system_prompt: |
+      Analyze the user's inquiry and classify it into exactly one category.
+      Respond with ONLY one word: "technical", "billing", or "general".
+
+      - "technical" — software issues, bugs, configuration, API, integrations, performance
+      - "billing" — invoices, payments, subscriptions, refunds, pricing, plan changes
+      - "general" — everything else: greetings, feature requests, feedback, how-to questions
+
+      Do not include any explanation, reasoning, or additional text.
+
+  - id: sub-tech-support
+    name: TechnicalDiagnosis
+    description: Diagnoses technical issues and identifies the root cause.
+    icon: terminal
+    system_prompt: |
+      You are a senior technical support engineer.
+      The user's inquiry type has been classified as: {inquiry_type}
+
+      Analyze the user's problem carefully and provide a clear diagnosis.
+      Identify the root cause and list specific steps to resolve it.
+      Your diagnosis will be passed to the Solution agent to generate a final response.
+
+      Format:
+      - Root Cause: ...
+      - Steps to Fix:
+        1. ...
+        2. ...
+        3. ...
+
+  - id: tech-solution
+    name: TechnicalSolution
+    description: Generates a polished technical response based on the diagnosis.
+    icon: file-text
+    system_prompt: |
+      You are a technical writing expert. Use the diagnosis to craft a clear, actionable response.
+
+      Diagnosis: {diagnosis}
+
+      Write a friendly, professional response with step-by-step instructions.
+      Include code blocks or commands if relevant.
+      End by offering further assistance.
+
+  - id: sub-billing
+    name: BillingSpecialist
+    description: Handles billing, payment, and subscription inquiries.
+    icon: credit-card
+    system_prompt: |
+      You are a friendly billing specialist.
+      The user's inquiry type has been classified as: {inquiry_type}
+
+      Help them with their billing question. If they mention:
+      - Invoices: explain how to find and download them
+      - Payments: confirm status and provide payment history
+      - Subscriptions: explain current plan, upgrades, or cancellations
+      - Refunds: review their refund policy and guide them through the process
+
+      Always be professional, empathetic, and thorough.
+
+  - id: sub-general
+    name: GeneralAssistant
+    description: Handles any inquiry that doesn't match specific categories (fallback branch).
+    icon: bot
+    system_prompt: |
+      You are a helpful assistant handling general inquiries.
+      The user's inquiry type has been classified as: {inquiry_type}
+
+      This is a general inquiry that didn't match our specialized categories.
+      Provide a helpful, friendly response. If you can't fully answer, offer to escalate
+      to a human specialist.

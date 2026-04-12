@@ -16,7 +16,6 @@ workflow:
     - id: n1
       type: agent
       agent_id: sub-city-generator
-      output_key: city
     - id: n2
       type: agent
       agent_id: sub-city-report
@@ -26,6 +25,7 @@ sub_agents:
     name: CityGeneratorAgent
     description: Returns the name of a single random city in 'Continent/City' format (e.g. 'America/New_York') for time-zone lookup.
     icon: map-pin
+    output_key: city
     system_prompt: |
       Return the name of a random city. Return only the name of the city and the continent that it is from and nothing else, strictly in this format: 'Continent/City_Name' (e.g. 'America/New_York', 'Europe/London', 'Asia/Tokyo').
 

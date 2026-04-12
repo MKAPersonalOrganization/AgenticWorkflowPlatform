@@ -16,7 +16,6 @@ workflow:
     - id: n1
       type: agent
       agent_id: sub-brief-enhancer
-      output_key: topic_brief
     - id: n2
       type: loop
       max_iterations: 3
@@ -31,21 +30,19 @@ workflow:
                 - id: n2a1a
                   type: agent
                   agent_id: sub-draft-a
-                  output_key: draft_a
                 - id: n2a1b
                   type: agent
                   agent_id: sub-draft-b
-                  output_key: draft_b
             - id: n2a2
               type: agent
               agent_id: sub-critic
-              output_key: best_draft
 
 sub_agents:
   - id: sub-brief-enhancer
     name: BriefEnhancerAgent
     description: Takes the user's topic and produces a structured brief with context, audience, and key requirements.
     icon: sparkles
+    output_key: topic_brief
     system_prompt: |
       ## Role: Brief Enhancer
 
@@ -68,6 +65,7 @@ sub_agents:
     name: DraftAAgent
     description: Produces a bold, creative draft with unconventional angles and vivid examples. Reads the brief from {topic_brief?} and the previous best draft from {best_draft?}.
     icon: lightbulb
+    output_key: draft_a
     system_prompt: |
       ## Role: Creative Drafter
 
@@ -87,6 +85,7 @@ sub_agents:
     name: DraftBAgent
     description: Produces a structured, analytical draft with logical reasoning and evidence. Reads the brief from {topic_brief?} and the previous best draft from {best_draft?}.
     icon: target
+    output_key: draft_b
     system_prompt: |
       ## Role: Analytical Drafter
 
@@ -106,6 +105,7 @@ sub_agents:
     name: CriticAgent
     description: Evaluates both drafts against the brief requirements, selects the stronger one, and outputs it as the new best draft.
     icon: clipboard-check
+    output_key: best_draft
     system_prompt: |
       ## Role: Critic
 

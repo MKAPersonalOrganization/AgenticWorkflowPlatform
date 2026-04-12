@@ -17,6 +17,7 @@ type catalogSubAgent struct {
 	Description  string `json:"description"`
 	SystemPrompt string `json:"system_prompt"`
 	Icon         string `json:"icon"`
+	OutputKey    string `json:"output_key,omitempty"`
 }
 
 // CatalogWorkflowForker handles forking workflow catalog entries.
@@ -64,15 +65,23 @@ func (f *CatalogWorkflowForker) ForkCatalogWorkflow(
 	// 2. Pre-generate the workflow ID so sub-agents can reference it.
 	wfID := uuid.New().String()
 
+	// Collect output_key from workflow nodes (legacy templates declare it on nodes).
+	nodeOutputKeys := collectOutputKeysFromJSON([]byte(graphJSON))
+
 	// 3. Create each sub-agent and build ID map.
 	idMap := make(map[string]string, len(subs)) // placeholder → real ID
 	for _, sub := range subs {
+		outputKey := sub.OutputKey
+		if outputKey == "" {
+			outputKey = nodeOutputKeys[sub.ID]
+		}
 		agent := &agentdefinition.AgentDefinition{
 			UserID:       userID,
 			Name:         sub.Name,
 			Description:  sub.Description,
 			SystemPrompt: sub.SystemPrompt,
 			Icon:         sub.Icon,
+			OutputKey:    outputKey,
 			WorkflowID:   wfID,
 		}
 		if err := f.agentRepo.Create(ctx, agent); err != nil {
@@ -120,5 +129,34 @@ func remapAgentIDs(node *WorkflowNode, idMap map[string]string) {
 	}
 	for i := range node.Children {
 		remapAgentIDs(&node.Children[i], idMap)
+	}
+}
+
+// collectOutputKeysFromJSON extracts output_key values from workflow node JSON.
+func collectOutputKeysFromJSON(data []byte) map[string]string {
+	result := make(map[string]string)
+	var m map[string]any
+	if json.Unmarshal(data, &m) != nil {
+		return result
+	}
+	walkJSONForOutputKeys(m, result)
+	return result
+}
+
+func walkJSONForOutputKeys(v any, result map[string]string) {
+	obj, ok := v.(map[string]any)
+	if !ok {
+		return
+	}
+	nodeType, _ := obj["type"].(string)
+	agentID, _ := obj["agent_id"].(string)
+	outputKey, _ := obj["output_key"].(string)
+	if nodeType == "agent" && agentID != "" && outputKey != "" {
+		result[agentID] = outputKey
+	}
+	if children, ok := obj["children"].([]any); ok {
+		for _, c := range children {
+			walkJSONForOutputKeys(c, result)
+		}
 	}
 }

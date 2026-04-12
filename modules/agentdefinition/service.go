@@ -118,6 +118,11 @@ func (s *Service) ImportComposedFromCatalogEntry(ctx context.Context, userID str
 		}
 	}
 
+	// Collect output_key from workflow nodes in the raw JSON before unmarshalling.
+	// Legacy templates declare output_key on workflow nodes; we transfer them to
+	// the forked AgentDefinition.OutputKey where ADK-Go reads them at runtime.
+	nodeOutputKeys := collectOutputKeysFromJSON([]byte(entry.WorkflowGraphJSON))
+
 	var graph CompositionNode
 	if err := json.Unmarshal([]byte(entry.WorkflowGraphJSON), &graph); err != nil {
 		return "", fmt.Errorf("parsing workflow graph: %w", err)
@@ -131,6 +136,11 @@ func (s *Service) ImportComposedFromCatalogEntry(ctx context.Context, userID str
 			Description:  sa.Description,
 			SystemPrompt: sa.SystemPrompt,
 			Icon:         sa.Icon,
+			OutputKey:    sa.OutputKey,
+		}
+		// Fall back to legacy workflow node output_key
+		if agent.OutputKey == "" {
+			agent.OutputKey = nodeOutputKeys[sa.ID]
 		}
 		if err := s.repo.Create(ctx, agent); err != nil {
 			return "", fmt.Errorf("creating sub-agent %q: %w", sa.Name, err)
@@ -526,5 +536,35 @@ func remapGraphAgentIDs(node *CompositionNode, idMap map[string]string) {
 	}
 	for i := range node.Children {
 		remapGraphAgentIDs(&node.Children[i], idMap)
+	}
+}
+
+// collectOutputKeysFromJSON extracts output_key values from workflow node JSON.
+// Used during fork to transfer legacy workflow node output_keys to AgentDefinition.
+func collectOutputKeysFromJSON(data []byte) map[string]string {
+	result := make(map[string]string)
+	var m map[string]any
+	if json.Unmarshal(data, &m) != nil {
+		return result
+	}
+	walkJSONForOutputKeys(m, result)
+	return result
+}
+
+func walkJSONForOutputKeys(v any, result map[string]string) {
+	obj, ok := v.(map[string]any)
+	if !ok {
+		return
+	}
+	nodeType, _ := obj["type"].(string)
+	agentID, _ := obj["agent_id"].(string)
+	outputKey, _ := obj["output_key"].(string)
+	if nodeType == "agent" && agentID != "" && outputKey != "" {
+		result[agentID] = outputKey
+	}
+	if children, ok := obj["children"].([]any); ok {
+		for _, c := range children {
+			walkJSONForOutputKeys(c, result)
+		}
 	}
 }

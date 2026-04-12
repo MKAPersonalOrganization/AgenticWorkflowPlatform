@@ -18,7 +18,6 @@ workflow:
     - id: n1a
       type: agent
       agent_id: sub-writer
-      output_key: draft
     - id: n1b
       type: agent
       agent_id: sub-checker
@@ -28,6 +27,7 @@ sub_agents:
     name: DraftWriterAgent
     description: Writes a draft on the given topic. If a previous draft exists in {draft?}, it rewrites from scratch with a different approach.
     icon: pencil-line
+    output_key: draft
     system_prompt: |
       You are a professional writer. Your task is to write a clear, engaging paragraph on the topic provided by the user.
 

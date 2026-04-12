@@ -365,6 +365,12 @@ type CompositionNode struct {
 	// A2AConnectorID references a registered A2A connector for remote delegation.
 	A2AConnectorID string `json:"a2a_connector_id,omitempty"`
 
+	// ── Conditional routing fields ──
+	// Condition specifies when this node should execute as a branch within
+	// a "conditional" parent. The value is matched against the evaluator's
+	// output (read from session state). Use "*" for the fallback/default branch.
+	Condition string `json:"condition,omitempty"`
+
 	// ── Composite-node fields ──
 	Children      []CompositionNode `json:"children,omitempty"`
 	MaxIterations int               `json:"max_iterations,omitempty"`
@@ -372,13 +378,6 @@ type CompositionNode struct {
 	// last child of this loop node. When true the LLM may break out early;
 	// when false (default) the loop always runs MaxIterations times.
 	AllowEarlyExit bool `json:"allow_early_exit,omitempty"`
-
-	// ── Conditional routing fields ──
-	// Condition specifies when this node should execute as a branch within
-	// a "conditional" parent. The value is matched against the evaluator's
-	// output (read from session state via the evaluator's OutputKey).
-	// Use "*" for the fallback/default branch.
-	Condition string `json:"condition,omitempty"`
 
 	// ── Visual layout (AlpineFlow canvas — ignored by ADK-Go runtime) ──
 	// X and Y store the node's position on the flow canvas (pixels).

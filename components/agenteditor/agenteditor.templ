@@ -1078,6 +1078,28 @@ templ AgentDesignerDialog() {
 															</div>
 														</template>
 													</div>
+
+													<!-- Output Variable (for storing result in session state) -->
+													<div>
+														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">
+															@icon.Key(icon.Props{Class: "size-3 inline me-0.5"})
+															Output Variable
+														</label>
+														<input :value="node.output_key || ''" @input="set('output_key', $event.target.value)" type="text" placeholder="e.g. research_results" class="w-full text-[11px] font-mono rounded-lg px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border"/>
+														<p class="text-[9px] text-muted-foreground mt-1">{ i18n.T(ctx, "Stores output in session state for other agents to use via {variable}") }</p>
+													</div>
+
+													<!-- Condition (only for branches of a conditional node) -->
+													<template x-if="isConditionalBranch">
+														<div>
+															<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">
+																@icon.GitBranch(icon.Props{Class: "size-3 inline me-0.5"})
+																Branch Condition
+															</label>
+															<input :value="node.condition || ''" @input="set('condition', $event.target.value)" type="text" placeholder="e.g. technical, billing" class="w-full text-[11px] font-mono rounded-lg px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-red-400/40 bg-background border-border"/>
+															<p class="text-[9px] text-muted-foreground mt-1">{ i18n.T(ctx, "Value to match against evaluator output. Use * for fallback/default branch.") }</p>
+														</div>
+													</template>
 												</div>
 											</template>
 
@@ -1122,6 +1144,79 @@ templ AgentDesignerDialog() {
 														<template x-if="node.children && node.children.length" x-text="node.children.length + ' sub-agent(s)'"></template>
 														<template x-if="!node.children || node.children.length === 0">No sub-agents yet</template>
 													</p>
+												</div>
+											</template>
+
+											<!-- Conditional Node -->
+											<template x-if="node.type === 'conditional'">
+												<div class="space-y-3">
+													<!-- Info card -->
+													<div class="rounded-lg p-3 bg-muted border-border">
+														<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Routes to one branch based on an evaluator's output.") }</p>
+														<p class="text-[9px] text-muted-foreground mt-1">{ i18n.T(ctx, "First child = evaluator (runs always). Remaining children = branches (only one executes).") }</p>
+													</div>
+
+													<!-- Evaluator warning: missing -->
+													<template x-if="!node.children || node.children.length < 2">
+														<div class="rounded-lg p-2.5 bg-amber-500/10 border border-amber-500/20">
+															<p class="text-[10px] text-amber-600 dark:text-amber-400 flex items-start gap-1.5">
+																<span class="shrink-0 mt-0.5">⚠️</span>
+																<span>{ i18n.T(ctx, "Needs at least an evaluator + 1 branch. Add agents as children.") }</span>
+															</p>
+														</div>
+													</template>
+
+													<!-- Evaluator warning: missing output_key -->
+													<template x-if="node.children && node.children.length >= 2 && evaluatorNode && !evaluatorHasOutputKey">
+														<div class="rounded-lg p-2.5 bg-red-500/10 border border-red-500/20">
+															<p class="text-[10px] text-red-600 dark:text-red-400 flex items-start gap-1.5">
+																<span class="shrink-0 mt-0.5">🔑</span>
+																<span>
+																	{ i18n.T(ctx, "Evaluator agent needs output_key set in the agent settings. This is how the router reads the classification.") }
+																	<button type="button" @click="editEvaluatorAgent()" class="underline font-semibold hover:text-red-500 transition-colors inline">{ i18n.T(ctx, "Open agent → State & Context → Output Variable") }</button>
+																</span>
+															</p>
+														</div>
+													</template>
+
+													<!-- Branch summary -->
+													<template x-if="node.children && node.children.length >= 2">
+														<div class="space-y-1.5">
+															<!-- Evaluator status -->
+															<div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border"
+																:class="evaluatorHasOutputKey ? 'bg-blue-500/10 border-blue-500/20' : 'bg-red-500/10 border-red-500/20'">
+																<span class="text-[8px]">🎯</span>
+																<span class="text-[10px] font-medium" :class="evaluatorHasOutputKey ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'">
+																	<template x-if="evaluatorAgent" x-text="'Evaluator: ' + evaluatorAgent.name"></template>
+																	<template x-if="!evaluatorAgent">No evaluator agent set</template>
+																</span>
+																<template x-if="evaluatorHasOutputKey">
+																	<span class="text-[8px] font-mono px-1 py-0.5 rounded bg-blue-500/20 text-blue-500" x-text="'→ ' + evaluatorAgent.output_key"></span>
+																</template>
+																<template x-if="!evaluatorHasOutputKey && evaluatorAgent">
+																	<span class="text-[8px] font-mono text-red-400">no output_key</span>
+																</template>
+															</div>
+															<!-- Branches -->
+															<template x-for="(child, idx) in node.children.slice(1)" :key="child.id">
+																<div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted border-border">
+																	<span class="text-[8px]">🔀</span>
+																	<span class="text-[10px] text-muted-foreground" x-text="'Branch ' + (idx + 1)"></span>
+																	<!-- Branch agent name -->
+																	<template x-if="child.type === 'agent' && child.agent_id">
+																		<span class="text-[9px] font-medium text-foreground truncate max-w-[100px]" x-text="$store.flow.agentName(child.agent_id)"></span>
+																	</template>
+																	<!-- Condition badge -->
+																	<template x-if="child.condition">
+																		<span class="text-[8px] font-mono px-1 py-0.5 rounded bg-red-500/10 text-red-500" x-text="child.condition === '*' ? '*' : child.condition"></span>
+																	</template>
+																	<template x-if="!child.condition">
+																		<span class="text-[8px] font-mono text-muted-foreground/50">no condition</span>
+																	</template>
+																</div>
+															</template>
+														</div>
+													</template>
 												</div>
 											</template>
 										</div>

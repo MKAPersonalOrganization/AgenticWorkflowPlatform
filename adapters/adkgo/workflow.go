@@ -299,11 +299,22 @@ func buildConditionalNode(wbc *workflowBuildContext, node *fagent.WorkflowNodeIn
 	}
 
 	evaluatorNode := &node.Children[0]
-	if evaluatorNode.OutputKey == "" {
-		return nil, fmt.Errorf("node %q: evaluator child (first child) must have output_key set", node.ID)
+	if evaluatorNode.Type != "agent" || evaluatorNode.AgentID == "" {
+		return nil, fmt.Errorf("node %q: evaluator (first child) must be an agent node with agent_id", node.ID)
 	}
 
-	outputKey := evaluatorNode.OutputKey
+	// Read output_key from the evaluator's AgentDefinition — the agent owns its
+	// routing config. Templates declare it in sub_agents[].output_key and the fork
+	// process transfers it to AgentDefinition.OutputKey.
+	foundAgent, err := wbc.adapter.agentProvider.GetForUser(wbc.ctx, evaluatorNode.AgentID, wbc.userID)
+	if err != nil {
+		return nil, fmt.Errorf("node %q: resolving evaluator agent: %w", node.ID, err)
+	}
+	evalCfg := extractAgentConfig(foundAgent)
+	if evalCfg.OutputKey == "" {
+		return nil, fmt.Errorf("node %q: evaluator agent %q must have output_key set in its definition", node.ID, foundAgent.Name())
+	}
+	outputKey := evalCfg.OutputKey
 
 	name := node.Label
 	if name == "" {

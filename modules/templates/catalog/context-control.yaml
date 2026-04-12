@@ -16,22 +16,20 @@ workflow:
     - id: n1
       type: agent
       agent_id: sub-planner
-      output_key: research_plan
     - id: n2
       type: agent
       agent_id: sub-researcher
-      output_key: findings
     - id: n3
       type: agent
       agent_id: sub-composer
       include_contents: none
-      output_key: final_report
 
 sub_agents:
   - id: sub-planner
     name: PlannerAgent
     description: Creates a structured research plan with key questions and methodology.
     icon: target
+    output_key: research_plan
     system_prompt: |
       ## Role: Research Planner
 
@@ -53,6 +51,7 @@ sub_agents:
     name: ResearcherAgent
     description: Conducts research based on the plan and produces structured findings.
     icon: search
+    output_key: findings
     system_prompt: |
       ## Role: Researcher
 
@@ -69,6 +68,7 @@ sub_agents:
     name: ComposerAgent
     description: Composes the final report using ONLY injected state variables ({research_plan}, {findings}). No conversation history is provided (include_contents=none).
     icon: file-text
+    output_key: final_report
     system_prompt: |
       ## Role: Report Composer
 

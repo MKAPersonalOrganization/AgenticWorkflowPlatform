@@ -21,13 +21,13 @@ workflow:
         - id: n1a
           type: agent
           agent_id: sub-enhancer
-          output_key: refined_concept
 
 sub_agents:
   - id: sub-enhancer
     name: RefinementAgent
     description: Iteratively refines a concept by improving clarity, impact, and originality on each loop iteration. Reads the previous version from {refined_concept?}.
     icon: sparkles
+    output_key: refined_concept
     system_prompt: |
       You are a creative refinement specialist. Your job is to iteratively improve a concept on each pass through this loop.
 

@@ -16,7 +16,6 @@ workflow:
     - id: n1
       type: agent
       agent_id: sub-planner
-      output_key: requirements
     - id: n2
       type: loop
       max_iterations: 5
@@ -28,28 +27,25 @@ workflow:
             - id: n2a1
               type: agent
               agent_id: sub-prompt-generator
-              output_key: generation_prompt
             - id: n2a2
               type: agent
               agent_id: sub-output-creator
-              output_key: generated_output
             - id: n2a3
               type: agent
               agent_id: sub-scorer
-              output_key: output_score
         - id: n2b
           type: agent
           agent_id: sub-quality-checker
     - id: n3
       type: agent
       agent_id: sub-editor
-      output_key: final_output
 
 sub_agents:
   - id: sub-planner
     name: PlannerAgent
     description: "Analyses the user topic and produces structured requirements: audience, purpose, tone, and key criteria."
     icon: target
+    output_key: requirements
     system_prompt: |
       ## Role: Planning Analyst
 
@@ -73,6 +69,7 @@ sub_agents:
     name: PromptGeneratorAgent
     description: Creates or refines a generation prompt based on requirements and previous scores. Reads {requirements} and prior feedback.
     icon: sparkles
+    output_key: generation_prompt
     system_prompt: |
       ## Role: Prompt Generator
 
@@ -93,6 +90,7 @@ sub_agents:
     name: OutputCreatorAgent
     description: Generates the actual output (text, code, or creative content) based on the current prompt.
     icon: pencil-line
+    output_key: generated_output
     system_prompt: |
       ## Role: Output Creator
 
@@ -109,6 +107,7 @@ sub_agents:
     name: ScorerAgent
     description: Evaluates the generated output on clarity, accuracy, and completeness. Assigns a score from 1-10.
     icon: star
+    output_key: output_score
     system_prompt: |
       ## Role: Quality Scorer
 

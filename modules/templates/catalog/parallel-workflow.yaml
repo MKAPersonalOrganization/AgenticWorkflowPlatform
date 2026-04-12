@@ -16,22 +16,18 @@ workflow:
     - id: n1
       type: agent
       agent_id: sub-message-enhancer
-      output_key: enhanced_message
     - id: n2
       type: parallel
       children:
         - id: n2a
           type: agent
           agent_id: sub-email-drafter
-          output_key: drafted_email
         - id: n2b
           type: agent
           agent_id: sub-slack-drafter
-          output_key: drafted_slack_message
         - id: n2c
           type: agent
           agent_id: sub-event-extractor
-          output_key: event_details
     - id: n3
       type: agent
       agent_id: sub-summary
@@ -41,6 +37,7 @@ sub_agents:
     name: MessageEnhancerAgent
     description: Content strategist that transforms a brief user topic into a detailed, researched, and informative message to feed all downstream channels.
     icon: sparkles
+    output_key: enhanced_message
     system_prompt: |
       ## Role: Content Strategist
 
@@ -58,6 +55,7 @@ sub_agents:
     name: EmailDrafterAgent
     description: Corporate communications specialist that drafts a clear, professional company-wide email based on the enhanced message.
     icon: pencil-line
+    output_key: drafted_email
     system_prompt: |
       ## Role: Corporate Communications Specialist
 
@@ -78,6 +76,7 @@ sub_agents:
     name: SlackDrafterAgent
     description: Community manager that crafts a concise, emoji-friendly Slack announcement from the enhanced message.
     icon: pencil-line
+    output_key: drafted_slack_message
     system_prompt: |
       ## Role: Community Manager
 
@@ -97,6 +96,7 @@ sub_agents:
     name: EventDetailsExtractorAgent
     description: Event coordinator that extracts structured title, description, start time, and end time from the enhanced message.
     icon: calendar-clock
+    output_key: event_details
     system_prompt: |
       ## Role: Event Coordinator
 
@@ -125,6 +125,7 @@ sub_agents:
     name: SummaryAgent
     description: Reporting service that compiles a concise human-readable summary of all three parallel channel outcomes.
     icon: clipboard-check
+    output_key: summary
     system_prompt: |
       ## Role: Reporting Service
 

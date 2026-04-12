@@ -16,7 +16,6 @@ workflow:
     - id: n1
       type: agent
       agent_id: sub-message-enhancer
-      output_key: enhanced_message
     - id: n2
       type: parallel
       children:
@@ -26,33 +25,27 @@ workflow:
             - id: n2a1
               type: agent
               agent_id: sub-email-drafter
-              output_key: drafted_email
             - id: n2a2
               type: agent
               agent_id: sub-email-publisher
-              output_key: email_publication_result
         - id: n2b
           type: sequential
           children:
             - id: n2b1
               type: agent
               agent_id: sub-slack-drafter
-              output_key: drafted_slack_message
             - id: n2b2
               type: agent
               agent_id: sub-slack-publisher
-              output_key: slack_publication_result
         - id: n2c
           type: sequential
           children:
             - id: n2c1
               type: agent
               agent_id: sub-event-extractor
-              output_key: event_details
             - id: n2c2
               type: agent
               agent_id: sub-calendar-publisher
-              output_key: calendar_creation_result
     - id: n3
       type: agent
       agent_id: sub-summary
@@ -62,6 +55,7 @@ sub_agents:
     name: MessageEnhancerAgent
     description: Content strategist that transforms a brief user topic into a detailed, researched, and informative message to feed all downstream broadcast channels.
     icon: sparkles
+    output_key: enhanced_message
     system_prompt: |
       ## Role: Content Strategist
 
@@ -79,6 +73,7 @@ sub_agents:
     name: EmailDrafterAgent
     description: Corporate communications specialist that drafts a clear, professional company-wide email based on the enhanced message.
     icon: pencil-line
+    output_key: drafted_email
     system_prompt: |
       ## Role: Corporate Communications Specialist
 
@@ -154,6 +149,7 @@ sub_agents:
     name: EventDetailsExtractorAgent
     description: Event coordinator that extracts structured title, description, start time, and end time from the enhanced message.
     icon: calendar-clock
+    output_key: event_details
     system_prompt: |
       ## Role: Event Coordinator
 

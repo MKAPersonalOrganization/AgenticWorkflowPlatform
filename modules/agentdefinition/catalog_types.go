@@ -47,4 +47,5 @@ type CatalogSubAgent struct {
 	Description  string `json:"description"`   // Short description
 	SystemPrompt string `json:"system_prompt"` // System prompt for the agent
 	Icon         string `json:"icon"`          // SVG icon markup
+	OutputKey    string `json:"output_key,omitempty"` // Session state key to store this agent's output
 }

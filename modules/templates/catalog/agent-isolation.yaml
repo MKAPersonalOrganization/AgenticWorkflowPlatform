@@ -16,23 +16,21 @@ workflow:
     - id: n1
       type: agent
       agent_id: sub-researcher
-      output_key: findings
     - id: n2
       type: agent
       agent_id: sub-evaluator
       disallow_transfer_to_parent: true
       disallow_transfer_to_peers: true
-      output_key: evaluation
     - id: n3
       type: agent
       agent_id: sub-executor
-      output_key: final_output
 
 sub_agents:
   - id: sub-researcher
     name: ResearcherAgent
     description: Conducts initial research and produces structured findings.
     icon: search
+    output_key: findings
     system_prompt: |
       ## Role: Researcher
 
@@ -49,6 +47,7 @@ sub_agents:
     name: EvaluatorAgent
     description: Evaluates research quality against strict criteria. Isolated — cannot transfer to parent or peers. Produces a pass/fail verdict with feedback.
     icon: clipboard-check
+    output_key: evaluation
     system_prompt: |
       ## Role: Quality Evaluator
 
@@ -79,6 +78,7 @@ sub_agents:
     name: ExecutorAgent
     description: Acts on the evaluation. If pass, produces the final output. If fail, produces improvement guidance.
     icon: play
+    output_key: final_output
     system_prompt: |
       ## Role: Executor
 

@@ -739,7 +739,16 @@ export const editableWorkflowTree = () => {
                                        data-field="condition"
                                        data-node-id="${nodeId}" />
                             </div>` : ''}
-                        ${node.output_key ? `<div class="ewt-agent-desc">→ ${esc(node.output_key)}</div>` : ''}
+                        <div style="display:flex;align-items:center;gap:4px;margin-top:4px;">
+                            <span style="font-size:9px;color:var(--ewt-muted);font-weight:600;">output_key:</span>
+                            <input type="text"
+                                   class="ewt-inline-edit"
+                                   value="${esc(node.output_key || '')}"
+                                   placeholder="e.g. research_data"
+                                   style="font-size:10px;"
+                                   data-field="output_key"
+                                   data-node-id="${nodeId}" />
+                        </div>
                         ${isCoordinator ? `
                             <div class="ewt-subagents-container">
                                 <div class="ewt-subagents-header">

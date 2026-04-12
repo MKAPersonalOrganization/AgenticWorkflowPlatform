@@ -16,32 +16,28 @@ workflow:
     - id: n1
       type: agent
       agent_id: sub-intake-analyst
-      output_key: topic_brief
     - id: n2
       type: parallel
       children:
         - id: n2a
           type: agent
           agent_id: sub-technical-analyst
-          output_key: technical_assessment
         - id: n2b
           type: agent
           agent_id: sub-business-analyst
-          output_key: business_assessment
         - id: n2c
           type: agent
           agent_id: sub-risk-analyst
-          output_key: risk_assessment
     - id: n3
       type: agent
       agent_id: sub-synthesiser
-      output_key: final_report
 
 sub_agents:
   - id: sub-intake-analyst
     name: IntakeAnalystAgent
     description: Processes the user's topic and produces a structured brief with key facts, context, and evaluation criteria.
     icon: target
+    output_key: topic_brief
     system_prompt: |
       ## Role: Intake Analyst
 
@@ -64,6 +60,7 @@ sub_agents:
     name: TechnicalAnalystAgent
     description: Evaluates the technical feasibility, architecture, implementation complexity, and technology choices.
     icon: code
+    output_key: technical_assessment
     system_prompt: |
       ## Role: Technical Analyst
 
@@ -84,6 +81,7 @@ sub_agents:
     name: BusinessAnalystAgent
     description: Evaluates market fit, revenue potential, competitive landscape, and business viability.
     icon: trending-up
+    output_key: business_assessment
     system_prompt: |
       ## Role: Business Analyst
 
@@ -104,6 +102,7 @@ sub_agents:
     name: RiskAnalystAgent
     description: Evaluates security, compliance, operational, financial, and reputational risks.
     icon: shield-alert
+    output_key: risk_assessment
     system_prompt: |
       ## Role: Risk Analyst
 
@@ -124,6 +123,7 @@ sub_agents:
     name: SynthesiserAgent
     description: Combines all three analyst perspectives into a unified final report with an overall recommendation.
     icon: clipboard-list
+    output_key: final_report
     system_prompt: |
       ## Role: Chief Synthesiser
 

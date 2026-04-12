@@ -16,18 +16,17 @@ workflow:
     - id: n1
       type: agent
       agent_id: sub-extractor
-      output_key: structured_data
       output_schema: '{"type":"object","required":["title","summary","tags","entities"],"properties":{"title":{"type":"string","description":"Main topic title"},"summary":{"type":"string","description":"2-3 sentence summary"},"tags":{"type":"array","items":{"type":"string"},"description":"3-5 relevant tags"},"entities":{"type":"array","items":{"type":"object","required":["name","type"],"properties":{"name":{"type":"string"},"type":{"type":"string","description":"person|organization|location|technology|event"}}},"description":"Key entities mentioned"}}}'
     - id: n2
       type: agent
       agent_id: sub-formatter
-      output_key: formatted_report
 
 sub_agents:
   - id: sub-extractor
     name: DataExtractorAgent
     description: Extracts structured data from the input text and returns JSON matching the output_schema.
     icon: database
+    output_key: structured_data
     system_prompt: |
       ## Role: Data Extractor
 
@@ -48,6 +47,7 @@ sub_agents:
     name: ReportFormatterAgent
     description: Takes the structured JSON data and produces a polished human-readable report.
     icon: file-text
+    output_key: formatted_report
     system_prompt: |
       ## Role: Report Formatter
 

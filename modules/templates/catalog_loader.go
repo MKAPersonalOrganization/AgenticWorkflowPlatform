@@ -51,6 +51,7 @@ type yamlSubAgent struct {
 	Description  string `yaml:"description"`
 	Icon         string `yaml:"icon"` // named icon or raw SVG
 	SystemPrompt string `yaml:"system_prompt"`
+	OutputKey    string `yaml:"output_key,omitempty"`
 }
 
 // loadYAMLCatalog reads every *.yaml file from the embedded catalog/ directory
@@ -131,6 +132,7 @@ func (s *yamlCatalogSpec) toEntry() (agentdefinition.AgentCatalogEntry, error) {
 				Description:  sa.Description,
 				SystemPrompt: sa.SystemPrompt,
 				Icon:         resolveIcon(sa.Icon),
+				OutputKey:    sa.OutputKey,
 			}
 		}
 		subsJSON, err := json.Marshal(subs)
