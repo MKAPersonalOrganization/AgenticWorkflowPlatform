@@ -6,6 +6,7 @@ import (
 	"aicompass/shared"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 )
@@ -182,11 +183,29 @@ func (h *catalogHandler) addToMyAgents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Use custom name if provided, otherwise fall back to template name
+	// Use custom name if provided and different from the template name.
+	// If the user already has an agent with this template name, append a counter
+	// so repeated forks are distinguishable (e.g. "Sequential Workflow (2)").
 	agentName := entry.Name
-	if req.Name != "" {
+	// The fork dialog pre-fills with the template name; only treat it as custom
+	// if the user actually changed it.
+	hasCustomName := req.Name != "" && req.Name != entry.Name
+	if hasCustomName {
 		agentName = req.Name
+	} else {
+		existing, _ := h.agentRepo.ListByUser(r.Context(), user.ID)
+		count := 0
+		for i := range existing {
+			if existing[i].Name == agentName ||
+				(len(existing[i].Name) > len(agentName) && existing[i].Name[:len(agentName)] == agentName) {
+				count++
+			}
+		}
+		if count > 0 {
+			agentName = fmt.Sprintf("%s (%d)", agentName, count+1)
+		}
 	}
+	h.log.Info(r.Context(), "resolved agent name", "name", agentName, "custom", hasCustomName)
 
 	// ── Composed catalog entry: create sub-agents + composed agent ──
 	if entry.IsWorkflow() {
