@@ -13,7 +13,6 @@ ADR 012 completed the first wave of module extractions (Phase 1) and the shared 
 | `billing` | ✅ Extracted |
 | `aisettings` | ✅ Extracted |
 | `resources` | ✅ Extracted |
-| `agentstore` | ✅ Extracted |
 | `mcp` | ✅ Extracted |
 | `knowledge` | ✅ Extracted |
 
@@ -75,7 +74,6 @@ As modules are extracted, their domain types move from `domain/` into the module
 |------|-----------------|---------------|
 | `UserPreference`, `UserPreferenceRepository` | `domain/user_preference.go` | `modules/preferences/` |
 | `StudentProfile`, `StudentProfileRepository` | `domain/student_profile.go` | `modules/identity/` |
-| `AgentDefinition`, `AgentCatalogEntry` | `domain/agent_*.go` | `modules/agentstore/` (already done) |
 | `MCPConnector` | `domain/mcp_connector.go` | `modules/mcp/` (already done) |
 | `AISettings` | `domain/ai_settings.go` | `modules/aisettings/` (already done) |
 

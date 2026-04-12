@@ -48,19 +48,15 @@ modules/
   identity/                  # Auth + profile bounded context
     module.go
     ...
-  
-  agentstore/                # Agent definitions + catalog
-    module.go
-    ...
-  
+
   mcp/                       # MCP connector management
     module.go
     ...
-  
+
   aisettings/                # Per-user AI configuration
     module.go
     ...
-  
+
   resources/                 # User-uploaded resources
     module.go
     ...
@@ -80,9 +76,8 @@ Order based on dependency analysis — fewest inbound dependencies first:
 | 1 | **billing** | `handlers/billing/`, `services/billing/`, `infra/projection/payment/` | None |
 | 2 | **aisettings** | `handlers/aisettings/`, `services/aisettings/` | None (but knowledge depends on it — extract before knowledge) |
 | 3 | **resources** | `handlers/resources/`, `services/resources/` | None |
-| 4 | **agentstore** | `handlers/agentstore/`, `handlers/agentcatalog/`, `services/agentstore/` | `services.AuthService` interface (trivially abstractable) |
-| 5 | **mcp** | `handlers/mcp/`, `services/plugindiscovery/` | `toolregistry` (shared infra — use interface) |
-| 6 | **knowledge** | `handlers/knowledge/`, `services/edgequake/`, `services/rag/` | `aisettings` (replace with interface) |
+| 4 | **mcp** | `handlers/mcp/`, `services/plugindiscovery/` | `toolregistry` (shared infra — use interface) |
+| 5 | **knowledge** | `handlers/knowledge/`, `services/edgequake/`, `services/rag/` | `aisettings` (replace with interface) |
 
 #### Phase 2: Extract core domain events ✅
 Remove the `sealed()` constraint on `domain.Event` and allow modules to define their own events. Introduce a shared `eventsourcing` package in `foundation/` with the generic `Event` interface, `BaseAggregate`, `Repository[T]`, and `EventStore`. Each module defines its events locally.

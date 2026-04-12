@@ -35,10 +35,9 @@ This ADR is a post-mortem. Its goal is to catalogue every unnecessary complicati
 **Accidental complexity cost:**
 - `modules/aisettings/` imported `domain/` for 57 symbols across 3 files — every type it used was its own private domain.
 - `modules/mcp/` imported `domain/` for connector types used by no other module.
-- `modules/agentstore/` imported `domain/` for catalog types used by no other module.
 - Each module appeared tightly coupled to a shared package when in reality the types were private.
 
-**Fix applied (ADR 015 WS2):** Moved `agent_catalog.go` → `modules/agentstore/`, `ai_settings.go` → `modules/aisettings/`, `mcp_connector.go` → `modules/mcp/`. Each module now owns its types — zero `domain/` import for private types.
+**Fix applied (ADR 015 WS2):** Moved `ai_settings.go` → `modules/aisettings/`, `mcp_connector.go` → `modules/mcp/`. Each module now owns its types — zero `domain/` import for private types.
 
 **Remaining debt:** Re-analysed in ADR 016 — both `AgentDefinition` (29 references, 5+ packages) and `StudentProfile` (16 references, 3+ packages across 2+ layers) meet the shared-kernel admission threshold. They stay in `domain/` by design. Comments updated in `domain/student_profile.go` and `modules/identity/types.go` to document this decision.
 
@@ -98,7 +97,7 @@ A package in `foundation/` importing 3 modules, 5 services, and 1 plugin is a **
 **Root cause:** The runner adapter was written as a single concrete class that orchestrates LLM calls, tool execution, thread management, MCP proxy calls, and permission checks. Instead of depending on abstractions (interfaces), it reaches directly into modules for their concrete types. This made it easy to write but turned it into a coupling bottleneck.
 
 **Accidental complexity cost:**
-- `AgentDefinition` cannot move out of `domain/` because `foundation/agentsdk/` consumes it. The type is semantically owned by `agentstore`, but physically trapped by the SDK import.
+- `AgentDefinition` cannot move out of `domain/` because `foundation/agentsdk/` consumes it. The type is semantically a domain concept, but physically trapped by the SDK import.
 - Any change to `modules/mcp`, `modules/knowledge/edgequake`, or `modules/chat/threadmgmt` can break `foundation/agentsdk/` — the foundation layer is fragile.
 - The runner cannot be tested in isolation; it needs the entire module graph.
 - This single file is the primary reason the dependency graph has a cycle between `foundation/` and `modules/`.

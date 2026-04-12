@@ -6,7 +6,7 @@ Accepted (Revised)
 
 ## Context
 
-Users can create and configure individual agents (ADR 012, `agentstore` module). Each agent has a name, system prompt, and associated tools/knowledge bases. However, agents are **flat** — a user selects a single agent per conversation and that agent handles everything alone.
+Users can create and configure individual agents. Each agent has a name, system prompt, and associated tools/knowledge bases. However, agents are **flat** — a user selects a single agent per conversation and that agent handles everything alone.
 
 Real-world tasks often benefit from **multi-agent workflows**: a pipeline where several specialists collaborate. Examples:
 

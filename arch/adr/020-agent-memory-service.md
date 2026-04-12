@@ -177,10 +177,8 @@ memories are naturally isolated per user.
 | `infra/sqldb/migrate/sql/migrate.sql` | v1.70: `memory_enabled` column. v1.71: `memory_entries` table + indexes |
 | `adapters/adkgo/runner.go` | `MemoryService` required field, tool injection, post-run persistence, error logging |
 | `adapters/adkgo/workflow.go` | `preloadmemorytool` injection for workflow leaf agents |
-| `modules/agentstore/types.go` | `MemoryEnabled` field on `AgentDefinition` |
-| `modules/agentstore/agent_definition_repo.go` | SELECT/INSERT/UPDATE queries |
-| `modules/agentstore/store_handler.go` | Request/response types + handlers |
-| `modules/agentstore/service.go` | Fork handler copies flag |
+| Agent definition types + repo | `MemoryEnabled` field on `AgentDefinition`, SELECT/INSERT/UPDATE queries |
+| Agent handlers + service | Request/response types + handlers, fork handler copies flag |
 | `foundation/agent/config.go` | `MemoryEnabled` on `Config` |
 | `adapters.go` | `agentFromDefinition()` maps flag |
 | `components/agenteditor/agenteditor.templ` | Toggle switch UI |

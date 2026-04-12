@@ -13,7 +13,6 @@ ADRs 012 and 013 completed Phases 1–4 of the modular monolith migration. Eleve
 | `billing` | ✅ Extracted |
 | `aisettings` | ✅ Extracted |
 | `resources` | ✅ Extracted |
-| `agentstore` | ✅ Extracted |
 | `mcp` | ✅ Extracted |
 | `knowledge` | ✅ Extracted |
 | `preferences` | ✅ Extracted |
@@ -233,7 +232,7 @@ All constraints from ADRs 012–013 remain in effect, plus:
 ### Achieved
 
 - **`main.go` shrank from 915 → ~850 lines** — all chat construction and route registration lives in `modules/chat/`.
-- **12 modules under `modules/`** — `agentstore`, `aisettings`, `analytics`, `banner`, `billing`, `chat`, `identity`, `knowledge`, `mcp`, `permissions`, `preferences`, `resources`.
+- **11 modules under `modules/`** — `aisettings`, `analytics`, `banner`, `billing`, `chat`, `identity`, `knowledge`, `mcp`, `permissions`, `preferences`, `resources`.
 - **`handlers/` contains only 2 shared packages** — `auth/` (middleware) and `health/` (infrastructure).
 - **`services/` contains only 6 shared packages** — `artifact/`, `interfaces.go`, `memory/`, `permissions/`, `toolregistry/`, `workspacepermissions/` — all genuinely cross-cutting.
 - **`infra/projection/` contains only `subscriber/`** — the projection polling engine, a true infrastructure concern.
@@ -250,7 +249,6 @@ All constraints from ADRs 012–013 remain in effect, plus:
 
 ```
 modules/
-  agentstore/       — Agent definitions & catalog (DB)
   aisettings/       — Per-user AI model configuration (DB)
   analytics/        — Dashboard + statistics projection (DB)
     statistics/     — PostgreSQL projection (moved from infra/)

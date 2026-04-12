@@ -17,8 +17,6 @@ ADRs 012–014 completed the modular monolith migration through five phases. Twe
 | `user.go` | `User`, `GetUserFromContext`, `IsAuthenticated` | **Alias** → `shared/` | Zero external consumers |
 | `aggregate.go` | `EventEnvelope`, `Aggregate`, `BaseAggregate`, `StreamName` | **Alias** → `foundation/eventsourcing` | Zero external consumers |
 | `repository.go` | `EventStore`, `Repository[T]`, `NewRepository` | **Alias** → `foundation/eventsourcing` | Zero external consumers |
-| `agent_catalog.go` | `AgentCatalogEntry`, `AgentCatalogRepository` | **Real code** | Only `modules/agentstore/` |
-| `agent_definition.go` | `AgentDefinition`, `InitialAgentTemplate`, `AgentDefinitionRepository` | **Real code** | Only `modules/agentstore/` + `foundation/agentsdk/` (via interface) |
 | `ai_settings.go` | `AIProvider`, `AISettings`, `AICapability`, repos, helpers (265 lines) | **Real code** | Only `modules/aisettings/` |
 | `mcp_connector.go` | `ConnectorStatus`, `MCPConnector`, `MCPDiscoveredTool`, `MCPConnectorRepository` | **Real code** | Only `modules/mcp/` |
 | `student_profile.go` | `StudentProfile`, `StudentProfileRepository` | **Real code** | `modules/identity/`, `modules/chat/`, `foundation/agentsdk/`, `components/profile/` |
@@ -30,7 +28,7 @@ ADRs 012–014 completed the modular monolith migration through five phases. Twe
 | `thread_aggregate.go` | `ThreadAggregate` + decider | **Real code** (chat kernel) | `modules/chat/`, `foundation/agentsdk/` |
 | `thread_repository.go` | `ThreadRepository` | **Real code** (chat kernel) | `modules/chat/` |
 
-**Summary:** 5 alias files with zero consumers (dead weight), 5 real-code files consumed by only one module (violating locality), 1 dead interface (`rag.go`), and 5 shared-kernel files that legitimately stay.
+**Summary:** 5 alias files with zero consumers (dead weight), 3 real-code files consumed by only one module (violating locality), 1 dead interface (`rag.go`), and 5 shared-kernel files that legitimately stay.
 
 ### Current state of `infra/sqldb/` (non-migration files)
 
@@ -91,8 +89,6 @@ Each of these type files is consumed by exactly one module. Moving the canonical
 
 | Type(s) | Current location | Target module | Migration steps |
 |---------|-----------------|---------------|-----------------|
-| `AgentCatalogEntry`, `AgentCatalogRepository` | `domain/agent_catalog.go` | `modules/agentstore/types.go` | 1. Move types into module. 2. Update internal refs. 3. Delete `domain/agent_catalog.go`. |
-| `AgentDefinition`, `InitialAgentTemplate`, `AgentDefinitionRepository` | `domain/agent_definition.go` | `modules/agentstore/types.go` | 1. Move types. 2. `foundation/agentsdk/` imports the interface — extract a minimal `agentstore.AgentDefinition` type or use a module-defined interface in the SDK. 3. Delete original. |
 | `AIProvider`, `AISettings`, `AICapability`, `AICapabilityConfig`, repos, helpers | `domain/ai_settings.go` | `modules/aisettings/types.go` | 1. Move all 265 lines. 2. Update internal refs. 3. If `foundation/agentsdk/` references `AISettings`, use an interface or import from module. 4. Delete original. |
 | `ConnectorStatus`, `MCPConnector`, `MCPDiscoveredTool`, `MCPConnectorRepository` | `domain/mcp_connector.go` | `modules/mcp/types.go` | 1. Move types. 2. Update internal refs. 3. Delete original. |
 | `StudentProfile`, `StudentProfileRepository` | `domain/student_profile.go` | `modules/identity/types.go` | **Blocked** by `components/profile/` importing `domain.StudentProfile`. Unblock by having `components/profile/` accept a generic template struct or import from `modules/identity/`. Then move type and delete alias in `modules/identity/types.go`. |
@@ -199,8 +195,7 @@ All constraints from ADRs 012–014 remain in effect, plus:
 ### Final Target Architecture
 
 ```
-modules/                        ← 12 bounded-context modules
-  agentstore/                   ← owns AgentDefinition, AgentCatalogEntry types
+modules/                        ← 11 bounded-context modules
   aisettings/                   ← owns AISettings, AIProvider, AICapability types
   analytics/
     statistics/

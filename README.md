@@ -107,7 +107,7 @@ graph TB
             KnowledgeH["<b>Knowledge Handlers</b><br/>KB UI + API: documents,<br/>workspaces, graph, pipeline"]
             MCPH["<b>MCP Handlers</b><br/>Connector CRUD, OAuth,<br/>connect/disconnect, tool proxy"]
             BillingH["<b>Billing Handlers</b><br/>Stripe intents, status,<br/>webhooks"]
-            OtherH["<b>Other Handlers</b><br/>Agent store, catalog, AI settings,<br/>resources, profile, preferences,<br/>statistics, ratings, co-writer"]
+            OtherH["<b>Other Handlers</b><br/>AI settings, catalog, resources,<br/>profile, preferences,<br/>statistics, ratings, co-writer"]
         end
 
         subgraph Services["Service Layer"]
@@ -120,7 +120,7 @@ graph TB
             EdgequakeS["<b>EdgeQuake Service</b><br/>REST facade to RAG API"]
             ArtifactS["<b>Artifact Service</b><br/>S3/MinIO storage"]
             MemoryS["<b>Memory Service</b><br/>Long-term memory (S3)"]
-            OtherS["<b>Other Services</b><br/>Agent store, AI settings,<br/>permissions, resources,<br/>student profile, title gen"]
+            OtherS["<b>Other Services</b><br/>AI settings, permissions,<br/>resources, student profile, title gen"]
         end
 
         subgraph Plugins["Plugin Layer (9 plugins)"]

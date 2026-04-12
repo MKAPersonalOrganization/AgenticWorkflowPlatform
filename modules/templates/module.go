@@ -19,7 +19,7 @@ import (
 //   - YAML-based catalog seeding from embedded files
 //
 // Catalog entries are shared, read-only templates available to all users.
-// When a user adds a template, it creates a copy in their personal agent store
+// When a user adds a template, it creates a copy in their personal agent collection
 // via the agentdefinition module.
 type Module struct {
 	log            *logger.Logger

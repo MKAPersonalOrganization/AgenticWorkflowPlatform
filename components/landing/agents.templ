@@ -2,7 +2,7 @@ package landing
 
 import "aicompass/components/icon"
 
-// ─── Agent Store ─────────────────────────────────────────────────────────────
+// ─── Agent Templates ─────────────────────────────────────────────────────────
 templ agentStoreSection() {
 	<section id="agents" class="border-t border-border bg-muted/20 py-24">
 		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -11,18 +11,18 @@ templ agentStoreSection() {
 				<div>
 					<div class="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-1.5 text-sm text-muted-foreground">
 						@icon.Bot(icon.Props{Class: "size-4 text-purple-500"})
-						<span>Agent Store</span>
+						<span>Agent Templates</span>
 					</div>
 					<h2 class="text-3xl font-bold tracking-tight sm:text-4xl">
 						Discover and create
 						<span class="text-primary">AI agents</span>
 					</h2>
 					<p class="mt-4 text-lg text-muted-foreground">
-						Browse our curated catalog of specialized agents, or build your own from scratch. Each agent can have its own tools, knowledge base access, personality, and the ability to delegate to sub-agents — then orchestrate them into workflow pipelines.
+						Start from pre-built templates designed around proven agentic patterns — or build your own from scratch. Each agent can have its own tools, knowledge base access, personality, and the ability to delegate to sub-agents — then orchestrate them into workflow pipelines.
 					</p>
 					<ul class="mt-8 space-y-4">
-						@checkListItem("Browse a growing catalog of specialized agent templates by category")
-						@checkListItem("Fork and customize any catalog agent to make it yours")
+						@checkListItem("Start from templates: sequential, parallel, loop, conditional, and coordinator patterns")
+						@checkListItem("Fork and customize any template to make it yours")
 						@checkListItem("Configure system prompts, transfer policies, and output schemas per agent")
 						@checkListItem("Assign specific tool sets and knowledge workspaces per agent")
 						@checkListItem("Orchestrate agents into sequential, parallel, loop, or conditional workflows with a visual builder")
@@ -30,14 +30,14 @@ templ agentStoreSection() {
 						@checkListItem("Global AI settings — model, temperature, max tokens, and iteration limits shared across all agents")
 					</ul>
 				</div>
-				<!-- Visual card grid -->
+				<!-- Visual card grid — agentic patterns -->
 				<div class="grid grid-cols-2 gap-4">
-					@agentPreviewCard("📊", "Data Analyst", "Expert in data processing and analytics", "text-blue-500")
-					@agentPreviewCard("🔬", "Research Guide", "Deep analysis and literature review", "text-green-500")
-					@agentPreviewCard("✍️", "Technical Writer", "Draft, edit, and refine documentation and content", "text-purple-500")
-					@agentPreviewCard("💻", "Code Assistant", "Debug, explain, and write code together", "text-orange-500")
-					@agentPreviewCard("🌍", "Strategy Consultant", "Business analysis and strategic planning", "text-amber-500")
-					@agentPreviewCard("🎨", "Creative Studio", "Art, design, and creative thinking", "text-pink-500")
+					@agentPreviewCard("⛓️", "Sequential", "Chain agents in a step-by-step pipeline where each reads the prior output", "text-blue-500")
+					@agentPreviewCard("⚡", "Parallel", "Fan-out to multiple agents running concurrently, then merge results", "text-emerald-500")
+					@agentPreviewCard("🔄", "Loop", "Iterative generate → evaluate → refine cycles with early exit", "text-rose-500")
+					@agentPreviewCard("🔀", "Conditional", "Classify input then route to the right specialist branch", "text-red-500")
+					@agentPreviewCard("🎯", "Coordinator", "LLM-driven dynamic delegation to specialist sub-agents", "text-indigo-500")
+					@agentPreviewCard("🧩", "Nested", "Compose patterns inside patterns — sequential within parallel within loop", "text-amber-500")
 				</div>
 			</div>
 		</div>

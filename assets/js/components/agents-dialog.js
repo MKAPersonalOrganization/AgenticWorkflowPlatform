@@ -52,7 +52,7 @@ export const agentsManager = () => ({
     // Delete state
     deletingAgent: null,
 
-    // ── Agent Store state ──
+    // ── Agent Templates state ──
     storeEntries: [],
     storeCategories: [],
     storeSearchQuery: '',
@@ -440,7 +440,7 @@ export const agentsManager = () => ({
     },
 
     // ============================================
-    // Agent Store (shared catalog)
+    // Agent Templates (shared catalog)
     // ============================================
 
     switchTab(tab) {

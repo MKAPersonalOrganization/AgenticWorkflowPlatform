@@ -422,7 +422,7 @@ func parseAgentSchema(jsonStr string) *agent.Schema {
 	return &s
 }
 
-// toAgentModelConfig converts the agentstore model config to the foundation type.
+// toAgentModelConfig converts the agent definition model config to the foundation type.
 // Returns nil when no per-agent config is set (falls back to user global settings).
 func toAgentModelConfig(src *agentdefinition.AgentModelConfig) *agent.AgentModelConfig {
 	if src == nil {
@@ -438,7 +438,7 @@ func toAgentModelConfig(src *agentdefinition.AgentModelConfig) *agent.AgentModel
 	return dst
 }
 
-// toAgentModelOverride converts the agentstore model override to the foundation type.
+// toAgentModelOverride converts the agent definition model override to the foundation type.
 // Returns nil when no override is set (falls back to user global provider/model).
 func toAgentModelOverride(src *agentdefinition.AgentModelOverride) *agent.AgentModelOverride {
 	if src == nil {

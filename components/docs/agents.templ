@@ -91,16 +91,16 @@ templ docsAISettings() {
 	}
 }
 
-// ─── Agent Store ─────────────────────────────────────────────────────────────
+// ─── Agent Templates ─────────────────────────────────────────────────────────
 templ docsAgentStore() {
-	@docsSection("agent-store", "Agent Store", iconStore, "text-purple-500") {
+	@docsSection("agent-store", "Agent Templates", iconStore, "text-purple-500") {
 		<p>
-			The Agent Store is a curated catalog of pre-built AI agents designed for specific tasks.
+			Agent Templates is a curated catalog of pre-built AI agents designed for specific tasks.
 			Each agent comes with a carefully crafted system prompt and tool configuration.
 		</p>
 		<h3>Browsing the Catalog</h3>
 		<p>
-			Open the Agent Store from the sidebar navigation. Agents are organized by category and can be searched
+			Open the Agent Templates from the sidebar navigation. Agents are organized by category and can be searched
 			by name, description, or tags. Featured agents appear at the top of the catalog.
 		</p>
 		<h3>Agent Categories</h3>
@@ -149,7 +149,7 @@ templ docsCustomAgents() {
 		</p>
 		<h3>Creating a Custom Agent</h3>
 		<ol class="list-decimal list-inside space-y-2 my-4">
-			<li>Open the Agent Store from the sidebar</li>
+			<li>Open the Agent Templates from the sidebar</li>
 			<li>Click <strong>"Create Agent"</strong> at the top</li>
 			<li>Fill in the agent's name, description, and icon</li>
 			<li>Write a detailed system prompt that defines the agent's role and instructions</li>
@@ -298,7 +298,7 @@ templ docsMultiAgentOrchestration() {
 			</thead>
 			<tbody>
 				@docsTableRow2("foundation/agent", "Framework-agnostic Config struct: name, system prompt, tools, transfer policy, output key, include contents, global instruction, I/O schemas")
-				@docsTableRow2("modules/agentstore", "Unified AgentDefinition with CompositionNode graph stored as JSONB. Supports per-node overrides of transfer policy and context control.")
+				@docsTableRow2("modules/agentdefinition", "Unified AgentDefinition with CompositionNode graph stored as JSONB. Supports per-node overrides of transfer policy and context control.")
 				@docsTableRow2("adapters/adkgo", "Bridges foundation types to the agent execution engine. Resolves precedence: node override > agent definition > default.")
 				@docsTableRow2("adapters.go", "Composition root. Converts DB models to foundation types and wires everything together.")
 			</tbody>
