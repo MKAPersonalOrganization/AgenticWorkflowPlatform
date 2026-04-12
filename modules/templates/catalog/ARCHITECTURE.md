@@ -504,3 +504,20 @@ flowchart LR
 |---|---|
 | `allow_early_exit: false` | Loop always runs exactly `max_iterations` times |
 | `allow_early_exit: true` | Last agent in the loop body receives the `exit_loop` tool; calling it stops the loop before `max_iterations` is reached |
+
+---
+
+## Terminology
+
+### `llm_agents` (YAML field)
+
+The `llm_agents` field in catalog YAML files defines **LLM-powered agent blueprints** used as workflow steps. Each entry is a full agent definition (id, name, description, icon, system_prompt, output_key) that gets instantiated as an `LlmAgent` when a user forks a workflow template. The `workflow.children[].agent_id` values reference the `id` fields in `llm_agents`.
+
+**Why not `sub_agents`?** The term `sub_agents` is used in the runtime layer for agent-to-agent delegation (a coordinator agent routing between child agents). The YAML `llm_agents` are **templates/blueprints** (data), not runtime delegation targets. Using different names prevents conceptual confusion between catalog templates and the live delegation pattern.
+
+| Layer | Field Name | What it is |
+|---|---|---|
+| **YAML catalog template** | `llm_agents` | Agent blueprints — full definitions (name, prompt, description) for workflow steps |
+| **Go code (catalog)** | `LLMAgentsJSON` | JSON-serialized agent blueprint array, stored in DB column `sub_agents` |
+| **Coordinator pattern** | `SubAgents []*SubAgentRef` | UUID references to child agents for runtime delegation (non-workflow) |
+| **Runtime delegation** | `SubAgents []Agent` | Live child agent instances on an agent's config struct |
