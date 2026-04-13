@@ -19,6 +19,8 @@ export const evaluationDialog = () => ({
     rubrics: [],
     agents: [],
     profiles: [],
+    aggregatedScores: {},     // Aggregated scores by metric
+    pollingInterval: null,
 
     // Forms
     launchForm: {
@@ -40,6 +42,7 @@ export const evaluationDialog = () => ({
         this.view = 'runs';
         this.showLaunchForm = false;
         this.showRubricForm = false;
+        this.stopSSE();
         await this.loadRuns();
     },
 
@@ -149,11 +152,95 @@ export const evaluationDialog = () => ({
             const resp = await fetch(`/api/evaluation/runs/${run.id}/results`, { credentials: 'same-origin' });
             if (resp.ok) {
                 this.results = await resp.json();
+                this.aggregateScores();
                 this.view = 'results';
+                
+                // If run is still running, start SSE stream
+                if (run.status === 'running') {
+                    this.startSSE(run.id);
+                }
             }
         } catch (err) {
             this.showToast('Failed to load results', 'error');
             console.error('Failed to load results:', err);
+        }
+    },
+
+    aggregateScores() {
+        this.aggregatedScores = {};
+        for (const r of this.results) {
+            const metric = r.metric_id;
+            if (!this.aggregatedScores[metric]) {
+                this.aggregatedScores[metric] = { scores: [], count: 0 };
+            }
+            if (r.score != null) {
+                this.aggregatedScores[metric].scores.push(r.score);
+            }
+            this.aggregatedScores[metric].count++;
+        }
+        // Calculate averages
+        for (const metric in this.aggregatedScores) {
+            const data = this.aggregatedScores[metric];
+            if (data.scores.length > 0) {
+                const sum = data.scores.reduce((a, b) => a + b, 0);
+                data.avg = (sum / data.scores.length).toFixed(2);
+                data.min = Math.min(...data.scores);
+                data.max = Math.max(...data.scores);
+            }
+        }
+    },
+
+    sseSource: null,
+
+    startSSE(runId) {
+        this.stopSSE();
+        
+        this.sseSource = new EventSource(`/api/evaluation/runs/${runId}/stream`, { withCredentials: true });
+        
+        this.sseSource.addEventListener('message', (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'status' || data.type === 'progress') {
+                    if (data.status !== 'running') {
+                        this.stopSSE();
+                        this.loadRuns().then(() => {
+                            if (data.status === 'completed') {
+                                this.viewResults(data.run);
+                            }
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error('SSE parse error:', err);
+            }
+        });
+
+        this.sseSource.onerror = (err) => {
+            console.error('SSE error:', err);
+            this.stopSSE();
+        };
+    },
+
+    stopSSE() {
+        if (this.sseSource) {
+            this.sseSource.close();
+            this.sseSource = null;
+        }
+    },
+
+    async cancelRun(run) {
+        if (!confirm(`Cancel this evaluation run?`)) return;
+        try {
+            const resp = await fetch(`/api/evaluation/runs/${run.id}/cancel`, {
+                method: 'POST',
+                credentials: 'same-origin',
+            });
+            if (resp.ok || resp.status === 204) {
+                await this.loadRuns();
+                this.showToast('Evaluation cancelled', 'success');
+            }
+        } catch (err) {
+            this.showToast('Failed to cancel run', 'error');
         }
     },
 

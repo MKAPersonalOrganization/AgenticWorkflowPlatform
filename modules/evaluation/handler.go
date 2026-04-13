@@ -1,6 +1,7 @@
 package evaluation
 
 import (
+	"aicompass/modules/chat/taskmgmt"
 	"aicompass/shared"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"mime"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -705,6 +707,87 @@ func (h *handler) cancelEvalRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// streamEvalRun handles GET /api/evaluation/runs/{id}/stream.
+// Streams evaluation run status changes via SSE.
+func (h *handler) streamEvalRun(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	// Verify ownership
+	run, err := h.svc.getEvalRun(r.Context(), id, user.ID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "evaluation run not found")
+		return
+	}
+
+	// Set SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	// Enable full duplex for HTTP/1.1
+	if f, ok := w.(interface{ EnableFullDuplex() error }); ok {
+		_ = f.EnableFullDuplex()
+	}
+	flusher.Flush()
+
+	// Send current status
+	_ = taskmgmt.WriteSSEEvent(w, map[string]any{
+		"type":   "status",
+		"status": run.Status,
+		"run":    run,
+	}, "")
+	flusher.Flush()
+
+	// If already completed, we're done
+	if run.Status != "running" {
+		return
+	}
+
+	// Poll for updates until completion or error
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-ticker.C:
+			run, err := h.svc.getEvalRun(r.Context(), id, user.ID)
+			if err != nil || run.Status != "running" {
+				_ = taskmgmt.WriteSSEEvent(w, map[string]any{
+					"type":   "status",
+					"status": run.Status,
+					"run":    run,
+				}, "")
+				flusher.Flush()
+				return
+			}
+			_ = taskmgmt.WriteSSEEvent(w, map[string]any{
+				"type":   "progress",
+				"status": run.Status,
+			}, "")
+			flusher.Flush()
+		}
+	}
 }
 
 // deleteEvalRun handles DELETE /api/evaluation/runs/{id}.
