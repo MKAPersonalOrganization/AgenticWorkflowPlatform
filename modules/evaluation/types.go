@@ -177,3 +177,38 @@ type EvalResult struct {
 	Invocation int             `json:"invocation" db:"invocation"`
 	CreatedAt  time.Time       `json:"created_at" db:"created_at"`
 }
+
+// ─── Rubric types ────────────────────────────────────────────────────────────
+
+// RubricLevel defines a single score level in a rubric.
+type RubricLevel struct {
+	Score       float64 `json:"score"`
+	Description string  `json:"description"`
+}
+
+// Rubric is a named scoring guide with levels.
+type Rubric struct {
+	ID          uuid.UUID       `json:"id" db:"id"`
+	UserID      string          `json:"user_id" db:"user_id"`
+	Name        string          `json:"name" db:"name"`
+	Description *string         `json:"description,omitempty" db:"description"`
+	Levels      []RubricLevel   `json:"levels" db:"-"`
+	LevelsJSON  json.RawMessage `json:"-" db:"levels"`
+	CreatedAt   time.Time       `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at" db:"updated_at"`
+}
+
+// RubricCreate holds fields for creating a new rubric.
+type RubricCreate struct {
+	UserID      string
+	Name        string
+	Description *string
+	Levels      []RubricLevel
+}
+
+// RubricUpdate holds mutable fields for a rubric.
+type RubricUpdate struct {
+	Name        *string
+	Description *string
+	Levels      []RubricLevel
+}

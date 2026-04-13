@@ -791,3 +791,132 @@ func (s *service) getEvalResults(ctx context.Context, runID uuid.UUID, userID st
 	}
 	return s.repo.ListResultsByRun(ctx, runID)
 }
+
+// ─── Rubrics ─────────────────────────────────────────────────────────────────
+
+func (s *service) createRubric(ctx context.Context, userID string, req RubricCreate) (Rubric, error) {
+	if err := validateRubricName(req.Name); err != nil {
+		return Rubric{}, fmt.Errorf("%w: %w", ErrValidation, err)
+	}
+	if err := validateRubricLevels(req.Levels); err != nil {
+		return Rubric{}, fmt.Errorf("%w: %w", ErrValidation, err)
+	}
+
+	// Check name uniqueness
+	rubrics, err := s.repo.ListRubrics(ctx, userID)
+	if err != nil {
+		return Rubric{}, fmt.Errorf("checking name uniqueness: %w", err)
+	}
+	for _, r := range rubrics {
+		if strings.EqualFold(r.Name, req.Name) {
+			return Rubric{}, fmt.Errorf("%w: a rubric named %q already exists", ErrDuplicateName, req.Name)
+		}
+	}
+
+	rubric := Rubric{
+		ID:          uuid.New(),
+		UserID:      userID,
+		Name:        strings.TrimSpace(req.Name),
+		Description: req.Description,
+		Levels:      req.Levels,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	if err := s.repo.CreateRubric(ctx, rubric); err != nil {
+		return Rubric{}, fmt.Errorf("creating rubric: %w", err)
+	}
+	return rubric, nil
+}
+
+func (s *service) getRubric(ctx context.Context, id uuid.UUID, userID string) (Rubric, error) {
+	r, err := s.repo.GetRubric(ctx, id)
+	if err != nil {
+		if err.Error() == "rubric not found" {
+			return Rubric{}, ErrNotFound
+		}
+		return Rubric{}, fmt.Errorf("getting rubric: %w", err)
+	}
+	if r.UserID != userID {
+		return Rubric{}, ErrUnauthorized
+	}
+	return r, nil
+}
+
+func (s *service) listRubrics(ctx context.Context, userID string) ([]Rubric, error) {
+	return s.repo.ListRubrics(ctx, userID)
+}
+
+func (s *service) updateRubric(ctx context.Context, id uuid.UUID, userID string, req RubricUpdate) error {
+	if req.Name != nil {
+		if err := validateRubricName(*req.Name); err != nil {
+			return fmt.Errorf("%w: %w", ErrValidation, err)
+		}
+	}
+	if req.Levels != nil {
+		if err := validateRubricLevels(req.Levels); err != nil {
+			return fmt.Errorf("%w: %w", ErrValidation, err)
+		}
+	}
+
+	// Verify ownership
+	r, err := s.repo.GetRubric(ctx, id)
+	if err != nil {
+		if err.Error() == "rubric not found" {
+			return ErrNotFound
+		}
+		return fmt.Errorf("getting rubric: %w", err)
+	}
+	if r.UserID != userID {
+		return ErrUnauthorized
+	}
+
+	if err := s.repo.UpdateRubric(ctx, id, req); err != nil {
+		return fmt.Errorf("updating rubric: %w", err)
+	}
+	return nil
+}
+
+func (s *service) deleteRubric(ctx context.Context, id uuid.UUID, userID string) error {
+	if err := s.repo.DeleteRubric(ctx, id, userID); err != nil {
+		if err.Error() == "rubric not found or unauthorized" {
+			return ErrNotFound
+		}
+		return fmt.Errorf("deleting rubric: %w", err)
+	}
+	return nil
+}
+
+func validateRubricName(name string) error {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return fmt.Errorf("name is required")
+	}
+	if len(trimmed) > 255 {
+		return fmt.Errorf("name must be at most 255 characters")
+	}
+	for _, r := range trimmed {
+		if r < 32 && r != '\t' {
+			return fmt.Errorf("name contains invalid characters")
+		}
+	}
+	return nil
+}
+
+func validateRubricLevels(levels []RubricLevel) error {
+	if len(levels) < 3 {
+		return fmt.Errorf("at least 3 score levels are required")
+	}
+	if len(levels) > 5 {
+		return fmt.Errorf("at most 5 score levels are allowed")
+	}
+	for i, l := range levels {
+		if l.Description == "" {
+			return fmt.Errorf("levels[%d]: description is required", i)
+		}
+		if l.Score < 1 || l.Score > 5 {
+			return fmt.Errorf("levels[%d]: score must be between 1 and 5", i)
+		}
+	}
+	return nil
+}

@@ -52,6 +52,13 @@ type repository interface {
 	// Evaluation result operations
 	BatchCreateResults(ctx context.Context, results []EvalResult) error
 	ListResultsByRun(ctx context.Context, runID uuid.UUID) ([]EvalResult, error)
+
+	// Rubric operations
+	CreateRubric(ctx context.Context, r Rubric) error
+	GetRubric(ctx context.Context, id uuid.UUID) (Rubric, error)
+	ListRubrics(ctx context.Context, userID string) ([]Rubric, error)
+	UpdateRubric(ctx context.Context, id uuid.UUID, updates RubricUpdate) error
+	DeleteRubric(ctx context.Context, id uuid.UUID, userID string) error
 }
 
 // postgresEvalRepo implements repository using PostgreSQL.
@@ -698,4 +705,152 @@ FROM evaluation_results WHERE run_id = $1 ORDER BY case_id, metric_id, invocatio
 		return nil, fmt.Errorf("listing evaluation results: %w", err)
 	}
 	return results, nil
+}
+
+// ─── Rubrics ─────────────────────────────────────────────────────────────────
+
+type rubricRow struct {
+	ID          uuid.UUID       `db:"id"`
+	UserID      string          `db:"user_id"`
+	Name        string          `db:"name"`
+	Description *string         `db:"description"`
+	Levels      json.RawMessage `db:"levels"`
+	CreatedAt   time.Time       `db:"created_at"`
+	UpdatedAt   time.Time       `db:"updated_at"`
+}
+
+func (r *postgresEvalRepo) CreateRubric(ctx context.Context, rubric Rubric) error {
+	levelsJSON, err := json.Marshal(rubric.Levels)
+	if err != nil {
+		return fmt.Errorf("marshaling levels: %w", err)
+	}
+	row := rubricRow{
+		ID:          rubric.ID,
+		UserID:      rubric.UserID,
+		Name:        rubric.Name,
+		Description: rubric.Description,
+		Levels:      levelsJSON,
+		CreatedAt:   rubric.CreatedAt,
+		UpdatedAt:   rubric.UpdatedAt,
+	}
+	const q = `
+INSERT INTO rubrics (id, user_id, name, description, levels, created_at, updated_at)
+VALUES (:id, :user_id, :name, :description, :levels, :created_at, :updated_at)`
+	if _, err := r.db.NamedExecContext(ctx, q, row); err != nil {
+		return fmt.Errorf("inserting rubric: %w", err)
+	}
+	return nil
+}
+
+func (r *postgresEvalRepo) GetRubric(ctx context.Context, id uuid.UUID) (Rubric, error) {
+	var row rubricRow
+	const q = `
+SELECT id, user_id, name, description, levels, created_at, updated_at
+FROM rubrics WHERE id = $1`
+	if err := r.db.GetContext(ctx, &row, q, id); err != nil {
+		if err == sql.ErrNoRows {
+			return Rubric{}, fmt.Errorf("rubric not found")
+		}
+		return Rubric{}, fmt.Errorf("selecting rubric: %w", err)
+	}
+	rubric := Rubric{
+		ID:          row.ID,
+		UserID:      row.UserID,
+		Name:        row.Name,
+		Description: row.Description,
+		CreatedAt:   row.CreatedAt,
+		UpdatedAt:   row.UpdatedAt,
+	}
+	if row.Levels != nil {
+		if err := json.Unmarshal(row.Levels, &rubric.Levels); err != nil {
+			return Rubric{}, fmt.Errorf("unmarshaling levels: %w", err)
+		}
+	}
+	return rubric, nil
+}
+
+func (r *postgresEvalRepo) ListRubrics(ctx context.Context, userID string) ([]Rubric, error) {
+	const q = `
+SELECT id, user_id, name, description, levels, created_at, updated_at
+FROM rubrics WHERE user_id = $1 ORDER BY updated_at DESC`
+	var rows []rubricRow
+	if err := r.db.SelectContext(ctx, &rows, q, userID); err != nil {
+		return nil, fmt.Errorf("listing rubrics: %w", err)
+	}
+	rubrics := make([]Rubric, 0, len(rows))
+	for _, row := range rows {
+		rubric := Rubric{
+			ID:          row.ID,
+			UserID:      row.UserID,
+			Name:        row.Name,
+			Description: row.Description,
+			CreatedAt:   row.CreatedAt,
+			UpdatedAt:   row.UpdatedAt,
+		}
+		if row.Levels != nil {
+			if err := json.Unmarshal(row.Levels, &rubric.Levels); err != nil {
+				return nil, fmt.Errorf("unmarshaling levels for rubric %s: %w", row.ID, err)
+			}
+		}
+		rubrics = append(rubrics, rubric)
+	}
+	return rubrics, nil
+}
+
+func (r *postgresEvalRepo) UpdateRubric(ctx context.Context, id uuid.UUID, updates RubricUpdate) error {
+	q := `UPDATE rubrics SET updated_at = now()`
+	args := []any{}
+	argIdx := 1
+
+	if updates.Name != nil {
+		q += fmt.Sprintf(", name = $%d", argIdx)
+		args = append(args, *updates.Name)
+		argIdx++
+	}
+	if updates.Description != nil {
+		q += fmt.Sprintf(", description = $%d", argIdx)
+		args = append(args, *updates.Description)
+		argIdx++
+	}
+	if updates.Levels != nil {
+		levelsJSON, err := json.Marshal(updates.Levels)
+		if err != nil {
+			return fmt.Errorf("marshaling levels: %w", err)
+		}
+		q += fmt.Sprintf(", levels = $%d", argIdx)
+		args = append(args, levelsJSON)
+		argIdx++
+	}
+
+	q += fmt.Sprintf(" WHERE id = $%d", argIdx)
+	args = append(args, id)
+
+	res, err := r.db.ExecContext(ctx, q, args...)
+	if err != nil {
+		return fmt.Errorf("updating rubric: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("rubric not found")
+	}
+	return nil
+}
+
+func (r *postgresEvalRepo) DeleteRubric(ctx context.Context, id uuid.UUID, userID string) error {
+	const q = `DELETE FROM rubrics WHERE id = $1 AND user_id = $2`
+	res, err := r.db.ExecContext(ctx, q, id, userID)
+	if err != nil {
+		return fmt.Errorf("deleting rubric: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("rubric not found or unauthorized")
+	}
+	return nil
 }

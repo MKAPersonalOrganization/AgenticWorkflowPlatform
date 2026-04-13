@@ -726,6 +726,132 @@ func (h *handler) deleteEvalRun(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// ─── Rubric Handlers ─────────────────────────────────────────────────────────
+
+// listRubrics handles GET /api/evaluation/rubrics.
+func (h *handler) listRubrics(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	rubrics, err := h.svc.listRubrics(r.Context(), user.ID)
+	if err != nil {
+		slog.Error("listing rubrics", "error", err)
+		http.Error(w, "Failed to list rubrics", http.StatusInternalServerError)
+		return
+	}
+	if rubrics == nil {
+		rubrics = []Rubric{}
+	}
+	writeJSON(w, http.StatusOK, rubrics)
+}
+
+// createRubric handles POST /api/evaluation/rubrics.
+func (h *handler) createRubric(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req RubricCreate
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	req.UserID = user.ID
+
+	rubric, err := h.svc.createRubric(r.Context(), user.ID, req)
+	if err != nil {
+		switch {
+		case strings.HasPrefix(err.Error(), "validation error:"):
+			writeError(w, http.StatusBadRequest, err.Error())
+		case strings.HasPrefix(err.Error(), "duplicate name:"):
+			writeErrorWithField(w, http.StatusConflict, "name", err.Error())
+		default:
+			slog.Error("creating rubric", "error", err)
+			http.Error(w, "Failed to create rubric", http.StatusInternalServerError)
+		}
+		return
+	}
+	writeJSON(w, http.StatusCreated, rubric)
+}
+
+// getRubric handles GET /api/evaluation/rubrics/{id}.
+func (h *handler) getRubric(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	rubric, err := h.svc.getRubric(r.Context(), id, user.ID)
+	if err != nil {
+		handleNotFound(w, err, "rubric")
+		return
+	}
+	writeJSON(w, http.StatusOK, rubric)
+}
+
+// updateRubric handles PUT /api/evaluation/rubrics/{id}.
+func (h *handler) updateRubric(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	var req RubricUpdate
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := h.svc.updateRubric(r.Context(), id, user.ID, req); err != nil {
+		switch err {
+		case ErrNotFound:
+			writeError(w, http.StatusNotFound, "rubric not found")
+		case ErrUnauthorized:
+			http.Error(w, "unauthorized", http.StatusForbidden)
+		default:
+			if strings.HasPrefix(err.Error(), "validation error:") {
+				writeError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			slog.Error("updating rubric", "error", err)
+			http.Error(w, "Failed to update rubric", http.StatusInternalServerError)
+		}
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// deleteRubric handles DELETE /api/evaluation/rubrics/{id}.
+func (h *handler) deleteRubric(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if err := h.svc.deleteRubric(r.Context(), id, user.ID); err != nil {
+		handleNotFound(w, err, "rubric")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // ─── Import / Export Handlers ────────────────────────────────────────────────
 
 // importEvalSet handles POST /api/eval-sets/import.

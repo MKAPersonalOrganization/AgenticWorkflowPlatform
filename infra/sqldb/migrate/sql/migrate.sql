@@ -1170,3 +1170,18 @@ CREATE TABLE IF NOT EXISTS evaluation_results (
 CREATE INDEX IF NOT EXISTS idx_eval_results_run_id ON evaluation_results(run_id);
 CREATE INDEX IF NOT EXISTS idx_eval_results_case_id ON evaluation_results(case_id);
 CREATE INDEX IF NOT EXISTS idx_eval_results_metric_id ON evaluation_results(metric_id);
+
+-- Version: 1.79
+-- Description: Create rubrics table for rubric-based evaluation.
+CREATE TABLE IF NOT EXISTS rubrics (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    description TEXT,
+    levels      JSONB NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_rubrics_user_name UNIQUE (user_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rubrics_user_id ON rubrics(user_id);

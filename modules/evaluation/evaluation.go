@@ -51,6 +51,13 @@ func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 	r.Post("/api/evaluation/runs/{id}/cancel", authMW.RequireAuthFunc(m.handler.cancelEvalRun))
 	r.Delete("/api/evaluation/runs/{id}", authMW.RequireAuthFunc(m.handler.deleteEvalRun))
 
+	// Rubric routes
+	r.Get("/api/evaluation/rubrics", authMW.RequireAuthFunc(m.handler.listRubrics))
+	r.Post("/api/evaluation/rubrics", authMW.RequireAuthFunc(m.handler.createRubric))
+	r.Get("/api/evaluation/rubrics/{id}", authMW.RequireAuthFunc(m.handler.getRubric))
+	r.Put("/api/evaluation/rubrics/{id}", authMW.RequireAuthFunc(m.handler.updateRubric))
+	r.Delete("/api/evaluation/rubrics/{id}", authMW.RequireAuthFunc(m.handler.deleteRubric))
+
 	// EvalSet routes
 	r.Get("/api/eval-sets", authMW.RequireAuthFunc(m.handler.listEvalSets))
 	r.Post("/api/eval-sets", authMW.RequireAuthFunc(m.handler.createEvalSet))

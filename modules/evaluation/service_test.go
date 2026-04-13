@@ -19,6 +19,7 @@ type mockRepo struct {
 	profiles  map[uuid.UUID]MetricProfile
 	runs      map[uuid.UUID]EvalRun
 	results   map[uuid.UUID]EvalResult
+	rubrics   map[uuid.UUID]Rubric
 }
 
 func newMockRepo() *mockRepo {
@@ -28,6 +29,7 @@ func newMockRepo() *mockRepo {
 		profiles: make(map[uuid.UUID]MetricProfile),
 		runs:     make(map[uuid.UUID]EvalRun),
 		results:  make(map[uuid.UUID]EvalResult),
+		rubrics:  make(map[uuid.UUID]Rubric),
 	}
 }
 
@@ -318,6 +320,56 @@ func (m *mockRepo) ListResultsByRun(_ context.Context, runID uuid.UUID) ([]EvalR
 		}
 	}
 	return result, nil
+}
+
+func (m *mockRepo) CreateRubric(_ context.Context, r Rubric) error {
+	m.rubrics[r.ID] = r
+	return nil
+}
+
+func (m *mockRepo) GetRubric(_ context.Context, id uuid.UUID) (Rubric, error) {
+	r, ok := m.rubrics[id]
+	if !ok {
+		return Rubric{}, fmt.Errorf("rubric not found")
+	}
+	return r, nil
+}
+
+func (m *mockRepo) ListRubrics(_ context.Context, userID string) ([]Rubric, error) {
+	var result []Rubric
+	for _, r := range m.rubrics {
+		if r.UserID == userID {
+			result = append(result, r)
+		}
+	}
+	return result, nil
+}
+
+func (m *mockRepo) UpdateRubric(_ context.Context, id uuid.UUID, updates RubricUpdate) error {
+	r, ok := m.rubrics[id]
+	if !ok {
+		return fmt.Errorf("rubric not found")
+	}
+	if updates.Name != nil {
+		r.Name = *updates.Name
+	}
+	if updates.Description != nil {
+		r.Description = updates.Description
+	}
+	if updates.Levels != nil {
+		r.Levels = updates.Levels
+	}
+	m.rubrics[id] = r
+	return nil
+}
+
+func (m *mockRepo) DeleteRubric(_ context.Context, id uuid.UUID, userID string) error {
+	r, ok := m.rubrics[id]
+	if !ok || r.UserID != userID {
+		return fmt.Errorf("rubric not found or unauthorized")
+	}
+	delete(m.rubrics, id)
+	return nil
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
