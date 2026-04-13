@@ -42,6 +42,16 @@ type repository interface {
 	UpdateMetricProfile(ctx context.Context, id uuid.UUID, updates MetricProfileUpdate) error
 	DeleteMetricProfile(ctx context.Context, id uuid.UUID, userID string) error
 	SetDefaultProfile(ctx context.Context, id uuid.UUID, userID string) error
+
+	// Evaluation run operations
+	CreateEvalRun(ctx context.Context, run EvalRun) error
+	GetEvalRun(ctx context.Context, id uuid.UUID) (EvalRun, error)
+	ListEvalRuns(ctx context.Context, userID string) ([]EvalRun, error)
+	UpdateEvalRunStatus(ctx context.Context, id uuid.UUID, status string, errMsg *string) error
+
+	// Evaluation result operations
+	BatchCreateResults(ctx context.Context, results []EvalResult) error
+	ListResultsByRun(ctx context.Context, runID uuid.UUID) ([]EvalResult, error)
 }
 
 // postgresEvalRepo implements repository using PostgreSQL.
@@ -574,4 +584,118 @@ func (r *postgresEvalRepo) SetDefaultProfile(ctx context.Context, id uuid.UUID, 
 		return fmt.Errorf("committing transaction: %w", err)
 	}
 	return nil
+}
+
+// ─── Evaluation Runs ─────────────────────────────────────────────────────────
+
+func (r *postgresEvalRepo) CreateEvalRun(ctx context.Context, run EvalRun) error {
+	const q = `
+INSERT INTO evaluation_runs (id, user_id, eval_set_id, agent_id, profile_id, status, num_runs, created_at)
+VALUES (:id, :user_id, :eval_set_id, :agent_id, :profile_id, :status, :num_runs, :created_at)`
+	if _, err := r.db.NamedExecContext(ctx, q, run); err != nil {
+		return fmt.Errorf("inserting evaluation run: %w", err)
+	}
+	return nil
+}
+
+func (r *postgresEvalRepo) GetEvalRun(ctx context.Context, id uuid.UUID) (EvalRun, error) {
+	const q = `
+SELECT id, user_id, eval_set_id, agent_id, profile_id, status, num_runs,
+       started_at, completed_at, error_msg, created_at
+FROM evaluation_runs WHERE id = $1`
+	var run EvalRun
+	if err := r.db.GetContext(ctx, &run, q, id); err != nil {
+		if err == sql.ErrNoRows {
+			return EvalRun{}, fmt.Errorf("evaluation run not found")
+		}
+		return EvalRun{}, fmt.Errorf("selecting evaluation run: %w", err)
+	}
+	return run, nil
+}
+
+func (r *postgresEvalRepo) ListEvalRuns(ctx context.Context, userID string) ([]EvalRun, error) {
+	const q = `
+SELECT id, user_id, eval_set_id, agent_id, profile_id, status, num_runs,
+       started_at, completed_at, error_msg, created_at
+FROM evaluation_runs WHERE user_id = $1 ORDER BY created_at DESC`
+	var runs []EvalRun
+	if err := r.db.SelectContext(ctx, &runs, q, userID); err != nil {
+		return nil, fmt.Errorf("listing evaluation runs: %w", err)
+	}
+	return runs, nil
+}
+
+func (r *postgresEvalRepo) UpdateEvalRunStatus(ctx context.Context, id uuid.UUID, status string, errMsg *string) error {
+	q := `UPDATE evaluation_runs SET status = $1`
+	args := []any{status}
+	argIdx := 2
+
+	if status == "running" {
+		q += ", started_at = now()"
+	}
+	if status == "completed" || status == "failed" || status == "cancelled" {
+		q += ", completed_at = now()"
+	}
+	if errMsg != nil {
+		q += fmt.Sprintf(", error_msg = $%d", argIdx)
+		args = append(args, *errMsg)
+		argIdx++
+	}
+
+	q += fmt.Sprintf(" WHERE id = $%d", argIdx)
+	args = append(args, id)
+
+	res, err := r.db.ExecContext(ctx, q, args...)
+	if err != nil {
+		return fmt.Errorf("updating evaluation run status: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("evaluation run not found")
+	}
+	return nil
+}
+
+// ─── Evaluation Results ──────────────────────────────────────────────────────
+
+func (r *postgresEvalRepo) BatchCreateResults(ctx context.Context, results []EvalResult) error {
+	if len(results) == 0 {
+		return nil
+	}
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	const q = `
+INSERT INTO evaluation_results (id, run_id, case_id, metric_id, score, status, details, invocation, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())`
+
+	for _, res := range results {
+		if _, err := tx.ExecContext(ctx, q,
+			res.ID, res.RunID, res.CaseID, res.MetricID,
+			res.Score, res.Status, res.Details, res.Invocation); err != nil {
+			return fmt.Errorf("inserting evaluation result: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing results: %w", err)
+	}
+	return nil
+}
+
+func (r *postgresEvalRepo) ListResultsByRun(ctx context.Context, runID uuid.UUID) ([]EvalResult, error) {
+	const q = `
+SELECT id, run_id, case_id, metric_id, score, status, details, invocation, created_at
+FROM evaluation_results WHERE run_id = $1 ORDER BY case_id, metric_id, invocation`
+	var results []EvalResult
+	if err := r.db.SelectContext(ctx, &results, q, runID); err != nil {
+		return nil, fmt.Errorf("listing evaluation results: %w", err)
+	}
+	return results, nil
 }

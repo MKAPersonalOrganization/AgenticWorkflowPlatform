@@ -1134,3 +1134,39 @@ CREATE TABLE IF NOT EXISTS eval_metric_profiles (
 );
 
 CREATE INDEX IF NOT EXISTS idx_metric_profiles_user_id ON eval_metric_profiles(user_id);
+
+-- Version: 1.78
+-- Description: Create evaluation_runs and evaluation_results tables for the evaluation pipeline.
+CREATE TABLE IF NOT EXISTS evaluation_runs (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id      TEXT NOT NULL,
+    eval_set_id  UUID NOT NULL REFERENCES eval_sets(id),
+    agent_id     UUID NOT NULL,
+    profile_id   UUID REFERENCES eval_metric_profiles(id),
+    status       TEXT NOT NULL DEFAULT 'pending',
+    num_runs     INT NOT NULL DEFAULT 1,
+    started_at   TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    error_msg    TEXT,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_eval_runs_user_id ON evaluation_runs(user_id);
+CREATE INDEX IF NOT EXISTS idx_eval_runs_eval_set_id ON evaluation_runs(eval_set_id);
+CREATE INDEX IF NOT EXISTS idx_eval_runs_status ON evaluation_runs(status);
+
+CREATE TABLE IF NOT EXISTS evaluation_results (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    run_id      UUID NOT NULL REFERENCES evaluation_runs(id) ON DELETE CASCADE,
+    case_id     UUID NOT NULL REFERENCES eval_cases(id),
+    metric_id   TEXT NOT NULL,
+    score       DOUBLE PRECISION,
+    status      TEXT NOT NULL,
+    details     JSONB,
+    invocation  INT NOT NULL DEFAULT 1,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_eval_results_run_id ON evaluation_results(run_id);
+CREATE INDEX IF NOT EXISTS idx_eval_results_case_id ON evaluation_results(case_id);
+CREATE INDEX IF NOT EXISTS idx_eval_results_metric_id ON evaluation_results(metric_id);

@@ -587,6 +587,145 @@ func (h *handler) setDefaultProfile(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// ─── Evaluation Run Handlers ─────────────────────────────────────────────────
+
+// createEvalRun handles POST /api/evaluation/runs.
+func (h *handler) createEvalRun(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req EvalRunCreate
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	req.UserID = user.ID
+
+	run, err := h.svc.createEvalRun(r.Context(), user.ID, req)
+	if err != nil {
+		switch err {
+		case ErrNotFound:
+			writeError(w, http.StatusNotFound, "eval set not found")
+		case ErrUnauthorized:
+			http.Error(w, "unauthorized", http.StatusForbidden)
+		default:
+			slog.Error("creating evaluation run", "error", err)
+			http.Error(w, "Failed to create evaluation run", http.StatusInternalServerError)
+		}
+		return
+	}
+	writeJSON(w, http.StatusCreated, run)
+}
+
+// listEvalRuns handles GET /api/evaluation/runs.
+func (h *handler) listEvalRuns(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	runs, err := h.svc.listEvalRuns(r.Context(), user.ID)
+	if err != nil {
+		slog.Error("listing evaluation runs", "error", err)
+		http.Error(w, "Failed to list evaluation runs", http.StatusInternalServerError)
+		return
+	}
+	if runs == nil {
+		runs = []EvalRun{}
+	}
+	writeJSON(w, http.StatusOK, runs)
+}
+
+// getEvalRun handles GET /api/evaluation/runs/{id}.
+func (h *handler) getEvalRun(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	run, err := h.svc.getEvalRun(r.Context(), id, user.ID)
+	if err != nil {
+		handleNotFound(w, err, "evaluation run")
+		return
+	}
+	writeJSON(w, http.StatusOK, run)
+}
+
+// getEvalResults handles GET /api/evaluation/runs/{id}/results.
+func (h *handler) getEvalResults(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	results, err := h.svc.getEvalResults(r.Context(), id, user.ID)
+	if err != nil {
+		handleNotFound(w, err, "evaluation run")
+		return
+	}
+	if results == nil {
+		results = []EvalResult{}
+	}
+	writeJSON(w, http.StatusOK, results)
+}
+
+// cancelEvalRun handles POST /api/evaluation/runs/{id}/cancel.
+func (h *handler) cancelEvalRun(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if err := h.svc.cancelEvalRun(r.Context(), id, user.ID); err != nil {
+		switch err {
+		case ErrNotFound:
+			writeError(w, http.StatusNotFound, "evaluation run not found")
+		case ErrUnauthorized:
+			http.Error(w, "unauthorized", http.StatusForbidden)
+		default:
+			writeError(w, http.StatusBadRequest, err.Error())
+		}
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// deleteEvalRun handles DELETE /api/evaluation/runs/{id}.
+func (h *handler) deleteEvalRun(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if err := h.svc.deleteEvalRun(r.Context(), id, user.ID); err != nil {
+		handleNotFound(w, err, "evaluation run")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // ─── Import / Export Handlers ────────────────────────────────────────────────
 
 // importEvalSet handles POST /api/eval-sets/import.

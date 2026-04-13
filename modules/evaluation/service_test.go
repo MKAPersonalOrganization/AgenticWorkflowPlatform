@@ -17,6 +17,8 @@ type mockRepo struct {
 	cases     map[uuid.UUID]EvalCase
 	evalCases []EvalCase // for ListEvalCases
 	profiles  map[uuid.UUID]MetricProfile
+	runs      map[uuid.UUID]EvalRun
+	results   map[uuid.UUID]EvalResult
 }
 
 func newMockRepo() *mockRepo {
@@ -24,6 +26,8 @@ func newMockRepo() *mockRepo {
 		sets:     make(map[uuid.UUID]EvalSet),
 		cases:    make(map[uuid.UUID]EvalCase),
 		profiles: make(map[uuid.UUID]MetricProfile),
+		runs:     make(map[uuid.UUID]EvalRun),
+		results:  make(map[uuid.UUID]EvalResult),
 	}
 }
 
@@ -264,6 +268,56 @@ func (m *mockRepo) SetDefaultProfile(_ context.Context, id uuid.UUID, userID str
 	p.IsDefault = true
 	m.profiles[id] = p
 	return nil
+}
+
+func (m *mockRepo) CreateEvalRun(_ context.Context, run EvalRun) error {
+	m.runs[run.ID] = run
+	return nil
+}
+
+func (m *mockRepo) GetEvalRun(_ context.Context, id uuid.UUID) (EvalRun, error) {
+	run, ok := m.runs[id]
+	if !ok {
+		return EvalRun{}, fmt.Errorf("evaluation run not found")
+	}
+	return run, nil
+}
+
+func (m *mockRepo) ListEvalRuns(_ context.Context, userID string) ([]EvalRun, error) {
+	var result []EvalRun
+	for _, r := range m.runs {
+		if r.UserID == userID {
+			result = append(result, r)
+		}
+	}
+	return result, nil
+}
+
+func (m *mockRepo) UpdateEvalRunStatus(_ context.Context, id uuid.UUID, status string, _ *string) error {
+	run, ok := m.runs[id]
+	if !ok {
+		return fmt.Errorf("evaluation run not found")
+	}
+	run.Status = status
+	m.runs[id] = run
+	return nil
+}
+
+func (m *mockRepo) BatchCreateResults(_ context.Context, results []EvalResult) error {
+	for _, r := range results {
+		m.results[r.ID] = r
+	}
+	return nil
+}
+
+func (m *mockRepo) ListResultsByRun(_ context.Context, runID uuid.UUID) ([]EvalResult, error) {
+	var result []EvalResult
+	for _, r := range m.results {
+		if r.RunID == runID {
+			result = append(result, r)
+		}
+	}
+	return result, nil
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -984,5 +1038,192 @@ func TestListMetricProfiles_UserScoped(t *testing.T) {
 	}
 	if profiles[0].Name != "User1 Profile" {
 		t.Errorf("expected User1 Profile, got %q", profiles[0].Name)
+	}
+}
+
+// ─── Evaluation Run Tests ────────────────────────────────────────────────────
+
+func TestCreateEvalRun_Valid(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	// Create an eval set first
+	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID: "user1",
+		Name:   "Test Set",
+	})
+
+	run, err := svc.createEvalRun(context.Background(), "user1", EvalRunCreate{
+		UserID:    "user1",
+		EvalSetID: es.ID,
+		AgentID:   uuid.New(),
+		NumRuns:   3,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if run.Status != "pending" {
+		t.Errorf("expected status pending, got %s", run.Status)
+	}
+	if run.NumRuns != 3 {
+		t.Errorf("expected num_runs 3, got %d", run.NumRuns)
+	}
+}
+
+func TestCreateEvalRun_NumRunsClamped(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID: "user1",
+		Name:   "Test Set",
+	})
+
+	// Test below minimum
+	run, err := svc.createEvalRun(context.Background(), "user1", EvalRunCreate{
+		UserID:    "user1",
+		EvalSetID: es.ID,
+		AgentID:   uuid.New(),
+		NumRuns:   0,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if run.NumRuns != 1 {
+		t.Errorf("expected num_runs clamped to 1, got %d", run.NumRuns)
+	}
+
+	// Test above maximum
+	run, err = svc.createEvalRun(context.Background(), "user1", EvalRunCreate{
+		UserID:    "user1",
+		EvalSetID: es.ID,
+		AgentID:   uuid.New(),
+		NumRuns:   50,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if run.NumRuns != 10 {
+		t.Errorf("expected num_runs clamped to 10, got %d", run.NumRuns)
+	}
+}
+
+func TestCreateEvalRun_UnauthorizedEvalSet(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID: "user1",
+		Name:   "User1 Set",
+	})
+
+	_, err := svc.createEvalRun(context.Background(), "user2", EvalRunCreate{
+		UserID:    "user2",
+		EvalSetID: es.ID,
+		AgentID:   uuid.New(),
+	})
+	if err != ErrUnauthorized {
+		t.Errorf("expected ErrUnauthorized, got %v", err)
+	}
+}
+
+func TestCreateEvalRun_EvalSetNotFound(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	_, err := svc.createEvalRun(context.Background(), "user1", EvalRunCreate{
+		UserID:    "user1",
+		EvalSetID: uuid.New(),
+		AgentID:   uuid.New(),
+	})
+	if err != ErrNotFound {
+		t.Errorf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestListEvalRuns_UserScoped(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID: "user1",
+		Name:   "Test Set",
+	})
+	_, _ = svc.createEvalRun(context.Background(), "user1", EvalRunCreate{
+		UserID:    "user1",
+		EvalSetID: es.ID,
+		AgentID:   uuid.New(),
+	})
+
+	es2, _ := svc.createEvalSet(context.Background(), "user2", EvalSetCreate{
+		UserID: "user2",
+		Name:   "User2 Set",
+	})
+	_, _ = svc.createEvalRun(context.Background(), "user2", EvalRunCreate{
+		UserID:    "user2",
+		EvalSetID: es2.ID,
+		AgentID:   uuid.New(),
+	})
+
+	runs, err := svc.listEvalRuns(context.Background(), "user1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(runs) != 1 {
+		t.Fatalf("expected 1 run for user1, got %d", len(runs))
+	}
+}
+
+func TestCancelEvalRun_OnlyRunningOrPending(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID: "user1",
+		Name:   "Test Set",
+	})
+	run, _ := svc.createEvalRun(context.Background(), "user1", EvalRunCreate{
+		UserID:    "user1",
+		EvalSetID: es.ID,
+		AgentID:   uuid.New(),
+	})
+
+	// Cancel pending run — should work
+	err := svc.cancelEvalRun(context.Background(), run.ID, "user1")
+	if err != nil {
+		t.Fatalf("expected cancel to succeed for pending run, got %v", err)
+	}
+
+	// Try to cancel again — should fail (now cancelled)
+	err = svc.cancelEvalRun(context.Background(), run.ID, "user1")
+	if err == nil {
+		t.Fatal("expected error when cancelling already-cancelled run")
+	}
+}
+
+func TestGetEvalResults_Unauthorized(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID: "user1",
+		Name:   "Test Set",
+	})
+	run, _ := svc.createEvalRun(context.Background(), "user1", EvalRunCreate{
+		UserID:    "user1",
+		EvalSetID: es.ID,
+		AgentID:   uuid.New(),
+	})
+
+	_, err := svc.getEvalResults(context.Background(), run.ID, "user2")
+	if err != ErrUnauthorized {
+		t.Errorf("expected ErrUnauthorized, got %v", err)
 	}
 }

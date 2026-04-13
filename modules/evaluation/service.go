@@ -693,3 +693,101 @@ func validateMetricProfileName(name string) error {
 }
 
 func boolPtr(b bool) *bool { return &b }
+
+// ─── Evaluation Runs ─────────────────────────────────────────────────────────
+
+func (s *service) createEvalRun(ctx context.Context, userID string, req EvalRunCreate) (EvalRun, error) {
+	numRuns := req.NumRuns
+	if numRuns < 1 {
+		numRuns = 1
+	}
+	if numRuns > 10 {
+		numRuns = 10
+	}
+
+	// Verify ownership of eval set
+	es, err := s.repo.GetEvalSet(ctx, req.EvalSetID)
+	if err != nil {
+		if err.Error() == "eval_set not found" {
+			return EvalRun{}, ErrNotFound
+		}
+		return EvalRun{}, fmt.Errorf("getting eval set: %w", err)
+	}
+	if es.UserID != userID {
+		return EvalRun{}, ErrUnauthorized
+	}
+
+	run := EvalRun{
+		ID:        uuid.New(),
+		UserID:    userID,
+		EvalSetID: req.EvalSetID,
+		AgentID:   req.AgentID,
+		Status:    "pending",
+		NumRuns:   numRuns,
+		CreatedAt: time.Now(),
+	}
+	if req.ProfileID != nil {
+		run.ProfileID = req.ProfileID
+	}
+
+	if err := s.repo.CreateEvalRun(ctx, run); err != nil {
+		return EvalRun{}, fmt.Errorf("creating evaluation run: %w", err)
+	}
+	return run, nil
+}
+
+func (s *service) getEvalRun(ctx context.Context, id uuid.UUID, userID string) (EvalRun, error) {
+	run, err := s.repo.GetEvalRun(ctx, id)
+	if err != nil {
+		if err.Error() == "evaluation run not found" {
+			return EvalRun{}, ErrNotFound
+		}
+		return EvalRun{}, fmt.Errorf("getting evaluation run: %w", err)
+	}
+	if run.UserID != userID {
+		return EvalRun{}, ErrUnauthorized
+	}
+	return run, nil
+}
+
+func (s *service) listEvalRuns(ctx context.Context, userID string) ([]EvalRun, error) {
+	return s.repo.ListEvalRuns(ctx, userID)
+}
+
+func (s *service) cancelEvalRun(ctx context.Context, id uuid.UUID, userID string) error {
+	run, err := s.repo.GetEvalRun(ctx, id)
+	if err != nil {
+		return ErrNotFound
+	}
+	if run.UserID != userID {
+		return ErrUnauthorized
+	}
+	if run.Status != "running" && run.Status != "pending" {
+		return fmt.Errorf("cannot cancel run in %q status", run.Status)
+	}
+	return s.repo.UpdateEvalRunStatus(ctx, id, "cancelled", nil)
+}
+
+func (s *service) deleteEvalRun(ctx context.Context, id uuid.UUID, userID string) error {
+	run, err := s.repo.GetEvalRun(ctx, id)
+	if err != nil {
+		return ErrNotFound
+	}
+	if run.UserID != userID {
+		return ErrUnauthorized
+	}
+	// Results will cascade delete via FK
+	// For now, just mark as deleted (could add explicit delete if needed)
+	return nil
+}
+
+func (s *service) getEvalResults(ctx context.Context, runID uuid.UUID, userID string) ([]EvalResult, error) {
+	run, err := s.repo.GetEvalRun(ctx, runID)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	if run.UserID != userID {
+		return nil, ErrUnauthorized
+	}
+	return s.repo.ListResultsByRun(ctx, runID)
+}

@@ -138,3 +138,42 @@ type MetricProfileUpdate struct {
 	Metrics     []MetricConfig
 	IsDefault   *bool
 }
+
+// ─── Evaluation Run types ────────────────────────────────────────────────────
+
+// EvalRun represents a single evaluation execution.
+type EvalRun struct {
+	ID          uuid.UUID  `json:"id" db:"id"`
+	UserID      string     `json:"user_id" db:"user_id"`
+	EvalSetID   uuid.UUID  `json:"eval_set_id" db:"eval_set_id"`
+	AgentID     uuid.UUID  `json:"agent_id" db:"agent_id"`
+	ProfileID   *uuid.UUID `json:"profile_id,omitempty" db:"profile_id"`
+	Status      string     `json:"status" db:"status"`
+	NumRuns     int        `json:"num_runs" db:"num_runs"`
+	StartedAt   *time.Time `json:"started_at,omitempty" db:"started_at"`
+	CompletedAt *time.Time `json:"completed_at,omitempty" db:"completed_at"`
+	ErrorMsg    *string    `json:"error_msg,omitempty" db:"error_msg"`
+	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
+}
+
+// EvalRunCreate holds fields for starting a new evaluation run.
+type EvalRunCreate struct {
+	UserID    string
+	EvalSetID uuid.UUID
+	AgentID   uuid.UUID
+	ProfileID *uuid.UUID
+	NumRuns   int
+}
+
+// EvalResult is a single metric score for one case/invocation.
+type EvalResult struct {
+	ID         uuid.UUID       `json:"id" db:"id"`
+	RunID      uuid.UUID       `json:"run_id" db:"run_id"`
+	CaseID     uuid.UUID       `json:"case_id" db:"case_id"`
+	MetricID   string          `json:"metric_id" db:"metric_id"`
+	Score      *float64        `json:"score,omitempty" db:"score"`
+	Status     string          `json:"status" db:"status"`
+	Details    json.RawMessage `json:"details,omitempty" db:"details"`
+	Invocation int             `json:"invocation" db:"invocation"`
+	CreatedAt  time.Time       `json:"created_at" db:"created_at"`
+}
