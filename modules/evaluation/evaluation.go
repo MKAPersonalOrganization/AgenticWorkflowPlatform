@@ -38,6 +38,10 @@ func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 	r.Put("/api/eval-sets/{id}", authMW.RequireAuthFunc(m.handler.updateEvalSet))
 	r.Delete("/api/eval-sets/{id}", authMW.RequireAuthFunc(m.handler.deleteEvalSet))
 
+	// Import/export routes
+	r.Post("/api/eval-sets/import", authMW.RequireAuthFunc(m.handler.importEvalSet))
+	r.Get("/api/eval-sets/{id}/export", authMW.RequireAuthFunc(m.handler.exportEvalSet))
+
 	// EvalCase routes (scoped under eval_set)
 	r.Get("/api/eval-sets/{id}/cases", authMW.RequireAuthFunc(m.handler.listEvalCases))
 	r.Post("/api/eval-sets/{id}/cases", authMW.RequireAuthFunc(m.handler.createEvalCase))

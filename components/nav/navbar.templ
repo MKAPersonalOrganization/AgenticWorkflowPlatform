@@ -3,6 +3,7 @@ package nav
 import (
 	a2acomp "aicompass/components/a2a"
 	"aicompass/components/button"
+	"aicompass/components/evals"
 	"aicompass/components/filesystem"
 	"aicompass/components/i18n"
 	"aicompass/components/icon"
@@ -88,6 +89,10 @@ templ Navbar(props ...NavbarProps) {
 			<!-- Plugins & Tools -->
 			<div class="nav-item hidden md:flex w-full justify-center">
 				@tools.ToolsButtonTrigger()
+			</div>
+			<!-- Evaluation -->
+			<div class="nav-item hidden md:flex w-full justify-center">
+				@evals.EvalSetsButtonTrigger()
 			</div>
 		}
 		<!-- Admin Indicator -->

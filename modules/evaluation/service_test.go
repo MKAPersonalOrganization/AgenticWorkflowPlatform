@@ -150,6 +150,29 @@ func (m *mockRepo) ReorderEvalCases(_ context.Context, evalSetID uuid.UUID, case
 	return nil
 }
 
+func (m *mockRepo) CreateEvalSetWithCases(_ context.Context, es EvalSet, cases []EvalCase) error {
+	m.sets[es.ID] = es
+	for _, ec := range cases {
+		m.cases[ec.ID] = ec
+		m.evalCases = append(m.evalCases, ec)
+	}
+	return nil
+}
+
+func (m *mockRepo) ListEvalCasesWithSet(_ context.Context, evalSetID uuid.UUID) (EvalSet, []EvalCase, error) {
+	es, ok := m.sets[evalSetID]
+	if !ok {
+		return EvalSet{}, nil, fmt.Errorf("eval_set not found")
+	}
+	var result []EvalCase
+	for _, ec := range m.evalCases {
+		if ec.EvalSetID == evalSetID {
+			result = append(result, ec)
+		}
+	}
+	return es, result, nil
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 func TestCreateEvalSet_ValidName(t *testing.T) {
@@ -478,4 +501,219 @@ func TestJSONFields_SerializeDeserialize(t *testing.T) {
 
 func ptr(s string) *string {
 	return &s
+}
+
+// ─── Import / Export Tests ───────────────────────────────────────────────────
+
+func TestImportEvalSet_ValidJSON(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	data := []byte(`{
+		"name": "Weather Tests",
+		"description": "Weather agent evaluation",
+		"eval_cases": [
+			{
+				"name": "basic_query",
+				"input": "What's the weather in Tokyo?",
+				"expected_trajectory": [
+					{"tool_name": "weather_api", "args": {"city": "Tokyo"}}
+				],
+				"expected_response": "The weather is sunny"
+			}
+		]
+	}`)
+
+	es, err := svc.importEvalSet(context.Background(), "user1", data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if es.Name != "Weather Tests" {
+		t.Errorf("expected name %q, got %q", "Weather Tests", es.Name)
+	}
+	if es.CaseCount != 1 {
+		t.Errorf("expected 1 case, got %d", es.CaseCount)
+	}
+}
+
+func TestImportEvalSet_InvalidJSON(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	_, err := svc.importEvalSet(context.Background(), "user1", []byte(`not json`))
+	if err == nil {
+		t.Fatal("expected error for invalid JSON")
+	}
+}
+
+func TestImportEvalSet_EmptyCases(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	data := []byte(`{"name": "Empty", "eval_cases": []}`)
+	_, err := svc.importEvalSet(context.Background(), "user1", data)
+	if err == nil {
+		t.Fatal("expected error for empty eval_cases")
+	}
+}
+
+func TestImportEvalSet_MissingInput(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	data := []byte(`{"name": "Bad", "eval_cases": [{"name": "no_input"}]}`)
+	_, err := svc.importEvalSet(context.Background(), "user1", data)
+	if err == nil {
+		t.Fatal("expected error for missing input")
+	}
+}
+
+func TestImportEvalSet_InvalidTrajectory(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	data := []byte(`{
+		"name": "Bad Trajectory",
+		"eval_cases": [{
+			"input": "test",
+			"expected_trajectory": "not an array"
+		}]
+	}`)
+	_, err := svc.importEvalSet(context.Background(), "user1", data)
+	if err == nil {
+		t.Fatal("expected error for invalid trajectory")
+	}
+}
+
+func TestImportEvalSet_DuplicateName(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	data := []byte(`{"name": "Dup", "eval_cases": [{"input": "test"}]}`)
+	_, _ = svc.importEvalSet(context.Background(), "user1", data)
+
+	_, err := svc.importEvalSet(context.Background(), "user1", data)
+	if err == nil {
+		t.Fatal("expected error for duplicate name")
+	}
+}
+
+func TestExportEvalSet_RoundTrip(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	// Import a set
+	importData := []byte(`{
+		"name": "Round Trip",
+		"description": "Test round trip",
+		"eval_cases": [
+			{
+				"name": "case1",
+				"input": "Hello world",
+				"expected_trajectory": [
+					{"tool_name": "search", "args": {"q": "hello"}, "match_type": "EXACT"}
+				],
+				"expected_response": "Hi there",
+				"rubrics": [{"name": "quality", "levels": [{"score": 5, "description": "great"}]}],
+				"user_messages": ["follow up"]
+			},
+			{
+				"input": "Second case"
+			}
+		]
+	}`)
+
+	es, err := svc.importEvalSet(context.Background(), "user1", importData)
+	if err != nil {
+		t.Fatalf("import failed: %v", err)
+	}
+
+	// Export it
+	export, err := svc.exportEvalSet(context.Background(), es.ID, "user1")
+	if err != nil {
+		t.Fatalf("export failed: %v", err)
+	}
+
+	// Verify export matches import
+	if export.Name != "Round Trip" {
+		t.Errorf("expected name %q, got %q", "Round Trip", export.Name)
+	}
+	if export.Desc == nil || *export.Desc != "Test round trip" {
+		t.Errorf("description mismatch")
+	}
+	if len(export.Cases) != 2 {
+		t.Fatalf("expected 2 cases, got %d", len(export.Cases))
+	}
+
+	// Verify first case
+	c1 := export.Cases[0]
+	if c1.Name == nil || *c1.Name != "case1" {
+		t.Errorf("case1 name mismatch")
+	}
+	if c1.Input != "Hello world" {
+		t.Errorf("case1 input mismatch")
+	}
+	if c1.ExpectedResponse == nil || *c1.ExpectedResponse != "Hi there" {
+		t.Errorf("case1 expected_response mismatch")
+	}
+
+	// Verify trajectory round-trip
+	traj, ok := c1.ExpectedTrajectory.([]any)
+	if !ok || len(traj) != 1 {
+		t.Fatalf("expected trajectory array with 1 element")
+	}
+	tool, ok := traj[0].(map[string]any)
+	if !ok || tool["tool_name"] != "search" {
+		t.Errorf("trajectory tool_name mismatch")
+	}
+
+	// Re-import the export and verify it works
+	// Must use different name (uniqueness)
+	export.Name = "Round Trip Reimport"
+	reimportData, err := json.Marshal(export)
+	if err != nil {
+		t.Fatalf("failed to marshal export: %v", err)
+	}
+
+	es2, err := svc.importEvalSet(context.Background(), "user1", reimportData)
+	if err != nil {
+		t.Fatalf("re-import failed: %v", err)
+	}
+	if es2.CaseCount != 2 {
+		t.Errorf("expected 2 cases after re-import, got %d", es2.CaseCount)
+	}
+}
+
+func TestExportEvalSet_NotFound(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	_, err := svc.exportEvalSet(context.Background(), uuid.New(), "user1")
+	if err != ErrNotFound {
+		t.Errorf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestExportEvalSet_Unauthorized(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	// Create as user1
+	es, _ := svc.importEvalSet(context.Background(), "user1",
+		[]byte(`{"name": "Secret", "eval_cases": [{"input": "test"}]}`))
+
+	// Try to export as user2
+	_, err := svc.exportEvalSet(context.Background(), es.ID, "user2")
+	if err != ErrUnauthorized {
+		t.Errorf("expected ErrUnauthorized, got %v", err)
+	}
 }

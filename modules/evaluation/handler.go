@@ -3,7 +3,10 @@ package evaluation
 import (
 	"aicompass/shared"
 	"encoding/json"
+	"fmt"
+	"io"
 	"log/slog"
+	"mime"
 	"net/http"
 	"strings"
 
@@ -404,5 +407,102 @@ func handleNotFound(w http.ResponseWriter, err error, resource string) {
 	default:
 		slog.Error("getting "+resource, "error", err)
 		http.Error(w, "Failed to get "+resource, http.StatusInternalServerError)
+	}
+}
+
+// ─── Import / Export Handlers ────────────────────────────────────────────────
+
+// importEvalSet handles POST /api/eval-sets/import.
+// Accepts a multipart form with a JSON file.
+func (h *handler) importEvalSet(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Limit upload to 10 MB
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		writeError(w, http.StatusBadRequest, "failed to parse form: file too large or invalid")
+		return
+	}
+
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "file field is required in multipart form")
+		return
+	}
+	defer func() { _ = file.Close() }()
+
+	data, err := io.ReadAll(io.LimitReader(file, 10<<20))
+	if err != nil {
+		slog.Error("reading upload file", "error", err)
+		http.Error(w, "Failed to read upload", http.StatusInternalServerError)
+		return
+	}
+
+	es, err := h.svc.importEvalSet(r.Context(), user.ID, data)
+	if err != nil {
+		switch {
+		case strings.HasPrefix(err.Error(), "validation error:"):
+			writeError(w, http.StatusBadRequest, err.Error())
+		case strings.HasPrefix(err.Error(), "duplicate name:"):
+			writeErrorWithField(w, http.StatusConflict, "name", err.Error())
+		default:
+			slog.Error("importing eval_set", "error", err)
+			http.Error(w, "Failed to import eval set", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, es)
+}
+
+// exportEvalSet handles GET /api/eval-sets/{id}/export.
+// Returns a JSON file download.
+func (h *handler) exportEvalSet(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	export, err := h.svc.exportEvalSet(r.Context(), id, user.ID)
+	if err != nil {
+		handleNotFound(w, err, "eval set")
+		return
+	}
+
+	data, err := json.MarshalIndent(export, "", "  ")
+	if err != nil {
+		slog.Error("marshaling export", "error", err)
+		http.Error(w, "Failed to marshal export", http.StatusInternalServerError)
+		return
+	}
+
+	// Sanitize filename for Content-Disposition
+	safeName := strings.Map(func(r rune) rune {
+		if r >= 32 && r != '/' && r != '\\' && r != ':' && r != '*' && r != '?' && r != '"' && r != '<' && r != '>' && r != '|' {
+			return r
+		}
+		return '_'
+	}, export.Name)
+	if safeName == "" {
+		safeName = "evalset"
+	}
+	filename := fmt.Sprintf("%s.json", safeName)
+
+	disposition := mime.FormatMediaType("attachment", map[string]string{"filename": filename})
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Disposition", disposition)
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(data); err != nil {
+		slog.Error("writing export response", "error", err)
 	}
 }

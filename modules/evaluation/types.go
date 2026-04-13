@@ -74,3 +74,24 @@ type ExpectedToolCall struct {
 	Args      map[string]any `json:"args,omitempty"`
 	MatchType string         `json:"match_type,omitempty"` // EXACT, IN_ORDER, ANY_ORDER
 }
+
+// ─── Import / Export types (ADK-compatible JSON format) ──────────────────────
+
+// EvalSetExport represents the JSON format used for import/export,
+// matching the ADK Python eval_set.py schema.
+type EvalSetExport struct {
+	EvalSetID string           `json:"eval_set_id,omitempty"`
+	Name      string           `json:"name"`
+	Desc      *string          `json:"description,omitempty"`
+	Cases     []EvalCaseExport `json:"eval_cases"`
+}
+
+// EvalCaseExport represents a single test case in the import/export JSON format.
+type EvalCaseExport struct {
+	Name               *string `json:"name,omitempty"`
+	Input              string  `json:"input"`
+	ExpectedTrajectory any     `json:"expected_trajectory,omitempty"`
+	ExpectedResponse   *string `json:"expected_response,omitempty"`
+	Rubrics            any     `json:"rubrics,omitempty"`
+	UserMessages       any     `json:"user_messages,omitempty"`
+}

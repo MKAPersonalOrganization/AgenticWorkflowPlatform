@@ -5,6 +5,7 @@ import (
 	"aicompass/components/agenteditor"
 	"aicompass/components/agents"
 	"aicompass/components/convsearch"
+	"aicompass/components/evals"
 	"aicompass/components/filesystem"
 	"aicompass/components/i18n"
 	"aicompass/components/nav"
@@ -106,6 +107,7 @@ templ BaseLayout(props LayoutProps) {
 					@agenteditor.AgentDesignerDialog()
 					@tools.ToolsDialog()
 					@a2acomp.A2ADialog()
+					@evals.EvalSetsDialog()
 					@convsearch.SearchDialog()
 					@filesystem.FilesystemDialog()
 				</div>

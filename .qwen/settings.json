@@ -9,7 +9,10 @@
       "Bash(gh *)",
       "Bash(mkdir *)",
       "Bash(gofmt *)",
-      "Bash(gofumpt *)"
+      "Bash(gofumpt *)",
+      "Bash(golangci-lint *)",
+      "Bash(docker compose exec *)",
+      "Bash(docker compose *)"
     ]
   },
   "$version": 3

@@ -12,6 +12,7 @@ import { agentDesigner } from './components/agent-designer-dialog.js';
 import { convSearchDialog } from './components/conv-search-dialog.js';
 import { mcpConnectors } from './components/mcp-connectors.js';
 import { a2aConnectors } from './components/a2a-connectors.js';
+import { evalSetsDialog } from './components/evalsets-dialog.js';
 import { workflowTreeBuilder } from './components/workflow-tree-builder.js';
 import { workflowTreeVisualizer } from './components/workflow-tree-visualizer.js';
 import { workflowGraphPanel } from './components/workflow-graph-panel.js';
@@ -49,6 +50,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('convSearchDialog', convSearchDialog);
     Alpine.data('mcpConnectors', mcpConnectors);
     Alpine.data('a2aConnectors', a2aConnectors);
+    Alpine.data('evalSetsDialog', evalSetsDialog);
     Alpine.data('workflowTreeBuilder', workflowTreeBuilder);
     Alpine.data('workflowTreeVisualizer', workflowTreeVisualizer);
     Alpine.data('workflowGraphPanel', workflowGraphPanel);

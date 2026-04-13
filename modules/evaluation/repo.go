@@ -25,6 +25,10 @@ type repository interface {
 	UpdateEvalCase(ctx context.Context, id uuid.UUID, updates EvalCaseUpdate) error
 	DeleteEvalCase(ctx context.Context, id uuid.UUID) error
 	ReorderEvalCases(ctx context.Context, evalSetID uuid.UUID, caseIDs []uuid.UUID) error
+
+	// Import/export operations
+	CreateEvalSetWithCases(ctx context.Context, es EvalSet, cases []EvalCase) error
+	ListEvalCasesWithSet(ctx context.Context, evalSetID uuid.UUID) (EvalSet, []EvalCase, error)
 }
 
 // postgresEvalRepo implements repository using PostgreSQL.
@@ -283,4 +287,62 @@ func (r *postgresEvalRepo) ReorderEvalCases(ctx context.Context, evalSetID uuid.
 		return fmt.Errorf("committing reorder transaction: %w", err)
 	}
 	return nil
+}
+
+// CreateEvalSetWithCases atomically inserts an EvalSet and all its EvalCases
+// in a single transaction. If any insert fails, the entire operation rolls back.
+func (r *postgresEvalRepo) CreateEvalSetWithCases(ctx context.Context, es EvalSet, cases []EvalCase) error {
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// Insert EvalSet
+	const qSet = `
+INSERT INTO eval_sets (id, user_id, name, description, created_at, updated_at)
+VALUES (:id, :user_id, :name, :description, :created_at, :updated_at)`
+	if _, err := sqlx.NamedExecContext(ctx, tx, qSet, es); err != nil {
+		return fmt.Errorf("inserting eval_set: %w", err)
+	}
+
+	// Insert each EvalCase
+	const qCase = `
+INSERT INTO eval_cases (
+    id, eval_set_id, name, input, expected_trajectory, expected_response,
+    rubrics, user_messages, sort_order, created_at, updated_at
+) VALUES (
+    :id, :eval_set_id, :name, :input, :expected_trajectory, :expected_response,
+    :rubrics, :user_messages, :sort_order, :created_at, :updated_at
+)`
+	for i, ec := range cases {
+		if _, err := sqlx.NamedExecContext(ctx, tx, qCase, ec); err != nil {
+			return fmt.Errorf("inserting eval_case %d: %w", i, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing transaction: %w", err)
+	}
+	return nil
+}
+
+// ListEvalCasesWithSet returns an EvalSet populated with all its EvalCases.
+func (r *postgresEvalRepo) ListEvalCasesWithSet(ctx context.Context, evalSetID uuid.UUID) (EvalSet, []EvalCase, error) {
+	const qSet = `
+SELECT id, user_id, name, description, created_at, updated_at
+FROM eval_sets WHERE id = $1`
+	var es EvalSet
+	if err := r.db.GetContext(ctx, &es, qSet, evalSetID); err != nil {
+		if err == sql.ErrNoRows {
+			return EvalSet{}, nil, fmt.Errorf("eval_set not found")
+		}
+		return EvalSet{}, nil, fmt.Errorf("selecting eval_set: %w", err)
+	}
+
+	cases, err := r.ListEvalCases(ctx, evalSetID)
+	if err != nil {
+		return EvalSet{}, nil, err
+	}
+	return es, cases, nil
 }

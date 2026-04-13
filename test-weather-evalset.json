@@ -1,0 +1,106 @@
+{
+  "name": "Weather Agent Tests",
+  "description": "Sample test cases for evaluating a weather agent's tool usage and response quality.",
+  "eval_cases": [
+    {
+      "name": "basic_city_query",
+      "input": "What's the weather in Tokyo?",
+      "expected_trajectory": [
+        {
+          "tool_name": "weather_api",
+          "args": { "city": "Tokyo" },
+          "match_type": "EXACT"
+        }
+      ],
+      "expected_response": "The current weather in Tokyo is 22°C, partly cloudy with light winds.",
+      "rubrics": [
+        {
+          "name": "accuracy",
+          "description": "Does the response include accurate weather data?",
+          "levels": [
+            { "score": 1, "description": "No weather data provided" },
+            { "score": 3, "description": "Basic weather info without specifics" },
+            { "score": 5, "description": "Complete accurate weather details with temperature and conditions" }
+          ]
+        }
+      ],
+      "user_messages": [
+        "What about tomorrow?",
+        "Should I bring an umbrella?"
+      ]
+    },
+    {
+      "name": "multi_city_comparison",
+      "input": "Compare the weather in London, Paris, and Berlin for this weekend.",
+      "expected_trajectory": [
+        {
+          "tool_name": "weather_api",
+          "args": { "city": "London", "forecast": "weekend" },
+          "match_type": "IN_ORDER"
+        },
+        {
+          "tool_name": "weather_api",
+          "args": { "city": "Paris", "forecast": "weekend" },
+          "match_type": "IN_ORDER"
+        },
+        {
+          "tool_name": "weather_api",
+          "args": { "city": "Berlin", "forecast": "weekend" },
+          "match_type": "IN_ORDER"
+        }
+      ],
+      "expected_response": "This weekend: London will be rainy at 14°C, Paris partly sunny at 20°C, and Berlin warm and clear at 24°C. Pack layers for London!",
+      "rubrics": [],
+      "user_messages": []
+    },
+    {
+      "name": "unknown_location",
+      "input": "What's the weather in Atlantis?",
+      "expected_trajectory": [],
+      "expected_response": "I couldn't find weather data for Atlantis. Could you verify the city name? Atlantis is a mythical underwater city, so no weather data exists for it.",
+      "rubrics": [
+        {
+          "name": "helpfulness",
+          "description": "How well does the agent handle unknown locations?",
+          "levels": [
+            { "score": 1, "description": "Returns error without explanation" },
+            { "score": 3, "description": "Asks for clarification without suggestion" },
+            { "score": 5, "description": "Explains the issue and suggests nearby valid locations" }
+          ]
+        }
+      ],
+      "user_messages": []
+    },
+    {
+      "name": "weather_alert_request",
+      "input": "Are there any weather warnings in Florida right now?",
+      "expected_trajectory": [
+        {
+          "tool_name": "weather_alerts",
+          "args": { "region": "Florida" },
+          "match_type": "EXACT"
+        }
+      ],
+      "expected_response": "Yes, there's an active tropical storm warning for South Florida. Expected rainfall of 3-5 inches over the next 48 hours.",
+      "rubrics": [],
+      "user_messages": [
+        "How long will it last?",
+        "What areas are most affected?"
+      ]
+    },
+    {
+      "name": "unit_conversion",
+      "input": "What's 72°F in Celsius?",
+      "expected_trajectory": [
+        {
+          "tool_name": "calculator",
+          "args": { "expression": "(72 - 32) * 5 / 9" },
+          "match_type": "ANY_ORDER"
+        }
+      ],
+      "expected_response": "72°F is approximately 22.2°C.",
+      "rubrics": [],
+      "user_messages": []
+    }
+  ]
+}
