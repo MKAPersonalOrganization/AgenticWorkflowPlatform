@@ -31,6 +31,10 @@ func New(db *sqlx.DB) *Module {
 
 // RegisterRoutes mounts all evaluation HTTP routes onto the given chi.Router.
 func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
+	// Metric catalog routes (public, no auth needed)
+	r.Get("/api/evaluation/metrics", m.handler.listMetrics)
+	r.Get("/api/evaluation/metrics/{id}", m.handler.getMetric)
+
 	// EvalSet routes
 	r.Get("/api/eval-sets", authMW.RequireAuthFunc(m.handler.listEvalSets))
 	r.Post("/api/eval-sets", authMW.RequireAuthFunc(m.handler.createEvalSet))

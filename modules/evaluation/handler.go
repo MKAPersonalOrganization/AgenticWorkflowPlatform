@@ -412,6 +412,28 @@ func handleNotFound(w http.ResponseWriter, err error, resource string) {
 	}
 }
 
+// ─── Metric Catalog Handlers ─────────────────────────────────────────────────
+
+// listMetrics handles GET /api/evaluation/metrics.
+func (h *handler) listMetrics(w http.ResponseWriter, r *http.Request) {
+	metrics := GetMetricCatalog()
+	if metrics == nil {
+		metrics = []MetricDefinition{}
+	}
+	writeJSON(w, http.StatusOK, metrics)
+}
+
+// getMetric handles GET /api/evaluation/metrics/{id}.
+func (h *handler) getMetric(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	m, ok := GetMetricByID(id)
+	if !ok {
+		writeError(w, http.StatusNotFound, "metric not found: "+id)
+		return
+	}
+	writeJSON(w, http.StatusOK, m)
+}
+
 // ─── Import / Export Handlers ────────────────────────────────────────────────
 
 // importEvalSet handles POST /api/eval-sets/import.
