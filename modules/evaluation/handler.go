@@ -130,6 +130,8 @@ func (h *handler) updateEvalSet(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "eval set not found")
 		case ErrUnauthorized:
 			http.Error(w, "unauthorized", http.StatusForbidden)
+		case ErrConflict:
+			writeErrorWithField(w, http.StatusConflict, "version", "another user modified this eval set. Please refresh and try again.")
 		default:
 			if strings.HasPrefix(err.Error(), "validation error:") {
 				writeError(w, http.StatusBadRequest, err.Error())

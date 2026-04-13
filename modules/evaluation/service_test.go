@@ -25,6 +25,7 @@ func newMockRepo() *mockRepo {
 }
 
 func (m *mockRepo) CreateEvalSet(_ context.Context, es EvalSet) error {
+	es.Version = 1 // match DB default
 	m.sets[es.ID] = es
 	return nil
 }
@@ -52,12 +53,20 @@ func (m *mockRepo) UpdateEvalSet(_ context.Context, id uuid.UUID, updates EvalSe
 	if !ok {
 		return fmt.Errorf("eval_set not found")
 	}
+	// Optimistic concurrency check
+	if updates.Version > 0 && updates.Version != es.Version {
+		return fmt.Errorf("eval_set not found or concurrent modification")
+	}
 	if updates.Name != nil {
 		es.Name = *updates.Name
 	}
 	if updates.Description != nil {
 		es.Description = updates.Description
 	}
+	if updates.UpdatedBy != nil {
+		es.UpdatedBy = updates.UpdatedBy
+	}
+	es.Version++
 	m.sets[id] = es
 	return nil
 }
@@ -171,6 +180,10 @@ func (m *mockRepo) ListEvalCasesWithSet(_ context.Context, evalSetID uuid.UUID) 
 		}
 	}
 	return es, result, nil
+}
+
+func (m *mockRepo) LogEvalAudit(_ context.Context, _ uuid.UUID, _, _ string, _ json.RawMessage) error {
+	return nil
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -715,5 +728,34 @@ func TestExportEvalSet_Unauthorized(t *testing.T) {
 	_, err := svc.exportEvalSet(context.Background(), es.ID, "user2")
 	if err != ErrUnauthorized {
 		t.Errorf("expected ErrUnauthorized, got %v", err)
+	}
+}
+
+func TestUpdateEvalSet_OptimisticConcurrency(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID: "user1",
+		Name:   "Concurrency Test",
+	})
+
+	// First update with correct version
+	err := svc.updateEvalSet(context.Background(), es.ID, "user1", EvalSetUpdate{
+		Name:    ptr("Updated Name"),
+		Version: es.Version,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error with correct version: %v", err)
+	}
+
+	// Second update with stale version should fail
+	err = svc.updateEvalSet(context.Background(), es.ID, "user1", EvalSetUpdate{
+		Name:    ptr("Stale Update"),
+		Version: 1, // stale version
+	})
+	if err != ErrConflict {
+		t.Errorf("expected ErrConflict for stale version, got %v", err)
 	}
 }

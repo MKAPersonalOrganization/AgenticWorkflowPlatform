@@ -15,6 +15,7 @@ var (
 	ErrUnauthorized  = fmt.Errorf("unauthorized")
 	ErrDuplicateName = fmt.Errorf("duplicate name")
 	ErrValidation    = fmt.Errorf("validation error")
+	ErrConflict      = fmt.Errorf("conflict: concurrent modification")
 )
 
 // service manages the evaluation business logic.
@@ -97,9 +98,35 @@ func (s *service) updateEvalSet(ctx context.Context, id uuid.UUID, userID string
 		return ErrUnauthorized
 	}
 
-	if err := s.repo.UpdateEvalSet(ctx, id, req); err != nil {
+	// Optimistic concurrency: reject if stale version
+	if req.Version > 0 && req.Version != es.Version {
+		return ErrConflict
+	}
+
+	updates := EvalSetUpdate{
+		Name:        req.Name,
+		Description: req.Description,
+		UpdatedBy:   &userID,
+		Version:     req.Version,
+	}
+	if err := s.repo.UpdateEvalSet(ctx, id, updates); err != nil {
+		if strings.Contains(err.Error(), "concurrent modification") {
+			return ErrConflict
+		}
 		return fmt.Errorf("updating eval_set: %w", err)
 	}
+
+	// Audit log
+	changes := map[string]any{}
+	if req.Name != nil {
+		changes["name"] = *req.Name
+	}
+	if req.Description != nil {
+		changes["description"] = *req.Description
+	}
+	raw, _ := json.Marshal(changes)
+	_ = s.repo.LogEvalAudit(ctx, id, "updated", userID, raw)
+
 	return nil
 }
 

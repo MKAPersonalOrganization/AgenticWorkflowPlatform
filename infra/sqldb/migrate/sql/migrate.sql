@@ -1096,3 +1096,25 @@ CREATE TABLE IF NOT EXISTS eval_cases (
 
 CREATE INDEX IF NOT EXISTS idx_eval_cases_eval_set_id ON eval_cases(eval_set_id);
 CREATE INDEX IF NOT EXISTS idx_eval_cases_sort_order ON eval_cases(eval_set_id, sort_order);
+
+-- Version: 1.76
+-- Description: Add version and audit columns for optimistic concurrency and audit trail.
+ALTER TABLE eval_sets ADD COLUMN IF NOT EXISTS version INT NOT NULL DEFAULT 1;
+ALTER TABLE eval_sets ADD COLUMN IF NOT EXISTS created_by TEXT;
+ALTER TABLE eval_sets ADD COLUMN IF NOT EXISTS updated_by TEXT;
+
+ALTER TABLE eval_cases ADD COLUMN IF NOT EXISTS version INT NOT NULL DEFAULT 1;
+ALTER TABLE eval_cases ADD COLUMN IF NOT EXISTS created_by TEXT;
+ALTER TABLE eval_cases ADD COLUMN IF NOT EXISTS updated_by TEXT;
+
+CREATE TABLE IF NOT EXISTS eval_audit_log (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    eval_set_id UUID NOT NULL REFERENCES eval_sets(id) ON DELETE CASCADE,
+    action      TEXT NOT NULL,
+    actor       TEXT,
+    changes     JSONB,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_eval_audit_log_eval_set_id ON eval_audit_log(eval_set_id);
+CREATE INDEX IF NOT EXISTS idx_eval_audit_log_action ON eval_audit_log(action);

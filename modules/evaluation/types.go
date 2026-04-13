@@ -13,6 +13,9 @@ type EvalSet struct {
 	UserID      string    `json:"user_id" db:"user_id"`
 	Name        string    `json:"name" db:"name"`
 	Description *string   `json:"description,omitempty" db:"description"`
+	Version     int       `json:"version" db:"version"`
+	CreatedBy   *string   `json:"created_by,omitempty" db:"created_by"`
+	UpdatedBy   *string   `json:"updated_by,omitempty" db:"updated_by"`
 	CaseCount   int       `json:"case_count,omitempty" db:"case_count"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
@@ -29,6 +32,8 @@ type EvalSetCreate struct {
 type EvalSetUpdate struct {
 	Name        *string
 	Description *string
+	UpdatedBy   *string
+	Version     int
 }
 
 // EvalCase is an individual test case within an EvalSet.

@@ -3,6 +3,7 @@ package evaluation
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -29,6 +30,9 @@ type repository interface {
 	// Import/export operations
 	CreateEvalSetWithCases(ctx context.Context, es EvalSet, cases []EvalCase) error
 	ListEvalCasesWithSet(ctx context.Context, evalSetID uuid.UUID) (EvalSet, []EvalCase, error)
+
+	// Audit operations
+	LogEvalAudit(ctx context.Context, evalSetID uuid.UUID, action, actor string, changes json.RawMessage) error
 }
 
 // postgresEvalRepo implements repository using PostgreSQL.
@@ -88,7 +92,7 @@ ORDER BY es.updated_at DESC`
 }
 
 func (r *postgresEvalRepo) UpdateEvalSet(ctx context.Context, id uuid.UUID, updates EvalSetUpdate) error {
-	q := `UPDATE eval_sets SET updated_at = now()`
+	q := `UPDATE eval_sets SET updated_at = now(), version = version + 1`
 	args := []any{}
 	argIdx := 1
 
@@ -102,9 +106,20 @@ func (r *postgresEvalRepo) UpdateEvalSet(ctx context.Context, id uuid.UUID, upda
 		args = append(args, *updates.Description)
 		argIdx++
 	}
+	if updates.UpdatedBy != nil {
+		q += fmt.Sprintf(", updated_by = $%d", argIdx)
+		args = append(args, *updates.UpdatedBy)
+		argIdx++
+	}
 
-	q += fmt.Sprintf(" WHERE id = $%d", argIdx)
-	args = append(args, id)
+	// Optimistic concurrency: only update if version matches
+	if updates.Version > 0 {
+		q += fmt.Sprintf(" WHERE id = $%d AND version = $%d", argIdx, argIdx+1)
+		args = append(args, id, updates.Version)
+	} else {
+		q += fmt.Sprintf(" WHERE id = $%d", argIdx)
+		args = append(args, id)
+	}
 
 	res, err := r.db.ExecContext(ctx, q, args...)
 	if err != nil {
@@ -116,6 +131,9 @@ func (r *postgresEvalRepo) UpdateEvalSet(ctx context.Context, id uuid.UUID, upda
 		return fmt.Errorf("checking rows affected: %w", err)
 	}
 	if rows == 0 {
+		if updates.Version > 0 {
+			return fmt.Errorf("eval_set not found or concurrent modification")
+		}
 		return fmt.Errorf("eval_set not found")
 	}
 	return nil
@@ -345,4 +363,15 @@ FROM eval_sets WHERE id = $1`
 		return EvalSet{}, nil, err
 	}
 	return es, cases, nil
+}
+
+// LogEvalAudit inserts an audit log entry for an eval set action.
+func (r *postgresEvalRepo) LogEvalAudit(ctx context.Context, evalSetID uuid.UUID, action, actor string, changes json.RawMessage) error {
+	const q = `
+INSERT INTO eval_audit_log (eval_set_id, action, actor, changes, created_at)
+VALUES ($1, $2, $3, $4, now())`
+	if _, err := r.db.ExecContext(ctx, q, evalSetID, action, actor, changes); err != nil {
+		return fmt.Errorf("inserting audit log: %w", err)
+	}
+	return nil
 }
