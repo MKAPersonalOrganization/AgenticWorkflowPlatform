@@ -46,7 +46,8 @@ This document extracts the complete evaluation framework capabilities from Googl
 > **EVAL-CORE-03** implemented in commit `022b3cd4` (issues #22–#24).
 > **EVAL-CORE-04** implemented in commit `057bc67d` (issue #26).
 > **EVAL-CORE-05** implemented in commit `69457629` (issue #25).
-> **EVAL-CORE-06** is the next story — see GitHub issues below.
+> **EVAL-CORE-06** implemented in commit `a063b6b0` (issue #27).
+> **EVAL-CORE-07** is the next story — see GitHub issues below.
 
 ---
 
@@ -211,6 +212,9 @@ This document extracts the complete evaluation framework capabilities from Googl
 - [ ] AC-07.5: Optionally evaluates intermediate tool-output responses, not just the final response.
 
 **Dependencies:** None (standalone evaluator). Can develop in parallel with EVAL-CORE-05, 06, 08.
+
+**GitHub Issues:**
+- [#28](https://github.com/MKAPersonalOrganization/school-with-ai/issues/28) — EVAL-CORE-07.1: Hallucination Detection Evaluator
 
 ---
 
@@ -584,8 +588,8 @@ Phase 2 Complete
 | EVAL-CORE-03 | Metric Configuration | 5 | ✅ 5/5 | Metric catalog, profiles, UI dialog |
 | EVAL-CORE-04 | Run Evaluation | 7 | ✅ 7/7 | Run API, evaluator interface, results |
 | EVAL-CORE-05 | Trajectory Evaluation | 6 | ✅ 6/6 | EXACT/IN_ORDER/ANY_ORDER matching |
-| EVAL-CORE-06 | Response Match Evaluation | 5 | 📋 Issue #27 | ROUGE-1, LLM-as-judge, coherence |
-| EVAL-CORE-07 | Hallucination Detection | 5 | 📋 Planned | Sentence-level claim classification |
+| EVAL-CORE-06 | Response Match Evaluation | 5 | ✅ 5/5 | ROUGE-1, LLM-as-judge, coherence |
+| EVAL-CORE-07 | Hallucination Detection | 5 | 📋 Issue #28 | Sentence-level claim classification |
 | EVAL-CORE-08 | Safety Evaluation | 4 | 📋 Planned | Vertex AI safety scoring |
 | EVAL-HELP-01 | Rubric-Based Evaluation | 7 | 📋 Planned | Custom rubrics, LLM-as-judge |
 | EVAL-HELP-02 | Custom Metrics | 5 | 📋 Planned | User-defined metric functions |
@@ -600,7 +604,7 @@ Phase 2 Complete
 | EVAL-ADV-04 | Parallel Evaluation | 4 | 📋 Planned | Concurrent invocation |
 | EVAL-ADV-05 | Schema Migration | 4 | 📋 Planned | Backward-compatible migration |
 
-**Total: 20 stories · 109 acceptance criteria · 31/109 completed (28%)**
+**Total: 20 stories · 109 acceptance criteria · 36/109 completed (33%)**
 
 ---
 
