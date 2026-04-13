@@ -84,6 +84,19 @@ templ EvalSetsDialog() {
 									{ i18n.T(ctx, "Metrics") }
 								}
 							}
+							@dialog.Trigger(dialog.TriggerProps{For: "evaluation-dialog"}) {
+								@button.Button(button.Props{
+									Size:    button.SizeSm,
+									Variant: button.VariantOutline,
+									Attributes: templ.Attributes{
+										"@click": "$dispatch('open-evaluation-dialog')",
+										"title":  i18n.T(ctx, "Run Evaluation"),
+									},
+								}) {
+									@icon.ChartBar(icon.Props{Class: "size-3.5 me-1.5"})
+									{ i18n.T(ctx, "Evaluate") }
+								}
+							}
 						</div>
 					}
 
