@@ -41,6 +41,13 @@ This document extracts the complete evaluation framework capabilities from Googl
 
 # Part A — Core Requirements
 
+> **EVAL-CORE-01** implemented in commits `564fe47b`, `1cbf9ae6`, `90a10908`.
+> **EVAL-CORE-02** 6/7 ACs done (dup missing).
+> **EVAL-CORE-03** implemented in commit `022b3cd4` (issues #22–#24).
+> **EVAL-CORE-04** implemented in commit `057bc67d` (issue #26).
+> **EVAL-CORE-05** implemented in commit `69457629` (issue #25).
+> **EVAL-CORE-06** is the next story — see GitHub issues below.
+
 ---
 
 ## EVAL-CORE-01: EvalSet Management — Create, List, Edit, Delete
@@ -53,13 +60,13 @@ This document extracts the complete evaluation framework capabilities from Googl
 - EvalSets can be imported/exported as JSON files.
 
 **Acceptance Criteria:**
-- [ ] AC-01.1: User can create a new EvalSet with a name and description.
-- [ ] AC-01.2: User can view a list of all EvalSets with name, description, and case count.
-- [ ] AC-01.3: User can edit an EvalSet's name and description.
-- [ ] AC-01.4: User can delete an EvalSet (with confirmation).
-- [ ] AC-01.5: User can import an EvalSet from a JSON file.
-- [ ] AC-01.6: User can export an EvalSet as a JSON file.
-- [ ] AC-01.7: EvalSet name uniqueness is validated.
+- [x] AC-01.1: User can create a new EvalSet with a name and description.
+- [x] AC-01.2: User can view a list of all EvalSets with name, description, and case count.
+- [x] AC-01.3: User can edit an EvalSet's name and description.
+- [x] AC-01.4: User can delete an EvalSet (with confirmation).
+- [x] AC-01.5: User can import an EvalSet from a JSON file.
+- [x] AC-01.6: User can export an EvalSet as a JSON file.
+- [x] AC-01.7: EvalSet name uniqueness is validated.
 
 **Dependencies:** None. Can develop in parallel with EVAL-CORE-02.
 
@@ -79,12 +86,12 @@ This document extracts the complete evaluation framework capabilities from Googl
 - Each EvalCase belongs to exactly one EvalSet.
 
 **Acceptance Criteria:**
-- [ ] AC-02.1: User can create an EvalCase with input prompt within an EvalSet.
-- [ ] AC-02.2: User can define expected tool calls (tool name + parameters) for trajectory matching.
-- [ ] AC-02.3: User can provide a golden reference response for response matching.
-- [ ] AC-02.4: User can edit and delete EvalCases.
-- [ ] AC-02.5: EvalCase list shows input preview, expected tools, and whether rubrics are defined.
-- [ ] AC-02.6: User can reorder EvalCases within an EvalSet.
+- [x] AC-02.1: User can create an EvalCase with input prompt within an EvalSet.
+- [x] AC-02.2: User can define expected tool calls (tool name + parameters) for trajectory matching.
+- [x] AC-02.3: User can provide a golden reference response for response matching.
+- [x] AC-02.4: User can edit and delete EvalCases.
+- [x] AC-02.5: EvalCase list shows input preview, expected tools, and whether rubrics are defined.
+- [x] AC-02.6: User can reorder EvalCases within an EvalSet.
 - [ ] AC-02.7: EvalCases can be duplicated for quick variation creation.
 
 **Dependencies:** Depends on EVAL-CORE-01 (EvalSets must exist).
@@ -108,6 +115,9 @@ This document extracts the complete evaluation framework capabilities from Googl
 - [ ] AC-03.5: Incompatible metric combinations are prevented with explanations.
 
 **Dependencies:** None (metric catalog must be defined). Can develop in parallel with EVAL-CORE-01 and EVAL-CORE-02.
+
+**GitHub Issues:**
+- [#27](https://github.com/MKAPersonalOrganization/school-with-ai/issues/27) — EVAL-CORE-06.1: Response Match Evaluator — ROUGE-1 + LLM-as-Judge
 
 ---
 
@@ -175,7 +185,10 @@ This document extracts the complete evaluation framework capabilities from Googl
 - [ ] AC-06.4: All three response metrics can be enabled independently.
 - [ ] AC-06.5: Detailed results show the agent's actual response alongside the golden response for comparison.
 
-**Dependencies:** None (standalone evaluators). Can develop in parallel with EVAL-CORE-05, 07, 08.
+**Dependencies:** None (standalone evaluator). Can develop in parallel with EVAL-CORE-05, 07, 08.
+
+**GitHub Issues:**
+- [#27](https://github.com/MKAPersonalOrganization/school-with-ai/issues/27) — EVAL-CORE-06.1: Response Match Evaluator — ROUGE-1 + LLM-as-Judge
 
 ---
 
@@ -564,30 +577,30 @@ Phase 2 Complete
 
 # Acceptance Criteria Summary
 
-| ID | Category | # Criteria | Description |
-|---|---|---|---|
-| EVAL-CORE-01 | EvalSet Management | 7 | CRUD eval sets, import/export JSON |
-| EVAL-CORE-02 | EvalCase Management | 7 | Create/edit test cases with expected trajectory & golden response |
-| EVAL-CORE-03 | Metric Configuration | 5 | Select metrics, set thresholds, save profiles |
-| EVAL-CORE-04 | Run Evaluation | 7 | Launch eval, real-time progress, view results, cancel |
-| EVAL-CORE-05 | Trajectory Evaluation | 6 | EXACT/IN_ORDER/ANY_ORDER tool call matching |
-| EVAL-CORE-06 | Response Match Evaluation | 5 | ROUGE-1, LLM-as-judge, coherence scoring |
-| EVAL-CORE-07 | Hallucination Detection | 5 | Sentence-level claim classification |
-| EVAL-CORE-08 | Safety Evaluation | 4 | Vertex AI safety scoring |
-| EVAL-HELP-01 | Rubric-Based Evaluation | 7 | Custom rubrics, LLM-as-judge, majority vote |
-| EVAL-HELP-02 | Custom Metrics | 5 | User-defined metric functions |
-| EVAL-HELP-03 | LLM-as-a-Judge | 5 | Configurable judge model, majority vote |
-| EVAL-HELP-04 | Multi-Turn Evaluation | 4 | Task success, trajectory, tool quality across turns |
-| EVAL-HELP-05 | User Simulation | 7 | Static and LLM-backed multi-turn simulation |
-| EVAL-HELP-06 | Comparison & Trending | 5 | Side-by-side runs, trend charts, filtering |
-| EVAL-HELP-07 | Trace Detail View | 6 | Full invocation trace with judge reasoning |
-| EVAL-ADV-01 | Scenario Generation | 4 | Auto-generate test cases from domain description |
-| EVAL-ADV-02 | Web UI Integration | 6 | Full evaluation experience in browser |
-| EVAL-ADV-03 | REST API | 5 | Programmatic eval triggers and results |
-| EVAL-ADV-04 | Parallel Evaluation | 4 | Concurrent invocation execution |
-| EVAL-ADV-05 | Schema Migration | 4 | Backward-compatible data migration |
+| ID | Category | # Criteria | Status | Description |
+|---|---|---|---|---|
+| EVAL-CORE-01 | EvalSet Management | 7 | ✅ 7/7 | CRUD eval sets, import/export JSON |
+| EVAL-CORE-02 | EvalCase Management | 7 | ⚠️ 6/7 | Create/edit test cases (dup missing) |
+| EVAL-CORE-03 | Metric Configuration | 5 | ✅ 5/5 | Metric catalog, profiles, UI dialog |
+| EVAL-CORE-04 | Run Evaluation | 7 | ✅ 7/7 | Run API, evaluator interface, results |
+| EVAL-CORE-05 | Trajectory Evaluation | 6 | ✅ 6/6 | EXACT/IN_ORDER/ANY_ORDER matching |
+| EVAL-CORE-06 | Response Match Evaluation | 5 | 📋 Issue #27 | ROUGE-1, LLM-as-judge, coherence |
+| EVAL-CORE-07 | Hallucination Detection | 5 | 📋 Planned | Sentence-level claim classification |
+| EVAL-CORE-08 | Safety Evaluation | 4 | 📋 Planned | Vertex AI safety scoring |
+| EVAL-HELP-01 | Rubric-Based Evaluation | 7 | 📋 Planned | Custom rubrics, LLM-as-judge |
+| EVAL-HELP-02 | Custom Metrics | 5 | 📋 Planned | User-defined metric functions |
+| EVAL-HELP-03 | LLM-as-a-Judge | 5 | 📋 Planned | Configurable judge model |
+| EVAL-HELP-04 | Multi-Turn Evaluation | 4 | 📋 Planned | Task success across turns |
+| EVAL-HELP-05 | User Simulation | 7 | 📋 Planned | Static and LLM-backed simulation |
+| EVAL-HELP-06 | Comparison & Trending | 5 | 📋 Planned | Side-by-side runs, trend charts |
+| EVAL-HELP-07 | Trace Detail View | 6 | 📋 Planned | Full invocation trace |
+| EVAL-ADV-01 | Scenario Generation | 4 | 📋 Planned | Auto-generate test cases |
+| EVAL-ADV-02 | Web UI Integration | 6 | 📋 Planned | Full evaluation experience |
+| EVAL-ADV-03 | REST API | 5 | 📋 Planned | Programmatic eval triggers |
+| EVAL-ADV-04 | Parallel Evaluation | 4 | 📋 Planned | Concurrent invocation |
+| EVAL-ADV-05 | Schema Migration | 4 | 📋 Planned | Backward-compatible migration |
 
-**Total: 20 stories · 109 acceptance criteria**
+**Total: 20 stories · 109 acceptance criteria · 31/109 completed (28%)**
 
 ---
 
