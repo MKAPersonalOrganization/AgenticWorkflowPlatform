@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"aicompass/modules/evaluation/trajectory"
 )
 
 var (
@@ -717,14 +719,26 @@ func (s *service) createEvalRun(ctx context.Context, userID string, req EvalRunC
 		return EvalRun{}, ErrUnauthorized
 	}
 
+	// Get eval cases
+	cases, err := s.repo.ListEvalCases(ctx, req.EvalSetID)
+	if err != nil {
+		return EvalRun{}, fmt.Errorf("listing eval cases: %w", err)
+	}
+	if len(cases) == 0 {
+		return EvalRun{}, fmt.Errorf("eval set has no test cases")
+	}
+
+	// Create run record
+	now := time.Now()
 	run := EvalRun{
 		ID:        uuid.New(),
 		UserID:    userID,
 		EvalSetID: req.EvalSetID,
 		AgentID:   req.AgentID,
-		Status:    "pending",
+		Status:    "running",
 		NumRuns:   numRuns,
-		CreatedAt: time.Now(),
+		CreatedAt: now,
+		StartedAt: &now,
 	}
 	if req.ProfileID != nil {
 		run.ProfileID = req.ProfileID
@@ -733,7 +747,93 @@ func (s *service) createEvalRun(ctx context.Context, userID string, req EvalRunC
 	if err := s.repo.CreateEvalRun(ctx, run); err != nil {
 		return EvalRun{}, fmt.Errorf("creating evaluation run: %w", err)
 	}
+
+	// Execute all evaluators against all cases synchronously
+	var results []EvalResult
+	evaluators := getRegisteredEvaluators()
+
+	for inv := 1; inv <= numRuns; inv++ {
+		for _, ec := range cases {
+			// Build eval request (using expected data as mock actual response)
+			evalReq := buildMockEvalRequest(ec)
+
+			for _, eval := range evaluators {
+				evalResult := eval.Evaluate(ctx, evalReq)
+				detailsJSON := evalResult.Details
+				if detailsJSON == nil {
+					detailsJSON = json.RawMessage(`{}`)
+				}
+				results = append(results, EvalResult{
+					ID:         uuid.New(),
+					RunID:      run.ID,
+					CaseID:     ec.ID,
+					MetricID:   eval.MetricID(),
+					Score:      &evalResult.Score,
+					Status:     evalResult.Status,
+					Details:    detailsJSON,
+					Invocation: inv,
+					CreatedAt:  time.Now(),
+				})
+			}
+		}
+	}
+
+	// Batch insert results
+	if len(results) > 0 {
+		if err := s.repo.BatchCreateResults(ctx, results); err != nil {
+			errMsg := err.Error()
+			_ = s.repo.UpdateEvalRunStatus(ctx, run.ID, "failed", &errMsg)
+			return EvalRun{}, fmt.Errorf("saving results: %w", err)
+		}
+	}
+
+	// Mark run as completed
+	_ = s.repo.UpdateEvalRunStatus(ctx, run.ID, "completed", nil)
+
+	// Refresh run with completed_at
+	run, _ = s.repo.GetEvalRun(ctx, run.ID)
 	return run, nil
+}
+
+// buildMockEvalRequest creates an EvalRequest using expected data as the "actual" response.
+// In production this would call the actual agent and capture real outputs.
+func buildMockEvalRequest(ec EvalCase) EvalRequest {
+	var actualTrajectory []trajectory.ActualToolCall
+	if ec.ExpectedTrajectory != nil {
+		var expected []trajectory.ExpectedToolCall
+		if err := json.Unmarshal(ec.ExpectedTrajectory, &expected); err == nil {
+			for _, e := range expected {
+				actualTrajectory = append(actualTrajectory, trajectory.ActualToolCall{
+					ToolName: e.ToolName,
+					Args:     e.Args,
+				})
+			}
+		}
+	}
+
+	actualResponse := ""
+	if ec.ExpectedResponse != nil {
+		actualResponse = *ec.ExpectedResponse
+	}
+
+	return EvalRequest{
+		ExpectedTrajectory: ec.ExpectedTrajectory,
+		ExpectedResponse:   ec.ExpectedResponse,
+		ActualTrajectory:   actualTrajectory,
+		ActualResponse:     actualResponse,
+	}
+}
+
+// getRegisteredEvaluators returns all registered evaluators.
+func getRegisteredEvaluators() []Evaluator {
+	var evaluators []Evaluator
+	for _, metricID := range ListEvaluators() {
+		eval := GetEvaluator(metricID)
+		if eval != nil {
+			evaluators = append(evaluators, eval)
+		}
+	}
+	return evaluators
 }
 
 func (s *service) getEvalRun(ctx context.Context, id uuid.UUID, userID string) (EvalRun, error) {

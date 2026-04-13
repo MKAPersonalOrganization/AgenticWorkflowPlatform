@@ -44,7 +44,7 @@ templ EvaluationDialog() {
 							@button.Button(button.Props{
 								Size: button.SizeSm,
 								Attributes: templ.Attributes{
-									"@click": "view = 'launch'; loadAgents(); loadProfiles()",
+									"@click": "view = 'launch'; loadAgents(); loadEvalSets(); loadProfiles()",
 								},
 							}) {
 								@icon.Play(icon.Props{Class: "size-3.5 me-1.5"})
@@ -75,13 +75,32 @@ templ EvaluationDialog() {
 						<!-- Launch Form -->
 						<div x-show="view == 'launch'" class="space-y-3 p-3 rounded-lg border border-border/60 bg-muted/30">
 							<div>
-								<label class="text-xs font-medium text-foreground mb-1 block">{ i18n.T(ctx, "Agent ID") }</label>
-								<input
-									type="text"
+								<label class="text-xs font-medium text-foreground mb-1 block">{ i18n.T(ctx, "EvalSet") }</label>
+								<select
+									x-model="launchForm.eval_set_id"
+									:disabled="evalSetsLoading"
+									class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+								>
+									<option value="" x-show="evalSetsLoading">{ i18n.T(ctx, "Loading...") }</option>
+									<option value="" x-show="!evalSetsLoading && evalSets.length == 0">{ i18n.T(ctx, "No eval sets found") }</option>
+									<template x-for="es in evalSets" :key="es.id">
+										<option :value="es.id" x-text="es.name + ' (' + es.case_count + ' cases)'"></option>
+									</template>
+								</select>
+							</div>
+							<div>
+								<label class="text-xs font-medium text-foreground mb-1 block">{ i18n.T(ctx, "Agent") }</label>
+								<select
 									x-model="launchForm.agent_id"
-									placeholder="Enter agent UUID"
-									class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-								/>
+									:disabled="agentsLoading"
+									class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+								>
+									<option value="" x-show="agentsLoading">{ i18n.T(ctx, "Loading agents...") }</option>
+									<option value="" x-show="!agentsLoading && agents.length == 0">{ i18n.T(ctx, "No agents found. Create one first.") }</option>
+									<template x-for="agent in agents" :key="agent.id">
+										<option :value="agent.id" x-text="agent.name + (agent.isComposed ? ' (workflow)' : '')"></option>
+									</template>
+								</select>
 							</div>
 							<div>
 								<label class="text-xs font-medium text-foreground mb-1 block">{ i18n.T(ctx, "Profile ID") }</label>
@@ -119,7 +138,7 @@ templ EvaluationDialog() {
 									Size: button.SizeSm,
 									Attributes: templ.Attributes{
 										"@click":    "launchEvaluation()",
-										":disabled": "!launchForm.agent_id || launching",
+										":disabled": "!launchForm.eval_set_id || !launchForm.agent_id || launching",
 									},
 								}) {
 									<span x-show="!launching">{ i18n.T(ctx, "Launch") }</span>

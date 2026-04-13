@@ -1106,6 +1106,16 @@ func TestCreateEvalRun_Valid(t *testing.T) {
 		Name:   "Test Set",
 	})
 
+	// Add eval cases to the eval set via the mock
+	testCaseName := "Test Case"
+	repo.evalCases = append(repo.evalCases, EvalCase{
+		ID:        uuid.New(),
+		EvalSetID: es.ID,
+		Name:      &testCaseName,
+		Input:     "test input",
+		SortOrder: 1,
+	})
+
 	run, err := svc.createEvalRun(context.Background(), "user1", EvalRunCreate{
 		UserID:    "user1",
 		EvalSetID: es.ID,
@@ -1115,8 +1125,8 @@ func TestCreateEvalRun_Valid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if run.Status != "pending" {
-		t.Errorf("expected status pending, got %s", run.Status)
+	if run.Status != "completed" {
+		t.Errorf("expected status completed, got %s", run.Status)
 	}
 	if run.NumRuns != 3 {
 		t.Errorf("expected num_runs 3, got %d", run.NumRuns)
@@ -1131,6 +1141,16 @@ func TestCreateEvalRun_NumRunsClamped(t *testing.T) {
 	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID: "user1",
 		Name:   "Test Set",
+	})
+
+	// Add test case
+	testCaseName := "Test Case"
+	repo.evalCases = append(repo.evalCases, EvalCase{
+		ID:        uuid.New(),
+		EvalSetID: es.ID,
+		Name:      &testCaseName,
+		Input:     "test input",
+		SortOrder: 1,
 	})
 
 	// Test below minimum
@@ -1206,6 +1226,14 @@ func TestListEvalRuns_UserScoped(t *testing.T) {
 		UserID: "user1",
 		Name:   "Test Set",
 	})
+	testCaseName := "Test Case"
+	repo.evalCases = append(repo.evalCases, EvalCase{
+		ID:        uuid.New(),
+		EvalSetID: es.ID,
+		Name:      &testCaseName,
+		Input:     "test input",
+		SortOrder: 1,
+	})
 	_, _ = svc.createEvalRun(context.Background(), "user1", EvalRunCreate{
 		UserID:    "user1",
 		EvalSetID: es.ID,
@@ -1215,6 +1243,14 @@ func TestListEvalRuns_UserScoped(t *testing.T) {
 	es2, _ := svc.createEvalSet(context.Background(), "user2", EvalSetCreate{
 		UserID: "user2",
 		Name:   "User2 Set",
+	})
+	testCaseName2 := "Test Case 2"
+	repo.evalCases = append(repo.evalCases, EvalCase{
+		ID:        uuid.New(),
+		EvalSetID: es2.ID,
+		Name:      &testCaseName2,
+		Input:     "test input 2",
+		SortOrder: 1,
 	})
 	_, _ = svc.createEvalRun(context.Background(), "user2", EvalRunCreate{
 		UserID:    "user2",
@@ -1240,22 +1276,24 @@ func TestCancelEvalRun_OnlyRunningOrPending(t *testing.T) {
 		UserID: "user1",
 		Name:   "Test Set",
 	})
+	testCaseName := "Test Case"
+	repo.evalCases = append(repo.evalCases, EvalCase{
+		ID:        uuid.New(),
+		EvalSetID: es.ID,
+		Name:      &testCaseName,
+		Input:     "test input",
+		SortOrder: 1,
+	})
 	run, _ := svc.createEvalRun(context.Background(), "user1", EvalRunCreate{
 		UserID:    "user1",
 		EvalSetID: es.ID,
 		AgentID:   uuid.New(),
 	})
 
-	// Cancel pending run — should work
+	// Cancel a run - but with sync execution it's already "completed" so cancel will fail
 	err := svc.cancelEvalRun(context.Background(), run.ID, "user1")
-	if err != nil {
-		t.Fatalf("expected cancel to succeed for pending run, got %v", err)
-	}
-
-	// Try to cancel again — should fail (now cancelled)
-	err = svc.cancelEvalRun(context.Background(), run.ID, "user1")
 	if err == nil {
-		t.Fatal("expected error when cancelling already-cancelled run")
+		t.Errorf("expected cancel to fail for completed run, but it succeeded")
 	}
 }
 
@@ -1267,6 +1305,14 @@ func TestGetEvalResults_Unauthorized(t *testing.T) {
 	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID: "user1",
 		Name:   "Test Set",
+	})
+	testCaseName := "Test Case"
+	repo.evalCases = append(repo.evalCases, EvalCase{
+		ID:        uuid.New(),
+		EvalSetID: es.ID,
+		Name:      &testCaseName,
+		Input:     "test input",
+		SortOrder: 1,
 	})
 	run, _ := svc.createEvalRun(context.Background(), "user1", EvalRunCreate{
 		UserID:    "user1",

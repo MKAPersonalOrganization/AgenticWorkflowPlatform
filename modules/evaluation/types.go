@@ -158,11 +158,11 @@ type EvalRun struct {
 
 // EvalRunCreate holds fields for starting a new evaluation run.
 type EvalRunCreate struct {
-	UserID    string
-	EvalSetID uuid.UUID
-	AgentID   uuid.UUID
-	ProfileID *uuid.UUID
-	NumRuns   int
+	UserID    string     `json:"-"`
+	EvalSetID uuid.UUID  `json:"eval_set_id"`
+	AgentID   uuid.UUID  `json:"agent_id"`
+	ProfileID *uuid.UUID `json:"profile_id,omitempty"`
+	NumRuns   int        `json:"num_runs"`
 }
 
 // EvalResult is a single metric score for one case/invocation.

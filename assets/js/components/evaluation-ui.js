@@ -4,14 +4,17 @@
  */
 export const evaluationDialog = () => ({
     // State
-    view: 'runs',            // 'runs' | 'results' | 'rubrics'
+    view: 'runs',            // 'runs' | 'results' | 'rubrics' | 'launch'
     loading: false,
+    agentsLoading: false,
+    evalSetsLoading: false,
     showLaunchForm: false,
     showRubricForm: false,
     launching: false,
     creatingRubric: false,
     evalSetId: '',           // Current EvalSet context (set from parent)
     runs: [],
+    evalSets: [],
     results: [],
     rubrics: [],
     agents: [],
@@ -55,14 +58,32 @@ export const evaluationDialog = () => ({
     },
 
     async loadAgents() {
+        this.agentsLoading = true;
         try {
-            const resp = await fetch('/api/agents', { credentials: 'same-origin' });
+            const resp = await fetch('/v1/agent-definitions', { credentials: 'same-origin' });
             if (resp.ok) {
                 const data = await resp.json();
-                this.agents = data.agents || [];
+                // Only show user's own agents, not catalog templates
+                this.agents = (data.agents || []).filter(a => !a.sourceCatalogId);
             }
         } catch (err) {
             console.error('Failed to load agents:', err);
+        } finally {
+            this.agentsLoading = false;
+        }
+    },
+
+    async loadEvalSets() {
+        this.evalSetsLoading = true;
+        try {
+            const resp = await fetch('/api/eval-sets', { credentials: 'same-origin' });
+            if (resp.ok) {
+                this.evalSets = await resp.json();
+            }
+        } catch (err) {
+            console.error('Failed to load eval sets:', err);
+        } finally {
+            this.evalSetsLoading = false;
         }
     },
 
@@ -78,10 +99,19 @@ export const evaluationDialog = () => ({
     },
 
     async launchEvaluation() {
+        if (!this.launchForm.eval_set_id) {
+            this.showToast('Please select an EvalSet', 'error');
+            return;
+        }
+        if (!this.launchForm.agent_id) {
+            this.showToast('Please select an agent', 'error');
+            return;
+        }
+
         this.launching = true;
         try {
             const body = {
-                eval_set_id: this.evalSetId,
+                eval_set_id: this.launchForm.eval_set_id,
                 agent_id: this.launchForm.agent_id,
                 num_runs: this.launchForm.num_runs || 1,
             };
@@ -97,10 +127,11 @@ export const evaluationDialog = () => ({
             });
 
             if (resp.ok || resp.status === 201) {
+                const agentName = this.agents.find(a => a.id === this.launchForm.agent_id)?.name || 'Agent';
                 this.showLaunchForm = false;
-                this.launchForm = { agent_id: '', profile_id: '', num_runs: 1 };
+                this.launchForm = { eval_set_id: '', agent_id: '', profile_id: '', num_runs: 1 };
                 await this.loadRuns();
-                this.showToast('Evaluation launched', 'success');
+                this.showToast('Evaluation launched for ' + agentName, 'success');
             } else {
                 const data = await resp.json().catch(() => ({}));
                 this.showToast(data.message || 'Failed to launch evaluation', 'error');
