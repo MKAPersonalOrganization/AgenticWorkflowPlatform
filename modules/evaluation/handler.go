@@ -434,6 +434,159 @@ func (h *handler) getMetric(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, m)
 }
 
+// ─── Metric Profile Handlers ─────────────────────────────────────────────────
+
+// listMetricProfiles handles GET /api/evaluation/profiles.
+func (h *handler) listMetricProfiles(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	profiles, err := h.svc.listMetricProfiles(r.Context(), user.ID)
+	if err != nil {
+		slog.Error("listing metric profiles", "error", err)
+		http.Error(w, "Failed to list metric profiles", http.StatusInternalServerError)
+		return
+	}
+	if profiles == nil {
+		profiles = []MetricProfile{}
+	}
+	writeJSON(w, http.StatusOK, profiles)
+}
+
+// createMetricProfile handles POST /api/evaluation/profiles.
+func (h *handler) createMetricProfile(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req MetricProfileCreate
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	req.UserID = user.ID
+
+	p, err := h.svc.createMetricProfile(r.Context(), user.ID, req)
+	if err != nil {
+		switch {
+		case strings.HasPrefix(err.Error(), "validation error:"):
+			writeError(w, http.StatusBadRequest, err.Error())
+		case strings.HasPrefix(err.Error(), "duplicate name:"):
+			writeErrorWithField(w, http.StatusConflict, "name", err.Error())
+		default:
+			slog.Error("creating metric profile", "error", err)
+			http.Error(w, "Failed to create metric profile", http.StatusInternalServerError)
+		}
+		return
+	}
+	writeJSON(w, http.StatusCreated, p)
+}
+
+// getMetricProfile handles GET /api/evaluation/profiles/{id}.
+func (h *handler) getMetricProfile(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	p, err := h.svc.getMetricProfile(r.Context(), id, user.ID)
+	if err != nil {
+		handleNotFound(w, err, "metric profile")
+		return
+	}
+	writeJSON(w, http.StatusOK, p)
+}
+
+// updateMetricProfile handles PUT /api/evaluation/profiles/{id}.
+func (h *handler) updateMetricProfile(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	var req MetricProfileUpdate
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := h.svc.updateMetricProfile(r.Context(), id, user.ID, req); err != nil {
+		switch err {
+		case ErrNotFound:
+			writeError(w, http.StatusNotFound, "metric profile not found")
+		case ErrUnauthorized:
+			http.Error(w, "unauthorized", http.StatusForbidden)
+		default:
+			if strings.HasPrefix(err.Error(), "validation error:") {
+				writeError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			slog.Error("updating metric profile", "error", err)
+			http.Error(w, "Failed to update metric profile", http.StatusInternalServerError)
+		}
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// deleteMetricProfile handles DELETE /api/evaluation/profiles/{id}.
+func (h *handler) deleteMetricProfile(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if err := h.svc.deleteMetricProfile(r.Context(), id, user.ID); err != nil {
+		handleNotFound(w, err, "metric profile")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// setDefaultProfile handles POST /api/evaluation/profiles/{id}/set-default.
+func (h *handler) setDefaultProfile(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if err := h.svc.setDefaultProfile(r.Context(), id, user.ID); err != nil {
+		switch err {
+		case ErrNotFound:
+			writeError(w, http.StatusNotFound, "metric profile not found")
+		case ErrUnauthorized:
+			http.Error(w, "unauthorized", http.StatusForbidden)
+		default:
+			slog.Error("setting default profile", "error", err)
+			http.Error(w, "Failed to set default profile", http.StatusInternalServerError)
+		}
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // ─── Import / Export Handlers ────────────────────────────────────────────────
 
 // importEvalSet handles POST /api/eval-sets/import.

@@ -1118,3 +1118,19 @@ CREATE TABLE IF NOT EXISTS eval_audit_log (
 
 CREATE INDEX IF NOT EXISTS idx_eval_audit_log_eval_set_id ON eval_audit_log(eval_set_id);
 CREATE INDEX IF NOT EXISTS idx_eval_audit_log_action ON eval_audit_log(action);
+
+-- Version: 1.77
+-- Description: Create eval_metric_profiles table for reusable metric configurations.
+CREATE TABLE IF NOT EXISTS eval_metric_profiles (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    description TEXT,
+    metrics     JSONB NOT NULL,
+    is_default  BOOLEAN NOT NULL DEFAULT false,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_metric_profiles_user_name UNIQUE (user_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_metric_profiles_user_id ON eval_metric_profiles(user_id);

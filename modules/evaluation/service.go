@@ -502,3 +502,197 @@ func (s *service) exportEvalSet(ctx context.Context, id uuid.UUID, userID string
 
 	return export, nil
 }
+
+// ─── Metric Profile ──────────────────────────────────────────────────────────
+
+func (s *service) createMetricProfile(ctx context.Context, userID string, req MetricProfileCreate) (MetricProfile, error) {
+	if err := validateMetricProfileName(req.Name); err != nil {
+		return MetricProfile{}, fmt.Errorf("%w: %w", ErrValidation, err)
+	}
+	if err := s.validateMetricConfigs(req.Metrics); err != nil {
+		return MetricProfile{}, fmt.Errorf("%w: %w", ErrValidation, err)
+	}
+
+	// Check name uniqueness
+	profiles, err := s.repo.ListMetricProfiles(ctx, userID)
+	if err != nil {
+		return MetricProfile{}, fmt.Errorf("checking name uniqueness: %w", err)
+	}
+	for _, p := range profiles {
+		if strings.EqualFold(p.Name, req.Name) {
+			return MetricProfile{}, fmt.Errorf("%w: a metric profile named %q already exists", ErrDuplicateName, req.Name)
+		}
+	}
+
+	// If setting as default, unset any existing default
+	if req.IsDefault {
+		for _, p := range profiles {
+			if p.IsDefault {
+				_ = s.repo.UpdateMetricProfile(ctx, p.ID, MetricProfileUpdate{IsDefault: boolPtr(false)})
+			}
+		}
+	}
+
+	metricsJSON, _ := json.Marshal(req.Metrics)
+	p := MetricProfile{
+		ID:          uuid.New(),
+		UserID:      userID,
+		Name:        strings.TrimSpace(req.Name),
+		Description: req.Description,
+		Metrics:     req.Metrics,
+		IsDefault:   req.IsDefault,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+	// Store metrics as JSON in the db struct tag
+	_ = metricsJSON // handled by NamedExec
+
+	if err := s.repo.CreateMetricProfile(ctx, p); err != nil {
+		return MetricProfile{}, fmt.Errorf("creating metric profile: %w", err)
+	}
+	return p, nil
+}
+
+func (s *service) getMetricProfile(ctx context.Context, id uuid.UUID, userID string) (MetricProfile, error) {
+	p, err := s.repo.GetMetricProfile(ctx, id)
+	if err != nil {
+		if err.Error() == "metric profile not found" {
+			return MetricProfile{}, ErrNotFound
+		}
+		return MetricProfile{}, fmt.Errorf("getting metric profile: %w", err)
+	}
+	if p.UserID != userID {
+		return MetricProfile{}, ErrUnauthorized
+	}
+	return p, nil
+}
+
+func (s *service) listMetricProfiles(ctx context.Context, userID string) ([]MetricProfile, error) {
+	return s.repo.ListMetricProfiles(ctx, userID)
+}
+
+func (s *service) updateMetricProfile(ctx context.Context, id uuid.UUID, userID string, req MetricProfileUpdate) error {
+	if req.Name != nil {
+		if err := validateMetricProfileName(*req.Name); err != nil {
+			return fmt.Errorf("%w: %w", ErrValidation, err)
+		}
+	}
+	if req.Metrics != nil {
+		if err := s.validateMetricConfigs(req.Metrics); err != nil {
+			return fmt.Errorf("%w: %w", ErrValidation, err)
+		}
+	}
+
+	// Verify ownership
+	p, err := s.repo.GetMetricProfile(ctx, id)
+	if err != nil {
+		if err.Error() == "metric profile not found" {
+			return ErrNotFound
+		}
+		return fmt.Errorf("getting metric profile: %w", err)
+	}
+	if p.UserID != userID {
+		return ErrUnauthorized
+	}
+
+	// If setting as default, unset previous defaults first
+	if req.IsDefault != nil && *req.IsDefault {
+		profiles, _ := s.repo.ListMetricProfiles(ctx, userID)
+		for _, prof := range profiles {
+			if prof.IsDefault && prof.ID != id {
+				_ = s.repo.UpdateMetricProfile(ctx, prof.ID, MetricProfileUpdate{IsDefault: boolPtr(false)})
+			}
+		}
+	}
+
+	if err := s.repo.UpdateMetricProfile(ctx, id, req); err != nil {
+		return fmt.Errorf("updating metric profile: %w", err)
+	}
+	return nil
+}
+
+func (s *service) deleteMetricProfile(ctx context.Context, id uuid.UUID, userID string) error {
+	if err := s.repo.DeleteMetricProfile(ctx, id, userID); err != nil {
+		if err.Error() == "metric profile not found or unauthorized" {
+			return ErrNotFound
+		}
+		return fmt.Errorf("deleting metric profile: %w", err)
+	}
+	return nil
+}
+
+func (s *service) setDefaultProfile(ctx context.Context, id uuid.UUID, userID string) error {
+	// Verify ownership
+	p, err := s.repo.GetMetricProfile(ctx, id)
+	if err != nil {
+		if err.Error() == "metric profile not found" {
+			return ErrNotFound
+		}
+		return fmt.Errorf("getting metric profile: %w", err)
+	}
+	if p.UserID != userID {
+		return ErrUnauthorized
+	}
+
+	if err := s.repo.SetDefaultProfile(ctx, id, userID); err != nil {
+		return fmt.Errorf("setting default profile: %w", err)
+	}
+	return nil
+}
+
+func (s *service) validateMetricConfigs(metrics []MetricConfig) error {
+	if len(metrics) == 0 {
+		return fmt.Errorf("at least one metric must be configured")
+	}
+
+	enabledCount := 0
+	seen := make(map[string]bool)
+	for i, mc := range metrics {
+		if mc.MetricID == "" {
+			return fmt.Errorf("metrics[%d]: metric_id is required", i)
+		}
+		if seen[mc.MetricID] {
+			return fmt.Errorf("metrics[%d]: duplicate metric_id %q", i, mc.MetricID)
+		}
+		seen[mc.MetricID] = true
+
+		def, ok := GetMetricByID(mc.MetricID)
+		if !ok {
+			return fmt.Errorf("metrics[%d]: unknown metric %q", i, mc.MetricID)
+		}
+
+		if mc.Enabled {
+			enabledCount++
+			// Validate threshold is in range
+			if def.HasBoundedRange() {
+				if mc.Threshold < def.RangeMin || mc.Threshold > def.RangeMax {
+					return fmt.Errorf("metrics[%d]: threshold %v out of range [%.1f, %.1f] for %s",
+						i, mc.Threshold, def.RangeMin, def.RangeMax, mc.MetricID)
+				}
+			}
+		}
+	}
+
+	if enabledCount == 0 {
+		return fmt.Errorf("at least one metric must be enabled")
+	}
+	return nil
+}
+
+func validateMetricProfileName(name string) error {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return fmt.Errorf("name is required")
+	}
+	if len(trimmed) > 255 {
+		return fmt.Errorf("name must be at most 255 characters")
+	}
+	for _, r := range trimmed {
+		if r < 32 && r != '\t' {
+			return fmt.Errorf("name contains invalid characters")
+		}
+	}
+	return nil
+}
+
+func boolPtr(b bool) *bool { return &b }

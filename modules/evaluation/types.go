@@ -100,3 +100,41 @@ type EvalCaseExport struct {
 	Rubrics            any     `json:"rubrics,omitempty"`
 	UserMessages       any     `json:"user_messages,omitempty"`
 }
+
+// ─── Metric Profile types ────────────────────────────────────────────────────
+
+// MetricProfile is a named configuration of evaluation metrics with thresholds.
+type MetricProfile struct {
+	ID          uuid.UUID      `json:"id" db:"id"`
+	UserID      string         `json:"user_id" db:"user_id"`
+	Name        string         `json:"name" db:"name"`
+	Description *string        `json:"description,omitempty" db:"description"`
+	Metrics     []MetricConfig `json:"metrics" db:"metrics"`
+	IsDefault   bool           `json:"is_default" db:"is_default"`
+	CreatedAt   time.Time      `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at" db:"updated_at"`
+}
+
+// MetricConfig configures a single metric within a profile.
+type MetricConfig struct {
+	MetricID  string  `json:"metric_id"`
+	Enabled   bool    `json:"enabled"`
+	Threshold float64 `json:"threshold"`
+}
+
+// MetricProfileCreate holds fields for creating a new metric profile.
+type MetricProfileCreate struct {
+	UserID      string
+	Name        string
+	Description *string
+	Metrics     []MetricConfig
+	IsDefault   bool
+}
+
+// MetricProfileUpdate holds mutable fields for a metric profile.
+type MetricProfileUpdate struct {
+	Name        *string
+	Description *string
+	Metrics     []MetricConfig
+	IsDefault   *bool
+}

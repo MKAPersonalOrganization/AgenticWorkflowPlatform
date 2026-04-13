@@ -35,6 +35,14 @@ func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 	r.Get("/api/evaluation/metrics", m.handler.listMetrics)
 	r.Get("/api/evaluation/metrics/{id}", m.handler.getMetric)
 
+	// Metric profile routes
+	r.Get("/api/evaluation/profiles", authMW.RequireAuthFunc(m.handler.listMetricProfiles))
+	r.Post("/api/evaluation/profiles", authMW.RequireAuthFunc(m.handler.createMetricProfile))
+	r.Get("/api/evaluation/profiles/{id}", authMW.RequireAuthFunc(m.handler.getMetricProfile))
+	r.Put("/api/evaluation/profiles/{id}", authMW.RequireAuthFunc(m.handler.updateMetricProfile))
+	r.Delete("/api/evaluation/profiles/{id}", authMW.RequireAuthFunc(m.handler.deleteMetricProfile))
+	r.Post("/api/evaluation/profiles/{id}/set-default", authMW.RequireAuthFunc(m.handler.setDefaultProfile))
+
 	// EvalSet routes
 	r.Get("/api/eval-sets", authMW.RequireAuthFunc(m.handler.listEvalSets))
 	r.Post("/api/eval-sets", authMW.RequireAuthFunc(m.handler.createEvalSet))

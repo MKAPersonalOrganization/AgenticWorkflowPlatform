@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"testing"
 
 	"github.com/google/uuid"
@@ -15,12 +16,14 @@ type mockRepo struct {
 	sets      map[uuid.UUID]EvalSet
 	cases     map[uuid.UUID]EvalCase
 	evalCases []EvalCase // for ListEvalCases
+	profiles  map[uuid.UUID]MetricProfile
 }
 
 func newMockRepo() *mockRepo {
 	return &mockRepo{
-		sets:  make(map[uuid.UUID]EvalSet),
-		cases: make(map[uuid.UUID]EvalCase),
+		sets:     make(map[uuid.UUID]EvalSet),
+		cases:    make(map[uuid.UUID]EvalCase),
+		profiles: make(map[uuid.UUID]MetricProfile),
 	}
 }
 
@@ -183,6 +186,83 @@ func (m *mockRepo) ListEvalCasesWithSet(_ context.Context, evalSetID uuid.UUID) 
 }
 
 func (m *mockRepo) LogEvalAudit(_ context.Context, _ uuid.UUID, _, _ string, _ json.RawMessage) error {
+	return nil
+}
+
+func (m *mockRepo) CreateMetricProfile(_ context.Context, p MetricProfile) error {
+	m.profiles[p.ID] = p
+	return nil
+}
+
+func (m *mockRepo) GetMetricProfile(_ context.Context, id uuid.UUID) (MetricProfile, error) {
+	p, ok := m.profiles[id]
+	if !ok {
+		return MetricProfile{}, fmt.Errorf("metric profile not found")
+	}
+	return p, nil
+}
+
+func (m *mockRepo) ListMetricProfiles(_ context.Context, userID string) ([]MetricProfile, error) {
+	var result []MetricProfile
+	for _, p := range m.profiles {
+		if p.UserID == userID {
+			result = append(result, p)
+		}
+	}
+	// Sort: default first, then by name
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].IsDefault != result[j].IsDefault {
+			return result[i].IsDefault
+		}
+		return result[i].Name < result[j].Name
+	})
+	return result, nil
+}
+
+func (m *mockRepo) UpdateMetricProfile(_ context.Context, id uuid.UUID, updates MetricProfileUpdate) error {
+	p, ok := m.profiles[id]
+	if !ok {
+		return fmt.Errorf("metric profile not found")
+	}
+	if updates.Name != nil {
+		p.Name = *updates.Name
+	}
+	if updates.Description != nil {
+		p.Description = updates.Description
+	}
+	if updates.Metrics != nil {
+		p.Metrics = updates.Metrics
+	}
+	if updates.IsDefault != nil {
+		p.IsDefault = *updates.IsDefault
+	}
+	m.profiles[id] = p
+	return nil
+}
+
+func (m *mockRepo) DeleteMetricProfile(_ context.Context, id uuid.UUID, userID string) error {
+	p, ok := m.profiles[id]
+	if !ok || p.UserID != userID {
+		return fmt.Errorf("metric profile not found or unauthorized")
+	}
+	delete(m.profiles, id)
+	return nil
+}
+
+func (m *mockRepo) SetDefaultProfile(_ context.Context, id uuid.UUID, userID string) error {
+	p, ok := m.profiles[id]
+	if !ok || p.UserID != userID {
+		return fmt.Errorf("metric profile not found or unauthorized")
+	}
+	// Unset other defaults for this user
+	for pid, prof := range m.profiles {
+		if prof.UserID == userID && prof.IsDefault && pid != id {
+			prof.IsDefault = false
+			m.profiles[pid] = prof
+		}
+	}
+	p.IsDefault = true
+	m.profiles[id] = p
 	return nil
 }
 
@@ -757,5 +837,152 @@ func TestUpdateEvalSet_OptimisticConcurrency(t *testing.T) {
 	})
 	if err != ErrConflict {
 		t.Errorf("expected ErrConflict for stale version, got %v", err)
+	}
+}
+
+// ─── Metric Profile Tests ────────────────────────────────────────────────────
+
+func TestCreateMetricProfile_Valid(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	p, err := svc.createMetricProfile(context.Background(), "user1", MetricProfileCreate{
+		UserID: "user1",
+		Name:   "Standard Quality",
+		Metrics: []MetricConfig{
+			{MetricID: "tool_trajectory_avg_score", Enabled: true, Threshold: 1.0},
+			{MetricID: "response_match_score", Enabled: true, Threshold: 0.8},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if p.Name != "Standard Quality" {
+		t.Errorf("expected name %q, got %q", "Standard Quality", p.Name)
+	}
+	if len(p.Metrics) != 2 {
+		t.Errorf("expected 2 metrics, got %d", len(p.Metrics))
+	}
+}
+
+func TestCreateMetricProfile_EmptyName(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	_, err := svc.createMetricProfile(context.Background(), "user1", MetricProfileCreate{
+		UserID:  "user1",
+		Name:    "",
+		Metrics: []MetricConfig{{MetricID: "tool_trajectory_avg_score", Enabled: true, Threshold: 1.0}},
+	})
+	if err == nil {
+		t.Fatal("expected error for empty name")
+	}
+}
+
+func TestCreateMetricProfile_DuplicateName(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	req := MetricProfileCreate{
+		UserID:  "user1",
+		Name:    "Dup Profile",
+		Metrics: []MetricConfig{{MetricID: "tool_trajectory_avg_score", Enabled: true, Threshold: 1.0}},
+	}
+	_, _ = svc.createMetricProfile(context.Background(), "user1", req)
+	_, err := svc.createMetricProfile(context.Background(), "user1", req)
+	if err == nil {
+		t.Fatal("expected error for duplicate name")
+	}
+}
+
+func TestCreateMetricProfile_UnknownMetric(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	_, err := svc.createMetricProfile(context.Background(), "user1", MetricProfileCreate{
+		UserID:  "user1",
+		Name:    "Bad Metrics",
+		Metrics: []MetricConfig{{MetricID: "nonexistent_metric", Enabled: true, Threshold: 0.5}},
+	})
+	if err == nil {
+		t.Fatal("expected error for unknown metric")
+	}
+}
+
+func TestCreateMetricProfile_ThresholdOutOfRange(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	// tool_trajectory_avg_score has range [0, 1]
+	_, err := svc.createMetricProfile(context.Background(), "user1", MetricProfileCreate{
+		UserID:  "user1",
+		Name:    "Bad Threshold",
+		Metrics: []MetricConfig{{MetricID: "tool_trajectory_avg_score", Enabled: true, Threshold: 2.0}},
+	})
+	if err == nil {
+		t.Fatal("expected error for out-of-range threshold")
+	}
+}
+
+func TestCreateMetricProfile_NoneEnabled(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	_, err := svc.createMetricProfile(context.Background(), "user1", MetricProfileCreate{
+		UserID:  "user1",
+		Name:    "None Enabled",
+		Metrics: []MetricConfig{{MetricID: "tool_trajectory_avg_score", Enabled: false, Threshold: 1.0}},
+	})
+	if err == nil {
+		t.Fatal("expected error when no metrics are enabled")
+	}
+}
+
+func TestCreateMetricProfile_EmptyMetrics(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	_, err := svc.createMetricProfile(context.Background(), "user1", MetricProfileCreate{
+		UserID:  "user1",
+		Name:    "Empty",
+		Metrics: []MetricConfig{},
+	})
+	if err == nil {
+		t.Fatal("expected error for empty metrics")
+	}
+}
+
+func TestListMetricProfiles_UserScoped(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	req := MetricProfileCreate{
+		UserID:  "user1",
+		Name:    "User1 Profile",
+		Metrics: []MetricConfig{{MetricID: "tool_trajectory_avg_score", Enabled: true, Threshold: 1.0}},
+	}
+	_, _ = svc.createMetricProfile(context.Background(), "user1", req)
+
+	req.UserID = "user2"
+	req.Name = "User2 Profile"
+	_, _ = svc.createMetricProfile(context.Background(), "user2", req)
+
+	profiles, err := svc.listMetricProfiles(context.Background(), "user1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(profiles) != 1 {
+		t.Fatalf("expected 1 profile, got %d", len(profiles))
+	}
+	if profiles[0].Name != "User1 Profile" {
+		t.Errorf("expected User1 Profile, got %q", profiles[0].Name)
 	}
 }

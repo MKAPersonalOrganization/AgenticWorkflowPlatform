@@ -33,6 +33,14 @@ type repository interface {
 
 	// Audit operations
 	LogEvalAudit(ctx context.Context, evalSetID uuid.UUID, action, actor string, changes json.RawMessage) error
+
+	// Metric profile operations
+	CreateMetricProfile(ctx context.Context, p MetricProfile) error
+	GetMetricProfile(ctx context.Context, id uuid.UUID) (MetricProfile, error)
+	ListMetricProfiles(ctx context.Context, userID string) ([]MetricProfile, error)
+	UpdateMetricProfile(ctx context.Context, id uuid.UUID, updates MetricProfileUpdate) error
+	DeleteMetricProfile(ctx context.Context, id uuid.UUID, userID string) error
+	SetDefaultProfile(ctx context.Context, id uuid.UUID, userID string) error
 }
 
 // postgresEvalRepo implements repository using PostgreSQL.
@@ -372,6 +380,135 @@ INSERT INTO eval_audit_log (eval_set_id, action, actor, changes, created_at)
 VALUES ($1, $2, $3, $4, now())`
 	if _, err := r.db.ExecContext(ctx, q, evalSetID, action, actor, changes); err != nil {
 		return fmt.Errorf("inserting audit log: %w", err)
+	}
+	return nil
+}
+
+// ─── Metric Profile ──────────────────────────────────────────────────────────
+
+func (r *postgresEvalRepo) CreateMetricProfile(ctx context.Context, p MetricProfile) error {
+	const q = `
+INSERT INTO eval_metric_profiles (id, user_id, name, description, metrics, is_default, created_at, updated_at)
+VALUES (:id, :user_id, :name, :description, :metrics, :is_default, :created_at, :updated_at)`
+	if _, err := r.db.NamedExecContext(ctx, q, p); err != nil {
+		return fmt.Errorf("inserting metric profile: %w", err)
+	}
+	return nil
+}
+
+func (r *postgresEvalRepo) GetMetricProfile(ctx context.Context, id uuid.UUID) (MetricProfile, error) {
+	const q = `
+SELECT id, user_id, name, description, metrics, is_default, created_at, updated_at
+FROM eval_metric_profiles WHERE id = $1`
+	var p MetricProfile
+	if err := r.db.GetContext(ctx, &p, q, id); err != nil {
+		if err == sql.ErrNoRows {
+			return MetricProfile{}, fmt.Errorf("metric profile not found")
+		}
+		return MetricProfile{}, fmt.Errorf("selecting metric profile: %w", err)
+	}
+	return p, nil
+}
+
+func (r *postgresEvalRepo) ListMetricProfiles(ctx context.Context, userID string) ([]MetricProfile, error) {
+	const q = `
+SELECT id, user_id, name, description, metrics, is_default, created_at, updated_at
+FROM eval_metric_profiles WHERE user_id = $1 ORDER BY is_default DESC, updated_at DESC`
+	var profiles []MetricProfile
+	if err := r.db.SelectContext(ctx, &profiles, q, userID); err != nil {
+		return nil, fmt.Errorf("listing metric profiles: %w", err)
+	}
+	return profiles, nil
+}
+
+func (r *postgresEvalRepo) UpdateMetricProfile(ctx context.Context, id uuid.UUID, updates MetricProfileUpdate) error {
+	q := `UPDATE eval_metric_profiles SET updated_at = now()`
+	args := []any{}
+	argIdx := 1
+
+	if updates.Name != nil {
+		q += fmt.Sprintf(", name = $%d", argIdx)
+		args = append(args, *updates.Name)
+		argIdx++
+	}
+	if updates.Description != nil {
+		q += fmt.Sprintf(", description = $%d", argIdx)
+		args = append(args, *updates.Description)
+		argIdx++
+	}
+	if updates.Metrics != nil {
+		q += fmt.Sprintf(", metrics = $%d", argIdx)
+		args = append(args, updates.Metrics)
+		argIdx++
+	}
+	if updates.IsDefault != nil {
+		q += fmt.Sprintf(", is_default = $%d", argIdx)
+		args = append(args, *updates.IsDefault)
+		argIdx++
+	}
+
+	q += fmt.Sprintf(" WHERE id = $%d", argIdx)
+	args = append(args, id)
+
+	res, err := r.db.ExecContext(ctx, q, args...)
+	if err != nil {
+		return fmt.Errorf("updating metric profile: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("metric profile not found")
+	}
+	return nil
+}
+
+func (r *postgresEvalRepo) DeleteMetricProfile(ctx context.Context, id uuid.UUID, userID string) error {
+	const q = `DELETE FROM eval_metric_profiles WHERE id = $1 AND user_id = $2`
+	res, err := r.db.ExecContext(ctx, q, id, userID)
+	if err != nil {
+		return fmt.Errorf("deleting metric profile: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("metric profile not found or unauthorized")
+	}
+	return nil
+}
+
+func (r *postgresEvalRepo) SetDefaultProfile(ctx context.Context, id uuid.UUID, userID string) error {
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// Unset all defaults for this user
+	const qUnset = `UPDATE eval_metric_profiles SET is_default = false WHERE user_id = $1`
+	if _, err := tx.ExecContext(ctx, qUnset, userID); err != nil {
+		return fmt.Errorf("unsetting default profiles: %w", err)
+	}
+
+	// Set the new default
+	const qSet = `UPDATE eval_metric_profiles SET is_default = true, updated_at = now() WHERE id = $1 AND user_id = $2`
+	res, err := tx.ExecContext(ctx, qSet, id, userID)
+	if err != nil {
+		return fmt.Errorf("setting default profile: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("metric profile not found or unauthorized")
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing transaction: %w", err)
 	}
 	return nil
 }
