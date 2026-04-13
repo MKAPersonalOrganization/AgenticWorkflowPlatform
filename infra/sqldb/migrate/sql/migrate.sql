@@ -1058,3 +1058,41 @@ ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS sub_agents JSONB;
 -- their parent workflow (composed AgentDefinition) so cascade delete works correctly.
 ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS parent_id VARCHAR(255);
 CREATE INDEX IF NOT EXISTS idx_user_agents_parent_id ON user_agents(parent_id);
+
+-- Version: 1.75
+-- Description: Replace old evaluation tables with new eval_sets/eval_cases schema.
+-- Drop the old evaluation schema entirely and create the ADK-compatible one.
+DROP TABLE IF EXISTS eval_suite_agent_permissions CASCADE;
+DROP TABLE IF EXISTS evaluation_results CASCADE;
+DROP TABLE IF EXISTS evaluation_runs CASCADE;
+DROP TABLE IF EXISTS evaluation_tests CASCADE;
+DROP TABLE IF EXISTS evaluation_suites CASCADE;
+
+CREATE TABLE IF NOT EXISTS eval_sets (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id       TEXT NOT NULL,
+    name          TEXT NOT NULL,
+    description   TEXT,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_eval_sets_user_name UNIQUE (user_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_eval_sets_user_id ON eval_sets(user_id);
+
+CREATE TABLE IF NOT EXISTS eval_cases (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    eval_set_id         UUID NOT NULL REFERENCES eval_sets(id) ON DELETE CASCADE,
+    name                TEXT,
+    input               TEXT NOT NULL,
+    expected_trajectory JSONB,
+    expected_response   TEXT,
+    rubrics             JSONB,
+    user_messages       JSONB,
+    sort_order          INT NOT NULL DEFAULT 0,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_eval_cases_eval_set_id ON eval_cases(eval_set_id);
+CREATE INDEX IF NOT EXISTS idx_eval_cases_sort_order ON eval_cases(eval_set_id, sort_order);

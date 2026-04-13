@@ -1,0 +1,481 @@
+package evaluation
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"testing"
+
+	"github.com/google/uuid"
+)
+
+// ─── Mock repository ────────────────────────────────────────────────────────
+
+type mockRepo struct {
+	sets      map[uuid.UUID]EvalSet
+	cases     map[uuid.UUID]EvalCase
+	evalCases []EvalCase // for ListEvalCases
+}
+
+func newMockRepo() *mockRepo {
+	return &mockRepo{
+		sets:  make(map[uuid.UUID]EvalSet),
+		cases: make(map[uuid.UUID]EvalCase),
+	}
+}
+
+func (m *mockRepo) CreateEvalSet(_ context.Context, es EvalSet) error {
+	m.sets[es.ID] = es
+	return nil
+}
+
+func (m *mockRepo) GetEvalSet(_ context.Context, id uuid.UUID) (EvalSet, error) {
+	es, ok := m.sets[id]
+	if !ok {
+		return EvalSet{}, fmt.Errorf("eval_set not found")
+	}
+	return es, nil
+}
+
+func (m *mockRepo) ListEvalSets(_ context.Context, userID string) ([]EvalSet, error) {
+	var result []EvalSet
+	for _, es := range m.sets {
+		if es.UserID == userID {
+			result = append(result, es)
+		}
+	}
+	return result, nil
+}
+
+func (m *mockRepo) UpdateEvalSet(_ context.Context, id uuid.UUID, updates EvalSetUpdate) error {
+	es, ok := m.sets[id]
+	if !ok {
+		return fmt.Errorf("eval_set not found")
+	}
+	if updates.Name != nil {
+		es.Name = *updates.Name
+	}
+	if updates.Description != nil {
+		es.Description = updates.Description
+	}
+	m.sets[id] = es
+	return nil
+}
+
+func (m *mockRepo) DeleteEvalSet(_ context.Context, id uuid.UUID, userID string) error {
+	es, ok := m.sets[id]
+	if !ok || es.UserID != userID {
+		return fmt.Errorf("eval_set not found or unauthorized")
+	}
+	delete(m.sets, id)
+	// Cascade delete cases
+	for cid, ec := range m.cases {
+		if ec.EvalSetID == id {
+			delete(m.cases, cid)
+		}
+	}
+	return nil
+}
+
+func (m *mockRepo) CreateEvalCase(_ context.Context, ec EvalCase) error {
+	m.cases[ec.ID] = ec
+	m.evalCases = append(m.evalCases, ec)
+	return nil
+}
+
+func (m *mockRepo) GetEvalCase(_ context.Context, id uuid.UUID) (EvalCase, error) {
+	ec, ok := m.cases[id]
+	if !ok {
+		return EvalCase{}, fmt.Errorf("eval_case not found")
+	}
+	return ec, nil
+}
+
+func (m *mockRepo) ListEvalCases(_ context.Context, evalSetID uuid.UUID) ([]EvalCase, error) {
+	var result []EvalCase
+	for _, ec := range m.evalCases {
+		if ec.EvalSetID == evalSetID {
+			result = append(result, ec)
+		}
+	}
+	return result, nil
+}
+
+func (m *mockRepo) UpdateEvalCase(_ context.Context, id uuid.UUID, updates EvalCaseUpdate) error {
+	ec, ok := m.cases[id]
+	if !ok {
+		return fmt.Errorf("eval_case not found")
+	}
+	if updates.Name != nil {
+		ec.Name = updates.Name
+	}
+	if updates.Input != nil {
+		ec.Input = *updates.Input
+	}
+	if updates.ExpectedTrajectory != nil {
+		ec.ExpectedTrajectory = updates.ExpectedTrajectory
+	}
+	if updates.ExpectedResponse != nil {
+		ec.ExpectedResponse = updates.ExpectedResponse
+	}
+	if updates.Rubrics != nil {
+		ec.Rubrics = updates.Rubrics
+	}
+	if updates.UserMessages != nil {
+		ec.UserMessages = updates.UserMessages
+	}
+	m.cases[id] = ec
+	return nil
+}
+
+func (m *mockRepo) DeleteEvalCase(_ context.Context, id uuid.UUID) error {
+	_, ok := m.cases[id]
+	if !ok {
+		return fmt.Errorf("eval_case not found")
+	}
+	delete(m.cases, id)
+	return nil
+}
+
+func (m *mockRepo) ReorderEvalCases(_ context.Context, evalSetID uuid.UUID, caseIDs []uuid.UUID) error {
+	// Update sort order in mock
+	for i, caseID := range caseIDs {
+		ec, ok := m.cases[caseID]
+		if !ok || ec.EvalSetID != evalSetID {
+			return fmt.Errorf("eval_case %s not found in eval_set %s", caseID, evalSetID)
+		}
+		ec.SortOrder = i
+		m.cases[caseID] = ec
+	}
+	return nil
+}
+
+// ─── Tests ───────────────────────────────────────────────────────────────────
+
+func TestCreateEvalSet_ValidName(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	es, err := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID:      "user1",
+		Name:        "My Test Suite",
+		Description: ptr("A test eval set"),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if es.Name != "My Test Suite" {
+		t.Errorf("expected name %q, got %q", "My Test Suite", es.Name)
+	}
+	if es.UserID != "user1" {
+		t.Errorf("expected user_id %q, got %q", "user1", es.UserID)
+	}
+}
+
+func TestCreateEvalSet_EmptyName(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	_, err := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID: "user1",
+		Name:   "",
+	})
+	if err == nil {
+		t.Fatal("expected error for empty name")
+	}
+}
+
+func TestCreateEvalSet_WhitespaceName(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	_, err := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID: "user1",
+		Name:   "   ",
+	})
+	if err == nil {
+		t.Fatal("expected error for whitespace-only name")
+	}
+}
+
+func TestCreateEvalSet_NameTooLong(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	_, err := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID: "user1",
+		Name:   string(make([]byte, 256)),
+	})
+	if err == nil {
+		t.Fatal("expected error for name > 255 chars")
+	}
+}
+
+func TestCreateEvalSet_DuplicateName(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	_, _ = svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID: "user1",
+		Name:   "Duplicate",
+	})
+
+	_, err := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID: "user1",
+		Name:   "Duplicate",
+	})
+	if err == nil {
+		t.Fatal("expected error for duplicate name")
+	}
+}
+
+func TestListEvalSets_UserScoped(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	_, _ = svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID: "user1",
+		Name:   "User1 Set",
+	})
+	_, _ = svc.createEvalSet(context.Background(), "user2", EvalSetCreate{
+		UserID: "user2",
+		Name:   "User2 Set",
+	})
+
+	sets, err := svc.listEvalSets(context.Background(), "user1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(sets) != 1 {
+		t.Fatalf("expected 1 set, got %d", len(sets))
+	}
+	if sets[0].Name != "User1 Set" {
+		t.Errorf("expected User1 Set, got %q", sets[0].Name)
+	}
+}
+
+func TestCreateEvalCase_EmptyInput(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID: "user1",
+		Name:   "Test Suite",
+	})
+
+	_, err := svc.createEvalCase(context.Background(), "user1", EvalCaseCreate{
+		EvalSetID: es.ID,
+		Input:     "",
+	})
+	if err == nil {
+		t.Fatal("expected error for empty input")
+	}
+}
+
+func TestCreateEvalCase_InputTooLong(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID: "user1",
+		Name:   "Test Suite",
+	})
+
+	_, err := svc.createEvalCase(context.Background(), "user1", EvalCaseCreate{
+		EvalSetID: es.ID,
+		Input:     string(make([]byte, 10001)),
+	})
+	if err == nil {
+		t.Fatal("expected error for input > 10000 chars")
+	}
+}
+
+func TestCreateEvalCase_InvalidTrajectory(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID: "user1",
+		Name:   "Test Suite",
+	})
+
+	// Invalid JSON
+	_, err := svc.createEvalCase(context.Background(), "user1", EvalCaseCreate{
+		EvalSetID:          es.ID,
+		Input:              "test input",
+		ExpectedTrajectory: json.RawMessage(`not json`),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid trajectory JSON")
+	}
+
+	// Missing tool_name
+	_, err = svc.createEvalCase(context.Background(), "user1", EvalCaseCreate{
+		EvalSetID:          es.ID,
+		Input:              "test input",
+		ExpectedTrajectory: json.RawMessage(`[{}]`),
+	})
+	if err == nil {
+		t.Fatal("expected error for trajectory with missing tool_name")
+	}
+}
+
+func TestCreateEvalCase_InvalidRubrics(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID: "user1",
+		Name:   "Test Suite",
+	})
+
+	_, err := svc.createEvalCase(context.Background(), "user1", EvalCaseCreate{
+		EvalSetID: es.ID,
+		Input:     "test input",
+		Rubrics:   json.RawMessage(`not json`),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid rubrics JSON")
+	}
+}
+
+func TestCreateEvalCase_InvalidUserMessages(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID: "user1",
+		Name:   "Test Suite",
+	})
+
+	_, err := svc.createEvalCase(context.Background(), "user1", EvalCaseCreate{
+		EvalSetID:    es.ID,
+		Input:        "test input",
+		UserMessages: json.RawMessage(`not json`),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid user_messages JSON")
+	}
+}
+
+func TestDeleteEvalSet_CascadeDeletesCases(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID: "user1",
+		Name:   "Test Suite",
+	})
+
+	_, _ = svc.createEvalCase(context.Background(), "user1", EvalCaseCreate{
+		EvalSetID: es.ID,
+		Input:     "test case 1",
+	})
+	_, _ = svc.createEvalCase(context.Background(), "user1", EvalCaseCreate{
+		EvalSetID: es.ID,
+		Input:     "test case 2",
+	})
+
+	// Verify cases exist
+	cases, _ := svc.listEvalCases(context.Background(), es.ID, "user1")
+	if len(cases) != 2 {
+		t.Fatalf("expected 2 cases before delete, got %d", len(cases))
+	}
+
+	// Delete eval set
+	if err := svc.deleteEvalSet(context.Background(), es.ID, "user1"); err != nil {
+		t.Fatalf("unexpected error deleting eval_set: %v", err)
+	}
+
+	// Verify cascade: cases should be deleted by mock
+	remaining, _ := svc.listEvalCases(context.Background(), es.ID, "user1")
+	if len(remaining) != 0 {
+		t.Errorf("expected 0 cases after cascade delete, got %d", len(remaining))
+	}
+}
+
+func TestEvalCase_UnauthorizedAccess(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID: "user1",
+		Name:   "User1 Suite",
+	})
+
+	// user2 should not be able to create cases in user1's set
+	_, err := svc.createEvalCase(context.Background(), "user2", EvalCaseCreate{
+		EvalSetID: es.ID,
+		Input:     "malicious input",
+	})
+	if err != ErrUnauthorized {
+		t.Errorf("expected ErrUnauthorized, got %v", err)
+	}
+}
+
+func TestJSONFields_SerializeDeserialize(t *testing.T) {
+	t.Parallel()
+	repo := newMockRepo()
+	svc := newService(repo)
+
+	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
+		UserID: "user1",
+		Name:   "JSON Test Suite",
+	})
+
+	trajectory := json.RawMessage(`[{"tool_name":"search","args":{"query":"hello"},"match_type":"EXACT"}]`)
+	rubrics := json.RawMessage(`[{"name":"quality","levels":[{"score":5,"description":"excellent"}]}]`)
+	userMsgs := json.RawMessage(`["follow up question","another turn"]`)
+
+	ec, err := svc.createEvalCase(context.Background(), "user1", EvalCaseCreate{
+		EvalSetID:          es.ID,
+		Input:              "test input",
+		ExpectedTrajectory: trajectory,
+		ExpectedResponse:   ptr("expected response"),
+		Rubrics:            rubrics,
+		UserMessages:       userMsgs,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error creating case: %v", err)
+	}
+
+	// Verify JSON fields round-trip
+	if string(ec.ExpectedTrajectory) != string(trajectory) {
+		t.Errorf("trajectory mismatch:\ngot  %s\nwant %s", ec.ExpectedTrajectory, trajectory)
+	}
+	if string(ec.Rubrics) != string(rubrics) {
+		t.Errorf("rubrics mismatch:\ngot  %s\nwant %s", ec.Rubrics, rubrics)
+	}
+	if string(ec.UserMessages) != string(userMsgs) {
+		t.Errorf("user_messages mismatch:\ngot  %s\nwant %s", ec.UserMessages, userMsgs)
+	}
+	if ec.ExpectedResponse == nil || *ec.ExpectedResponse != "expected response" {
+		t.Errorf("expected_response mismatch")
+	}
+
+	// Verify the JSON fields can be parsed back
+	var tools []ExpectedToolCall
+	if err := json.Unmarshal(ec.ExpectedTrajectory, &tools); err != nil {
+		t.Fatalf("failed to unmarshal trajectory: %v", err)
+	}
+	if len(tools) != 1 || tools[0].ToolName != "search" {
+		t.Errorf("parsed trajectory incorrectly")
+	}
+}
+
+func ptr(s string) *string {
+	return &s
+}

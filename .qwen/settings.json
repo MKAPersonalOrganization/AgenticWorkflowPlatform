@@ -5,7 +5,11 @@
       "Bash(rm *)",
       "Bash(do *)",
       "Bash(done)",
-      "Bash(git show *)"
+      "Bash(git show *)",
+      "Bash(gh *)",
+      "Bash(mkdir *)",
+      "Bash(gofmt *)",
+      "Bash(gofumpt *)"
     ]
   },
   "$version": 3

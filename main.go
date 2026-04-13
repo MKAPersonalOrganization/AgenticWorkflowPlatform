@@ -79,6 +79,7 @@ import (
 	pluginsettingsmod "aicompass/modules/pluginsettings"
 	resourcesmod "aicompass/modules/resources"
 	templatesmod "aicompass/modules/templates"
+	evalmod "aicompass/modules/evaluation"
 
 	userprofilemod "aicompass/modules/userprofile"
 
@@ -380,6 +381,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Initialize resources module
 	resourcesModule := resourcesmod.New(db, artifactService)
 
+	// Initialize evaluation module
+	evaluationModule := evalmod.New(db)
+
 	// Initialize filesystem module (VFS backed by S3/MinIO)
 	var ghClient *githubauth.Client
 	var ghStore *githubauth.Store
@@ -657,6 +661,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		mcp:            mcpModule,
 		a2a:            a2aModule,
 		resources:      resourcesModule,
+		evaluation:     evaluationModule,
 		filesystem:     filesystemModule,
 		billing:        billingModule,
 		permissions:    permissionsmod.New(log, workspacePermissionsService, &WorkspaceProviderAdapter{svc: edgequakeService}, agentProvider, cfg.Edgequake.TenantID),
@@ -787,6 +792,9 @@ type routeModules struct {
 	resources interface {
 		RegisterRoutes(chi.Router, *auth.Middleware)
 	}
+	evaluation interface {
+		RegisterRoutes(chi.Router, *auth.Middleware)
+	}
 	filesystem interface {
 		RegisterRoutes(chi.Router, *auth.Middleware)
 	}
@@ -815,6 +823,7 @@ func registerRoutes(
 ) {
 	// Module routes
 	mods.resources.RegisterRoutes(r, authMW)
+	mods.evaluation.RegisterRoutes(r, authMW)
 	mods.filesystem.RegisterRoutes(r, authMW)
 	mods.permissions.RegisterRoutes(r, authMW)
 	mods.agentDef.RegisterRoutes(r, authMW)
