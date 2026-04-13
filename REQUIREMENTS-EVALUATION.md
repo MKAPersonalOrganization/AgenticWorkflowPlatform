@@ -233,7 +233,8 @@ This document extracts the complete evaluation framework capabilities from Googl
 - [ ] AC-08.3: Detailed results show which safety categories were violated (if any).
 - [ ] AC-08.4: Responses that fail the safety threshold are flagged.
 
-**Dependencies:** None (standalone evaluator, requires Vertex AI credentials). Can develop in parallel with EVAL-CORE-05, 06, 07.
+**GitHub Issues:**
+- [#29](https://github.com/MKAPersonalOrganization/school-with-ai/issues/29) — EVAL-CORE-08.1: Safety Evaluation Evaluator
 
 ---
 
@@ -268,6 +269,9 @@ This document extracts the complete evaluation framework capabilities from Googl
 
 **Dependencies:** Depends on EVAL-CORE-03 (metric configuration). Can develop after basic evaluation pipeline is working.
 
+**GitHub Issues:**
+- [#30](https://github.com/MKAPersonalOrganization/school-with-ai/issues/30) — EVAL-HELP-01: Rubric-Based Evaluation
+
 ---
 
 ## EVAL-HELP-02: Custom Metrics
@@ -287,6 +291,9 @@ This document extracts the complete evaluation framework capabilities from Googl
 - [ ] AC-H02.5: Custom metrics can be enabled/disabled per EvalSet.
 
 **Dependencies:** Depends on EVAL-CORE-04 (evaluation pipeline). Develop after prebuilt metrics are working.
+
+**GitHub Issues:**
+- [#31](https://github.com/MKAPersonalOrganization/school-with-ai/issues/31) — EVAL-HELP-02: Custom Metrics
 
 ---
 
@@ -311,6 +318,9 @@ This document extracts the complete evaluation framework capabilities from Googl
 
 **Dependencies:** Depends on EVAL-CORE-04 (evaluation pipeline). Can develop in parallel with EVAL-HELP-01.
 
+**GitHub Issues:**
+- [#32](https://github.com/MKAPersonalOrganization/school-with-ai/issues/32) — EVAL-HELP-03: LLM-as-a-Judge Evaluation
+
 ---
 
 ## EVAL-HELP-04: Multi-Turn Evaluation
@@ -333,6 +343,9 @@ This document extracts the complete evaluation framework capabilities from Googl
 - [ ] AC-H04.4: Task success is evaluated at the conversation level, not per-turn.
 
 **Dependencies:** Depends on EVAL-CORE-04 (evaluation pipeline) and EVAL-HELP-05 (user simulation, for dynamic multi-turn).
+
+**GitHub Issues:**
+- [#33](https://github.com/MKAPersonalOrganization/school-with-ai/issues/33) — EVAL-HELP-04: Multi-Turn Evaluation
 
 ---
 
@@ -363,6 +376,9 @@ This document extracts the complete evaluation framework capabilities from Googl
 
 **Dependencies:** Depends on EVAL-CORE-04 (evaluation pipeline). LLM-backed simulator requires a judge model configuration.
 
+**GitHub Issues:**
+- [#34](https://github.com/MKAPersonalOrganization/school-with-ai/issues/34) — EVAL-HELP-05: User Simulation
+
 ---
 
 ## EVAL-HELP-06: Evaluation Results — Comparison & Trending
@@ -383,6 +399,9 @@ This document extracts the complete evaluation framework capabilities from Googl
 - [ ] AC-H06.5: User can filter results by agent version or date range.
 
 **Dependencies:** Depends on EVAL-CORE-04 (results must be persisted). Can develop after basic results view is working.
+
+**GitHub Issues:**
+- [#35](https://github.com/MKAPersonalOrganization/school-with-ai/issues/35) — EVAL-HELP-06: Evaluation Results — Comparison & Trending
 
 ---
 
@@ -407,6 +426,9 @@ This document extracts the complete evaluation framework capabilities from Googl
 
 **Dependencies:** Depends on EVAL-CORE-04 (results) and EVAL-CORE-05 through EVAL-CORE-08 (individual evaluator details).
 
+**GitHub Issues:**
+- [#36](https://github.com/MKAPersonalOrganization/school-with-ai/issues/36) — EVAL-HELP-07: Eval Results Detail View — Full Trace Inspection
+
 ---
 
 # Part C — Advanced Requirements
@@ -429,6 +451,9 @@ This document extracts the complete evaluation framework capabilities from Googl
 - [ ] AC-A01.4: Pre-built scenario templates are available for common domains (customer service, travel, etc.).
 
 **Dependencies:** Depends on EVAL-CORE-02 (EvalCase management). Develop after manual case creation is stable.
+
+**GitHub Issues:**
+- [#37](https://github.com/MKAPersonalOrganization/school-with-ai/issues/37) — EVAL-ADV-01: Conversation Scenario Generation
 
 ---
 
@@ -454,6 +479,9 @@ This document extracts the complete evaluation framework capabilities from Googl
 
 **Dependencies:** Depends on EVAL-CORE-04 (evaluation pipeline). Develop after CLI evaluation works.
 
+**GitHub Issues:**
+- [#38](https://github.com/MKAPersonalOrganization/school-with-ai/issues/38) — EVAL-ADV-02: Evaluation via Web UI
+
 ---
 
 ## EVAL-ADV-03: Evaluation API — REST Endpoints
@@ -477,6 +505,9 @@ This document extracts the complete evaluation framework capabilities from Googl
 
 **Dependencies:** Depends on EVAL-CORE-04 (evaluation pipeline). Can develop in parallel with EVAL-ADV-02.
 
+**GitHub Issues:**
+- [#39](https://github.com/MKAPersonalOrganization/school-with-ai/issues/39) — EVAL-ADV-03: Evaluation API — REST Endpoints for CI/CD
+
 ---
 
 ## EVAL-ADV-04: Distributed / Parallel Evaluation
@@ -497,6 +528,9 @@ This document extracts the complete evaluation framework capabilities from Googl
 
 **Dependencies:** Depends on EVAL-CORE-04. Develop when performance becomes a bottleneck for large EvalSets.
 
+**GitHub Issues:**
+- [#40](https://github.com/MKAPersonalOrganization/school-with-ai/issues/40) — EVAL-ADV-04: Distributed / Parallel Evaluation
+
 ---
 
 ## EVAL-ADV-05: Evaluation Data Migration & Schema Management
@@ -515,6 +549,9 @@ This document extracts the complete evaluation framework capabilities from Googl
 - [ ] AC-A05.4: Migration is non-destructive (original data is preserved).
 
 **Dependencies:** Depends on EVAL-CORE-04. Develop when schema changes are introduced.
+
+**GitHub Issues:**
+- [#41](https://github.com/MKAPersonalOrganization/school-with-ai/issues/41) — EVAL-ADV-05: Evaluation Data Migration & Schema Management
 
 ---
 
