@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -386,26 +387,66 @@ VALUES ($1, $2, $3, $4, now())`
 
 // ─── Metric Profile ──────────────────────────────────────────────────────────
 
+// profileRow is the DB-facing representation with json.RawMessage for JSONB.
+type profileRow struct {
+	ID          uuid.UUID       `db:"id"`
+	UserID      string          `db:"user_id"`
+	Name        string          `db:"name"`
+	Description *string         `db:"description"`
+	Metrics     json.RawMessage `db:"metrics"`
+	IsDefault   bool            `db:"is_default"`
+	CreatedAt   time.Time       `db:"created_at"`
+	UpdatedAt   time.Time       `db:"updated_at"`
+}
+
 func (r *postgresEvalRepo) CreateMetricProfile(ctx context.Context, p MetricProfile) error {
+	metricsJSON, err := json.Marshal(p.Metrics)
+	if err != nil {
+		return fmt.Errorf("marshaling metrics: %w", err)
+	}
+	row := profileRow{
+		ID:          p.ID,
+		UserID:      p.UserID,
+		Name:        p.Name,
+		Description: p.Description,
+		Metrics:     metricsJSON,
+		IsDefault:   p.IsDefault,
+		CreatedAt:   p.CreatedAt,
+		UpdatedAt:   p.UpdatedAt,
+	}
 	const q = `
 INSERT INTO eval_metric_profiles (id, user_id, name, description, metrics, is_default, created_at, updated_at)
 VALUES (:id, :user_id, :name, :description, :metrics, :is_default, :created_at, :updated_at)`
-	if _, err := r.db.NamedExecContext(ctx, q, p); err != nil {
+	if _, err := r.db.NamedExecContext(ctx, q, row); err != nil {
 		return fmt.Errorf("inserting metric profile: %w", err)
 	}
 	return nil
 }
 
 func (r *postgresEvalRepo) GetMetricProfile(ctx context.Context, id uuid.UUID) (MetricProfile, error) {
+	var row profileRow
 	const q = `
 SELECT id, user_id, name, description, metrics, is_default, created_at, updated_at
 FROM eval_metric_profiles WHERE id = $1`
-	var p MetricProfile
-	if err := r.db.GetContext(ctx, &p, q, id); err != nil {
+	if err := r.db.GetContext(ctx, &row, q, id); err != nil {
 		if err == sql.ErrNoRows {
 			return MetricProfile{}, fmt.Errorf("metric profile not found")
 		}
 		return MetricProfile{}, fmt.Errorf("selecting metric profile: %w", err)
+	}
+	p := MetricProfile{
+		ID:          row.ID,
+		UserID:      row.UserID,
+		Name:        row.Name,
+		Description: row.Description,
+		IsDefault:   row.IsDefault,
+		CreatedAt:   row.CreatedAt,
+		UpdatedAt:   row.UpdatedAt,
+	}
+	if row.Metrics != nil {
+		if err := json.Unmarshal(row.Metrics, &p.Metrics); err != nil {
+			return MetricProfile{}, fmt.Errorf("unmarshaling metrics: %w", err)
+		}
 	}
 	return p, nil
 }
@@ -414,9 +455,27 @@ func (r *postgresEvalRepo) ListMetricProfiles(ctx context.Context, userID string
 	const q = `
 SELECT id, user_id, name, description, metrics, is_default, created_at, updated_at
 FROM eval_metric_profiles WHERE user_id = $1 ORDER BY is_default DESC, updated_at DESC`
-	var profiles []MetricProfile
-	if err := r.db.SelectContext(ctx, &profiles, q, userID); err != nil {
+	var rows []profileRow
+	if err := r.db.SelectContext(ctx, &rows, q, userID); err != nil {
 		return nil, fmt.Errorf("listing metric profiles: %w", err)
+	}
+	profiles := make([]MetricProfile, 0, len(rows))
+	for _, row := range rows {
+		p := MetricProfile{
+			ID:          row.ID,
+			UserID:      row.UserID,
+			Name:        row.Name,
+			Description: row.Description,
+			IsDefault:   row.IsDefault,
+			CreatedAt:   row.CreatedAt,
+			UpdatedAt:   row.UpdatedAt,
+		}
+		if row.Metrics != nil {
+			if err := json.Unmarshal(row.Metrics, &p.Metrics); err != nil {
+				return nil, fmt.Errorf("unmarshaling metrics for profile %s: %w", row.ID, err)
+			}
+		}
+		profiles = append(profiles, p)
 	}
 	return profiles, nil
 }
@@ -437,8 +496,12 @@ func (r *postgresEvalRepo) UpdateMetricProfile(ctx context.Context, id uuid.UUID
 		argIdx++
 	}
 	if updates.Metrics != nil {
+		metricsJSON, err := json.Marshal(updates.Metrics)
+		if err != nil {
+			return fmt.Errorf("marshaling metrics: %w", err)
+		}
 		q += fmt.Sprintf(", metrics = $%d", argIdx)
-		args = append(args, updates.Metrics)
+		args = append(args, metricsJSON)
 		argIdx++
 	}
 	if updates.IsDefault != nil {

@@ -533,7 +533,6 @@ func (s *service) createMetricProfile(ctx context.Context, userID string, req Me
 		}
 	}
 
-	metricsJSON, _ := json.Marshal(req.Metrics)
 	p := MetricProfile{
 		ID:          uuid.New(),
 		UserID:      userID,
@@ -544,8 +543,6 @@ func (s *service) createMetricProfile(ctx context.Context, userID string, req Me
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
-	// Store metrics as JSON in the db struct tag
-	_ = metricsJSON // handled by NamedExec
 
 	if err := s.repo.CreateMetricProfile(ctx, p); err != nil {
 		return MetricProfile{}, fmt.Errorf("creating metric profile: %w", err)
