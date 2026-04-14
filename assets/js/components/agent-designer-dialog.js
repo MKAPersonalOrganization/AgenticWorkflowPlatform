@@ -242,6 +242,41 @@ export const agentDesigner = () => ({
     // ══════════════════════════════════════════
     // Templates / Catalog
     // ══════════════════════════════════════════
+    // Agent Fetching
+    // ══════════════════════════════════════════
+
+    async fetchConsumers(agentId) {
+        try {
+            const response = await fetch(`/v1/agent-definitions/${encodeURIComponent(agentId)}/consumers`);
+            if (response.ok) {
+                const data = await response.json();
+                this.pipelineConsumers = data.agents || [];
+            }
+        } catch (err) {
+            console.error('Failed to fetch consumers:', err);
+            this.pipelineConsumers = [];
+        }
+    },
+
+    async fetchAgents() {
+        this.loading = true;
+        try {
+            const response = await fetch('/v1/agent-definitions');
+            if (response.ok) {
+                const data = await response.json();
+                const all = data.agents || [];
+                this.allAgents = all;
+                this.agents = all; // all agents (including composed) for tree builder to allow fork references
+                this.applyFilter();
+            }
+        } catch (err) {
+            console.error('Failed to fetch agents:', err);
+        } finally {
+            this.loading = false;
+        }
+    },
+
+    // ══════════════════════════════════════════
 
     /** Open the templates/catalog view */
     openTemplatesView() {

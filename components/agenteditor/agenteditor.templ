@@ -908,6 +908,20 @@ templ AgentDesignerDialog() {
                                                                                         Test Explorer
                                                                                 </span>
                                                                                 <span class="flex-1"></span>
+                                                                                @dialog.Trigger(dialog.TriggerProps{
+                                                                                        For: "evalsets-manager-dialog",
+                                                                                }) {
+                                                                                        @button.Button(button.Props{
+                                                                                                Size:    button.SizeIcon,
+                                                                                                Variant: button.VariantGhost,
+                                                                                                Class:   "size-6",
+                                                                                                Attributes: templ.Attributes{
+                                                                                                        "title": "Manage Eval Sets",
+                                                                                                },
+                                                                                        }) {
+                                                                                                @icon.Settings(icon.Props{Class: "size-3"})
+                                                                                        }
+                                                                                }
                                                                                 <button
                                                                                         @click="loadEvalSets()"
                                                                                         title="Refresh"
@@ -915,8 +929,8 @@ templ AgentDesignerDialog() {
                                                                                 >
                                                                                         @icon.RefreshCw(icon.Props{Class: "size-3"})
                                                                                 </button>
-                                                                        </div>
 
+                                                                        </div>
                                                                         <!-- Panel Content -->
                                                                         <div class="flex-1 overflow-y-auto p-2 space-y-1">
                                                                                 <!-- Loading State -->
