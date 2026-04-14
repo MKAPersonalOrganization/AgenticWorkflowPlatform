@@ -1506,69 +1506,67 @@ templ AgentDesignerDialog() {
                                                                         </div>
                                                                 </template>
 
-                                                                <!-- Test Results Tab -->
+                                                                <!-- Test Results Tab (VS Code / IntelliJ pattern) -->
                                                                 <template x-if="activeBottomTab === 'test-results'">
                                                                         <div class="h-full flex flex-col overflow-hidden">
-                                                                                <!-- Compact status bar (VS Code pattern) -->
+                                                                                <!-- Thin status bar -->
                                                                                 <template x-if="testResults.length > 0">
-                                                                                        <div class="flex items-center gap-3 px-3 py-1 text-[11px] border-b border-border/50 bg-muted/20 shrink-0">
-                                                                                                <span class="text-green-600 dark:text-green-400 font-medium" x-text="evalPassedCount + ' passed'"></span>
-                                                                                                <span class="text-red-600 dark:text-red-400 font-medium" x-text="evalFailedCount + ' failed'"></span>
-                                                                                                <span class="text-muted-foreground" x-text="'avg ' + evalAverageScore"></span>
-                                                                                                <span class="flex-1"></span>
-                                                                                                <span class="text-muted-foreground" x-text="testResults.length + ' total'"></span>
+                                                                                        <div class="flex items-center gap-2 px-2 py-0.5 text-[10px] border-b border-border/50 bg-muted/20 shrink-0">
+                                                                                                <span class="text-muted-foreground" x-text="evalPassedCount + '/' + testResults.length + ' passed'"></span>
+                                                                                                <template x-if="evalFailedCount > 0">
+                                                                                                        <span class="text-red-600 dark:text-red-400" x-text="evalFailedCount + ' failed'"></span>
+                                                                                                </template>
+                                                                                                <template x-if="evalAverageScore !== '-'">
+                                                                                                        <span class="text-muted-foreground" x-text="'avg ' + evalAverageScore"></span>
+                                                                                                </template>
                                                                                         </div>
                                                                                 </template>
 
-                                                                                <!-- Compact results list -->
-                                                                                <div class="flex-1 overflow-y-auto p-1 space-y-0.5">
+                                                                                <!-- Compact tree list -->
+                                                                                <div class="flex-1 overflow-y-auto">
                                                                                         <!-- Empty State -->
                                                                                         <template x-if="testResults.length === 0">
                                                                                                 <div class="flex flex-col items-center justify-center h-full text-muted-foreground">
                                                                                                         @icon.TestTube(icon.Props{Class: "size-8 opacity-30 mb-2"})
                                                                                                         <span class="text-xs">No test results yet</span>
-                                                                                                        <span class="text-[10px]">Run tests to see results here</span>
                                                                                                 </div>
                                                                                         </template>
 
-                                                                                        <!-- Per-Case Results -->
+                                                                                        <!-- Per-case tree (compact, no cards) -->
                                                                                         <template x-for="(result, idx) in testResults" :key="idx">
                                                                                                 <div>
-                                                                                                        <!-- Case row (clickable to expand) -->
+                                                                                                        <!-- Case row -->
                                                                                                         <div
-                                                                                                                class="flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer hover:bg-muted/50 text-xs"
-                                                                                                                :class="result.status === 'passed' ? 'text-green-700 dark:text-green-400' : result.status === 'failed' || result.status === 'error' ? 'text-red-700 dark:text-red-400' : ''"
+                                                                                                                class="flex items-center gap-1.5 px-2 py-0.5 cursor-pointer hover:bg-accent/50 text-xs"
                                                                                                                 @click="result.expanded = !result.expanded"
                                                                                                         >
                                                                                                                 <!-- Expand chevron -->
-                                                                                                                <template x-if="result.metrics && result.metrics.length > 0">
-                                                                                                                        <span class="transition-transform duration-150 text-[8px] text-muted-foreground" :class="result.expanded ? 'rotate-90' : ''">▶</span>
-                                                                                                                </template>
-                                                                                                                <template x-if="!result.metrics || result.metrics.length === 0">
-                                                                                                                        <span class="size-2"></span>
-                                                                                                                </template>
+                                                                                                                <span class="transition-transform duration-150 text-[8px] text-muted-foreground" :class="result.expanded ? 'rotate-90' : ''">▶</span>
                                                                                                                 <!-- Status icon -->
                                                                                                                 <template x-if="result.status === 'passed'">
-                                                                                                                        @icon.Check(icon.Props{Class: "size-3.5 flex-shrink-0"})
+                                                                                                                        @icon.Check(icon.Props{Class: "size-3.5 text-green-600 flex-shrink-0"})
                                                                                                                 </template>
                                                                                                                 <template x-if="result.status === 'failed' || result.status === 'error'">
-                                                                                                                        @icon.X(icon.Props{Class: "size-3.5 flex-shrink-0"})
+                                                                                                                        @icon.X(icon.Props{Class: "size-3.5 text-red-600 flex-shrink-0"})
                                                                                                                 </template>
                                                                                                                 <template x-if="result.status === 'running'">
-                                                                                                                        <span class="animate-spin size-3 border border-current border-t-transparent rounded-full flex-shrink-0"></span>
+                                                                                                                        <span class="animate-spin size-3 border border-blue-500 border-t-transparent rounded-full flex-shrink-0"></span>
                                                                                                                 </template>
-                                                                                                                <!-- Case name -->
+                                                                                                                <template x-if="result.status === 'pending'">
+                                                                                                                        @icon.Circle(icon.Props{Class: "size-3.5 text-muted-foreground flex-shrink-0"})
+                                                                                                                </template>
+                                                                                                                <!-- Name -->
                                                                                                                 <span class="flex-1 truncate" x-text="result.name"></span>
                                                                                                                 <!-- Score -->
                                                                                                                 <template x-if="result.score != null">
-                                                                                                                        <span class="font-mono text-[10px]" x-text="result.score.toFixed(2)"></span>
+                                                                                                                        <span class="font-mono text-[10px] text-muted-foreground" x-text="result.score.toFixed(2)"></span>
                                                                                                                 </template>
                                                                                                         </div>
 
-                                                                                                        <!-- Expanded metric details (indented, like VS Code tree) -->
-                                                                                                        <div x-show="result.expanded" class="ml-4 space-y-0 py-0.5" x-transition>
+                                                                                                        <!-- Expanded metrics (indented child rows) -->
+                                                                                                        <div x-show="result.expanded" class="ml-4" x-transition>
                                                                                                                 <template x-for="(m, mIdx) in result.metrics" :key="mIdx">
-                                                                                                                        <div class="flex items-center justify-between px-2 py-0.5 text-[11px] text-muted-foreground">
+                                                                                                                        <div class="flex items-center justify-between px-2 py-0.5 text-[11px]">
                                                                                                                                 <div class="flex items-center gap-1.5">
                                                                                                                                         <template x-if="m.status === 'passed'">
                                                                                                                                                 @icon.Check(icon.Props{Class: "size-3 text-green-600"})
@@ -1576,13 +1574,13 @@ templ AgentDesignerDialog() {
                                                                                                                                         <template x-if="m.status === 'failed'">
                                                                                                                                                 @icon.X(icon.Props{Class: "size-3 text-red-600"})
                                                                                                                                         </template>
-                                                                                                                                        <span x-text="m.metric_id"></span>
+                                                                                                                                        <span class="text-muted-foreground" x-text="m.metric_id"></span>
                                                                                                                                 </div>
-                                                                                                                                <span class="font-mono" x-text="m.score?.toFixed(2) || '-'"></span>
+                                                                                                                                <span class="font-mono text-[10px] text-muted-foreground" x-text="m.score?.toFixed(2) || '-'"></span>
                                                                                                                         </div>
                                                                                                                 </template>
                                                                                                                 <template x-if="!result.metrics || result.metrics.length === 0">
-                                                                                                                        <p class="px-2 py-0.5 text-[10px] text-muted-foreground/50">No metrics recorded</p>
+                                                                                                                        <p class="px-2 py-0.5 text-[10px] text-muted-foreground/50">No metrics</p>
                                                                                                                 </template>
                                                                                                         </div>
                                                                                                 </div>
