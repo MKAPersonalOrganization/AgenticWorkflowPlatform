@@ -1712,6 +1712,20 @@ export const agentDesigner = () => ({
         return result && result.metrics ? result.metrics : [];
     },
 
+    get evalPassedCount() {
+        return this.testResults.filter(r => r.status === 'passed').length;
+    },
+
+    get evalFailedCount() {
+        return this.testResults.filter(r => r.status === 'failed' || r.status === 'error').length;
+    },
+
+    get evalAverageScore() {
+        const scores = this.testResults.filter(r => r.score != null).map(r => r.score);
+        if (scores.length === 0) return '-';
+        return (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2);
+    },
+
     // ══════════════════════════════════════════
     // Evaluation Event Handler
     // ══════════════════════════════════════════
@@ -1729,7 +1743,8 @@ export const agentDesigner = () => ({
                 this.evalLogs.push(`  ▶️ ${data.case_name}`);
                 this.testResults = [...this.testResults, {
                     id: data.case_id, name: data.case_name,
-                    status: 'running', score: null, duration: null
+                    status: 'running', score: null, duration: null,
+                    expanded: false, metrics: [],
                 }];
                 break;
             case 'METRIC_DONE':
