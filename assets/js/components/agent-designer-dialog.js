@@ -1597,7 +1597,14 @@ export const agentDesigner = () => ({
         try {
             const res = await fetch('/api/eval-sets');
             if (res.ok) {
-                this.evalSets = (await res.json()).map(es => ({...es, expanded: false}));
+                const sets = await res.json();
+                for (const es of sets) {
+                    const casesRes = await fetch(`/api/eval-sets/${es.id}/cases`);
+                    es.cases = casesRes.ok ? await casesRes.json() : [];
+                    es.expanded = false;
+                    es.casesExpanded = false;
+                }
+                this.evalSets = sets;
             }
         } catch (err) {
             console.error('Failed to load eval sets:', err);
@@ -1692,6 +1699,23 @@ export const agentDesigner = () => ({
         }
     },
 
+    // ══════════════════════════════════════════
+    // Test Explorer Helpers
+    // ══════════════════════════════════════════
+
+    getCaseResult(caseId) {
+        return this.testResults.find(r => r.id === caseId) || null;
+    },
+
+    getCaseMetrics(caseId) {
+        const result = this.getCaseResult(caseId);
+        return result && result.metrics ? result.metrics : [];
+    },
+
+    // ══════════════════════════════════════════
+    // Evaluation Event Handler
+    // ══════════════════════════════════════════
+
     handleEvalEvent(data) {
         console.log('📨 Eval Event:', data.type, data);
         switch (data.type) {
@@ -1710,6 +1734,17 @@ export const agentDesigner = () => ({
                 break;
             case 'METRIC_DONE':
                 this.evalLogs.push(`    ${data.metric}: ${data.score.toFixed(2)} (${data.status})`);
+                // Attach metric to the most recently running case
+                const runningCase = this.testResults.find(r => r.status === 'running');
+                if (runningCase) {
+                    if (!runningCase.metrics) runningCase.metrics = [];
+                    runningCase.metrics.push({
+                        metric_id: data.metric,
+                        score: data.score,
+                        status: data.status,
+                    });
+                    this.testResults = [...this.testResults]; // trigger reactivity
+                }
                 break;
             case 'CASE_COMPLETE':
                 this.testResults = this.testResults.map(r => 
