@@ -166,6 +166,35 @@ export const agentDesigner = () => ({
     propertyPanelVisible: true,
 
     // ══════════════════════════════════════════
+    // IDE Layout State (VS Code / IntelliJ pattern)
+    // ══════════════════════════════════════════
+    evalPanelActive: false,        // Left panel (Test Explorer)
+    evalPanelCollapsed: false,
+    evalSelectedSets: [],
+    evalSets: [],                  // Available eval sets
+    evalSetsLoading: false,
+    evalRunning: false,
+    evalCompleted: false,
+    evalLogs: [],
+    evalProgressPercent: 0,
+    evalPassed: 0,
+    evalFailed: 0,
+    evalAvgScore: '-',
+    evalDurationMs: 0,
+    evalAbortController: null,
+    testResults: [],
+
+    // Bottom Panel
+    bottomPanelActive: true,
+    bottomPanelCollapsed: false,
+    activeBottomTab: 'terminal',
+    bottomTabs: [
+        { id: 'terminal', label: 'Terminal', icon: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>' },
+        { id: 'test-results', label: 'Test Results', icon: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>', badge: null },
+        { id: 'output', label: 'Output', icon: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>' },
+    ],
+
+    // ══════════════════════════════════════════
     // Tool / Plugin Helpers
     // ══════════════════════════════════════════
 
@@ -257,6 +286,8 @@ export const agentDesigner = () => ({
         this.searchQuery = '';
         this.selectedNodePath = null;
         await Promise.all([this.fetchAgents(), this.fetchConnectors()]);
+        // Pre-load eval sets for Test Explorer
+        this.loadEvalSets();
     },
 
     toggleExpand() {
@@ -2003,6 +2034,170 @@ export const agentDesigner = () => ({
         const g = store.export();
         if (g) this.pipelineGraph = g;
         this.pipelineSystemPrompt = store.systemPrompt || this.pipelineSystemPrompt;
+    },
+
+    // ══════════════════════════════════════════
+    // Evaluation Panel Methods
+    // ══════════════════════════════════════════
+
+    toggleEvalPanel() {
+        this.evalPanelActive = !this.evalPanelActive;
+        if (this.evalPanelActive && this.evalSets.length === 0) {
+            this.loadEvalSets();
+        }
+    },
+
+    async loadEvalSets() {
+        this.evalSetsLoading = true;
+        try {
+            const res = await fetch('/api/eval-sets');
+            if (res.ok) {
+                this.evalSets = (await res.json()).map(es => ({...es, expanded: false}));
+            }
+        } catch (err) {
+            console.error('Failed to load eval sets:', err);
+        } finally {
+            this.evalSetsLoading = false;
+        }
+    },
+
+    async runEvalSet(evalSetId) {
+        if (!this.currentAgentId || this.evalRunning) return;
+
+        this.evalRunning = true;
+        this.evalCompleted = false;
+        this.testResults = [];
+        this.evalLogs = [];
+        this.evalProgressPercent = 0;
+        this.evalPassed = 0;
+        this.evalFailed = 0;
+        this.evalAvgScore = '-';
+        this.evalDurationMs = 0;
+        this.evalAbortController = new AbortController();
+        this.bottomPanelActive = true;
+        this.activeBottomTab = 'terminal';
+
+        this.evalLogs.push(`[RUN] Starting evaluation run...`);
+        const startTime = Date.now();
+
+        try {
+            const res = await fetch('/api/evaluation/runs/eval-stream', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    eval_set_id: evalSetId,
+                    agent_id: this.currentAgentId,
+                    num_runs: 1
+                }),
+                signal: this.evalAbortController.signal
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`Failed: ${res.status} ${errText}`);
+            }
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            this.handleEvalEvent(data);
+                        } catch (e) {
+                            // Ignore parse errors
+                        }
+                    }
+                }
+            }
+
+            this.evalDurationMs = Date.now() - startTime;
+            this.evalRunning = false;
+            this.evalCompleted = true;
+            this.evalLogs.push(`\n[COMPLETE] Evaluation finished in ${this.evalDurationMs}ms`);
+            this.activeBottomTab = 'test-results';
+
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                this.evalLogs.push(`\n[CANCELLED] Evaluation cancelled`);
+            } else {
+                this.evalLogs.push(`\n[ERROR] ${err.message}`);
+            }
+            this.evalRunning = false;
+        } finally {
+            this.evalAbortController = null;
+        }
+    },
+
+    async runAllEvalSets() {
+        if (!this.currentAgentId || this.evalSets.length === 0) return;
+        for (const es of this.evalSets) {
+            if (this.evalAbortController?.signal.aborted) break;
+            await this.runEvalSet(es.id);
+        }
+    },
+
+    handleEvalEvent(data) {
+        console.log('📨 Eval Event:', data.type, data);
+        switch (data.type) {
+            case 'SESSION_START':
+                this.evalLogs.push(`[SESSION] ${data.contextId.substring(0, 8)}`);
+                break;
+            case 'RUN_STARTED':
+                this.evalLogs.push(`[RUN] ${data.eval_set} (${data.num_cases} cases)`);
+                break;
+            case 'CASE_STARTED':
+                this.evalLogs.push(`  ▶️ ${data.case_name}`);
+                this.testResults = [...this.testResults, {
+                    id: data.case_id, name: data.case_name,
+                    status: 'running', score: null, duration: null
+                }];
+                break;
+            case 'METRIC_DONE':
+                this.evalLogs.push(`    ${data.metric}: ${data.score.toFixed(2)} (${data.status})`);
+                break;
+            case 'CASE_COMPLETE':
+                this.testResults = this.testResults.map(r => 
+                    r.id === data.case_id ? { ...r, status: data.status, score: data.score } : r
+                );
+                if (data.status === 'passed') this.evalPassed++;
+                else this.evalFailed++;
+                this.evalProgressPercent = Math.round(data.progress_pct || 0);
+                this.evalLogs.push(`  ✅ ${data.case_name} - ${data.status} (${data.score?.toFixed(2) || 'N/A'})`);
+                break;
+            case 'RUN_COMPLETE':
+                this.evalLogs.push(`[RUN] ✅ Completed in ${data.duration_ms}ms`);
+                this.evalDurationMs = data.duration_ms;
+                break;
+            case 'RUN_ERROR':
+                this.evalLogs.push(`[RUN] ❌ Error: ${data.message}`);
+                break;
+        }
+        const testTab = this.bottomTabs.find(t => t.id === 'test-results');
+        if (testTab && this.testResults.length > 0) {
+            testTab.badge = `${this.evalPassed}/${this.testResults.length}`;
+        }
+        this.$nextTick(() => {
+            if (this.$refs.terminalPanel) {
+                this.$refs.terminalPanel.scrollTop = this.$refs.terminalPanel.scrollHeight;
+            }
+        });
+    },
+
+    get currentAgentId() {
+        if (this.editingPipeline) return this.editingPipeline.id;
+        if (this.editingAgent) return this.editingAgent.id;
+        return null;
     },
 
     // ══════════════════════════════════════════

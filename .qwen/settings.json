@@ -12,7 +12,11 @@
       "Bash(gofumpt *)",
       "Bash(golangci-lint *)",
       "Bash(docker compose exec *)",
-      "Bash(docker compose *)"
+      "Bash(docker compose *)",
+      "Bash(templ *)",
+      "Bash(sed *)",
+      "Bash(true)",
+      "Bash(git checkout *)"
     ]
   },
   "$version": 3

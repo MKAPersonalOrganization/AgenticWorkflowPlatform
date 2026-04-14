@@ -1031,3 +1031,9 @@ func (h *handler) exportEvalSet(w http.ResponseWriter, r *http.Request) {
 		slog.Error("writing export response", "error", err)
 	}
 }
+
+// ─── IDE Test Runner Endpoints ───────────────────────────────────────────────
+
+
+
+

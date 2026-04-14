@@ -7,14 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// Module is the evaluation bounded context. It owns the repository, service,
-// and handler as internal collaborators, exposing only the wiring methods that
-// main.go (and other modules) need.
-//
-// Public API for main.go:
-//
-//	module := evaluation.New(db)
-//	module.RegisterRoutes(r, authMiddleware)
+// Module is the evaluation bounded context.
 type Module struct {
 	handler *handler
 	svc     *service
@@ -45,6 +38,7 @@ func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 
 	// Evaluation run routes
 	r.Post("/api/evaluation/runs", authMW.RequireAuthFunc(m.handler.createEvalRun))
+	r.Post("/api/evaluation/runs/eval-stream", authMW.RequireAuthFunc(RunEvalInline(m.svc)))
 	r.Get("/api/evaluation/runs", authMW.RequireAuthFunc(m.handler.listEvalRuns))
 	r.Get("/api/evaluation/runs/{id}", authMW.RequireAuthFunc(m.handler.getEvalRun))
 	r.Get("/api/evaluation/runs/{id}/results", authMW.RequireAuthFunc(m.handler.getEvalResults))

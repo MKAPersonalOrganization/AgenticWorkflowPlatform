@@ -212,3 +212,36 @@ type RubricUpdate struct {
 	Description *string
 	Levels      []RubricLevel
 }
+
+// ─── IDE Test Runner types ───────────────────────────────────────────────────
+
+// TestCaseStatus represents the status of a single test case during a run.
+type TestCaseStatus struct {
+	CaseID   uuid.UUID       `json:"case_id"`
+	CaseName *string         `json:"case_name"`
+	Status   string          `json:"status"` // pending, running, passed, failed, error
+	Score    *float64        `json:"score,omitempty"`
+	Metrics  []CaseMetric    `json:"metrics,omitempty"`
+	Error    *string         `json:"error,omitempty"`
+}
+
+// CaseMetric holds a metric result for a test case.
+type CaseMetric struct {
+	MetricID string          `json:"metric_id"`
+	Score    *float64        `json:"score,omitempty"`
+	Status   string          `json:"status"` // passed, failed
+	Details  json.RawMessage `json:"details,omitempty"`
+}
+
+// RunProgress represents the progress of an evaluation run.
+type RunProgress struct {
+	RunID         uuid.UUID          `json:"run_id"`
+	TotalCases    int                `json:"total_cases"`
+	Completed     int                `json:"completed"`
+	CurrentCase   *string            `json:"current_case,omitempty"`
+	Status        string             `json:"status"` // running, completed, failed, cancelled
+	TestCases     []TestCaseStatus   `json:"test_cases"`
+	Logs          []string           `json:"logs"`
+	StartedAt     *time.Time         `json:"started_at,omitempty"`
+	CompletedAt   *time.Time         `json:"completed_at,omitempty"`
+}
