@@ -189,7 +189,6 @@ export const agentDesigner = () => ({
     activeBottomTab: 'terminal',
     bottomTabs: [
         { id: 'terminal', label: 'Terminal', icon: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>' },
-        { id: 'test-results', label: 'Test Results', icon: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>', badge: null },
         { id: 'output', label: 'Output', icon: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>' },
     ],
 
@@ -1777,10 +1776,6 @@ export const agentDesigner = () => ({
             case 'RUN_ERROR':
                 this.evalLogs.push(`[RUN] ❌ Error: ${data.message}`);
                 break;
-        }
-        const testTab = this.bottomTabs.find(t => t.id === 'test-results');
-        if (testTab && this.testResults.length > 0) {
-            testTab.badge = `${this.evalPassed}/${this.testResults.length}`;
         }
         this.$nextTick(() => {
             if (this.$refs.terminalPanel) {
