@@ -15,7 +15,6 @@ var readOnlyTools = []string{
 	"think",
 	"query_knowledge_base",
 	"write_todos",
-	"ask_user",
 }
 
 var enterPlanModeSchema = &agent.Schema{
@@ -23,7 +22,7 @@ var enterPlanModeSchema = &agent.Schema{
 	Description: `Switch the agent into Plan Mode — a research-only phase where you gather information, analyze context, and formulate a structured plan BEFORE taking any actions.
 
 CRITICAL RULES WHILE IN PLAN MODE:
-• You may ONLY use read-only tools: search, read, think, query, list, ask_user, write_todos
+• You may ONLY use read-only tools: search, read, think, query, list, write_todos
 • You MUST NOT use any tools that create, modify, or delete content (no create_markdown, no update_markdown, etc.)
 • You MUST NOT attempt to produce a final answer — your goal is to research and plan
 • When your research is complete, call exit_plan_mode with your structured plan

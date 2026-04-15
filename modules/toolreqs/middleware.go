@@ -68,6 +68,8 @@ func BlockMiddleware(checker blockChecker, agentID string) agent.Middleware {
 // from persistent storage (DB + cache). Implemented by [Service].
 type ConfirmationConfigResolver interface {
 	GetToolRequirementConfig(ctx context.Context, userID, agentID, toolSetID, toolID string) (ToolRequirementConfig, error)
+	GetToolSetRequirementConfig(ctx context.Context, userID, agentID, toolSetID string) (ToolRequirementConfig, error)
+	GetToolSetsWithConfirmation(ctx context.Context, userID, agentID string) ([]string, error)
 }
 
 // CheckConfirmation determines whether a tool call needs user confirmation,
@@ -85,11 +87,32 @@ func CheckConfirmation(
 	userID, agentID, toolSetID, toolName string,
 	args map[string]any,
 ) (bool, string) {
-	// 1. Check per-user requirement config from DB (primary source).
+	// 1. Check per-user individual tool config from DB (primary source).
 	if userID != "" && resolver != nil {
 		cfg, err := resolver.GetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolName)
 		if err == nil && (cfg.Action == RequirementActionRequireConfirmation || cfg.RequireConfirmation) {
 			return true, cfg.ConfirmationHint
+		}
+
+		// 1b. Check tool-set level config if we know the tool-set ID.
+		if toolSetID != "" {
+			tsCfg, err := resolver.GetToolSetRequirementConfig(ctx, userID, agentID, toolSetID)
+			if err == nil && (tsCfg.Action == RequirementActionRequireConfirmation || tsCfg.RequireConfirmation) {
+				return true, tsCfg.ConfirmationHint
+			}
+		} else {
+			// 1c. No tool-set ID provided - check all tool-sets the user has configured
+			// with require_confirmation and see if any of them contain this tool.
+			confToolSets, err := resolver.GetToolSetsWithConfirmation(ctx, userID, agentID)
+			if err == nil && len(confToolSets) > 0 {
+				// Check each tool-set that has require_confirmation
+				for _, tsID := range confToolSets {
+					tsCfg, err := resolver.GetToolSetRequirementConfig(ctx, userID, agentID, tsID)
+					if err == nil && (tsCfg.Action == RequirementActionRequireConfirmation || tsCfg.RequireConfirmation) {
+						return true, tsCfg.ConfirmationHint
+					}
+				}
+			}
 		}
 	}
 

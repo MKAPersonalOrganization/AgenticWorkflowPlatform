@@ -152,9 +152,9 @@ func TestToolSetRequirementConfigs(t *testing.T) {
 		t.Errorf("Expected math-expert to NOT have calculator-set permission")
 	}
 
-	// Verify unconfigured tool set — fail-open (no config = allowed)
-	if !service.HasToolSetPermission(ctx, userID, "physics-expert", "calculator-set") {
-		t.Errorf("Expected unconfigured tool set to be allowed (fail-open)")
+	// Verify unconfigured tool set — fail-closed (no config = denied)
+	if service.HasToolSetPermission(ctx, userID, "physics-expert", "calculator-set") {
+		t.Errorf("Expected unconfigured tool set to be denied (fail-closed)")
 	}
 
 	if !service.HasToolSetPermission(ctx, userID, "math-expert", "chemistry-set") {

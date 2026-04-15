@@ -256,6 +256,16 @@ export function createEventHandlerMethods() {
 
             this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
 
+            // Check if this is a confirmation_required response
+            let parsedResult;
+            try {
+                parsedResult = typeof result === 'string' ? JSON.parse(result) : result;
+            } catch {
+                parsedResult = null;
+            }
+
+            const isConfirmationRequired = parsedResult?.status === 'confirmation_required';
+
             // Mark streaming as complete and clean up
             const msg = state.messages.find(m => m.id === toolCallId);
             if (msg) {
@@ -265,9 +275,17 @@ export function createEventHandlerMethods() {
                     msg.args = toolArgs;
                     msg.parsedArgs = safeParseJSON(toolArgs);
                 }
+                // Store the result but don't override awaiting_input status
+                if (parsedResult) {
+                    msg.parsedResult = parsedResult;
+                }
             }
 
-            this.transitionToolState(toolCallId, TOOL_EVENTS.SUCCESS, { toolName, result });
+            // Only transition to SUCCESS if NOT confirmation_required
+            // (TOOL_NEEDS_INPUT already handled the state transition to AWAITING_INPUT)
+            if (!isConfirmationRequired) {
+                this.transitionToolState(toolCallId, TOOL_EVENTS.SUCCESS, { toolName, result });
+            }
 
             // Notify artifacts panel to refresh
             window.dispatchEvent(new CustomEvent('artifacts-updated'));
@@ -289,17 +307,21 @@ export function createEventHandlerMethods() {
         },
 
         __handleToolNeedsInput(value, state, threadId) {
-            const { toolCallId, toolName, question, schema, agentName } = value;
+            const { toolCallId, originalToolCallId, toolName, question, schema, agentName } = value;
 
-            this.__ensureToolCallMessage(state, toolCallId, toolName, agentName);
+            // Use originalToolCallId to find the existing message (created by TOOL_START)
+            // Falls back to toolCallId for backwards compatibility
+            const effectiveId = originalToolCallId || toolCallId;
 
-            // Transition machine
-            this.transitionToolState(toolCallId, TOOL_EVENTS.NEEDS_INPUT, {
+            this.__ensureToolCallMessage(state, effectiveId, toolName, agentName);
+
+            // Transition machine using the original tool call ID
+            this.transitionToolState(effectiveId, TOOL_EVENTS.NEEDS_INPUT, {
                 elicitation: { question, schema }
             });
 
             // Update the message in the list to trigger UI rendering
-            const msg = state.messages.find(m => m.id === toolCallId);
+            const msg = state.messages.find(m => m.id === effectiveId);
             if (msg) {
                 msg.status = 'awaiting_input';
                 msg.parsedResult = { question_text: question, schema: schema };

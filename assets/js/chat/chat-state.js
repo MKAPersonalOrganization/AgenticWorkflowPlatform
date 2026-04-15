@@ -268,7 +268,7 @@ export function createStateMethods() {
                 msg.parsedResult = safeParseJSON(msg.result);
             }
 
-            // Sync elicitation data for ask_user tool (pass schema directly as parsedResult)
+            // Sync elicitation data for tool confirmation (pass schema directly as parsedResult)
             if (context.elicitation) {
                 const { question, schema } = context.elicitation;
                 msg.parsedResult = { question_text: question, schema: schema };

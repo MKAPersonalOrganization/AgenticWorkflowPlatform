@@ -183,7 +183,7 @@ export function formatNumber(num) {
 /**
  * Enrich a tool result message or object with parsed content.
  * This is the SINGLE place where parsedResult is set during message hydration.
- * For tools with elicitation data (ask_user in awaiting_input state), parsedResult
+ * For tools with elicitation data (confirmation in awaiting_input state), parsedResult
  * is set from the elicitation schema. For standard tools, it's JSON-parsed result.
  * @param {Object} toolResult - The tool result object/message
  * @param {string} content - The JSON string content
@@ -195,8 +195,8 @@ export function enrichToolResult(toolResult, content) {
     // Always set the raw result
     toolResult.result = content;
 
-    // For tools with elicitation data (e.g. ask_user in awaiting_input state),
-    // parsedResult must carry the schema so the UI component can render questions.
+    // For tools with elicitation data (e.g. confirmation in awaiting_input state),
+    // parsedResult must carry the schema so the UI component can render the confirmation.
     if (toolResult.elicitation) {
         const { question, schema } = toolResult.elicitation;
         toolResult.parsedResult = { question_text: question, schema: schema };

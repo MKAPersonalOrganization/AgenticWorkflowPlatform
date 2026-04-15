@@ -142,7 +142,34 @@ func (s *Service) Confirmation() *ConfirmationRequirement {
 // Returns (needsConfirmation, hint). Used by the adapter layer to build
 // ADK-native BeforeToolCallbacks that use ctx.RequestConfirmation().
 func (s *Service) CheckConfirmation(ctx context.Context, userID, agentID, toolSetID, toolName string, args map[string]any) (bool, string) {
-	return CheckConfirmation(ctx, s, s.confirmReq, userID, agentID, toolSetID, toolName, args)
+	s.log.Info(ctx, "CheckConfirmation called",
+		"user_id", userID,
+		"agent_id", agentID,
+		"tool_set_id", toolSetID,
+		"tool_name", toolName,
+	)
+
+	// Check all tool-sets with require_confirmation for this user/agent
+	confirmSets, err := s.GetToolSetsWithConfirmation(ctx, userID, agentID)
+	if err == nil {
+		s.log.Info(ctx, "Tool sets with require_confirmation",
+			"user_id", userID,
+			"agent_id", agentID,
+			"tool_sets", confirmSets,
+		)
+	}
+
+	needsConfirm, hint := CheckConfirmation(ctx, s, s.confirmReq, userID, agentID, toolSetID, toolName, args)
+
+	s.log.Info(ctx, "CheckConfirmation result",
+		"user_id", userID,
+		"agent_id", agentID,
+		"tool_name", toolName,
+		"needs_confirmation", needsConfirm,
+		"hint", hint,
+	)
+
+	return needsConfirm, hint
 }
 
 // BlockMiddleware returns a [agent.Middleware] scoped to the given agent that
@@ -379,24 +406,25 @@ func (s *Service) GetPermission(ctx context.Context, userID, agentID, toolSetID,
 // rather than the legacy Enabled boolean.
 // =============================================================================
 
-// isToolSetAllowed checks if a tool set is enabled (config action is "allow").
+// isToolSetAllowed checks if a tool set is enabled.
 // Implements [permissionChecker].
-// Note: Disabled by default — no permission record or config means NOT allowed.
+// Note: Tools are denied by default (fail-closed) unless explicitly allowed.
 func (s *Service) isToolSetAllowed(ctx context.Context, userID, agentID, toolSetID string) bool {
 	permission, err := s.GetToolSetPermission(ctx, userID, agentID, toolSetID)
 	if err != nil {
-		// No permission record = NOT allowed (disabled by default)
+		// No permission record = denied (fail-closed)
 		return false
 	}
 	cfg := permission.RequirementConfig()
-	// Only "allow" explicitly enables the tool set
-	return cfg.Action == RequirementActionAllow
+	// Only "allow" and "require_confirmation" explicitly enable the tool set
+	// "block" or empty/unspecified = denied
+	return cfg.Action == RequirementActionAllow || cfg.Action == RequirementActionRequireConfirmation
 }
 
-// isToolAllowed checks if a specific tool is enabled (config action is "allow").
+// isToolAllowed checks if a specific tool is enabled.
 // Falls back to tool-set level when no explicit individual config exists.
 // Implements [permissionChecker].
-// Note: Disabled by default — no individual config falls back to tool-set, which is also disabled by default.
+// Note: Tools are denied by default (fail-closed) unless explicitly allowed.
 func (s *Service) isToolAllowed(ctx context.Context, userID, agentID, toolSetID, toolID string) bool {
 	permission, err := s.GetPermission(ctx, userID, agentID, toolSetID, toolID)
 	if err != nil {
@@ -404,14 +432,14 @@ func (s *Service) isToolAllowed(ctx context.Context, userID, agentID, toolSetID,
 		return s.isToolSetAllowed(ctx, userID, agentID, toolSetID)
 	}
 	cfg := permission.RequirementConfig()
-	// Only "allow" explicitly enables the tool
-	return cfg.Action == RequirementActionAllow
+	// Only "allow" and "require_confirmation" explicitly enable the tool
+	// "block" or empty/unspecified = denied
+	return cfg.Action == RequirementActionAllow || cfg.Action == RequirementActionRequireConfirmation
 }
 
-// getAllowedToolSets returns all tool set IDs whose config action is "allow".
+// getAllowedToolSets returns all tool set IDs that are not explicitly blocked.
 // Implements [permissionChecker].
-// Note: Tools are disabled by default unless explicitly set to "allow".
-// If no permissions exist or config is missing/empty, the tool set is NOT included (disabled by default).
+// Note: Tools are denied by default (fail-closed). Only "allow" and "require_confirmation" enable a tool set.
 func (s *Service) getAllowedToolSets(ctx context.Context, userID, agentID string) ([]string, error) {
 	permissions, err := s.repo.ListToolSetPermissions(ctx, userID, agentID)
 	if err != nil {
@@ -419,7 +447,7 @@ func (s *Service) getAllowedToolSets(ctx context.Context, userID, agentID string
 		return nil, nil
 	}
 
-	// No permissions saved = all tools disabled by default
+	// No permissions saved = all tools denied (fail-closed)
 	if len(permissions) == 0 {
 		return nil, nil
 	}
@@ -427,12 +455,45 @@ func (s *Service) getAllowedToolSets(ctx context.Context, userID, agentID string
 	var allowedToolSets []string
 	for _, perm := range permissions {
 		cfg := perm.RequirementConfig()
-		// Only "allow" explicitly enables the tool set
-		// Missing config, empty config, or any other value = disabled
-		if cfg.Action == RequirementActionAllow {
+		// Only "allow" and "require_confirmation" enable the tool set
+		// "block" or empty/unspecified = denied
+		if cfg.Action == RequirementActionAllow || cfg.Action == RequirementActionRequireConfirmation {
 			allowedToolSets = append(allowedToolSets, perm.ToolSetID)
 		}
 	}
 
 	return allowedToolSets, nil
+}
+
+// GetToolSetsWithConfirmation returns all tool set IDs that have require_confirmation
+// action for the given user/agent. This is used to check if a tool needs confirmation
+// when the tool-set ID is not known.
+func (s *Service) GetToolSetsWithConfirmation(ctx context.Context, userID, agentID string) ([]string, error) {
+	permissions, err := s.repo.ListToolSetPermissions(ctx, userID, agentID)
+	if err != nil {
+		s.log.Warn(ctx, "Failed to load tool set permissions", "user_id", userID, "agent_id", agentID, "error", err)
+		return nil, nil
+	}
+
+	if len(permissions) == 0 {
+		s.log.Info(ctx, "No tool set permissions found", "user_id", userID, "agent_id", agentID)
+		return nil, nil
+	}
+
+	var confirmToolSets []string
+	for _, perm := range permissions {
+		cfg := perm.RequirementConfig()
+		if cfg.Action == RequirementActionRequireConfirmation || cfg.RequireConfirmation {
+			confirmToolSets = append(confirmToolSets, perm.ToolSetID)
+		}
+	}
+
+	s.log.Info(ctx, "Tool set permissions loaded",
+		"user_id", userID,
+		"agent_id", agentID,
+		"total_permissions", len(permissions),
+		"require_confirmation_sets", confirmToolSets,
+	)
+
+	return confirmToolSets, nil
 }

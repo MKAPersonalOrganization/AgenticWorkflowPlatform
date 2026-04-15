@@ -364,6 +364,7 @@ func (s *Service) ExecuteRun(
 			},
 			Context: map[string]any{
 				"attachmentRefs": attachmentRefs,
+				"toolCallId":     req.ToolCallID,
 			},
 		}
 		rawDomainEvents := runner.Run(ctx, runnerReq)

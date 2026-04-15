@@ -28,7 +28,6 @@ import (
 	"aicompass/platform/toolregistry"
 	"aicompass/plugins/agentmemory"
 	"aicompass/plugins/artifacts"
-	"aicompass/plugins/askuser"
 	"aicompass/plugins/calculator"
 	"aicompass/plugins/codebase"
 	"aicompass/plugins/cognitive"
@@ -72,6 +71,11 @@ import (
 	billingmod "aicompass/modules/billing"
 	chatmod "aicompass/modules/chat"
 	taskmgmthandlers "aicompass/modules/chat/taskmgmt"
+	evalmod "aicompass/modules/evaluation"
+	evalhallucinationmod "aicompass/modules/evaluation/hallucination"
+	evalresponsemod "aicompass/modules/evaluation/response"
+	evalrubricmod "aicompass/modules/evaluation/rubric"
+	evalsafetymod "aicompass/modules/evaluation/safety"
 	filesystemmod "aicompass/modules/filesystem"
 	knowledgemod "aicompass/modules/knowledge"
 	mcpmod "aicompass/modules/mcp"
@@ -79,11 +83,6 @@ import (
 	pluginsettingsmod "aicompass/modules/pluginsettings"
 	resourcesmod "aicompass/modules/resources"
 	templatesmod "aicompass/modules/templates"
-	evalmod "aicompass/modules/evaluation"
-	evalhallucinationmod "aicompass/modules/evaluation/hallucination"
-	evalresponsemod "aicompass/modules/evaluation/response"
-	evalrubricmod "aicompass/modules/evaluation/rubric"
-	evalsafetymod "aicompass/modules/evaluation/safety"
 
 	userprofilemod "aicompass/modules/userprofile"
 
@@ -424,7 +423,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	toolregistry.RegisterPlugin(&codebase.Provider{})
 	toolregistry.RegisterPlugin(&cognitive.Provider{})
 	toolregistry.RegisterPlugin(&document.Provider{})
-	toolregistry.RegisterPlugin(&askuser.Provider{})
 	toolregistry.RegisterPlugin(&knowledgebase.Provider{})
 	toolregistry.RegisterPlugin(&library.Provider{})
 	toolregistry.RegisterPlugin(&planmode.Provider{})
@@ -470,6 +468,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Single authority for all tool access decisions: permissions, confirmation, etc.
 	toolReqsModule := toolreqs.New(log, permissionsRepo, permCacheRedis)
 	toolReqsService := toolReqsModule.Service()
+
 	log.Info(ctx, "startup", "status", "tool requirements module initialized")
 
 	// Initialize Knowledge module (owns Edgequake / RAG services)

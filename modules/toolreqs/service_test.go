@@ -109,9 +109,17 @@ func TestService_HasToolSetPermission(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()
 
-	// Not configured → allowed (fail-open: no config means no block).
-	if !svc.HasToolSetPermission(ctx, "user1", "agent1", "unconfigured-set") {
-		t.Error("expected unconfigured tool set to be allowed (fail-open)")
+	// Not configured → denied (fail-closed: no config means no permission).
+	if svc.HasToolSetPermission(ctx, "user1", "agent1", "unconfigured-set") {
+		t.Error("expected unconfigured tool set to be denied (fail-closed)")
+	}
+
+	// Explicitly allowed → allowed.
+	svc.SetToolSetRequirementConfig(ctx, "user1", "agent1", "allowed-set", toolreqs.ToolRequirementConfig{
+		Action: toolreqs.RequirementActionAllow,
+	})
+	if !svc.HasToolSetPermission(ctx, "user1", "agent1", "allowed-set") {
+		t.Error("expected explicitly allowed tool set to be allowed")
 	}
 
 	// Explicitly blocked → blocked.

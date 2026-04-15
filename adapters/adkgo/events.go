@@ -8,6 +8,7 @@ import (
 
 	"google.golang.org/adk/session"
 	adktool "google.golang.org/adk/tool"
+	"google.golang.org/adk/tool/toolconfirmation"
 	"google.golang.org/genai"
 )
 
@@ -142,8 +143,29 @@ func translateModelEvent(evt *session.Event, ctx EventContext) []thread.Event {
 		})
 	}
 
-	// ToolStart for each function call the LLM wants to invoke.
+	// ToolStart / ToolNeedsInput for each function call.
+	//
+	// When the call is an adk_request_confirmation wrapper, we emit
+	// ToolNeedsInput (with the wrapper's call ID, which the frontend
+	// must send back) instead of ToolStart. This replaces the old
+	// translateToolConfirmations path which used the wrong call ID.
 	for _, tc := range toolCalls {
+		if tc.Name == toolconfirmation.FunctionCallName {
+			originalID, originalName, hint := extractConfirmationInfo(tc.Arguments)
+			events = append(events, &thread.ToolNeedsInput{
+				ThreadID:           ctx.ThreadID,
+				MessageID:          evt.ID,
+				ToolCallID:         tc.ID,
+				OriginalToolCallID: originalID,
+				ToolName:           originalName,
+				Elicitation: &thread.ElicitationSpec{
+					Question: hint,
+				},
+				AgentName: ctx.AgentName,
+				Timestamp: now,
+			})
+			continue
+		}
 		events = append(events, &thread.ToolStart{
 			ThreadID:      ctx.ThreadID,
 			MessageID:     evt.ID,
@@ -164,6 +186,25 @@ func translateModelEvent(evt *session.Event, ctx EventContext) []thread.Event {
 	}
 
 	return events
+}
+
+// extractConfirmationInfo parses the originalFunctionCall name, ID, and
+// toolConfirmation hint from an adk_request_confirmation FunctionCall's
+// JSON-encoded arguments. Returns ("", "", "") on parse failure.
+func extractConfirmationInfo(argsJSON string) (originalID, originalName, hint string) {
+	var args struct {
+		OriginalFunctionCall struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"originalFunctionCall"`
+		ToolConfirmation struct {
+			Hint string `json:"hint"`
+		} `json:"toolConfirmation"`
+	}
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return "", "", ""
+	}
+	return args.OriginalFunctionCall.ID, args.OriginalFunctionCall.Name, args.ToolConfirmation.Hint
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -285,45 +326,17 @@ func translateArtifactDelta(evt *session.Event, ctx EventContext) []thread.Event
 // thread.ToolNeedsInput events so the frontend can display approval dialogs.
 // ──────────────────────────────────────────────────────────────────────────────
 
-func translateToolConfirmations(evt *session.Event, ctx EventContext) []thread.Event {
-	if evt == nil || len(evt.Actions.RequestedToolConfirmations) == 0 {
-		return nil
-	}
-
-	// Build a callID → toolName lookup from any FunctionCall parts in the event.
-	// ADK-Go keys RequestedToolConfirmations by function call ID, not tool name.
-	// The matching FunctionCall parts (if present) carry the actual tool name.
-	callIDToName := make(map[string]string)
-	if evt.Content != nil {
-		for _, p := range evt.Content.Parts {
-			if p.FunctionCall != nil && p.FunctionCall.ID != "" {
-				callIDToName[p.FunctionCall.ID] = p.FunctionCall.Name
-			}
-		}
-	}
-
-	var events []thread.Event
-	now := coalesceTime(evt.Timestamp)
-
-	for callID, confirmation := range evt.Actions.RequestedToolConfirmations {
-		toolName := callIDToName[callID]
-		if toolName == "" {
-			toolName = callID // fallback: use call ID when name can't be resolved
-		}
-		events = append(events, &thread.ToolNeedsInput{
-			ThreadID:   ctx.ThreadID,
-			MessageID:  evt.ID,
-			ToolCallID: callID,
-			ToolName:   toolName,
-			Elicitation: &thread.ElicitationSpec{
-				Question: confirmation.Hint,
-			},
-			AgentName: ctx.AgentName,
-			Timestamp: now,
-		})
-	}
-
-	return events
+// translateToolConfirmations is intentionally a no-op.
+//
+// Previously this function generated ToolNeedsInput from the function
+// response event's RequestedToolConfirmations map, which is keyed by the
+// ORIGINAL tool's call ID. But ADK-Go's RequestConfirmationRequestProcessor
+// expects the response to reference the adk_request_confirmation wrapper's
+// call ID (a different UUID). The ToolNeedsInput is now generated in
+// translateModelEvent when the adk_request_confirmation FunctionCall event
+// arrives, which carries the correct call ID.
+func translateToolConfirmations(_ *session.Event, _ EventContext) []thread.Event {
+	return nil
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -346,7 +359,13 @@ func translateFunctionResponses(evt *session.Event, ctx EventContext) []thread.E
 			continue
 		}
 
-		resultJSON, _ := json.Marshal(p.FunctionResponse.Response)
+		resp := p.FunctionResponse.Response
+
+		if isConfirmationRequiredResponse(resp) {
+			continue
+		}
+
+		resultJSON, _ := json.Marshal(resp)
 
 		events = append(events, &thread.ToolResultAdded{
 			ThreadID:   ctx.ThreadID,
@@ -354,13 +373,24 @@ func translateFunctionResponses(evt *session.Event, ctx EventContext) []thread.E
 			ToolCallID: p.FunctionResponse.ID,
 			ToolName:   p.FunctionResponse.Name,
 			Result:     string(resultJSON),
-			IsError:    isErrorResponse(p.FunctionResponse.Response),
+			IsError:    isErrorResponse(resp),
 			AgentName:  ctx.AgentName,
 			Timestamp:  now,
 		})
 	}
 
 	return events
+}
+
+// isConfirmationRequiredResponse returns true when the FunctionResponse indicates
+// the tool is waiting for user confirmation. These responses should NOT emit
+// ToolResultAdded because the ToolNeedsInput event already handles this case.
+func isConfirmationRequiredResponse(resp map[string]any) bool {
+	if resp == nil {
+		return false
+	}
+	status, ok := resp["status"].(string)
+	return ok && status == "confirmation_required"
 }
 
 // isErrorResponse returns true when the FunctionResponse map represents an

@@ -114,11 +114,12 @@ func toAguiEventsInternal(event any) []any {
 		return []any{aguievents.NewCustomEvent(
 			"TOOL_NEEDS_INPUT",
 			aguievents.WithValue(map[string]any{
-				"toolCallId": evt.ToolCallID,
-				"toolName":   evt.ToolName,
-				"question":   evt.Elicitation.Question,
-				"schema":     evt.Elicitation.Schema,
-				"agentName":  evt.AgentName,
+				"toolCallId":         evt.ToolCallID,
+				"originalToolCallId": evt.OriginalToolCallID,
+				"toolName":           evt.ToolName,
+				"question":           evt.Elicitation.Question,
+				"schema":             evt.Elicitation.Schema,
+				"agentName":          evt.AgentName,
 			}),
 		)}
 

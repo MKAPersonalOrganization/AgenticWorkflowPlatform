@@ -63,7 +63,19 @@ export function createToolStateMachine(toolCallId, initialContext = {}) {
         states: {
             [TOOL_STATES.IDLE]: {
                 on: {
-                    [TOOL_EVENTS.START]: TOOL_STATES.EXECUTING
+                    [TOOL_EVENTS.START]: TOOL_STATES.EXECUTING,
+                    [TOOL_EVENTS.NEEDS_INPUT]: {
+                        target: TOOL_STATES.AWAITING_INPUT,
+                        actions: assign({
+                            elicitation: ({ event }) => event.elicitation
+                        })
+                    },
+                    [TOOL_EVENTS.NEEDS_AUTH]: {
+                        target: TOOL_STATES.AWAITING_AUTH,
+                        actions: assign({
+                            authSpec: ({ event }) => event.authSpec
+                        })
+                    }
                 }
             },
             [TOOL_STATES.EXECUTING]: {

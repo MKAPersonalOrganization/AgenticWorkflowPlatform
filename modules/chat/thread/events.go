@@ -218,13 +218,14 @@ func (e *TokenUsageReported) AggregateID() string       { return e.ThreadID }
 
 // ToolNeedsInput is emitted when a tool requires user input to continue (elicitation).
 type ToolNeedsInput struct {
-	ThreadID    string           `json:"threadId"`
-	MessageID   string           `json:"messageId"`
-	ToolCallID  string           `json:"toolCallId"`
-	ToolName    string           `json:"toolName"`
-	Elicitation *ElicitationSpec `json:"elicitation"`
-	AgentName   string           `json:"agentName"`
-	Timestamp   time.Time        `json:"timestamp"`
+	ThreadID           string           `json:"threadId"`
+	MessageID          string           `json:"messageId"`
+	ToolCallID         string           `json:"toolCallId"`
+	OriginalToolCallID string           `json:"originalToolCallId"`
+	ToolName           string           `json:"toolName"`
+	Elicitation        *ElicitationSpec `json:"elicitation"`
+	AgentName          string           `json:"agentName"`
+	Timestamp          time.Time        `json:"timestamp"`
 }
 
 func (e *ToolNeedsInput) EventType() string         { return "ToolNeedsInput" }

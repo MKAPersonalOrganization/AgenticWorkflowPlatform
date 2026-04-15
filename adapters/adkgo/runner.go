@@ -25,6 +25,8 @@ import (
 	"google.golang.org/adk/tool/loadartifactstool"
 	"google.golang.org/adk/tool/loadmemorytool"
 	"google.golang.org/adk/tool/preloadmemorytool"
+	"google.golang.org/adk/tool/toolconfirmation"
+	"google.golang.org/genai"
 
 	fagent "aicompass/foundation/agent"
 )
@@ -143,15 +145,31 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 
 		userContent := extractUserText(req.Message)
 
-		// Extract artifact attachment refs from orchestrator context.
+		// Extract tool call ID and artifact attachment refs from orchestrator context.
+		var toolCallID string
 		var attachmentRefs []thread.Attachment
 		if req.Context != nil {
 			if refs, ok := req.Context["attachmentRefs"].([]thread.Attachment); ok {
 				attachmentRefs = refs
 			}
+			if id, ok := req.Context["toolCallId"].(string); ok {
+				toolCallID = id
+			}
 		}
 
-		if req.Message != nil {
+		if toolCallID != "" {
+			// Confirmation/elicitation resume: the user's response is already
+			// captured in the InputProvided event (emitted by the orchestrator
+			// before calling Run). Skip persisting a duplicate UserMessageAdded
+			// to avoid polluting the session with a plain-text user event that
+			// would cause ADK's RequestConfirmationRequestProcessor to bail.
+			var lErr error
+			agg, lErr = r.threadMgr.Load(ctx, req.SessionID)
+			if lErr != nil {
+				yield(nil, fmt.Errorf("failed to load thread for tool response: %w", lErr))
+				return
+			}
+		} else if req.Message != nil {
 			messageID := req.Message.ID
 			if messageID == "" {
 				messageID = generateID()
@@ -435,7 +453,26 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 		}
 
 		// 14. Build user content for adk-go.
-		userMsg := buildUserContent(req.Message)
+		//
+		// For confirmation responses, send a FunctionResponse with
+		// Name = "adk_request_confirmation" so ADK's
+		// RequestConfirmationRequestProcessor can match it to the
+		// pending confirmation FunctionCall. For normal messages,
+		// send the user's text content as usual.
+		var userMsg *genai.Content
+		if toolCallID != "" {
+			// The toolCallID from the frontend is the original tool call ID.
+			// We need to look up the confirmation wrapper ID to send to ADK.
+			confirmationWrapperID := GetConfirmationWrapperID(agg.Messages, toolCallID)
+			if confirmationWrapperID != "" {
+				userMsg = buildConfirmationResponse(confirmationWrapperID)
+			} else {
+				// Fallback: use the original ID (shouldn't happen in normal flow)
+				userMsg = buildConfirmationResponse(toolCallID)
+			}
+		} else {
+			userMsg = buildUserContent(req.Message)
+		}
 
 		// 15. Run the agent and translate events.
 		evtCtx := EventContext{
@@ -1026,6 +1063,24 @@ func (r *RunnerAdapter) ListAgents() []string {
 		return names
 	}
 	return nil
+}
+
+// buildConfirmationResponse creates a genai.Content with a FunctionResponse
+// for the adk_request_confirmation protocol. This is sent to adkRunner.Run()
+// instead of plain text when resuming from a tool confirmation pause.
+func buildConfirmationResponse(toolCallID string) *genai.Content {
+	return &genai.Content{
+		Role: "user",
+		Parts: []*genai.Part{{
+			FunctionResponse: &genai.FunctionResponse{
+				Name: toolconfirmation.FunctionCallName,
+				ID:   toolCallID,
+				Response: map[string]any{
+					"confirmed": true,
+				},
+			},
+		}},
+	}
 }
 
 // extractUserText extracts the text content from an agent.Message.
