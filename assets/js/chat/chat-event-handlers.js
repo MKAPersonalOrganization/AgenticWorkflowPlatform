@@ -170,87 +170,6 @@ export function createEventHandlerMethods() {
             this.transitionToolState(toolCallId, TOOL_EVENTS.START, { toolName });
         },
 
-        /**
-         * Handle TOOL_CONTENT_STREAMED event — streams tool output tokens in real-time.
-         *
-         * Two streaming phases:
-         *   1. LLM argument generation: field='__arguments__' — raw JSON deltas
-         *   2. Tool execution: field='answer', 'thoughts', etc. — post-execution streaming
-         */
-        __handleToolContentStreamed(value, state, threadId) {
-            const { toolCallId, toolName, delta, field } = value;
-
-            // Lazily create the tool call message if it doesn't exist yet.
-            this.__ensureToolCallMessage(state, toolCallId, toolName);
-
-            const msg = state.messages.find(m => m.id === toolCallId);
-            if (!msg) return;
-
-            // Initialize streaming state on the message if not present
-            if (!msg.streamingContent) {
-                msg.streamingContent = {};
-            }
-            msg.isStreaming = true;
-
-            // Accumulate streamed content by field
-            const fieldKey = field || 'default';
-            if (!msg.streamingContent[fieldKey]) {
-                msg.streamingContent[fieldKey] = '';
-            }
-            msg.streamingContent[fieldKey] += delta;
-
-            // --- Phase 1: LLM argument streaming ---
-            if (fieldKey === '__arguments__') {
-                msg.args = (msg.args || '') + delta;
-                this.__extractStreamingArgs(msg, toolName);
-            }
-            // --- Phase 2: Tool execution streaming ---
-            else if (fieldKey === 'thoughts') {
-                if (!msg.parsedArgs) msg.parsedArgs = {};
-                msg.parsedArgs.thoughts = msg.streamingContent[fieldKey];
-            } else if (fieldKey === 'answer') {
-                if (!msg.parsedResult) msg.parsedResult = {};
-                msg.parsedResult.answer = msg.streamingContent[fieldKey];
-                msg.result = msg.streamingContent[fieldKey];
-            }
-
-            // Scroll to bottom during streaming
-            if (threadId === this.__currentThreadId && !this.__abortScroll) {
-                this.__scrollToBottomThrottled();
-            }
-        },
-
-        /**
-         * Extract display-ready fields from partially streamed JSON arguments.
-         * Handles incomplete JSON gracefully.
-         */
-        __extractStreamingArgs(msg, toolName) {
-            const raw = msg.args || '';
-            if (!raw) return;
-
-            // Try full JSON parse first
-            const parsed = safeParseJSON(raw);
-            if (parsed) {
-                msg.parsedArgs = parsed;
-                return;
-            }
-
-            // Fallback: extract partial string values from incomplete JSON.
-            if (!msg.parsedArgs) msg.parsedArgs = {};
-
-            // Generic extraction for any string field in progress
-            const fieldPattern = /"(\w+)"\s*:\s*"((?:[^"\\]|\\.)*)$/;
-            const match = raw.match(fieldPattern);
-            if (match) {
-                const [, key, partialValue] = match;
-                try {
-                    msg.parsedArgs[key] = JSON.parse('"' + partialValue + '"');
-                } catch {
-                    msg.parsedArgs[key] = partialValue;
-                }
-            }
-        },
-
         __handleToolSuccess(value, state) {
             const { toolCallId, toolName, result, arguments: toolArgs, agentName } = value;
 
@@ -308,27 +227,47 @@ export function createEventHandlerMethods() {
 
         __handleToolNeedsInput(value, state, threadId) {
             const { toolCallId, originalToolCallId, toolName, question, schema, agentName } = value;
-
-            // Use originalToolCallId to find the existing message (created by TOOL_START)
-            // Falls back to toolCallId for backwards compatibility
             const effectiveId = originalToolCallId || toolCallId;
 
             this.__ensureToolCallMessage(state, effectiveId, toolName, agentName);
 
-            // Transition machine using the original tool call ID
+            // Single Source of Truth: 'TOOL_NEEDS_INPUT' always means structured input.
+            const schemaObj = typeof schema === 'string' ? safeParseJSON(schema) : schema;
+            
             this.transitionToolState(effectiveId, TOOL_EVENTS.NEEDS_INPUT, {
-                elicitation: { question, schema }
+                elicitation: { question, schema: schemaObj }
             });
 
-            // Update the message in the list to trigger UI rendering
             const msg = state.messages.find(m => m.id === effectiveId);
             if (msg) {
                 msg.status = 'awaiting_input';
-                msg.parsedResult = { question_text: question, schema: schema };
+                msg.parsedResult = { question_text: question, schema: schemaObj };
             }
 
             if (threadId === this.__currentThreadId) {
                 this.showToast(window.i18n.t('Input required'), 'info');
+            }
+        },
+
+        __handleToolNeedsConfirmation(value, state, threadId) {
+            const { toolCallId, originalToolCallId, toolName, question, agentName } = value;
+            const effectiveId = originalToolCallId || toolCallId;
+
+            this.__ensureToolCallMessage(state, effectiveId, toolName, agentName);
+
+            // Transition machine to awaiting confirmation state.
+            this.transitionToolState(effectiveId, TOOL_EVENTS.NEEDS_CONFIRMATION, {
+                elicitation: { question }
+            });
+
+            const msg = state.messages.find(m => m.id === effectiveId);
+            if (msg) {
+                msg.status = 'awaiting_confirmation'; // NEW specifically for binary
+                msg.parsedResult = { question_text: question };
+            }
+
+            if (threadId === this.__currentThreadId) {
+                this.showToast(window.i18n.t('Confirmation required'), 'info');
             }
         },
 

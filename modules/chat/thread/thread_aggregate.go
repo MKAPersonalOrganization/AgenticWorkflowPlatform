@@ -244,6 +244,19 @@ func (t *ThreadAggregate) Apply(event Event) {
 		}
 		t.ActiveToolStates[e.ToolCallID] = state
 
+	case *ToolNeedsConfirmation:
+		state := ToolCallState{
+			ToolCallID:         e.ToolCallID,
+			OriginalToolCallID: e.OriginalToolCallID,
+			ToolName:           e.ToolName,
+			AgentName:          e.AgentName,
+			Status:             "AwaitingConfirmation",
+			Elicitation: map[string]any{
+				"question": e.Question,
+			},
+		}
+		t.ActiveToolStates[e.ToolCallID] = state
+
 	case *ToolNeedsAuth:
 		state := ToolCallState{
 			ToolCallID: e.ToolCallID,

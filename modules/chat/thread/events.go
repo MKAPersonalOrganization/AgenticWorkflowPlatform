@@ -136,21 +136,39 @@ func (e *ToolStart) EventType() string         { return "ToolStart" }
 func (e *ToolStart) EventTimestamp() time.Time { return e.Timestamp }
 func (e *ToolStart) AggregateID() string       { return e.ThreadID }
 
-// ToolContentStreamed is emitted for each content delta during streaming tool execution.
-// This is a transient event - NOT persisted to event store.
-type ToolContentStreamed struct {
-	ThreadID   string    `json:"threadId"`
-	MessageID  string    `json:"messageId"`
-	ToolCallID string    `json:"toolCallId"`
-	ToolName   string    `json:"toolName"`
-	Delta      string    `json:"delta"`
-	Field      string    `json:"field,omitempty"` // Which part of the result is streaming (e.g. "answer", "thoughts")
-	Timestamp  time.Time `json:"timestamp"`
+// ToolNeedsInput is emitted when a tool requires structured user input to continue (elicitation).
+// This maps to the SSE event TOOL_NEEDS_INPUT.
+type ToolNeedsInput struct {
+	ThreadID           string           `json:"threadId"`
+	MessageID          string           `json:"messageId"`
+	ToolCallID         string           `json:"toolCallId"`
+	OriginalToolCallID string           `json:"originalToolCallId"`
+	ToolName           string           `json:"toolName"`
+	Elicitation        *ElicitationSpec `json:"elicitation"`
+	AgentName          string           `json:"agentName"`
+	Timestamp          time.Time        `json:"timestamp"`
 }
 
-func (e *ToolContentStreamed) EventType() string         { return "ToolContentStreamed" }
-func (e *ToolContentStreamed) EventTimestamp() time.Time { return e.Timestamp }
-func (e *ToolContentStreamed) AggregateID() string       { return e.ThreadID }
+func (e *ToolNeedsInput) EventType() string         { return "ToolNeedsInput" }
+func (e *ToolNeedsInput) EventTimestamp() time.Time { return e.Timestamp }
+func (e *ToolNeedsInput) AggregateID() string       { return e.ThreadID }
+
+// ToolNeedsConfirmation is emitted when a tool requires binary user confirmation (Allow/Deny).
+// This maps to the SSE event TOOL_NEEDS_CONFIRMATION.
+type ToolNeedsConfirmation struct {
+	ThreadID           string    `json:"threadId"`
+	MessageID          string    `json:"messageId"`
+	ToolCallID         string    `json:"toolCallId"`
+	OriginalToolCallID string    `json:"originalToolCallId"`
+	ToolName           string    `json:"toolName"`
+	Question           string    `json:"question"`
+	AgentName          string    `json:"agentName"`
+	Timestamp          time.Time `json:"timestamp"`
+}
+
+func (e *ToolNeedsConfirmation) EventType() string         { return "ToolNeedsConfirmation" }
+func (e *ToolNeedsConfirmation) EventTimestamp() time.Time { return e.Timestamp }
+func (e *ToolNeedsConfirmation) AggregateID() string       { return e.ThreadID }
 
 // AgentTransferStarted is emitted when a workflow agent transfers control
 // to a different sub-agent. This is a transient event — NOT persisted to the
@@ -215,22 +233,6 @@ type TokenUsageReported struct {
 func (e *TokenUsageReported) EventType() string         { return "TokenUsageReported" }
 func (e *TokenUsageReported) EventTimestamp() time.Time { return e.Timestamp }
 func (e *TokenUsageReported) AggregateID() string       { return e.ThreadID }
-
-// ToolNeedsInput is emitted when a tool requires user input to continue (elicitation).
-type ToolNeedsInput struct {
-	ThreadID           string           `json:"threadId"`
-	MessageID          string           `json:"messageId"`
-	ToolCallID         string           `json:"toolCallId"`
-	OriginalToolCallID string           `json:"originalToolCallId"`
-	ToolName           string           `json:"toolName"`
-	Elicitation        *ElicitationSpec `json:"elicitation"`
-	AgentName          string           `json:"agentName"`
-	Timestamp          time.Time        `json:"timestamp"`
-}
-
-func (e *ToolNeedsInput) EventType() string         { return "ToolNeedsInput" }
-func (e *ToolNeedsInput) EventTimestamp() time.Time { return e.Timestamp }
-func (e *ToolNeedsInput) AggregateID() string       { return e.ThreadID }
 
 // ToolNeedsAuth is emitted when a tool requires user authorization to continue.
 type ToolNeedsAuth struct {

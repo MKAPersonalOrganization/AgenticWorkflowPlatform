@@ -89,6 +89,9 @@ func (p *PostgresAguiProjection) RegisterHandlers(router interface {
 	router.Register(&thread.ToolNeedsInput{}, func(ctx context.Context, e thread.Event) error {
 		return p.applyToolNeedsInput(ctx, e.(*thread.ToolNeedsInput))
 	})
+	router.Register(&thread.ToolNeedsConfirmation{}, func(ctx context.Context, e thread.Event) error {
+		return p.applyToolNeedsConfirmation(ctx, e.(*thread.ToolNeedsConfirmation))
+	})
 	router.Register(&thread.ToolNeedsAuth{}, func(ctx context.Context, e thread.Event) error {
 		return p.applyToolNeedsAuth(ctx, e.(*thread.ToolNeedsAuth))
 	})
@@ -272,17 +275,17 @@ func (p *PostgresAguiProjection) applyToolResultAdded(ctx context.Context, event
 		VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $7 THEN $6 ELSE NULL END, $8)
 		ON CONFLICT (tool_call_id) DO UPDATE SET
 			state = CASE
-				WHEN agui_tool_states.state IN ('awaiting_input', 'input_provided', 'answered')
+				WHEN agui_tool_states.state IN ('awaiting_input', 'awaiting_confirmation', 'input_provided', 'answered')
 				THEN agui_tool_states.state
 				ELSE EXCLUDED.state
 			END,
 			result = CASE
-				WHEN agui_tool_states.state IN ('awaiting_input', 'input_provided', 'answered')
+				WHEN agui_tool_states.state IN ('awaiting_input', 'awaiting_confirmation', 'input_provided', 'answered')
 				THEN agui_tool_states.result
 				ELSE EXCLUDED.result
 			END,
 			error = CASE
-				WHEN agui_tool_states.state IN ('awaiting_input', 'input_provided', 'answered')
+				WHEN agui_tool_states.state IN ('awaiting_input', 'awaiting_confirmation', 'input_provided', 'answered')
 				THEN agui_tool_states.error
 				ELSE EXCLUDED.error
 			END,
@@ -401,33 +404,51 @@ func (p *PostgresAguiProjection) applyToolStart(ctx context.Context, event *thre
 	return nil
 }
 
-// applyToolNeedsInput records elicitation data in the dedicated tool states table.
+// applyToolNeedsInput records custom input data in the dedicated tool states table.
 func (p *PostgresAguiProjection) applyToolNeedsInput(ctx context.Context, event *thread.ToolNeedsInput) error {
-	elicitationJSON, err := json.Marshal(event.Elicitation)
-	if err != nil {
-		return fmt.Errorf("failed to marshal elicitation: %w", err)
-	}
+	// Clean previous elicitation for this tool if any
+	_, _ = p.db.ExecContext(ctx, "UPDATE agui_tool_states SET elicitation = NULL WHERE tool_call_id = $1", event.ToolCallID)
 
-	query := `
+	elicitationJSON, _ := json.Marshal(event.Elicitation)
+
+	// Single Source of Truth for tool input state:
+	// 'awaiting_input' means structured data entry (io.Read / ToolNeedsInput).
+	state := "awaiting_input"
+
+	_, err := p.db.ExecContext(ctx, `
 		INSERT INTO agui_tool_states (tool_call_id, thread_id, state, tool_name, agent_name, elicitation, updated_at)
-		VALUES ($1, $2, 'awaiting_input', $3, $4, $5, $6)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT (tool_call_id) DO UPDATE SET
-			state       = 'awaiting_input',
+			state       = EXCLUDED.state,
 			elicitation = EXCLUDED.elicitation,
 			updated_at  = EXCLUDED.updated_at
-	`
-	_, err = p.db.ExecContext(ctx, query,
-		event.ToolCallID,
-		event.ThreadID,
-		event.ToolName,
-		event.AgentName,
-		elicitationJSON,
-		event.Timestamp,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to upsert tool awaiting input: %w", err)
-	}
-	return nil
+	`, event.ToolCallID, event.ThreadID, state, event.ToolName, event.AgentName, elicitationJSON, event.Timestamp)
+	return err
+}
+
+// applyToolNeedsConfirmation records binary confirmation requests in the tool states table.
+func (p *PostgresAguiProjection) applyToolNeedsConfirmation(ctx context.Context, event *thread.ToolNeedsConfirmation) error {
+	// Clean previous elicitation for this tool if any
+	_, _ = p.db.ExecContext(ctx, "UPDATE agui_tool_states SET elicitation = NULL WHERE tool_call_id = $1", event.ToolCallID)
+
+	// Map binary question to ElicitationSpec structure for consistency in frontend hydration
+	elicitationJSON, _ := json.Marshal(map[string]any{
+		"question": event.Question,
+	})
+
+	// Single Source of Truth for tool input state:
+	// 'awaiting_confirmation' means binary Allow/Deny (ToolNeedsConfirmation).
+	state := "awaiting_confirmation"
+
+	_, err := p.db.ExecContext(ctx, `
+		INSERT INTO agui_tool_states (tool_call_id, thread_id, state, tool_name, agent_name, elicitation, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (tool_call_id) DO UPDATE SET
+			state       = EXCLUDED.state,
+			elicitation = EXCLUDED.elicitation,
+			updated_at  = EXCLUDED.updated_at
+	`, event.ToolCallID, event.ThreadID, state, event.ToolName, event.AgentName, elicitationJSON, event.Timestamp)
+	return err
 }
 
 // applyToolNeedsAuth records authorization data in the dedicated tool states table.

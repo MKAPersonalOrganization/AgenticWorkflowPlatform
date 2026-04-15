@@ -1,6 +1,7 @@
 package adkgo
 
 import (
+	agentio "aicompass/foundation/agent/io"
 	"aicompass/foundation/logger"
 	"aicompass/modules/chat/thread"
 	"aicompass/plugins/agentmemory"
@@ -443,6 +444,21 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 		// 12. Inject user into context.
 		if req.UserID != "" {
 			ctx = context.WithValue(ctx, shared.UserContextKey, &shared.User{ID: req.UserID})
+		}
+
+		// 12b. Inject IO handler for tools that use io.Read() / io.Confirm().
+		//
+		// Default: PauseHandler for all runs (fresh + confirmation resume).
+		// This ensures tools that call io.Read() can properly pause and emit
+		// TOOL_NEEDS_INPUT events, even when resuming from a regular confirmation.
+		//
+		// Override: CachedReadHandler when resuming with custom input from the
+		// user (toolCallID is set AND userInput is provided).
+		ctx = agentio.WithHandler(ctx, agentio.NewPauseHandler())
+		if toolCallID != "" {
+			if userInput, _ := req.Context["userInput"].(string); userInput != "" {
+				ctx = agentio.WithHandler(ctx, agentio.NewCachedReadHandler(userInput))
+			}
 		}
 
 		// 13. Yield initial events.

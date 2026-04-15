@@ -17,7 +17,9 @@
       "Bash(sed *)",
       "Bash(true)",
       "Bash(git checkout *)",
-      "Bash(ls *)"
+      "Bash(ls *)",
+      "Bash(grep *)",
+      "Bash(find *)"
     ]
   },
   "$version": 3

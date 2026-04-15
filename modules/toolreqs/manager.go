@@ -2,6 +2,7 @@ package toolreqs
 
 import (
 	"aicompass/foundation/logger"
+	"aicompass/platform/toolregistry"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -21,11 +22,13 @@ type Module struct {
 //
 // The module owns all permission persistence (PostgreSQL repository + Redis
 // caching) and all requirement evaluation (permissions, confirmation, etc.).
-func New(log *logger.Logger, repo Repository, rdb redis.Cmdable) *Module {
+// The toolRegistry is optional but recommended for accurate tool membership checks.
+func New(log *logger.Logger, repo Repository, rdb redis.Cmdable, toolRegistry *toolregistry.Registry) *Module {
 	svc := NewService(ServiceConfig{
-		Log:  log,
-		Repo: repo,
-		RDB:  rdb,
+		Log:          log,
+		Repo:         repo,
+		RDB:          rdb,
+		ToolRegistry: toolRegistry,
 	})
 	return &Module{service: svc}
 }

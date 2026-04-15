@@ -187,6 +187,7 @@ func (s *Service) isDurable(event thread.Event) bool {
 		*thread.ToolResultAdded,
 		*thread.TokenUsageReported,
 		*thread.ToolNeedsInput,
+		*thread.ToolNeedsConfirmation,
 		*thread.ToolNeedsAuth,
 		*thread.InputProvided,
 		*thread.AuthGranted,
@@ -204,7 +205,6 @@ func (s *Service) isDurable(event thread.Event) bool {
 		*thread.AssistantContentStreamed,
 		*thread.AssistantMessageCompleted,
 		*thread.ToolStart,
-		*thread.ToolContentStreamed,
 		*thread.AgentTransferStarted:
 		return false
 
@@ -238,6 +238,7 @@ func (s *Service) persistDurableEvent(ctx context.Context, event thread.Event) e
 		_, err := s.threadMgmt.AddTokenUsage(ctx, e)
 		return err
 	case *thread.ToolNeedsInput,
+		*thread.ToolNeedsConfirmation,
 		*thread.ToolNeedsAuth,
 		*thread.InputProvided,
 		*thread.AuthGranted,
@@ -281,6 +282,7 @@ type RunExecutionRequest struct {
 	Message     string           // User message content
 	MessageID   string           // Message ID (used as RunID)
 	ToolCallID  string           // (Optional) Correlates this message as an answer to a tool elicitation
+	UserInput   string           // (Optional) Raw user text for io.Read() responses (injected into CachedReadHandler)
 	ParentRunID string           // (Optional) Lineage pointer for branching/time travel
 	Attachments []FileAttachment // (Optional) Attached files (images, audio, PDFs, etc.)
 }
@@ -325,6 +327,7 @@ func (s *Service) ExecuteRun(
 				Input:      req.Message,
 				AgentName:  req.AgentName,
 				Timestamp:  time.Now(),
+
 			}
 
 			inputIter := func(y func(thread.Event, error) bool) {
@@ -365,6 +368,7 @@ func (s *Service) ExecuteRun(
 			Context: map[string]any{
 				"attachmentRefs": attachmentRefs,
 				"toolCallId":     req.ToolCallID,
+				"userInput":      req.UserInput,
 			},
 		}
 		rawDomainEvents := runner.Run(ctx, runnerReq)
@@ -389,7 +393,7 @@ func (s *Service) ExecuteRun(
 			// When this happens we must NOT emit RunFinished — the run is
 			// suspended, not done.
 			switch de.(type) {
-			case *thread.ToolNeedsInput, *thread.ToolNeedsAuth:
+			case *thread.ToolNeedsInput, *thread.ToolNeedsConfirmation, *thread.ToolNeedsAuth:
 				awaitingInteraction = true
 			}
 			if !yield(de, nil) {

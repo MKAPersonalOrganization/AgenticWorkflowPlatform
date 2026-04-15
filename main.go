@@ -30,6 +30,7 @@ import (
 	"aicompass/plugins/artifacts"
 	"aicompass/plugins/calculator"
 	"aicompass/plugins/codebase"
+	"aicompass/plugins/demoinput"
 	"aicompass/plugins/cognitive"
 	"aicompass/plugins/document"
 	"aicompass/plugins/fsplugin"
@@ -420,6 +421,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	toolregistry.RegisterPlugin(&agentmemory.Provider{})
 	toolregistry.RegisterPlugin(&artifacts.Provider{})
 	toolregistry.RegisterPlugin(&calculator.Provider{})
+	toolregistry.RegisterPlugin(&demoinput.Provider{})
 	toolregistry.RegisterPlugin(&codebase.Provider{})
 	toolregistry.RegisterPlugin(&cognitive.Provider{})
 	toolregistry.RegisterPlugin(&document.Provider{})
@@ -466,7 +468,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// ── Tool Requirements Module ──
 	// Single authority for all tool access decisions: permissions, confirmation, etc.
-	toolReqsModule := toolreqs.New(log, permissionsRepo, permCacheRedis)
+	toolReqsModule := toolreqs.New(log, permissionsRepo, permCacheRedis, toolRegistry)
 	toolReqsService := toolReqsModule.Service()
 
 	log.Info(ctx, "startup", "status", "tool requirements module initialized")

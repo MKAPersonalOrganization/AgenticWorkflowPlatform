@@ -9,6 +9,7 @@ export const TOOL_STATES = {
     IDLE: 'idle',
     EXECUTING: 'executing',
     AWAITING_INPUT: 'awaiting_input',
+    AWAITING_CONFIRMATION: 'awaiting_confirmation',
     AWAITING_AUTH: 'awaiting_auth',
     ANSWERED: 'answered',
     COMPLETED: 'completed',
@@ -21,6 +22,7 @@ export const TOOL_EVENTS = {
     SUCCESS: 'TOOL_SUCCESS',
     ERROR: 'TOOL_ERROR',
     NEEDS_INPUT: 'TOOL_NEEDS_INPUT',
+    NEEDS_CONFIRMATION: 'TOOL_NEEDS_CONFIRMATION',
     NEEDS_AUTH: 'TOOL_NEEDS_AUTH',
     INPUT_PROVIDED: 'INPUT_PROVIDED',
     AUTH_GRANTED: 'AUTH_GRANTED',
@@ -70,6 +72,12 @@ export function createToolStateMachine(toolCallId, initialContext = {}) {
                             elicitation: ({ event }) => event.elicitation
                         })
                     },
+                    [TOOL_EVENTS.NEEDS_CONFIRMATION]: {
+                        target: TOOL_STATES.AWAITING_CONFIRMATION,
+                        actions: assign({
+                            elicitation: ({ event }) => event.elicitation
+                        })
+                    },
                     [TOOL_EVENTS.NEEDS_AUTH]: {
                         target: TOOL_STATES.AWAITING_AUTH,
                         actions: assign({
@@ -99,6 +107,12 @@ export function createToolStateMachine(toolCallId, initialContext = {}) {
                             elicitation: ({ event }) => event.elicitation
                         })
                     },
+                    [TOOL_EVENTS.NEEDS_CONFIRMATION]: {
+                        target: TOOL_STATES.AWAITING_CONFIRMATION,
+                        actions: assign({
+                            elicitation: ({ event }) => event.elicitation
+                        })
+                    },
                     [TOOL_EVENTS.NEEDS_AUTH]: {
                         target: TOOL_STATES.AWAITING_AUTH,
                         actions: assign({
@@ -108,6 +122,22 @@ export function createToolStateMachine(toolCallId, initialContext = {}) {
                 }
             },
             [TOOL_STATES.AWAITING_INPUT]: {
+                on: {
+                    [TOOL_EVENTS.INPUT_PROVIDED]: {
+                        target: TOOL_STATES.ANSWERED,
+                        actions: assign({
+                            userAnswer: ({ event }) => event.input || null
+                        })
+                    },
+                    [TOOL_EVENTS.CANCELLED]: {
+                        target: TOOL_STATES.ERROR,
+                        actions: assign({
+                            error: ({ event }) => 'Cancelled'
+                        })
+                    }
+                }
+            },
+            [TOOL_STATES.AWAITING_CONFIRMATION]: {
                 on: {
                     [TOOL_EVENTS.INPUT_PROVIDED]: {
                         target: TOOL_STATES.ANSWERED,

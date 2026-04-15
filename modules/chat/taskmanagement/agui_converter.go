@@ -77,18 +77,6 @@ func toAguiEventsInternal(event any) []any {
 			}),
 		)}
 
-	case *thread.ToolContentStreamed:
-		return []any{aguievents.NewCustomEvent(
-			"TOOL_CONTENT_STREAMED",
-			aguievents.WithValue(map[string]any{
-				"toolCallId": evt.ToolCallID,
-				"toolName":   evt.ToolName,
-				"delta":      evt.Delta,
-				"field":      evt.Field,
-				"timestamp":  evt.Timestamp,
-			}),
-		)}
-
 	case *thread.ToolResultAdded:
 		// Emit event names based on IsError flag
 		var eventName string
@@ -107,6 +95,18 @@ func toAguiEventsInternal(event any) []any {
 				"isError":    evt.IsError,
 				"agentName":  evt.AgentName,
 				"timestamp":  evt.Timestamp,
+			}),
+		)}
+
+	case *thread.ToolNeedsConfirmation:
+		return []any{aguievents.NewCustomEvent(
+			"TOOL_NEEDS_CONFIRMATION",
+			aguievents.WithValue(map[string]any{
+				"toolCallId":         evt.ToolCallID,
+				"originalToolCallId": evt.OriginalToolCallID,
+				"toolName":           evt.ToolName,
+				"question":           evt.Question,
+				"agentName":          evt.AgentName,
 			}),
 		)}
 

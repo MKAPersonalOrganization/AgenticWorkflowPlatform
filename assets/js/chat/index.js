@@ -334,7 +334,7 @@ document.addEventListener('alpine:init', () => {
                     const m = msgs[i];
                     if (m.type === 'tool_call') {
                         const tc = state.toolCalls?.[m.id];
-                        if (tc?.state === 'awaiting_input') return m;
+                        if (tc?.state === 'awaiting_input' || tc?.state === 'awaiting_confirmation') return m;
                     }
                 }
                 return null;

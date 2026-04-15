@@ -193,6 +193,9 @@ func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 	// Uses a separate endpoint for clarity (vs mixing with normal messages).
 	r.Post("/v1/tool:confirm", authMW.RequireAuthFunc(h.ConfirmTool))
 
+	// tool:provide_input handles custom tool input responses (io.Read).
+	r.Post("/v1/tool:provide_input", authMW.RequireAuthFunc(h.ProvideInput))
+
 	// Attachment pre-upload (multipart form, 20 MB per file).
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.BodyLimit(25 << 20)) // 25 MB (20 MB file + multipart overhead)

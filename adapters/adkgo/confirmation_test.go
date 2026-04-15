@@ -111,21 +111,21 @@ func buildFunctionResponseEvent() *session.Event {
 // 1. Event translation: adk_request_confirmation → ToolNeedsInput
 // ──────────────────────────────────────────────────────────────────────────────
 
-func TestTranslateEvent_ConfirmationFunctionCall_EmitsToolNeedsInput(t *testing.T) {
+func TestTranslateEvent_ConfirmationFunctionCall_EmitsToolNeedsConfirmation(t *testing.T) {
 	evt := buildConfirmationFunctionCallEvent()
 	ctx := testEventContext()
 
 	domainEvents := TranslateEvent(evt, ctx)
 
-	// Should contain AssistantMessageAdded + ToolNeedsInput (no ToolStart).
-	var needsInput *thread.ToolNeedsInput
+	// Should contain AssistantMessageAdded + ToolNeedsConfirmation (no ToolStart).
+	var needsConfirm *thread.ToolNeedsConfirmation
 	var assistantMsg *thread.AssistantMessageAdded
 	var toolStarts []*thread.ToolStart
 
 	for _, de := range domainEvents {
 		switch e := de.(type) {
-		case *thread.ToolNeedsInput:
-			needsInput = e
+		case *thread.ToolNeedsConfirmation:
+			needsConfirm = e
 		case *thread.AssistantMessageAdded:
 			assistantMsg = e
 		case *thread.ToolStart:
@@ -133,24 +133,24 @@ func TestTranslateEvent_ConfirmationFunctionCall_EmitsToolNeedsInput(t *testing.
 		}
 	}
 
-	// ToolNeedsInput must be present with the CONFIRMATION call ID and original ID.
-	if needsInput == nil {
-		t.Fatal("expected ToolNeedsInput event, got none")
+	// ToolNeedsConfirmation must be present with the CONFIRMATION call ID and original ID.
+	if needsConfirm == nil {
+		t.Fatal("expected ToolNeedsConfirmation event, got none")
 	}
-	if needsInput.ToolCallID != confirmationCallID {
-		t.Errorf("ToolNeedsInput.ToolCallID = %q, want %q", needsInput.ToolCallID, confirmationCallID)
+	if needsConfirm.ToolCallID != confirmationCallID {
+		t.Errorf("ToolNeedsConfirmation.ToolCallID = %q, want %q", needsConfirm.ToolCallID, confirmationCallID)
 	}
-	if needsInput.OriginalToolCallID != originalToolCallID {
-		t.Errorf("ToolNeedsInput.OriginalToolCallID = %q, want %q", needsInput.OriginalToolCallID, originalToolCallID)
+	if needsConfirm.OriginalToolCallID != originalToolCallID {
+		t.Errorf("ToolNeedsConfirmation.OriginalToolCallID = %q, want %q", needsConfirm.OriginalToolCallID, originalToolCallID)
 	}
-	if needsInput.ToolName != "delete_file" {
-		t.Errorf("ToolNeedsInput.ToolName = %q, want %q", needsInput.ToolName, "delete_file")
+	if needsConfirm.ToolName != "delete_file" {
+		t.Errorf("ToolNeedsConfirmation.ToolName = %q, want %q", needsConfirm.ToolName, "delete_file")
 	}
-	if needsInput.Elicitation == nil || needsInput.Elicitation.Question == "" {
-		t.Error("ToolNeedsInput.Elicitation.Question is empty")
+	if needsConfirm.Question == "" {
+		t.Error("ToolNeedsConfirmation.Question is empty")
 	}
-	if needsInput.AgentName != testAgent {
-		t.Errorf("ToolNeedsInput.AgentName = %q, want %q", needsInput.AgentName, testAgent)
+	if needsConfirm.AgentName != testAgent {
+		t.Errorf("ToolNeedsConfirmation.AgentName = %q, want %q", needsConfirm.AgentName, testAgent)
 	}
 
 	// AssistantMessageAdded should include the adk_request_confirmation tool call.
@@ -210,19 +210,8 @@ func TestTranslateEvent_RegularToolCall_StillEmitsToolStart(t *testing.T) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// 2. translateToolConfirmations is now a no-op
-// ──────────────────────────────────────────────────────────────────────────────
-
-func TestTranslateToolConfirmations_NoOp(t *testing.T) {
-	// The function response event has RequestedToolConfirmations but
-	// translateToolConfirmations should no longer generate events from it.
-	evt := buildFunctionResponseEvent()
-
-	events := translateToolConfirmations(evt, testEventContext())
-	if len(events) != 0 {
-		t.Errorf("translateToolConfirmations returned %d events, want 0", len(events))
-	}
-}
+// 2. translateToolConfirmations logic is no longer used
+// Handled by verification in TestTranslateEvent_ConfirmationFunctionCall_EmitsToolNeedsConfirmation
 
 // ──────────────────────────────────────────────────────────────────────────────
 // 3. extractConfirmationInfo
@@ -243,22 +232,60 @@ func TestExtractConfirmationInfo(t *testing.T) {
 	}
 	argsJSON, _ := json.Marshal(args)
 
-	id, name, hint := extractConfirmationInfo(string(argsJSON))
-	if id != "call-abc" {
-		t.Errorf("id = %q, want %q", id, "call-abc")
+	info := extractConfirmationInfo(string(argsJSON))
+	if info.originalID != "call-abc" {
+		t.Errorf("originalID = %q, want %q", info.originalID, "call-abc")
 	}
-	if name != "delete_file" {
-		t.Errorf("name = %q, want %q", name, "delete_file")
+	if info.originalName != "delete_file" {
+		t.Errorf("originalName = %q, want %q", info.originalName, "delete_file")
 	}
-	if hint != "Confirm delete?" {
-		t.Errorf("hint = %q, want %q", hint, "Confirm delete?")
+	if info.hint != "Confirm delete?" {
+		t.Errorf("hint = %q, want %q", info.hint, "Confirm delete?")
+	}
+	if info.inputSchema != nil {
+		t.Errorf("inputSchema = %v, want nil for regular confirmation", info.inputSchema)
+	}
+}
+
+func TestExtractConfirmationInfo_CustomInput(t *testing.T) {
+	args := map[string]any{
+		"originalFunctionCall": map[string]any{
+			"id":   "call-xyz",
+			"name": "file_search",
+		},
+		"toolConfirmation": map[string]any{
+			"hint":      "What file should I search for?",
+			"confirmed": false,
+			"payload": map[string]any{
+				"type":   "custom_input",
+				"schema": map[string]any{"type": "string"},
+			},
+		},
+	}
+	argsJSON, _ := json.Marshal(args)
+
+	info := extractConfirmationInfo(string(argsJSON))
+	if info.originalID != "call-xyz" {
+		t.Errorf("originalID = %q, want %q", info.originalID, "call-xyz")
+	}
+	if info.originalName != "file_search" {
+		t.Errorf("originalName = %q, want %q", info.originalName, "file_search")
+	}
+	if info.hint != "What file should I search for?" {
+		t.Errorf("hint = %q, want %q", info.hint, "What file should I search for?")
+	}
+	if info.inputSchema == nil {
+		t.Fatal("inputSchema = nil, want non-nil for custom input")
+	}
+	if info.inputSchema["type"] != "string" {
+		t.Errorf("inputSchema[type] = %v, want %q", info.inputSchema["type"], "string")
 	}
 }
 
 func TestExtractConfirmationInfo_InvalidJSON(t *testing.T) {
-	id, name, hint := extractConfirmationInfo("not json")
-	if id != "" || name != "" || hint != "" {
-		t.Errorf("expected empty strings for invalid JSON, got id=%q name=%q hint=%q", id, name, hint)
+	info := extractConfirmationInfo("not json")
+	if info.originalID != "" || info.originalName != "" || info.hint != "" {
+		t.Errorf("expected empty strings for invalid JSON, got id=%q name=%q hint=%q", info.originalID, info.originalName, info.hint)
 	}
 }
 
@@ -455,28 +482,28 @@ func TestConfirmationWorkflow_E2E(t *testing.T) {
 		}
 	}
 
-	// Step 1b: The adk_request_confirmation FunctionCall event - this is the one that should emit ToolNeedsInput.
+	// Step 1b: The adk_request_confirmation FunctionCall event - this is the one that should emit ToolNeedsConfirmation.
 	confirmEvt := buildConfirmationFunctionCallEvent()
 	confirmDomainEvents := TranslateEvent(confirmEvt, evtCtx)
 
-	var needsInput *thread.ToolNeedsInput
+	var needsConfirm *thread.ToolNeedsConfirmation
 	var assistantMsg *thread.AssistantMessageAdded
 	for _, de := range confirmDomainEvents {
 		switch e := de.(type) {
-		case *thread.ToolNeedsInput:
-			needsInput = e
+		case *thread.ToolNeedsConfirmation:
+			needsConfirm = e
 		case *thread.AssistantMessageAdded:
 			assistantMsg = e
 		}
 	}
-	if needsInput == nil {
-		t.Fatal("Phase 1: expected ToolNeedsInput from confirmation event")
+	if needsConfirm == nil {
+		t.Fatal("Phase 1: expected ToolNeedsConfirmation from confirmation event")
 	}
-	if needsInput.ToolCallID != confirmationCallID {
-		t.Fatalf("Phase 1: ToolNeedsInput.ToolCallID = %q, want %q", needsInput.ToolCallID, confirmationCallID)
+	if needsConfirm.ToolCallID != confirmationCallID {
+		t.Fatalf("Phase 1: ToolNeedsConfirmation.ToolCallID = %q, want %q", needsConfirm.ToolCallID, confirmationCallID)
 	}
-	if needsInput.OriginalToolCallID != originalToolCallID {
-		t.Fatalf("Phase 1: ToolNeedsInput.OriginalToolCallID = %q, want %q", needsInput.OriginalToolCallID, originalToolCallID)
+	if needsConfirm.OriginalToolCallID != originalToolCallID {
+		t.Fatalf("Phase 1: ToolNeedsConfirmation.OriginalToolCallID = %q, want %q", needsConfirm.OriginalToolCallID, originalToolCallID)
 	}
 
 	// ── Phase 2: Build thread aggregate mimicking what persistence would create ──

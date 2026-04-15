@@ -285,9 +285,6 @@ export function createStreamingMethods() {
                 case 'TOOL_START':
                     this.__handleToolStart(event.value, state);
                     break;
-                case 'TOOL_CONTENT_STREAMED':
-                    this.__handleToolContentStreamed(event.value, state, threadId);
-                    break;
                 case 'TOOL_SUCCESS':
                     this.__handleToolSuccess(event.value, state);
                     break;
@@ -296,6 +293,9 @@ export function createStreamingMethods() {
                     break;
                 case 'TOOL_NEEDS_INPUT':
                     this.__handleToolNeedsInput(event.value, state, threadId);
+                    break;
+                case 'TOOL_NEEDS_CONFIRMATION':
+                    this.__handleToolNeedsConfirmation(event.value, state, threadId);
                     break;
                 case 'TOOL_NEEDS_AUTH':
                     this.__handleToolNeedsAuth(event.value, state);

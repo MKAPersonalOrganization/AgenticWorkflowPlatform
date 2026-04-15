@@ -49,11 +49,11 @@ templ DateSeparator() {
 	</div>
 }
 
-// ToolConfirmationDialog - Renders a confirmation dialog for tools that require user input.
-// Shows when a tool message has status 'awaiting_input' with a question_text in parsedResult.
+// ToolConfirmationDialog - Renders a confirmation dialog for tools that require binary verification.
+// Shows when a tool message has status 'awaiting_confirmation' with a question_text in parsedResult.
 templ ToolConfirmationDialog() {
 	<div
-		x-show="message.type === 'tool_call' && message.status === 'awaiting_input' && message.parsedResult?.question_text"
+		x-show="message.type === 'tool_call' && message.status === 'awaiting_confirmation' && message.parsedResult?.question_text"
 		x-data="{
 			confirm() {
 				$dispatch('tool-input-provided', {
@@ -110,6 +110,65 @@ templ ToolConfirmationDialog() {
 				<span class="flex items-center gap-1.5">
 					<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
 					Allow
+				</span>
+			</button>
+		</div>
+	</div>
+}
+
+// ToolCustomInputDialog - Renders a text input form for tools that request custom user input
+// via io.Read(). Shows when a tool message has status 'awaiting_input' with a question_text.
+templ ToolCustomInputDialog() {
+	<div
+		x-show="message.type === 'tool_call' && message.status === 'awaiting_input' && message.parsedResult?.question_text"
+		x-data="{
+			userInput: '',
+			submit() {
+				if (!this.userInput.trim()) return;
+				$dispatch('tool-input-provided', {
+					toolCallId: message.id,
+					input: this.userInput.trim()
+				});
+			}
+		}"
+		class="my-3 rounded-xl border border-blue-500/30 bg-blue-500/5 overflow-hidden shadow-lg shadow-blue-500/10"
+	>
+		<!-- Header -->
+		<div class="flex items-center gap-3 px-4 py-3 bg-blue-500/10 border-b border-blue-500/20">
+			<div class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
+				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-600 dark:text-blue-400">
+					<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+				</svg>
+			</div>
+			<div class="flex-1 min-w-0">
+				<div class="text-sm font-semibold text-blue-700 dark:text-blue-300">
+					Input Required
+				</div>
+				<div class="text-xs text-blue-600/70 dark:text-blue-400/70" x-text="message.name"></div>
+			</div>
+		</div>
+		<!-- Question -->
+		<div class="px-4 py-4">
+			<p class="text-sm text-foreground/90 leading-relaxed mb-3" x-text="message.parsedResult?.question_text || 'Please provide input'"></p>
+			<input
+				type="text"
+				x-model="userInput"
+				@keydown.enter="submit()"
+				placeholder="Type your response..."
+				class="w-full px-3 py-2 rounded-lg border border-border/40 bg-background text-sm text-foreground placeholder-foreground/40 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50"
+			/>
+		</div>
+		<!-- Actions -->
+		<div class="flex items-center justify-end gap-3 px-4 py-3 bg-muted/30 border-t border-border/10">
+			<button
+				type="button"
+				@click="submit()"
+				:disabled="!userInput.trim()"
+				class="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-all duration-200 shadow-sm shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+			>
+				<span class="flex items-center gap-1.5">
+					<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+					Submit
 				</span>
 			</button>
 		</div>
@@ -506,8 +565,10 @@ templ MessageList() {
 				@ParallelGroup()
 				<!-- User Message -->
 				@message.UserMessage()
-				<!-- Tool Confirmation Dialog (for awaiting_input state) -->
+				<!-- Tool Confirmation Dialog (for awaiting_confirmation state) -->
 				@ToolConfirmationDialog()
+				<!-- Tool Custom Input Dialog (for awaiting_input state) -->
+				@ToolCustomInputDialog()
 				<!-- Tool Call Message -->
 				<template x-if="message.type === 'tool_call'">
 					@ToolCall(ctx)

@@ -4,6 +4,7 @@ import (
 	"aicompass/foundation/agent"
 	"aicompass/foundation/logger"
 	"aicompass/foundation/permcache"
+	"aicompass/platform/toolregistry"
 	"context"
 	"fmt"
 	"time"
@@ -40,13 +41,17 @@ type Service struct {
 	repo         Repository
 	toolSetCache *permcache.Cache[ToolSetPermission]
 	toolCache    *permcache.Cache[Permission]
+
+	// External dependency for tool membership lookup.
+	toolRegistry *toolregistry.Registry
 }
 
 // ServiceConfig contains dependencies for creating a [Service].
 type ServiceConfig struct {
-	Log  *logger.Logger
-	Repo Repository
-	RDB  redis.Cmdable // Redis client for distributed caching
+	Log          *logger.Logger
+	Repo         Repository
+	RDB          redis.Cmdable         // Redis client for distributed caching
+	ToolRegistry *toolregistry.Registry // For checking tool membership in toolsets
 }
 
 // NewService creates a new tool requirements service.
@@ -66,6 +71,7 @@ func NewService(cfg ServiceConfig) *Service {
 		repo:         cfg.Repo,
 		toolSetCache: permcache.New[ToolSetPermission](cfg.RDB, "toolsetperm"),
 		toolCache:    permcache.New[Permission](cfg.RDB, "toolperm"),
+		toolRegistry: cfg.ToolRegistry,
 	}
 
 	// Wire the permission requirement to use this service's cached lookups.
@@ -184,6 +190,26 @@ func (s *Service) BlockMiddleware(agentID string) agent.Middleware {
 // This is a convenience method used by the adapter's before-tool callback.
 func (s *Service) RequiresConfirmation(ctx context.Context, agentID, toolName string, args map[string]any) bool {
 	return s.confirmReq.RequiresConfirmation(agentID, toolName, args)
+}
+
+// IsToolInToolSet checks if a tool belongs to a specific toolset.
+// This is used during confirmation checks to avoid requiring confirmation
+// for tools that are NOT members of a toolset with require_confirmation.
+func (s *Service) IsToolInToolSet(ctx context.Context, userID, agentID, toolSetID, toolName string) (bool, error) {
+	if s.toolRegistry == nil {
+		// No registry available — cannot verify. Return false to avoid false positives.
+		return false, nil
+	}
+	tools, err := s.toolRegistry.GetToolsInSet(ctx, toolSetID)
+	if err != nil {
+		return false, err
+	}
+	for _, t := range tools {
+		if t.ID == toolName || t.Name == toolName {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // =============================================================================

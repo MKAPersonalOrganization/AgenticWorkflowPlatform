@@ -23,6 +23,7 @@ export function syncToolState(toolId, threadId, context, hydrateFn) {
         'completed': TOOL_STATES.COMPLETED,
         'error': TOOL_STATES.ERROR,
         'awaiting_input': TOOL_STATES.AWAITING_INPUT,
+        'awaiting_confirmation': TOOL_STATES.AWAITING_CONFIRMATION,
         'awaiting_auth': TOOL_STATES.AWAITING_AUTH,
         'input_provided': TOOL_STATES.ANSWERED,
         'answered': TOOL_STATES.ANSWERED,

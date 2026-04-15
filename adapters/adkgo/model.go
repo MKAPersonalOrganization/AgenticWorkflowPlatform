@@ -106,6 +106,10 @@ func (m *openAIModel) GenerateContent(ctx context.Context, req *adkmodel.LLMRequ
 			}
 			for _, t := range req.Config.Tools {
 				for _, fd := range t.FunctionDeclarations {
+					// Filter out internal ADK tools (adk_ prefix)
+					if strings.HasPrefix(fd.Name, "adk_") {
+						continue
+					}
 					funcDef := openai.FunctionDefinitionParam{
 						Name:        fd.Name,
 						Description: openai.String(fd.Description),
@@ -256,12 +260,16 @@ func contentsToOpenAI(contents []*genai.Content) []openai.ChatCompletionMessageP
 		if c == nil {
 			continue
 		}
-		msgs = append(msgs, contentToOpenAI(c)...)
+		converted := contentToOpenAI(c)
+		if len(converted) > 0 {
+			msgs = append(msgs, converted...)
+		}
 	}
 	return msgs
 }
 
 // contentToOpenAI converts a single genai.Content to one or more OpenAI messages.
+// Internal ADK tools (starting with "adk_") and their responses are filtered out.
 func contentToOpenAI(c *genai.Content) []openai.ChatCompletionMessageParamUnion {
 	var msgs []openai.ChatCompletionMessageParamUnion
 
@@ -274,6 +282,10 @@ func contentToOpenAI(c *genai.Content) []openai.ChatCompletionMessageParamUnion 
 		// Also handle function responses from user role (tool results).
 		for _, p := range c.Parts {
 			if p.FunctionResponse != nil {
+				// Filter out internal tool responses (e.g. adk_request_confirmation).
+				if strings.HasPrefix(p.FunctionResponse.Name, "adk_") {
+					continue
+				}
 				resultJSON, _ := json.Marshal(p.FunctionResponse.Response)
 				msgs = append(msgs, openai.ToolMessage(string(resultJSON), p.FunctionResponse.ID))
 			}
@@ -288,6 +300,10 @@ func contentToOpenAI(c *genai.Content) []openai.ChatCompletionMessageParamUnion 
 				textParts = append(textParts, p.Text)
 			}
 			if p.FunctionCall != nil {
+				// Filter out internal tool calls (e.g. adk_request_confirmation).
+				if strings.HasPrefix(p.FunctionCall.Name, "adk_") {
+					continue
+				}
 				argsJSON, _ := json.Marshal(p.FunctionCall.Args)
 				toolCalls = append(toolCalls, openai.ChatCompletionMessageToolCallUnionParam{
 					OfFunction: &openai.ChatCompletionMessageFunctionToolCallParam{

@@ -36,8 +36,8 @@ func (t *ThinkTool) Schema() *agent.Schema { return thinkSchema }
 
 // Execute implements the Executor interface.
 // The think tool's purpose is to let the model generate text in the arguments;
-// the actual streaming of "thoughts" happens during LLM argument generation
-// (via ToolContentStreamed events emitted by StreamProcessor), not here.
+// the actual streaming of "thoughts" happens during LLM argument generation,
+// not here.
 func (t *ThinkTool) Execute(ctx context.Context, args agent.Arguments) (agent.Result, error) {
 	// We simply return OK. The thoughts content was already streamed to the
 	// frontend in real-time during the LLM response phase.

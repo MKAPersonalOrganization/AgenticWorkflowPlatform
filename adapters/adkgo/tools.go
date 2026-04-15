@@ -2,7 +2,10 @@ package adkgo
 
 import (
 	"aicompass/foundation/agent"
+	agentio "aicompass/foundation/agent/io"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -108,13 +111,43 @@ func executeFoundationTool(
 		return nil, err
 	}
 
-	result, err := et.Execute(ctx, agent.Arguments{
+	// Inject an IO handler so tools can use io.Read() / io.Confirm().
+	// If a handler is already set (e.g. CachedReadHandler on resume), keep it.
+	var execCtx context.Context = ctx
+	if agentio.FromContext(ctx) == nil {
+		execCtx = agentio.WithHandler(ctx, agentio.NewPauseHandler())
+	}
+
+	result, err := et.Execute(execCtx, agent.Arguments{
 		Raw:       raw,
 		CallID:    ctx.FunctionCallID(),
 		SessionID: sessionID,
 		UserID:    userID,
 	})
 	if err != nil {
+		// Check for ErrInputRequired — tool is requesting custom user input
+		// via io.Read(). We pause the ADK agent loop using the confirmation
+		// mechanism (the only pause mechanism in ADK-Go), with a payload that
+		// marks this as a custom input request (Python ADK's adk_request_input
+		// pattern).
+		var inputReq *agentio.ErrInputRequired
+		if errors.As(err, &inputReq) {
+			// Build a payload that distinguishes custom input from confirmation.
+			payload := map[string]any{
+				"type": "custom_input",
+			}
+			if inputReq.Schema != nil {
+				payload["schema"] = inputReq.Schema
+			}
+
+			if reqErr := ctx.RequestConfirmation(inputReq.Question, payload); reqErr != nil {
+				return map[string]any{errorKey: reqErr.Error()}, nil
+			}
+			ctx.Actions().SkipSummarization = true
+
+			return nil, fmt.Errorf("tool %q %w", et.Name(), adktool.ErrConfirmationRequired)
+		}
+
 		// Convention: execution errors are surfaced as {"error":"..."} so the LLM
 		// sees the failure reason and can retry or report to the user.
 		return map[string]any{errorKey: err.Error()}, nil

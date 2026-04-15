@@ -245,22 +245,27 @@ export function createStateMethods() {
          * Update derived state based on current messages.
          * This ensures a Single Source of Truth for UI state.
          */
-        /**
-         * Synchronize tool machine state and context to the corresponding UI message.
-         * Centralizes mapping of status, result, and elicitation data.
-         * @param {Object} threadState - Target thread state
-         * @param {string} toolCallId - ID of the tool call
-         * @param {string} stateValue - Current machine state value
-         * @param {Object} context - Machine context
-         */
-        __syncToolStateToMessage(threadState, toolCallId, stateValue, context) {
-            if (!threadState.messages) return;
+        __syncToolStateToMessage(id, snapshot) {
+            const state = this.__currentState;
+            const messageIndex = state.messages.findIndex(m => m.id === id);
+            if (messageIndex === -1) return;
 
-            const msg = threadState.messages.find(m => m.id === toolCallId);
-            if (!msg) return;
+            const msg = state.messages[messageIndex];
+            const status = snapshot.value;
+            const context = snapshot.context;
 
-            // Update status
-            msg.status = stateValue;
+            // map machine state to display status
+            if (status === 'awaiting_input') {
+                msg.status = 'awaiting_input';
+            } else if (status === 'awaiting_confirmation') {
+                msg.status = 'awaiting_confirmation';
+            } else if (status === 'awaiting_auth') {
+                msg.status = 'awaiting_auth';
+            } else if (status === 'success') {
+                msg.status = 'completed';
+            } else if (status === 'error') {
+                msg.status = 'error';
+            }
 
             // Sync result/args
             if (context.result !== undefined && context.result !== null) {
@@ -268,7 +273,7 @@ export function createStateMethods() {
                 msg.parsedResult = safeParseJSON(msg.result);
             }
 
-            // Sync elicitation data for tool confirmation (pass schema directly as parsedResult)
+            // Sync elicitation data for tool confirmation
             if (context.elicitation) {
                 const { question, schema } = context.elicitation;
                 msg.parsedResult = { question_text: question, schema: schema };
@@ -315,7 +320,7 @@ export function createStateMethods() {
                         };
 
                         // Sync to message object for UI binding
-                        this.__syncToolStateToMessage(targetState, toolCallId, snapshot.value, snapshot.context);
+                        this.__syncToolStateToMessage(toolCallId, snapshot);
                     });
                 });
 
@@ -366,7 +371,7 @@ export function createStateMethods() {
                         state: snapshot.value,
                         context: snapshot.context
                     };
-                    this.__syncToolStateToMessage(ts, toolCallId, snapshot.value, snapshot.context);
+                    this.__syncToolStateToMessage(toolCallId, snapshot);
                 });
             });
 
@@ -374,7 +379,7 @@ export function createStateMethods() {
             this.__toolStateServices[toolCallId] = actor;
 
             // Sync to message immediately (not via microtask) for correct initial render
-            this.__syncToolStateToMessage(threadState, toolCallId, targetState, actor.getSnapshot().context);
+            this.__syncToolStateToMessage(toolCallId, actor.getSnapshot());
         },
 
         // Registry Helpers (exposed for UI templates)

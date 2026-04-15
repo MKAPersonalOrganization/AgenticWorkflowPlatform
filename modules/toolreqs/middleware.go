@@ -70,6 +70,7 @@ type ConfirmationConfigResolver interface {
 	GetToolRequirementConfig(ctx context.Context, userID, agentID, toolSetID, toolID string) (ToolRequirementConfig, error)
 	GetToolSetRequirementConfig(ctx context.Context, userID, agentID, toolSetID string) (ToolRequirementConfig, error)
 	GetToolSetsWithConfirmation(ctx context.Context, userID, agentID string) ([]string, error)
+	IsToolInToolSet(ctx context.Context, userID, agentID, toolSetID, toolName string) (bool, error)
 }
 
 // CheckConfirmation determines whether a tool call needs user confirmation,
@@ -103,13 +104,25 @@ func CheckConfirmation(
 		} else {
 			// 1c. No tool-set ID provided - check all tool-sets the user has configured
 			// with require_confirmation and see if any of them contain this tool.
+			// NOTE: This is a fallback. The preferred path is when toolSetID is
+			// provided (section 1b). Without toolSetID, we must check every toolset
+			// with require_confirmation to see if this tool is a member.
 			confToolSets, err := resolver.GetToolSetsWithConfirmation(ctx, userID, agentID)
 			if err == nil && len(confToolSets) > 0 {
-				// Check each tool-set that has require_confirmation
+				// Check each tool-set that has require_confirmation.
 				for _, tsID := range confToolSets {
 					tsCfg, err := resolver.GetToolSetRequirementConfig(ctx, userID, agentID, tsID)
 					if err == nil && (tsCfg.Action == RequirementActionRequireConfirmation || tsCfg.RequireConfirmation) {
-						return true, tsCfg.ConfirmationHint
+						// Verify the tool belongs to this tool-set by checking
+						// per-tool config exists or checking tool registry.
+						// If we can verify tool membership, enforce confirmation.
+						// Otherwise, only enforce if we have a positive match.
+						toolInSet, lookupErr := resolver.IsToolInToolSet(ctx, userID, agentID, tsID, toolName)
+						if lookupErr == nil && toolInSet {
+							return true, tsCfg.ConfirmationHint
+						}
+						// If IsToolInToolSet is not implemented or returns error,
+						// skip confirmation to avoid false positives (fail-open for custom input).
 					}
 				}
 			}

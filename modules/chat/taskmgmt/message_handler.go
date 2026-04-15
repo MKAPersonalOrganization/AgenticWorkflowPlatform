@@ -25,12 +25,20 @@ type SendMessageRequest struct {
 	Attachments []FileAttachment `json:"attachments,omitempty"` // Optional: attached files
 }
 
-// ConfirmToolRequest represents a tool confirmation response.
+// ConfirmToolRequest represents a tool confirmation response (Allow/Deny).
 type ConfirmToolRequest struct {
 	ContextID  string `json:"contextId"`           // Required: thread/chat session ID
 	ToolCallID string `json:"toolCallId"`          // Required: which tool call to confirm
 	Confirmed  bool   `json:"confirmed"`           // User's choice: true = Allow, false = Deny
 	AgentName  string `json:"agentName,omitempty"` // Optional: specific agent (auto-detected if empty)
+}
+
+// ProvideInputRequest represents a custom user input response (io.Read).
+type ProvideInputRequest struct {
+	ContextID  string `json:"contextId"`           // Required: thread/chat session ID
+	ToolCallID string `json:"toolCallId"`          // Required: which tool call requested input
+	Input      string `json:"input"`               // Required: the user's text response
+	AgentName  string `json:"agentName,omitempty"` // Optional: specific agent
 }
 
 // SendMessage handles POST /v1/message:send — runs the agent inline and streams
@@ -110,16 +118,54 @@ func (h *TaskManagementHandler) ConfirmTool(w http.ResponseWriter, r *http.Reque
 		"toolCallId", req.ToolCallID,
 		"confirmed", req.Confirmed)
 
-	// Format the confirmation response as JSON (same format frontend was using)
-	confirmationJSON := fmt.Sprintf(`{"confirmed":%v}`, req.Confirmed)
+	// Format binary confirmation as JSON (read by ADK's confirmation logic)
+	message := fmt.Sprintf(`{"confirmed":%v}`, req.Confirmed)
 
 	execReq := agentorchestrator.RunExecutionRequest{
 		ThreadID:   req.ContextID,
 		UserID:     user.ID,
 		AgentName:  req.AgentName,
-		Message:    confirmationJSON,
+		Message:    message,
 		MessageID:  agent.GenerateID(),
-		ToolCallID: req.ToolCallID, // This signals it's a confirmation response
+		ToolCallID: req.ToolCallID,
+	}
+
+	h.streamRun(w, r, execReq)
+}
+
+// ProvideInput handles POST /v1/tool:provide_input — responds to an io.Read request.
+// Streams AGUI events back as SSE on the same HTTP response.
+func (h *TaskManagementHandler) ProvideInput(w http.ResponseWriter, r *http.Request) {
+	user := h.authService.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req ProvideInputRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.ContextID == "" || req.ToolCallID == "" || req.Input == "" {
+		http.Error(w, "contextId, toolCallId, and input are required", http.StatusBadRequest)
+		return
+	}
+
+	h.log.Info(r.Context(), "[API] Custom input response",
+		"userID", user.ID,
+		"contextID", req.ContextID,
+		"toolCallId", req.ToolCallID)
+
+	execReq := agentorchestrator.RunExecutionRequest{
+		ThreadID:   req.ContextID,
+		UserID:     user.ID,
+		AgentName:  req.AgentName,
+		Message:    req.Input,
+		MessageID:  agent.GenerateID(),
+		ToolCallID: req.ToolCallID,
+		UserInput:  req.Input,
 	}
 
 	h.streamRun(w, r, execReq)

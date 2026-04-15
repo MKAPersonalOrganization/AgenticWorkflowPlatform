@@ -24,7 +24,7 @@ import (
 //
 // Production-ready features:
 //   - State delta extraction → StateChangeReported events
-//   - Tool confirmation detection → ToolNeedsInput events
+//   - Tool elicitation detection → ToolNeedsInput/ToolNeedsConfirmation events
 //   - Agent transfer detection → AgentTransferRequested events
 //   - Escalation detection → thread metadata
 //   - Error response detection with convention-based heuristics
@@ -61,9 +61,6 @@ func TranslateEvent(evt *session.Event, ctx EventContext) []thread.Event {
 
 	// Extract artifact delta events (ADK-Go EventActions.ArtifactDelta).
 	events = append(events, translateArtifactDelta(evt, ctx)...)
-
-	// Extract tool confirmation events (ADK-Go HITL).
-	events = append(events, translateToolConfirmations(evt, ctx)...)
 
 	return events
 }
@@ -143,27 +140,42 @@ func translateModelEvent(evt *session.Event, ctx EventContext) []thread.Event {
 		})
 	}
 
-	// ToolStart / ToolNeedsInput for each function call.
+	// ToolStart / ToolNeedsInput / ToolNeedsConfirmation for each function call.
 	//
 	// When the call is an adk_request_confirmation wrapper, we emit
-	// ToolNeedsInput (with the wrapper's call ID, which the frontend
-	// must send back) instead of ToolStart. This replaces the old
-	// translateToolConfirmations path which used the wrong call ID.
+	// ToolNeedsInput or ToolNeedsConfirmation (with the wrapper's call ID,
+	// which the frontend must send back) instead of ToolStart.
 	for _, tc := range toolCalls {
 		if tc.Name == toolconfirmation.FunctionCallName {
-			originalID, originalName, hint := extractConfirmationInfo(tc.Arguments)
-			events = append(events, &thread.ToolNeedsInput{
-				ThreadID:           ctx.ThreadID,
-				MessageID:          evt.ID,
-				ToolCallID:         tc.ID,
-				OriginalToolCallID: originalID,
-				ToolName:           originalName,
-				Elicitation: &thread.ElicitationSpec{
-					Question: hint,
-				},
-				AgentName: ctx.AgentName,
-				Timestamp: now,
-			})
+			info := extractConfirmationInfo(tc.Arguments)
+			if info.inputSchema != nil {
+				// Structured input request (e.g. io.Read)
+				events = append(events, &thread.ToolNeedsInput{
+					ThreadID:           ctx.ThreadID,
+					MessageID:          evt.ID,
+					ToolCallID:         tc.ID,
+					OriginalToolCallID: info.originalID,
+					ToolName:           info.originalName,
+					Elicitation: &thread.ElicitationSpec{
+						Question: info.hint,
+						Schema:   info.inputSchema,
+					},
+					AgentName: ctx.AgentName,
+					Timestamp: now,
+				})
+			} else {
+				// Simple binary Allow/Deny confirmation
+				events = append(events, &thread.ToolNeedsConfirmation{
+					ThreadID:           ctx.ThreadID,
+					MessageID:          evt.ID,
+					ToolCallID:         tc.ID,
+					OriginalToolCallID: info.originalID,
+					ToolName:           info.originalName,
+					Question:           info.hint,
+					AgentName:          ctx.AgentName,
+					Timestamp:          now,
+				})
+			}
 			continue
 		}
 		events = append(events, &thread.ToolStart{
@@ -188,23 +200,108 @@ func translateModelEvent(evt *session.Event, ctx EventContext) []thread.Event {
 	return events
 }
 
-// extractConfirmationInfo parses the originalFunctionCall name, ID, and
-// toolConfirmation hint from an adk_request_confirmation FunctionCall's
-// JSON-encoded arguments. Returns ("", "", "") on parse failure.
-func extractConfirmationInfo(argsJSON string) (originalID, originalName, hint string) {
-	var args struct {
-		OriginalFunctionCall struct {
-			ID   string `json:"id"`
-			Name string `json:"name"`
-		} `json:"originalFunctionCall"`
-		ToolConfirmation struct {
-			Hint string `json:"hint"`
-		} `json:"toolConfirmation"`
+// confirmationInfo holds parsed fields from an adk_request_confirmation
+// FunctionCall's JSON-encoded arguments.
+type confirmationInfo struct {
+	originalID   string
+	originalName string
+	hint         string
+	// inputSchema is non-nil when the confirmation is actually a custom input
+	// request (Python ADK's adk_request_input pattern). The payload contains
+	// {"type":"custom_input","schema":{...}}.
+	inputSchema map[string]any
+}
+
+// findKey case-insensitively finds a value in a map for the given key.
+func findKey(m map[string]any, keys ...string) (any, bool) {
+	for k, v := range m {
+		for _, target := range keys {
+			if strings.EqualFold(k, target) {
+				return v, true
+			}
+		}
 	}
-	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
-		return "", "", ""
+	return nil, false
+}
+
+// extractConfirmationInfo parses the originalFunctionCall name, ID,
+// toolConfirmation hint, and optional custom input payload from an
+// adk_request_confirmation FunctionCall's JSON-encoded arguments.
+func extractConfirmationInfo(argsJSON string) confirmationInfo {
+	var raw map[string]any
+	if err := json.Unmarshal([]byte(argsJSON), &raw); err != nil {
+		return confirmationInfo{}
 	}
-	return args.OriginalFunctionCall.ID, args.OriginalFunctionCall.Name, args.ToolConfirmation.Hint
+
+	info := confirmationInfo{}
+
+	// 1. Extract original tool call info
+	// Try nested "originalFunctionCall" first
+	if ofcVal, ok := findKey(raw, "originalFunctionCall"); ok {
+		if ofc, ok := ofcVal.(map[string]any); ok {
+			if id, ok := findKey(ofc, "id"); ok {
+				info.originalID, _ = id.(string)
+			}
+			if name, ok := findKey(ofc, "name"); ok {
+				info.originalName, _ = name.(string)
+			}
+		}
+	}
+	// Fallback to top-level if not found
+	if info.originalID == "" {
+		if id, ok := findKey(raw, "originalToolCallId", "originalId", "id"); ok {
+			info.originalID, _ = id.(string)
+		}
+	}
+	if info.originalName == "" {
+		if name, ok := findKey(raw, "originalToolName", "originalName", "name"); ok {
+			info.originalName, _ = name.(string)
+		}
+	}
+
+	// 2. Extract tool confirmation info
+	// Try nested "toolConfirmation" first
+	var payload map[string]any
+	if tcVal, ok := findKey(raw, "toolConfirmation"); ok {
+		if tc, ok := tcVal.(map[string]any); ok {
+			if hint, ok := findKey(tc, "hint"); ok {
+				info.hint, _ = hint.(string)
+			}
+			if pVal, ok := findKey(tc, "payload"); ok {
+				payload, _ = pVal.(map[string]any)
+			}
+		}
+	}
+	// Fallback to top-level if not found
+	if info.hint == "" {
+		if hint, ok := findKey(raw, "hint"); ok {
+			info.hint, _ = hint.(string)
+		}
+	}
+	if payload == nil {
+		if pVal, ok := findKey(raw, "payload"); ok {
+			payload, _ = pVal.(map[string]any)
+		}
+	}
+
+	// 3. Check for custom input payload
+	if payload != nil {
+		typeVal, _ := findKey(payload, "type")
+		if payloadType, _ := typeVal.(string); strings.EqualFold(payloadType, "custom_input") {
+			// Custom input request!
+			if sVal, ok := findKey(payload, "schema"); ok {
+				if schema, ok := sVal.(map[string]any); ok {
+					info.inputSchema = schema
+				}
+			}
+			// Fallback to ensure UI renders text input
+			if info.inputSchema == nil {
+				info.inputSchema = map[string]any{"type": "string"}
+			}
+		}
+	}
+
+	return info
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -318,29 +415,7 @@ func translateArtifactDelta(evt *session.Event, ctx EventContext) []thread.Event
 	return events
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Tool Confirmation Translation (HITL)
-//
-// ADK-Go's tool confirmation system stores pending confirmations in
-// EventActions.RequestedToolConfirmations. We translate these to
-// thread.ToolNeedsInput events so the frontend can display approval dialogs.
-// ──────────────────────────────────────────────────────────────────────────────
-
-// translateToolConfirmations is intentionally a no-op.
-//
-// Previously this function generated ToolNeedsInput from the function
-// response event's RequestedToolConfirmations map, which is keyed by the
-// ORIGINAL tool's call ID. But ADK-Go's RequestConfirmationRequestProcessor
-// expects the response to reference the adk_request_confirmation wrapper's
-// call ID (a different UUID). The ToolNeedsInput is now generated in
-// translateModelEvent when the adk_request_confirmation FunctionCall event
-// arrives, which carries the correct call ID.
-func translateToolConfirmations(_ *session.Event, _ EventContext) []thread.Event {
-	return nil
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Function Response → ToolResultAdded
+// isConfirmationRequiredResponse returns true when the FunctionResponse indicates
 //
 // Convention established in tools.go resultToMap():
 //   - Success: map has content keys at top level (e.g. "success", "audio_url")
