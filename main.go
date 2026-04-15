@@ -40,7 +40,6 @@ import (
 	"aicompass/plugins/todos"
 	"aicompass/plugins/tracker"
 	"aicompass/plugins/tts"
-	"aicompass/plugins/weather"
 	"aicompass/plugins/websearch"
 	"aicompass/shared"
 	"context"
@@ -432,7 +431,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	toolregistry.RegisterPlugin(&todos.Provider{})
 	toolregistry.RegisterPlugin(&tracker.Provider{})
 	toolregistry.RegisterPlugin(&tts.Provider{})
-	toolregistry.RegisterPlugin(&weather.Provider{})
 	toolregistry.RegisterPlugin(websearch.NewProvider(func(apiKey, model string) websearch.GroundedSearchClient {
 		return gemini.NewSearchClient(apiKey, model)
 	}))
