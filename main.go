@@ -40,6 +40,7 @@ import (
 	"aicompass/plugins/todos"
 	"aicompass/plugins/tracker"
 	"aicompass/plugins/tts"
+	"aicompass/plugins/weather"
 	"aicompass/plugins/websearch"
 	"aicompass/shared"
 	"context"
@@ -80,6 +81,10 @@ import (
 	resourcesmod "aicompass/modules/resources"
 	templatesmod "aicompass/modules/templates"
 	evalmod "aicompass/modules/evaluation"
+	evalhallucinationmod "aicompass/modules/evaluation/hallucination"
+	evalresponsemod "aicompass/modules/evaluation/response"
+	evalrubricmod "aicompass/modules/evaluation/rubric"
+	evalsafetymod "aicompass/modules/evaluation/safety"
 
 	userprofilemod "aicompass/modules/userprofile"
 
@@ -381,8 +386,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Initialize resources module
 	resourcesModule := resourcesmod.New(db, artifactService)
 
-	// Initialize evaluation module
-	evaluationModule := evalmod.New(db)
+	// Initialize evaluation module with nil invoker for now
+	// Will be properly initialized after agent provider is set up
+	var evaluationModule *evalmod.Module
+	var evalRunner evalmod.AgentInvoker
 
 	// Initialize filesystem module (VFS backed by S3/MinIO)
 	var ghClient *githubauth.Client
@@ -425,6 +432,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	toolregistry.RegisterPlugin(&todos.Provider{})
 	toolregistry.RegisterPlugin(&tracker.Provider{})
 	toolregistry.RegisterPlugin(&tts.Provider{})
+	toolregistry.RegisterPlugin(&weather.Provider{})
 	toolregistry.RegisterPlugin(websearch.NewProvider(func(apiKey, model string) websearch.GroundedSearchClient {
 		return gemini.NewSearchClient(apiKey, model)
 	}))
@@ -490,6 +498,19 @@ func run(ctx context.Context, log *logger.Logger) error {
 	agentProvider := newUserAwareAgentProvider(
 		agentDefModule.Repo(),
 	)
+
+	// Create eval runner for real agent invocation during evaluations.
+	evalRunner = adkgo.NewEvalRunner(agentProvider, aiSettingsModule, aiSettingsModule)
+
+	// Now initialize the evaluation module with the eval runner.
+	evaluationModule = evalmod.New(db, evalRunner)
+
+	// Register all evaluation metrics from subpackages.
+	// This must happen after the evaluation module is created to avoid circular imports.
+	evalresponsemod.RegisterEvaluators(evalmod.Register)
+	evalrubricmod.RegisterEvaluators(evalmod.Register)
+	evalsafetymod.RegisterEvaluators(evalmod.Register)
+	evalhallucinationmod.RegisterEvaluators(evalmod.Register)
 
 	// -------------------------------------------------------------------------
 	// Initialize Chat Module (core chat bounded context — ADR 014)

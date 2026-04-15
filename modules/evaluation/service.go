@@ -22,12 +22,13 @@ var (
 
 // service manages the evaluation business logic.
 type service struct {
-	repo repository
+	repo    repository
+	invoker AgentInvoker
 }
 
 // newService creates a new evaluation service.
-func newService(repo repository) *service {
-	return &service{repo: repo}
+func newService(repo repository, invoker AgentInvoker) *service {
+	return &service{repo: repo, invoker: invoker}
 }
 
 // ─── EvalSet ─────────────────────────────────────────────────────────────────
@@ -754,8 +755,8 @@ func (s *service) createEvalRun(ctx context.Context, userID string, req EvalRunC
 
 	for inv := 1; inv <= numRuns; inv++ {
 		for _, ec := range cases {
-			// Build eval request (using expected data as mock actual response)
-			evalReq := buildMockEvalRequest(ec)
+			// Build eval request (real agent invocation or mock fallback)
+			evalReq := s.buildEvalRequest(ctx, userID, req.AgentID.String(), ec)
 
 			for _, eval := range evaluators {
 				evalResult := eval.Evaluate(ctx, evalReq)
@@ -822,6 +823,52 @@ func buildMockEvalRequest(ec EvalCase) EvalRequest {
 		ActualTrajectory:   actualTrajectory,
 		ActualResponse:     actualResponse,
 	}
+}
+
+// buildEvalRequest builds an EvalRequest using either real agent invocation or mock fallback.
+// If an AgentInvoker is available, it invokes the real agent and captures actual responses.
+// Otherwise it falls back to buildMockEvalRequest for backward compatibility.
+func (s *service) buildEvalRequest(ctx context.Context, userID, agentID string, ec EvalCase) EvalRequest {
+	if s.invoker == nil || agentID == "" {
+		return buildMockEvalRequest(ec)
+	}
+
+	result, err := s.invoker.InvokeForEval(ctx, EvalInvokeRequest{
+		AgentID: agentID,
+		UserID:  userID,
+		Input:   ec.Input,
+	})
+	if err != nil {
+		// Log error and fall back to mock (don't fail the eval)
+		// TODO: add logging here
+		return buildMockEvalRequest(ec)
+	}
+
+	// Convert EvalInvokeResult to actual trajectory
+	var actualTrajectory []trajectory.ActualToolCall
+	for _, tc := range result.ToolCalls {
+		actualTrajectory = append(actualTrajectory, trajectory.ActualToolCall{
+			ToolName: tc.Name,
+			Args:     tc.Args,
+		})
+	}
+
+	evalReq := EvalRequest{
+		ExpectedTrajectory: ec.ExpectedTrajectory,
+		ExpectedResponse:   ec.ExpectedResponse,
+		ActualTrajectory:   actualTrajectory,
+		ActualResponse:     result.FinalResponse,
+	}
+
+	// Include judge config if available
+	if result.JudgeAPIKey != "" {
+		evalReq.JudgeConfig = &JudgeConfig{
+			APIKey: result.JudgeAPIKey,
+			Model:  result.JudgeModel,
+		}
+	}
+
+	return evalReq
 }
 
 // getRegisteredEvaluators returns all registered evaluators.

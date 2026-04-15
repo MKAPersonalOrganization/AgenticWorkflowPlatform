@@ -809,6 +809,121 @@ func (h *handler) deleteEvalRun(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// exportEvalRun handles GET /api/evaluation/runs/{id}/export.
+// Exports evaluation results as a JSON file.
+func (h *handler) exportEvalRun(w http.ResponseWriter, r *http.Request) {
+	user := shared.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	// Get run info
+	run, err := h.svc.getEvalRun(r.Context(), id, user.ID)
+	if err != nil {
+		handleNotFound(w, err, "evaluation run")
+		return
+	}
+
+	// Get eval set info
+	evalSet, err := h.svc.getEvalSet(r.Context(), run.EvalSetID, user.ID)
+	if err != nil {
+		handleNotFound(w, err, "eval set")
+		return
+	}
+
+	// Get eval cases
+	cases, err := h.svc.listEvalCases(r.Context(), run.EvalSetID, user.ID)
+	if err != nil {
+		slog.Error("getting eval cases", "error", err)
+		http.Error(w, "Failed to get eval cases", http.StatusInternalServerError)
+		return
+	}
+
+	// Get eval results
+	results, err := h.svc.getEvalResults(r.Context(), id, user.ID)
+	if err != nil {
+		slog.Error("getting eval results", "error", err)
+		http.Error(w, "Failed to get eval results", http.StatusInternalServerError)
+		return
+	}
+
+	// Build export structure
+	caseMap := make(map[uuid.UUID]*EvalCase)
+	for i, c := range cases {
+		caseMap[c.ID] = &cases[i]
+	}
+
+	// Group results by case
+	resultsByCase := make(map[uuid.UUID][]EvalResult)
+	for _, r := range results {
+		resultsByCase[r.CaseID] = append(resultsByCase[r.CaseID], r)
+	}
+
+	// Build export payload
+	type ExportMetric struct {
+		MetricID string          `json:"metric_id"`
+		Score    *float64        `json:"score,omitempty"`
+		Status   string          `json:"status"`
+		Details  json.RawMessage `json:"details,omitempty"`
+	}
+
+	type ExportCase struct {
+		ID       uuid.UUID       `json:"id"`
+		Name     *string         `json:"name,omitempty"`
+		Input    string          `json:"input"`
+		Metrics  []ExportMetric  `json:"metrics"`
+	}
+
+	type ExportPayload struct {
+		Run        *EvalRun      `json:"run"`
+		EvalSet    *EvalSet      `json:"eval_set"`
+		Cases      []ExportCase  `json:"cases"`
+		ExportedAt time.Time     `json:"exported_at"`
+	}
+
+	exportCases := make([]ExportCase, 0)
+	for _, c := range cases {
+		caseResults := resultsByCase[c.ID]
+		metrics := make([]ExportMetric, 0)
+		for _, res := range caseResults {
+			metrics = append(metrics, ExportMetric{
+				MetricID: res.MetricID,
+				Score:    res.Score,
+				Status:   res.Status,
+				Details:  res.Details,
+			})
+		}
+		exportCases = append(exportCases, ExportCase{
+			ID:      c.ID,
+			Name:    c.Name,
+			Input:   c.Input,
+			Metrics: metrics,
+		})
+	}
+
+	payload := ExportPayload{
+		Run:        &run,
+		EvalSet:    &evalSet,
+		Cases:      exportCases,
+		ExportedAt: time.Now(),
+	}
+
+	// Set response headers for file download
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="eval-results-%s.json"`, id.String()[:8]))
+
+	// Write JSON
+	if err := json.NewEncoder(w).Encode(payload); err != nil {
+		slog.Error("encoding export", "error", err)
+	}
+}
+
 // ─── Rubric Handlers ─────────────────────────────────────────────────────────
 
 // listRubrics handles GET /api/evaluation/rubrics.

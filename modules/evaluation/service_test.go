@@ -377,7 +377,7 @@ func (m *mockRepo) DeleteRubric(_ context.Context, id uuid.UUID, userID string) 
 func TestCreateEvalSet_ValidName(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	es, err := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID:      "user1",
@@ -398,7 +398,7 @@ func TestCreateEvalSet_ValidName(t *testing.T) {
 func TestCreateEvalSet_EmptyName(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	_, err := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID: "user1",
@@ -412,7 +412,7 @@ func TestCreateEvalSet_EmptyName(t *testing.T) {
 func TestCreateEvalSet_WhitespaceName(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	_, err := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID: "user1",
@@ -426,7 +426,7 @@ func TestCreateEvalSet_WhitespaceName(t *testing.T) {
 func TestCreateEvalSet_NameTooLong(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	_, err := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID: "user1",
@@ -440,7 +440,7 @@ func TestCreateEvalSet_NameTooLong(t *testing.T) {
 func TestCreateEvalSet_DuplicateName(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	_, _ = svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID: "user1",
@@ -459,7 +459,7 @@ func TestCreateEvalSet_DuplicateName(t *testing.T) {
 func TestListEvalSets_UserScoped(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	_, _ = svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID: "user1",
@@ -485,7 +485,7 @@ func TestListEvalSets_UserScoped(t *testing.T) {
 func TestCreateEvalCase_EmptyInput(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID: "user1",
@@ -504,7 +504,7 @@ func TestCreateEvalCase_EmptyInput(t *testing.T) {
 func TestCreateEvalCase_InputTooLong(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID: "user1",
@@ -523,7 +523,7 @@ func TestCreateEvalCase_InputTooLong(t *testing.T) {
 func TestCreateEvalCase_InvalidTrajectory(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID: "user1",
@@ -554,7 +554,7 @@ func TestCreateEvalCase_InvalidTrajectory(t *testing.T) {
 func TestCreateEvalCase_InvalidRubrics(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID: "user1",
@@ -574,7 +574,7 @@ func TestCreateEvalCase_InvalidRubrics(t *testing.T) {
 func TestCreateEvalCase_InvalidUserMessages(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID: "user1",
@@ -594,7 +594,7 @@ func TestCreateEvalCase_InvalidUserMessages(t *testing.T) {
 func TestDeleteEvalSet_CascadeDeletesCases(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID: "user1",
@@ -631,7 +631,7 @@ func TestDeleteEvalSet_CascadeDeletesCases(t *testing.T) {
 func TestEvalCase_UnauthorizedAccess(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID: "user1",
@@ -651,7 +651,7 @@ func TestEvalCase_UnauthorizedAccess(t *testing.T) {
 func TestJSONFields_SerializeDeserialize(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID: "user1",
@@ -707,7 +707,7 @@ func ptr(s string) *string {
 func TestImportEvalSet_ValidJSON(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	data := []byte(`{
 		"name": "Weather Tests",
@@ -739,7 +739,7 @@ func TestImportEvalSet_ValidJSON(t *testing.T) {
 func TestImportEvalSet_InvalidJSON(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	_, err := svc.importEvalSet(context.Background(), "user1", []byte(`not json`))
 	if err == nil {
@@ -750,7 +750,7 @@ func TestImportEvalSet_InvalidJSON(t *testing.T) {
 func TestImportEvalSet_EmptyCases(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	data := []byte(`{"name": "Empty", "eval_cases": []}`)
 	_, err := svc.importEvalSet(context.Background(), "user1", data)
@@ -762,7 +762,7 @@ func TestImportEvalSet_EmptyCases(t *testing.T) {
 func TestImportEvalSet_MissingInput(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	data := []byte(`{"name": "Bad", "eval_cases": [{"name": "no_input"}]}`)
 	_, err := svc.importEvalSet(context.Background(), "user1", data)
@@ -774,7 +774,7 @@ func TestImportEvalSet_MissingInput(t *testing.T) {
 func TestImportEvalSet_InvalidTrajectory(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	data := []byte(`{
 		"name": "Bad Trajectory",
@@ -792,7 +792,7 @@ func TestImportEvalSet_InvalidTrajectory(t *testing.T) {
 func TestImportEvalSet_DuplicateName(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	data := []byte(`{"name": "Dup", "eval_cases": [{"input": "test"}]}`)
 	_, _ = svc.importEvalSet(context.Background(), "user1", data)
@@ -806,7 +806,7 @@ func TestImportEvalSet_DuplicateName(t *testing.T) {
 func TestExportEvalSet_RoundTrip(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	// Import a set
 	importData := []byte(`{
@@ -893,7 +893,7 @@ func TestExportEvalSet_RoundTrip(t *testing.T) {
 func TestExportEvalSet_NotFound(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	_, err := svc.exportEvalSet(context.Background(), uuid.New(), "user1")
 	if err != ErrNotFound {
@@ -904,7 +904,7 @@ func TestExportEvalSet_NotFound(t *testing.T) {
 func TestExportEvalSet_Unauthorized(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	// Create as user1
 	es, _ := svc.importEvalSet(context.Background(), "user1",
@@ -920,7 +920,7 @@ func TestExportEvalSet_Unauthorized(t *testing.T) {
 func TestUpdateEvalSet_OptimisticConcurrency(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID: "user1",
@@ -951,7 +951,7 @@ func TestUpdateEvalSet_OptimisticConcurrency(t *testing.T) {
 func TestCreateMetricProfile_Valid(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	p, err := svc.createMetricProfile(context.Background(), "user1", MetricProfileCreate{
 		UserID: "user1",
@@ -975,7 +975,7 @@ func TestCreateMetricProfile_Valid(t *testing.T) {
 func TestCreateMetricProfile_EmptyName(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	_, err := svc.createMetricProfile(context.Background(), "user1", MetricProfileCreate{
 		UserID:  "user1",
@@ -990,7 +990,7 @@ func TestCreateMetricProfile_EmptyName(t *testing.T) {
 func TestCreateMetricProfile_DuplicateName(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	req := MetricProfileCreate{
 		UserID:  "user1",
@@ -1007,7 +1007,7 @@ func TestCreateMetricProfile_DuplicateName(t *testing.T) {
 func TestCreateMetricProfile_UnknownMetric(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	_, err := svc.createMetricProfile(context.Background(), "user1", MetricProfileCreate{
 		UserID:  "user1",
@@ -1022,7 +1022,7 @@ func TestCreateMetricProfile_UnknownMetric(t *testing.T) {
 func TestCreateMetricProfile_ThresholdOutOfRange(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	// tool_trajectory_avg_score has range [0, 1]
 	_, err := svc.createMetricProfile(context.Background(), "user1", MetricProfileCreate{
@@ -1038,7 +1038,7 @@ func TestCreateMetricProfile_ThresholdOutOfRange(t *testing.T) {
 func TestCreateMetricProfile_NoneEnabled(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	_, err := svc.createMetricProfile(context.Background(), "user1", MetricProfileCreate{
 		UserID:  "user1",
@@ -1053,7 +1053,7 @@ func TestCreateMetricProfile_NoneEnabled(t *testing.T) {
 func TestCreateMetricProfile_EmptyMetrics(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	_, err := svc.createMetricProfile(context.Background(), "user1", MetricProfileCreate{
 		UserID:  "user1",
@@ -1068,7 +1068,7 @@ func TestCreateMetricProfile_EmptyMetrics(t *testing.T) {
 func TestListMetricProfiles_UserScoped(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	req := MetricProfileCreate{
 		UserID:  "user1",
@@ -1098,7 +1098,7 @@ func TestListMetricProfiles_UserScoped(t *testing.T) {
 func TestCreateEvalRun_Valid(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	// Create an eval set first
 	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
@@ -1136,7 +1136,7 @@ func TestCreateEvalRun_Valid(t *testing.T) {
 func TestCreateEvalRun_NumRunsClamped(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID: "user1",
@@ -1185,7 +1185,7 @@ func TestCreateEvalRun_NumRunsClamped(t *testing.T) {
 func TestCreateEvalRun_UnauthorizedEvalSet(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID: "user1",
@@ -1205,7 +1205,7 @@ func TestCreateEvalRun_UnauthorizedEvalSet(t *testing.T) {
 func TestCreateEvalRun_EvalSetNotFound(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	_, err := svc.createEvalRun(context.Background(), "user1", EvalRunCreate{
 		UserID:    "user1",
@@ -1220,7 +1220,7 @@ func TestCreateEvalRun_EvalSetNotFound(t *testing.T) {
 func TestListEvalRuns_UserScoped(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID: "user1",
@@ -1270,7 +1270,7 @@ func TestListEvalRuns_UserScoped(t *testing.T) {
 func TestCancelEvalRun_OnlyRunningOrPending(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID: "user1",
@@ -1300,7 +1300,7 @@ func TestCancelEvalRun_OnlyRunningOrPending(t *testing.T) {
 func TestGetEvalResults_Unauthorized(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
+	svc := newService(repo, nil) // no invoker for test
 
 	es, _ := svc.createEvalSet(context.Background(), "user1", EvalSetCreate{
 		UserID: "user1",

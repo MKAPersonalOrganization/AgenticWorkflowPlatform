@@ -12,9 +12,8 @@ import (
 func TestListEvalSets_Unauthenticated(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
-	asyncRunner := NewAsyncRunner(svc, NewEventBus())
-	h := newHandler(svc, asyncRunner)
+	svc := newService(repo, nil) // no invoker for test
+	h := newHandler(svc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/eval-sets", nil)
 	rec := httptest.NewRecorder()
@@ -30,9 +29,8 @@ func TestListEvalSets_Unauthenticated(t *testing.T) {
 func TestCreateEvalSet_InvalidJSON(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
-	asyncRunner := NewAsyncRunner(svc, NewEventBus())
-	h := newHandler(svc, asyncRunner)
+	svc := newService(repo, nil) // no invoker for test
+	h := newHandler(svc)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/eval-sets", nil)
 	req.Header.Set("Content-Type", "application/json")
@@ -51,9 +49,8 @@ func TestCreateEvalSet_InvalidJSON(t *testing.T) {
 func TestCreateEvalCase_Unauthenticated(t *testing.T) {
 	t.Parallel()
 	repo := newMockRepo()
-	svc := newService(repo)
-	asyncRunner := NewAsyncRunner(svc, NewEventBus())
-	h := newHandler(svc, asyncRunner)
+	svc := newService(repo, nil) // no invoker for test
+	h := newHandler(svc)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/eval-sets/test-id/cases", nil)
 	req.Header.Set("Content-Type", "application/json")

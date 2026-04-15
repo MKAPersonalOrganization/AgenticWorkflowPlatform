@@ -181,6 +181,7 @@ export const agentDesigner = () => ({
     evalAvgScore: '-',
     evalDurationMs: 0,
     evalAbortController: null,
+    currentRunId: null,
     testResults: [],
 
     // Bottom Panel
@@ -272,6 +273,23 @@ export const agentDesigner = () => ({
             console.error('Failed to fetch agents:', err);
         } finally {
             this.loading = false;
+        }
+    },
+
+    /** Fetch a single agent by ID */
+    async fetchAgentById(agentId) {
+        try {
+            const response = await fetch(`/v1/agent-definitions/${agentId}`);
+            if (response.ok) {
+                const data = await response.json();
+                return data;
+            } else {
+                console.error('Failed to fetch agent:', response.status);
+                return null;
+            }
+        } catch (err) {
+            console.error('Failed to fetch agent:', err);
+            return null;
         }
     },
 
@@ -1676,7 +1694,6 @@ export const agentDesigner = () => ({
             this.evalRunning = false;
             this.evalCompleted = true;
             this.evalLogs.push(`\n[COMPLETE] Evaluation finished in ${this.evalDurationMs}ms`);
-            this.activeBottomTab = 'test-results';
 
         } catch (err) {
             if (err.name === 'AbortError') {
@@ -1725,6 +1742,35 @@ export const agentDesigner = () => ({
         return (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2);
     },
 
+    exportTestResults() {
+        if (!this.currentRunId || this.testResults.length === 0) {
+            alert('No test results to export');
+            return;
+        }
+
+        // Fetch and download the export via the API
+        const exportUrl = `/api/evaluation/runs/${this.currentRunId}/export`;
+        fetch(exportUrl)
+            .then(response => {
+                if (!response.ok) throw new Error('Export failed');
+                return response.blob();
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `eval-results-${this.currentRunId.substring(0, 8)}.json`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            })
+            .catch(err => {
+                console.error('Export error:', err);
+                alert('Failed to export test results');
+            });
+    },
+
     // ══════════════════════════════════════════
     // Evaluation Event Handler
     // ══════════════════════════════════════════
@@ -1736,6 +1782,7 @@ export const agentDesigner = () => ({
                 this.evalLogs.push(`[SESSION] ${data.contextId.substring(0, 8)}`);
                 break;
             case 'RUN_STARTED':
+                this.currentRunId = data.run_id;
                 this.evalLogs.push(`[RUN] ${data.eval_set} (${data.num_cases} cases)`);
                 break;
             case 'CASE_STARTED':
@@ -1752,11 +1799,24 @@ export const agentDesigner = () => ({
                 const runningCase = this.testResults.find(r => r.status === 'running');
                 if (runningCase) {
                     if (!runningCase.metrics) runningCase.metrics = [];
-                    runningCase.metrics.push({
+                    const metricObj = {
                         metric_id: data.metric,
                         score: data.score,
                         status: data.status,
-                    });
+                        details: data.details, // diagnostic details (JSON/string)
+                        detailsExpanded: false, // toggle for details section
+                    };
+                    // Parse details if it's a string
+                    if (typeof data.details === 'string') {
+                        try {
+                            metricObj.detailsObj = JSON.parse(data.details);
+                        } catch (e) {
+                            metricObj.detailsObj = { raw: data.details };
+                        }
+                    } else {
+                        metricObj.detailsObj = data.details || {};
+                    }
+                    runningCase.metrics.push(metricObj);
                     this.testResults = [...this.testResults]; // trigger reactivity
                 }
                 break;

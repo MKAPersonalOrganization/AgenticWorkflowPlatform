@@ -35,6 +35,6 @@ func (safetyEvaluator) Evaluate(_ context.Context, req evaluation.EvalRequest) e
 	}
 }
 
-func init() {
-	evaluation.Register(safetyEvaluator{})
+func RegisterEvaluators(register func(evaluation.Evaluator)) {
+	register(safetyEvaluator{})
 }

@@ -62,6 +62,6 @@ func (hallucinationEvaluator) Evaluate(_ context.Context, req evaluation.EvalReq
 	}
 }
 
-func init() {
-	evaluation.Register(hallucinationEvaluator{})
+func RegisterEvaluators(register func(evaluation.Evaluator)) {
+	register(hallucinationEvaluator{})
 }

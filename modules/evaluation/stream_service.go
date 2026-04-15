@@ -95,15 +95,6 @@ func (s *service) executeEvalStream(ctx context.Context, userID string, req Eval
 					return
 				}
 
-				// Add realistic delay before starting case (simulate agent call)
-				select {
-				case <-time.After(500 * time.Millisecond):
-					// Continue
-				case <-ctx.Done():
-					yield(nil, fmt.Errorf("context cancelled"))
-					return
-				}
-
 				caseName := ""
 				if ec.Name != nil {
 					caseName = *ec.Name
@@ -125,8 +116,8 @@ func (s *service) executeEvalStream(ctx context.Context, userID string, req Eval
 					return
 				}
 
-				// Build eval request (using expected data as mock actual response)
-				evalReq := buildMockEvalRequest(ec)
+				// Build eval request (real agent invocation or mock fallback)
+				evalReq := s.buildEvalRequest(ctx, userID, req.AgentID.String(), ec)
 
 				var caseMetrics []map[string]any
 				var avgScore float64
@@ -161,14 +152,6 @@ func (s *service) executeEvalStream(ctx context.Context, userID string, req Eval
 						"details":    detailsJSON,
 					}, nil) {
 						return
-
-					// Small delay between metrics
-					select {
-					case <-time.After(100 * time.Millisecond):
-					case <-ctx.Done():
-						yield(nil, fmt.Errorf("context cancelled"))
-						return
-					}
 					}
 
 					avgScore += evalResult.Score
@@ -224,14 +207,6 @@ func (s *service) executeEvalStream(ctx context.Context, userID string, req Eval
 					"progress_pct": float64(completed) / float64(totalCases) * 100,
 				}, nil) {
 					return
-
-				// Delay between cases
-				select {
-				case <-time.After(300 * time.Millisecond):
-				case <-ctx.Done():
-					yield(nil, fmt.Errorf("context cancelled"))
-					return
-				}
 				}
 			}
 		}

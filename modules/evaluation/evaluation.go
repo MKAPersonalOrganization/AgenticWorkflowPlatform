@@ -14,9 +14,9 @@ type Module struct {
 }
 
 // New creates the evaluation module.
-func New(db *sqlx.DB) *Module {
+func New(db *sqlx.DB, invoker AgentInvoker) *Module {
 	repo := newPostgresEvalRepo(db)
-	svc := newService(repo)
+	svc := newService(repo, invoker)
 	h := newHandler(svc)
 
 	return &Module{handler: h, svc: svc}
@@ -42,6 +42,7 @@ func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 	r.Get("/api/evaluation/runs", authMW.RequireAuthFunc(m.handler.listEvalRuns))
 	r.Get("/api/evaluation/runs/{id}", authMW.RequireAuthFunc(m.handler.getEvalRun))
 	r.Get("/api/evaluation/runs/{id}/results", authMW.RequireAuthFunc(m.handler.getEvalResults))
+	r.Get("/api/evaluation/runs/{id}/export", authMW.RequireAuthFunc(m.handler.exportEvalRun))
 	r.Post("/api/evaluation/runs/{id}/cancel", authMW.RequireAuthFunc(m.handler.cancelEvalRun))
 	r.Delete("/api/evaluation/runs/{id}", authMW.RequireAuthFunc(m.handler.deleteEvalRun))
 	r.Get("/api/evaluation/runs/{id}/stream", authMW.RequireAuthFunc(m.handler.streamEvalRun))

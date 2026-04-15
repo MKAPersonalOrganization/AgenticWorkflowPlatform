@@ -2,9 +2,12 @@ package response
 
 import (
 	"aicompass/modules/evaluation"
+	"aicompass/modules/evaluation/llmjudge"
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
+	"regexp"
 	"strings"
 )
 
@@ -122,7 +125,7 @@ func (finalResponseMatchV2Evaluator) MetricID() string {
 	return "final_response_match_v2"
 }
 
-func (finalResponseMatchV2Evaluator) Evaluate(_ context.Context, req evaluation.EvalRequest) evaluation.EvalResultOutput {
+func (finalResponseMatchV2Evaluator) Evaluate(ctx context.Context, req evaluation.EvalRequest) evaluation.EvalResultOutput {
 	if req.ExpectedResponse == nil || *req.ExpectedResponse == "" {
 		return evaluation.EvalResultOutput{
 			Score:   1.0,
@@ -131,24 +134,29 @@ func (finalResponseMatchV2Evaluator) Evaluate(_ context.Context, req evaluation.
 		}
 	}
 
-	// Placeholder: In production this calls an LLM to judge semantic equivalence.
-	// For now, use a combination of ROUGE-1 and simple semantic heuristics.
-	rouge := ROUGE1(req.ActualResponse, *req.ExpectedResponse)
+	var score float64
+	var details map[string]any
 
-	// Boost score for semantic similarity indicators
-	semanticBoost := semanticSimilarityHeuristic(req.ActualResponse, *req.ExpectedResponse)
+	// If JudgeConfig is available, use LLM judge; otherwise fall back to heuristic
+	if req.JudgeConfig != nil && req.JudgeConfig.APIKey != "" {
+		judgeScore, _, judgeDetails := evaluateWithLLMJudge(ctx, req)
+		score = judgeScore
+		details = judgeDetails
+	} else {
+		// Fallback: heuristic combination (70% ROUGE-1 + 30% semantic)
+		rouge := ROUGE1(req.ActualResponse, *req.ExpectedResponse)
+		semanticBoost := semanticSimilarityHeuristic(req.ActualResponse, *req.ExpectedResponse)
+		score = 0.7*rouge.F1 + 0.3*semanticBoost
+		details = map[string]any{
+			"score":          score,
+			"rouge_f1":       rouge.F1,
+			"semantic_score": semanticBoost,
+			"actual":         req.ActualResponse,
+			"expected":       *req.ExpectedResponse,
+		}
+	}
 
-	// Weighted combination: 70% ROUGE-1 + 30% semantic heuristic
-	score := 0.7*rouge.F1 + 0.3*semanticBoost
-
-	details, _ := json.Marshal(map[string]any{
-		"score":          score,
-		"rouge_f1":       rouge.F1,
-		"semantic_score": semanticBoost,
-		"method":         "hybrid",
-		"actual":         req.ActualResponse,
-		"expected":       *req.ExpectedResponse,
-	})
+	detailsJSON, _ := json.Marshal(details)
 
 	status := "passed"
 	if score < 0.8 {
@@ -158,7 +166,7 @@ func (finalResponseMatchV2Evaluator) Evaluate(_ context.Context, req evaluation.
 	return evaluation.EvalResultOutput{
 		Score:   roundScore(score),
 		Status:  status,
-		Details: details,
+		Details: detailsJSON,
 	}
 }
 
@@ -197,12 +205,91 @@ func semanticSimilarityHeuristic(actual, expected string) float64 {
 	return float64(intersection) / float64(union)
 }
 
+// ─── LLM Judge Helper ────────────────────────────────────────────────────────
+
+// evaluateWithLLMJudge calls the Gemini API to judge semantic equivalence.
+// Returns (score, method, details).
+func evaluateWithLLMJudge(ctx context.Context, req evaluation.EvalRequest) (float64, string, map[string]any) {
+	model := "gemini-2.5-flash"
+	if req.JudgeConfig.Model != "" {
+		model = req.JudgeConfig.Model
+	}
+
+	judge := llmjudge.New(req.JudgeConfig.APIKey, model)
+
+	// Format prompt using ADK Python template
+	prompt := fmt.Sprintf(`You are an expert rater for an AI agent's response to a user prompt. Your task is to evaluate whether the agent's response is semantically valid and matches the reference response.
+
+User prompt: %s
+
+Agent response: %s
+
+Reference response: %s
+
+Provide your evaluation in the following JSON format:
+{"reasoning": "[brief explanation of your assessment]", "is_the_agent_response_valid": "[valid or invalid]"}
+
+Output only the JSON, no other text.`, req.ActualResponse, *req.ExpectedResponse, req.ActualResponse)
+
+	response, err := judge.Score(ctx, prompt)
+	if err != nil {
+		// Fallback to heuristic on error
+		rouge := ROUGE1(req.ActualResponse, *req.ExpectedResponse)
+		semanticBoost := semanticSimilarityHeuristic(req.ActualResponse, *req.ExpectedResponse)
+		score := 0.7*rouge.F1 + 0.3*semanticBoost
+		return score, "hybrid_heuristic_fallback", map[string]any{
+			"score":           score,
+			"rouge_f1":        rouge.F1,
+			"semantic_score":  semanticBoost,
+			"judge_error":     err.Error(),
+			"actual":          req.ActualResponse,
+			"expected":        *req.ExpectedResponse,
+		}
+	}
+
+	// Parse response to extract "is_the_agent_response_valid"
+	// Pattern: "is_the_agent_response_valid": "[value]"
+	re := regexp.MustCompile(`"is_the_agent_response_valid":\s*"([^"]+)"`)
+	matches := re.FindStringSubmatch(response)
+
+	var score float64
+	reasoning := ""
+
+	if len(matches) > 1 {
+		validity := strings.ToLower(strings.TrimSpace(matches[1]))
+		if validity == "valid" {
+			score = 1.0
+		} else {
+			score = 0.0
+		}
+
+		// Try to extract reasoning too
+		reasoningRe := regexp.MustCompile(`"reasoning":\s*"([^"]+)"`)
+		reasoningMatches := reasoningRe.FindStringSubmatch(response)
+		if len(reasoningMatches) > 1 {
+			reasoning = reasoningMatches[1]
+		}
+	} else {
+		// Could not parse response, treat as invalid
+		score = 0.0
+		reasoning = "Could not parse judge response"
+	}
+
+	return score, "llm_judge", map[string]any{
+		"score":       score,
+		"reasoning":   reasoning,
+		"judge_model": model,
+		"actual":      req.ActualResponse,
+		"expected":    *req.ExpectedResponse,
+	}
+}
+
 // ─── Registration ────────────────────────────────────────────────────────────
 
-func init() {
-	evaluation.Register(responseMatchEvaluator{})
-	evaluation.Register(responseCoherenceEvaluator{})
-	evaluation.Register(finalResponseMatchV2Evaluator{})
+func RegisterEvaluators(register func(evaluation.Evaluator)) {
+	register(responseMatchEvaluator{})
+	register(responseCoherenceEvaluator{})
+	register(finalResponseMatchV2Evaluator{})
 }
 
 func min(a, b float64) float64 {

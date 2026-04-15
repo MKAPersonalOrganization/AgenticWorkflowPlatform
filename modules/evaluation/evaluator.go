@@ -7,12 +7,19 @@ import (
 	"fmt"
 )
 
+// JudgeConfig holds configuration for LLM-as-judge evaluators.
+type JudgeConfig struct {
+	Model  string // e.g. "gemini-2.5-flash"
+	APIKey string
+}
+
 // EvalRequest is the input to an evaluator for a single case/invocation.
 type EvalRequest struct {
 	ExpectedTrajectory json.RawMessage
 	ExpectedResponse   *string
 	ActualTrajectory   []trajectory.ActualToolCall
 	ActualResponse     string
+	JudgeConfig        *JudgeConfig // Optional: nil = use heuristic fallback
 }
 
 // EvalResultOutput is the output from an evaluator.

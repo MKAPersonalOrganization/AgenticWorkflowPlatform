@@ -138,8 +138,8 @@ func TestMetricDefaults_AreInRange(t *testing.T) {
 
 func TestListMetrics_ReturnsAll(t *testing.T) {
 	t.Parallel()
-	svc := newService(newMockRepo())
-	h := newHandler(svc, NewAsyncRunner(svc, NewEventBus()))
+	svc := newService(newMockRepo(), nil) // no invoker for test
+	h := newHandler(svc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/evaluation/metrics", nil)
 	rec := httptest.NewRecorder()
@@ -161,8 +161,8 @@ func TestListMetrics_ReturnsAll(t *testing.T) {
 
 func TestGetMetric_Found(t *testing.T) {
 	t.Parallel()
-	svc := newService(newMockRepo())
-	h := newHandler(svc, NewAsyncRunner(svc, NewEventBus()))
+	svc := newService(newMockRepo(), nil) // no invoker for test
+	h := newHandler(svc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/evaluation/metrics/tool_trajectory_avg_score", nil)
 	rec := httptest.NewRecorder()
@@ -188,8 +188,8 @@ func TestGetMetric_Found(t *testing.T) {
 
 func TestGetMetric_NotFound(t *testing.T) {
 	t.Parallel()
-	svc := newService(newMockRepo())
-	h := newHandler(svc, NewAsyncRunner(svc, NewEventBus()))
+	svc := newService(newMockRepo(), nil) // no invoker for test
+	h := newHandler(svc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/evaluation/metrics/nonexistent", nil)
 	rec := httptest.NewRecorder()
