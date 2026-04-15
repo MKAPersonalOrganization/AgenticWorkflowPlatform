@@ -69,17 +69,18 @@ type ToolCall struct {
 
 // Message represents a single message in a conversation.
 type Message struct {
-	ID         string         `json:"id"`
-	Role       string         `json:"role"` // "user" | "assistant" | "tool"
-	Content    string         `json:"content"`
-	Timestamp  time.Time      `json:"timestamp"`
-	ToolCalls  []ToolCall     `json:"toolCalls,omitempty"`  // For assistant messages with tool calls
-	ToolCallID string         `json:"toolCallId,omitempty"` // For tool result messages
-	ToolName   string         `json:"toolName,omitempty"`   // Name of the tool for result messages
-	IsError    bool           `json:"isError,omitempty"`    // For tool result messages
-	Error      string         `json:"error,omitempty"`      // For tool result messages
-	AgentName  string         `json:"agentName,omitempty"`  // Name of the agent that created this message
-	Metadata   map[string]any `json:"metadata,omitempty"`   // Additional metadata for custom message types
+	ID                 string         `json:"id"`
+	Role               string         `json:"role"` // "user" | "assistant" | "tool"
+	Content            string         `json:"content"`
+	Timestamp          time.Time      `json:"timestamp"`
+	ToolCalls          []ToolCall     `json:"toolCalls,omitempty"`          // For assistant messages with tool calls
+	ToolCallID         string         `json:"toolCallId,omitempty"`         // For tool result messages
+	ToolName           string         `json:"toolName,omitempty"`           // Name of the tool for result messages
+	IsError            bool           `json:"isError,omitempty"`            // For tool result messages
+	Error              string         `json:"error,omitempty"`              // For tool result messages
+	AgentName          string         `json:"agentName,omitempty"`          // Name of the agent that created this message
+	OriginalToolCallID string         `json:"originalToolCallId,omitempty"` // For confirmation responses: original tool call ID
+	Metadata           map[string]any `json:"metadata,omitempty"`           // Additional metadata for custom message types
 }
 
 // Thread represents a conversation thread with message history.
@@ -105,12 +106,13 @@ func GenerateMessageID() string {
 
 // ToolCallState represents the current state of a tool call in the thread.
 type ToolCallState struct {
-	ToolCallID  string         `json:"toolCallId"`
-	ToolName    string         `json:"toolName,omitempty"`
-	AgentName   string         `json:"agentName,omitempty"`
-	Status      string         `json:"status"` // "AwaitingInput", "AwaitingAuth", "Completed", etc.
-	Elicitation map[string]any `json:"elicitation,omitempty"`
-	AuthSpec    map[string]any `json:"authSpec,omitempty"`
+	ToolCallID         string         `json:"toolCallId"`
+	OriginalToolCallID string         `json:"originalToolCallId,omitempty"` // For confirmations: the wrapper ID's original tool call ID
+	ToolName           string         `json:"toolName,omitempty"`
+	AgentName          string         `json:"agentName,omitempty"`
+	Status             string         `json:"status"` // "AwaitingInput", "AwaitingAuth", "Completed", etc.
+	Elicitation        map[string]any `json:"elicitation,omitempty"`
+	AuthSpec           map[string]any `json:"authSpec,omitempty"`
 }
 
 // ElicitationSpec defines the structure for user input requests.

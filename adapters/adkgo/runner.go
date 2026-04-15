@@ -454,23 +454,27 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 
 		// 14. Build user content for adk-go.
 		//
-		// For confirmation responses, send a FunctionResponse with
-		// Name = "adk_request_confirmation" so ADK's
-		// RequestConfirmationRequestProcessor can match it to the
-		// pending confirmation FunctionCall. For normal messages,
-		// send the user's text content as usual.
+		// Two types of user content can be sent:
+		// 1. Confirmation Response: User answered Allow/Deny to a tool confirmation
+		//    - toolCallID is set in the request
+		//    - We send a FunctionResponse with Name="adk_request_confirmation" and the user's choice
+		//
+		// 2. Normal Message: User typed a regular message
+		//    - toolCallID is empty
+		//    - We send the text content as a user message
 		var userMsg *genai.Content
 		if toolCallID != "" {
-			// The toolCallID from the frontend is the original tool call ID.
-			// We need to look up the confirmation wrapper ID to send to ADK.
-			confirmationWrapperID := GetConfirmationWrapperID(agg.Messages, toolCallID)
-			if confirmationWrapperID != "" {
-				userMsg = buildConfirmationResponse(confirmationWrapperID)
-			} else {
-				// Fallback: use the original ID (shouldn't happen in normal flow)
-				userMsg = buildConfirmationResponse(toolCallID)
+			// ── Path 1: Confirmation Response ──────────────────────────────────
+			// The frontend sends the original tool call ID (not the wrapper ID).
+			// We need to look up the confirmation wrapper ID from thread history.
+			wrapperID := GetConfirmationWrapperID(agg.Messages, toolCallID)
+			if wrapperID == "" {
+				// Fallback: shouldn't happen in normal flow, but safer than silently failing
+				wrapperID = toolCallID
 			}
+			userMsg = buildConfirmationResponse(wrapperID, toolCallID)
 		} else {
+			// ── Path 2: Normal User Message ───────────────────────────────────
 			userMsg = buildUserContent(req.Message)
 		}
 
@@ -1068,15 +1072,20 @@ func (r *RunnerAdapter) ListAgents() []string {
 // buildConfirmationResponse creates a genai.Content with a FunctionResponse
 // for the adk_request_confirmation protocol. This is sent to adkRunner.Run()
 // instead of plain text when resuming from a tool confirmation pause.
-func buildConfirmationResponse(toolCallID string) *genai.Content {
+//
+// The wrapperID is the adk_request_confirmation FunctionCall ID (used by ADK internally).
+// The originalToolCallID is the original tool call ID (used for logging/debugging).
+func buildConfirmationResponse(wrapperID, originalToolCallID string) *genai.Content {
 	return &genai.Content{
 		Role: "user",
 		Parts: []*genai.Part{{
 			FunctionResponse: &genai.FunctionResponse{
-				Name: toolconfirmation.FunctionCallName,
-				ID:   toolCallID,
+				Name: toolconfirmation.FunctionCallName, // = "adk_request_confirmation"
+				ID:   wrapperID,                         // ADK uses this to match pending confirmation
 				Response: map[string]any{
 					"confirmed": true,
+					// Include original tool call ID for traceability
+					"original_tool_call_id": originalToolCallID,
 				},
 			},
 		}},

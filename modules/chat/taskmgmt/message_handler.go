@@ -22,21 +22,26 @@ type SendMessageRequest struct {
 	ContextID   string           `json:"contextId,omitempty"`   // Optional: existing context (threadID)
 	Message     string           `json:"message"`               // The message/input for the task
 	AgentName   string           `json:"agentName,omitempty"`   // Optional: specific agent to target
-	ToolCallID  string           `json:"toolCallId,omitempty"`  // Optional: correlates this message as an answer to a tool's elicitation
 	Attachments []FileAttachment `json:"attachments,omitempty"` // Optional: attached files
+}
+
+// ConfirmToolRequest represents a tool confirmation response.
+type ConfirmToolRequest struct {
+	ContextID  string `json:"contextId"`           // Required: thread/chat session ID
+	ToolCallID string `json:"toolCallId"`          // Required: which tool call to confirm
+	Confirmed  bool   `json:"confirmed"`           // User's choice: true = Allow, false = Deny
+	AgentName  string `json:"agentName,omitempty"` // Optional: specific agent (auto-detected if empty)
 }
 
 // SendMessage handles POST /v1/message:send — runs the agent inline and streams
 // AGUI events back as SSE on the same HTTP response.
 func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
-	// Get authenticated user from context
 	user := h.authService.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	// Parse JSON request body (body size is enforced by BodyLimit middleware)
 	var req SendMessageRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -48,19 +53,16 @@ func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Generate IDs
 	contextID := req.ContextID
 	if contextID == "" {
 		contextID = fmt.Sprintf("thread_%s_%d", user.ID, time.Now().UnixNano())
 	}
-	messageID := agent.GenerateID()
 
 	h.log.Info(r.Context(), "[API] Streaming chat request",
 		"userID", user.ID,
 		"contextID", contextID,
 		"numAttachments", len(req.Attachments))
 
-	// Convert file attachments
 	var attachments []agentorchestrator.FileAttachment
 	for _, att := range req.Attachments {
 		attachments = append(attachments, agentorchestrator.FileAttachment{
@@ -70,6 +72,62 @@ func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Reque
 		})
 	}
 
+	execReq := agentorchestrator.RunExecutionRequest{
+		ThreadID:    contextID,
+		UserID:      user.ID,
+		AgentName:   req.AgentName,
+		Message:     req.Message,
+		MessageID:   agent.GenerateID(),
+		Attachments: attachments,
+	}
+
+	h.streamRun(w, r, execReq)
+}
+
+// ConfirmTool handles POST /v1/tool:confirm — responds to a tool confirmation request.
+// Streams AGUI events back as SSE on the same HTTP response.
+func (h *TaskManagementHandler) ConfirmTool(w http.ResponseWriter, r *http.Request) {
+	user := h.authService.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req ConfirmToolRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.ContextID == "" || req.ToolCallID == "" {
+		http.Error(w, "contextId and toolCallId are required", http.StatusBadRequest)
+		return
+	}
+
+	h.log.Info(r.Context(), "[API] Tool confirmation request",
+		"userID", user.ID,
+		"contextID", req.ContextID,
+		"toolCallId", req.ToolCallID,
+		"confirmed", req.Confirmed)
+
+	// Format the confirmation response as JSON (same format frontend was using)
+	confirmationJSON := fmt.Sprintf(`{"confirmed":%v}`, req.Confirmed)
+
+	execReq := agentorchestrator.RunExecutionRequest{
+		ThreadID:   req.ContextID,
+		UserID:     user.ID,
+		AgentName:  req.AgentName,
+		Message:    confirmationJSON,
+		MessageID:  agent.GenerateID(),
+		ToolCallID: req.ToolCallID, // This signals it's a confirmation response
+	}
+
+	h.streamRun(w, r, execReq)
+}
+
+// streamRun executes a run and streams SSE events to the client.
+// This is the shared streaming logic used by both SendMessage and ConfirmTool.
+func (h *TaskManagementHandler) streamRun(w http.ResponseWriter, r *http.Request, execReq agentorchestrator.RunExecutionRequest) {
 	// Set SSE headers — must happen before any writes commit the status code.
 	origin := h.allowedOrigin
 	if origin == "" {
@@ -79,7 +137,6 @@ func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	// Disable any reverse-proxy response buffering (nginx, Cloudflare, etc.)
 	w.Header().Set("X-Accel-Buffering", "no")
 
 	flusher, ok := w.(http.Flusher)
@@ -88,35 +145,19 @@ func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Per-write deadline pattern: set a short deadline before every individual
-	// write so zombie clients are detected quickly.
 	rc := http.NewResponseController(w)
 
-	// Opt into full-duplex mode so HTTP/2's response buffering is bypassed.
-	// Without this, Go's HTTP/2 framer coalesces small SSE writes into a
-	// single DATA frame, causing tokens to arrive in bursts instead of
-	// streaming smoothly. On HTTP/1.1 this is a no-op.
+	// Opt into full-duplex mode for smooth streaming on HTTP/2.
 	if err := rc.EnableFullDuplex(); err != nil {
 		h.log.Info(r.Context(), "[API] EnableFullDuplex not supported, SSE may buffer on HTTP/2", "error", err)
 	}
 
 	// Send the contextId as the first SSE event so the frontend knows the threadID.
 	_ = rc.SetWriteDeadline(time.Now().Add(h.sse.WriteTimeout))
-	if err := WriteSSEEvent(w, map[string]string{"type": "SESSION_START", "contextId": contextID}, ""); err != nil {
+	if err := WriteSSEEvent(w, map[string]string{"type": "SESSION_START", "contextId": execReq.ThreadID}, ""); err != nil {
 		return
 	}
 	flusher.Flush()
-
-	// Build orchestrator request
-	execReq := agentorchestrator.RunExecutionRequest{
-		ThreadID:    contextID,
-		UserID:      user.ID,
-		AgentName:   req.AgentName,
-		Message:     req.Message,
-		MessageID:   messageID,
-		ToolCallID:  req.ToolCallID,
-		Attachments: attachments,
-	}
 
 	// Execute the run and stream events inline
 	for event, err := range h.orchestrator.ExecuteRun(r.Context(), execReq) {

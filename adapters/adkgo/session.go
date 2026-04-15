@@ -53,7 +53,7 @@ func BuildSessionFromThread(
 
 	// Pass 2: replay thread messages as session events.
 	for _, msg := range agg.Messages {
-		evt := messageToSessionEvent(msg, confirmationMappings.wrapperIDs)
+		evt := messageToSessionEvent(msg, confirmationMappings)
 		if evt == nil {
 			continue
 		}
@@ -157,12 +157,15 @@ func GetConfirmationWrapperID(msgs []thread.Message, originalToolCallID string) 
 
 // messageToSessionEvent converts a domain thread.Message to an adk-go session.Event.
 //
-// confirmationCallIDs is the set of adk_request_confirmation FunctionCall IDs
-// collected in the first pass. Tool messages whose ToolCallID is in this set
-// are confirmation responses and must use Name = "adk_request_confirmation"
-// with a structured {"confirmed": true} response so ADK's processor can
-// match them on session replay.
-func messageToSessionEvent(msg thread.Message, confirmationCallIDs map[string]bool) *session.Event {
+// confirmationMappings contains:
+// - wrapperIDs: set of adk_request_confirmation FunctionCall IDs
+// - originalToWrap: map from original tool call ID -> wrapper ID
+//
+// For confirmation responses, we need to:
+// 1. Detect if this is a confirmation response (OriginalToolCallID is set)
+// 2. Look up the wrapper ID to use as the FunctionResponse ID
+// 3. Set Name = "adk_request_confirmation" and Response = {"confirmed": true}
+func messageToSessionEvent(msg thread.Message, mappings confirmationMappings) *session.Event {
 	var content *genai.Content
 
 	switch msg.Role {
@@ -185,15 +188,22 @@ func messageToSessionEvent(msg thread.Message, confirmationCallIDs map[string]bo
 	case "tool":
 		// Tool result message — wrap as FunctionResponse.
 		//
-		// For confirmation responses (ToolCallID matches an
-		// adk_request_confirmation FunctionCall), use the ADK protocol
-		// name and structured response so the processor can match them.
+		// For confirmation responses (OriginalToolCallID is set), we need to:
+		// - Look up the wrapper ID from original ID
+		// - Use Name = "adk_request_confirmation"
+		// - Use wrapper ID as FunctionResponse ID
 		name := msg.ToolName
 		var result map[string]any
+		responseID := msg.ToolCallID
+		isConfirmation := msg.OriginalToolCallID != ""
 
-		if confirmationCallIDs[msg.ToolCallID] {
+		if isConfirmation {
 			name = toolconfirmation.FunctionCallName
 			result = map[string]any{"confirmed": true}
+			// Look up wrapper ID for this confirmation
+			if wrapperID, ok := mappings.originalToWrap[msg.OriginalToolCallID]; ok {
+				responseID = wrapperID
+			}
 		} else {
 			if msg.Content != "" {
 				_ = json.Unmarshal([]byte(msg.Content), &result)
@@ -207,7 +217,7 @@ func messageToSessionEvent(msg thread.Message, confirmationCallIDs map[string]bo
 			Role: "user", // adk-go convention: function responses come as user role
 			Parts: []*genai.Part{{
 				FunctionResponse: &genai.FunctionResponse{
-					ID:       msg.ToolCallID,
+					ID:       responseID,
 					Name:     name,
 					Response: result,
 				},

@@ -130,6 +130,96 @@ export function createMessagingMethods() {
         },
 
         /**
+         * Confirm or deny a tool that is awaiting user input.
+         * Called when user clicks Allow/Deny on a confirmation dialog.
+         * @param {Object} detail - Event detail containing toolCallId, input, etc.
+         */
+        confirmTool(detail) {
+            const state = this.__getThreadState();
+
+            // Find the awaiting tool call to get its info
+            const awaitingTC = this.__awaitingToolCall;
+            if (!awaitingTC) {
+                console.warn('[Messaging] confirmTool called but no awaiting tool found');
+                return;
+            }
+
+            // Parse the confirmation choice from the input
+            let confirmed = false;
+            if (detail.input) {
+                try {
+                    const parsed = typeof detail.input === 'string' ? JSON.parse(detail.input) : detail.input;
+                    confirmed = parsed.confirmed === true;
+                } catch {
+                    confirmed = false;
+                }
+            }
+
+            this.__tryCatch('confirm tool', { toolCallId: awaitingTC.id, confirmed }, () => {
+                // Mark as answered immediately to hide confirmation UI
+                if (awaitingTC.id) {
+                    this.transitionToolState(awaitingTC.id, 'INPUT_PROVIDED', { input: detail.input });
+                }
+
+                // Call the new dedicated endpoint
+                const body = {
+                    contextId: this.__currentThreadId,
+                    toolCallId: awaitingTC.id,
+                    confirmed: confirmed,
+                    agentName: this.selectedAgent || '',
+                };
+
+                this.__streamConfirmResponse(body);
+            });
+        },
+
+        /**
+         * Stream response for a tool confirmation.
+         * @param {Object} body - Request body for /v1/tool:confirm
+         */
+        async __streamConfirmResponse(body) {
+            const state = this.__getThreadState();
+            const threadId = body.contextId;
+
+            // Create abort controller
+            state.abortController = new AbortController();
+
+            // Close existing stream if any
+            if (state.eventSource) {
+                state.eventSource.close();
+                state.eventSource = null;
+            }
+
+            state.isStreaming = true;
+            state.showTypingIndicator = true;
+            state.errorMessage = null;
+
+            try {
+                const response = await fetch('/v1/tool:confirm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                    signal: state.abortController.signal,
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Confirm failed: ${response.status}`);
+                }
+
+                await this.__processSSEStream(response.body, threadId);
+            } catch (err) {
+                if (err.name === 'AbortError') {
+                    this.__stopStreaming();
+                    return;
+                }
+                state.errorMessage = err.message || 'Confirmation failed';
+            } finally {
+                state.isStreaming = false;
+                state.showTypingIndicator = false;
+            }
+        },
+
+        /**
          * Handle keydown in message input
          * @param {KeyboardEvent} event - Keyboard event
          */

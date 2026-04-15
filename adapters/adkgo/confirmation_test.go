@@ -267,7 +267,7 @@ func TestExtractConfirmationInfo_InvalidJSON(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestBuildConfirmationResponse(t *testing.T) {
-	content := buildConfirmationResponse("call-confirm-xyz")
+	content := buildConfirmationResponse("call-confirm-xyz", "call-original-abc")
 
 	if content.Role != "user" {
 		t.Errorf("role = %q, want %q", content.Role, "user")
@@ -289,6 +289,11 @@ func TestBuildConfirmationResponse(t *testing.T) {
 	confirmed, ok := fr.Response["confirmed"].(bool)
 	if !ok || !confirmed {
 		t.Errorf("FunctionResponse.Response[confirmed] = %v, want true", fr.Response["confirmed"])
+	}
+	// Verify original tool call ID is included for traceability
+	origID, ok := fr.Response["original_tool_call_id"].(string)
+	if !ok || origID != "call-original-abc" {
+		t.Errorf("FunctionResponse.Response[original_tool_call_id] = %v, want %q", fr.Response["original_tool_call_id"], "call-original-abc")
 	}
 }
 
@@ -344,18 +349,22 @@ func TestGetConfirmationWrapperID(t *testing.T) {
 }
 
 func TestMessageToSessionEvent_ConfirmationToolResult(t *testing.T) {
-	confirmIDs := map[string]bool{confirmationCallID: true}
-
-	msg := thread.Message{
-		ID:         "msg-response",
-		Role:       "tool",
-		Content:    "yes",
-		ToolCallID: confirmationCallID,
-		ToolName:   "delete_file", // stored as original name in aggregate
-		Timestamp:  time.Now(),
+	mappings := confirmationMappings{
+		wrapperIDs:     map[string]bool{confirmationCallID: true},
+		originalToWrap: map[string]string{originalToolCallID: confirmationCallID},
 	}
 
-	evt := messageToSessionEvent(msg, confirmIDs)
+	msg := thread.Message{
+		ID:                 "msg-response",
+		Role:               "tool",
+		Content:            "yes",
+		ToolCallID:         confirmationCallID,
+		ToolName:           "delete_file",
+		Timestamp:          time.Now(),
+		OriginalToolCallID: originalToolCallID,
+	}
+
+	evt := messageToSessionEvent(msg, mappings)
 	if evt == nil {
 		t.Fatal("expected session event, got nil")
 	}
@@ -390,7 +399,10 @@ func TestMessageToSessionEvent_ConfirmationToolResult(t *testing.T) {
 }
 
 func TestMessageToSessionEvent_RegularToolResult_Unchanged(t *testing.T) {
-	confirmIDs := map[string]bool{confirmationCallID: true}
+	mappings := confirmationMappings{
+		wrapperIDs:     map[string]bool{confirmationCallID: true},
+		originalToWrap: map[string]string{},
+	}
 
 	msg := thread.Message{
 		ID:         "msg-regular",
@@ -401,7 +413,7 @@ func TestMessageToSessionEvent_RegularToolResult_Unchanged(t *testing.T) {
 		Timestamp:  time.Now(),
 	}
 
-	evt := messageToSessionEvent(msg, confirmIDs)
+	evt := messageToSessionEvent(msg, mappings)
 	if evt == nil {
 		t.Fatal("expected session event, got nil")
 	}
@@ -490,13 +502,14 @@ func TestConfirmationWorkflow_E2E(t *testing.T) {
 		},
 		// User's confirmation response (created by InputProvided.Apply()).
 		{
-			ID:         "msg-input-provided",
-			Role:       "tool",
-			Content:    "yes, go ahead",
-			ToolCallID: confirmationCallID,
-			ToolName:   "delete_file", // stored as original tool name
-			AgentName:  testAgent,
-			Timestamp:  time.Now(),
+			ID:                 "msg-input-provided",
+			Role:               "tool",
+			Content:            "yes, go ahead",
+			ToolCallID:         confirmationCallID,
+			ToolName:           "delete_file", // stored as original tool name
+			AgentName:          testAgent,
+			Timestamp:          time.Now(),
+			OriginalToolCallID: originalToolCallID, // preserves original ID for session rebuild
 		},
 	}
 
@@ -534,7 +547,7 @@ func TestConfirmationWorkflow_E2E(t *testing.T) {
 
 	// ── Phase 4: Verify confirmation content for ADK runner ──────────────
 
-	resumeContent := buildConfirmationResponse(confirmationCallID)
+	resumeContent := buildConfirmationResponse(confirmationCallID, originalToolCallID)
 	resumeFR := resumeContent.Parts[0].FunctionResponse
 
 	if resumeFR.Name != toolconfirmation.FunctionCallName {

@@ -115,7 +115,7 @@ templ ChatInputScreen(user *shared.User) {
 		User:      user,
 		ExtraHead: HomeExtraHead(),
 	}) {
-		<div class="w-full h-full flex flex-col" x-data="chat" @agent-selected.window="selectAgent($event.detail.id)" @tool-input-provided="sendMessage($event.detail.input)">
+		<div class="w-full h-full flex flex-col" x-data="chat" @agent-selected.window="selectAgent($event.detail.id)" @tool-input-provided="confirmTool($event.detail)">
 			<!-- Sidebar Layout -->
 			<div class="flex-1 min-h-0 overflow-hidden">
 				@sidebar.Layout(sidebar.LayoutProps{Class: "h-full min-h-0"}) {

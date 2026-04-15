@@ -232,10 +232,11 @@ func (t *ThreadAggregate) Apply(event Event) {
 
 	case *ToolNeedsInput:
 		state := ToolCallState{
-			ToolCallID: e.ToolCallID,
-			ToolName:   e.ToolName,
-			AgentName:  e.AgentName,
-			Status:     "AwaitingInput",
+			ToolCallID:         e.ToolCallID,
+			OriginalToolCallID: e.OriginalToolCallID,
+			ToolName:           e.ToolName,
+			AgentName:          e.AgentName,
+			Status:             "AwaitingInput",
 			Elicitation: map[string]any{
 				"question": e.Elicitation.Question,
 				"schema":   e.Elicitation.Schema,
@@ -259,22 +260,45 @@ func (t *ThreadAggregate) Apply(event Event) {
 		t.ActiveToolStates[e.ToolCallID] = state
 
 	case *InputProvided:
-		if state, ok := t.ActiveToolStates[e.ToolCallID]; ok {
+		// Look up by original tool call ID (for confirmations) or wrapper ID
+		var state ToolCallState
+		var found bool
+		var keyToDelete string
+
+		// Try direct lookup first
+		if s, ok := t.ActiveToolStates[e.ToolCallID]; ok {
+			state = s
+			keyToDelete = e.ToolCallID
+			found = true
+		} else {
+			// Try finding by OriginalToolCallID (for confirmation responses)
+			for k, s := range t.ActiveToolStates {
+				if s.OriginalToolCallID == e.ToolCallID {
+					state = s
+					keyToDelete = k
+					found = true
+					break
+				}
+			}
+		}
+
+		if found {
 			// Record the user's answer as the real tool result message.
 			// No placeholder was stored during the pause — this is the
 			// single source of truth for the tool's output, ensuring the
 			// LLM sees a valid tool_call → tool_result pair.
 			msg := Message{
-				ID:         e.MessageID,
-				Role:       "tool",
-				Content:    e.Input,
-				ToolCallID: e.ToolCallID,
-				ToolName:   state.ToolName,
-				AgentName:  state.AgentName,
-				Timestamp:  e.Timestamp,
+				ID:                 e.MessageID,
+				Role:               "tool",
+				Content:            e.Input,
+				ToolCallID:         e.ToolCallID,
+				ToolName:           state.ToolName,
+				AgentName:          state.AgentName,
+				Timestamp:          e.Timestamp,
+				OriginalToolCallID: state.OriginalToolCallID, // Preserve for session rebuild
 			}
 			t.Messages = append(t.Messages, msg)
-			delete(t.ActiveToolStates, e.ToolCallID)
+			delete(t.ActiveToolStates, keyToDelete)
 			t.UpdatedAt = e.Timestamp
 		}
 
