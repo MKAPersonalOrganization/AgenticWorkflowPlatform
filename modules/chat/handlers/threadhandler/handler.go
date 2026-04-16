@@ -1,15 +1,38 @@
-package taskmgmt
+package threadhandler
 
 import (
+	"aicompass/foundation/logger"
+	"aicompass/modules/chat/projection/agui"
 	"aicompass/modules/chat/thread"
+	"aicompass/modules/chat/threadmgmt"
 	"aicompass/shared"
 	"encoding/json"
 	"errors"
 	"net/http"
 )
 
+// Handler handles thread-related HTTP endpoints.
+type Handler struct {
+	log            *logger.Logger
+	aguiProjection agui.AguiProjection
+	threadMgmt     *threadmgmt.Manager
+}
+
+// New creates a new thread handler.
+func New(
+	log *logger.Logger,
+	aguiProjection agui.AguiProjection,
+	threadMgmt *threadmgmt.Manager,
+) *Handler {
+	return &Handler{
+		log:            log,
+		aguiProjection: aguiProjection,
+		threadMgmt:     threadMgmt,
+	}
+}
+
 // DeleteThread deletes a thread.
-func (h *TaskManagementHandler) DeleteThread(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
 	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
@@ -66,7 +89,7 @@ type UpdateThreadTitleRequest struct {
 
 // UpdateThreadTitle renames a thread.
 // PATCH /api/agui/threads/{threadId}
-func (h *TaskManagementHandler) UpdateThreadTitle(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) UpdateThreadTitle(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
 	user := shared.GetUserFromContext(r.Context())
 	if user == nil {

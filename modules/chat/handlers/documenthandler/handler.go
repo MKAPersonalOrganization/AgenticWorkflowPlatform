@@ -1,6 +1,7 @@
-package taskmgmt
+package documenthandler
 
 import (
+	"aicompass/foundation/logger"
 	"aicompass/modules/chat/chatcontracts"
 	"aicompass/modules/knowledge/tenant"
 	"aicompass/shared"
@@ -11,8 +12,28 @@ import (
 	"github.com/google/uuid"
 )
 
+// Handler handles document-related HTTP endpoints.
+type Handler struct {
+	log              *logger.Logger
+	documentProvider chatcontracts.DocumentProvider
+	tenantID         string
+}
+
+// New creates a new document handler.
+func New(
+	log *logger.Logger,
+	documentProvider chatcontracts.DocumentProvider,
+	tenantID string,
+) *Handler {
+	return &Handler{
+		log:              log,
+		documentProvider: documentProvider,
+		tenantID:         tenantID,
+	}
+}
+
 // ListDocuments handles GET /v1/documents - retrieves documents from Edgequake using passive context resolution.
-func (h *TaskManagementHandler) ListDocuments(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 	// 1. Authenticate user
 	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
@@ -66,7 +87,7 @@ func (h *TaskManagementHandler) ListDocuments(w http.ResponseWriter, r *http.Req
 }
 
 // UploadDocument handles POST /v1/documents - uploads a document to Edgequake using passive context resolution.
-func (h *TaskManagementHandler) UploadDocument(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	// 1. Authenticate user
 	user := shared.GetUserFromContext(r.Context())
 	if user == nil {

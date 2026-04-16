@@ -1,13 +1,31 @@
-package taskmgmt
+package agenthandler
 
 import (
 	"aicompass/foundation/agent"
+	"aicompass/foundation/logger"
 	"aicompass/shared"
 	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
 )
+
+// Handler handles agent-related HTTP endpoints.
+type Handler struct {
+	log           *logger.Logger
+	agentProvider agent.AgentProvider
+}
+
+// New creates a new agent handler.
+func New(
+	log *logger.Logger,
+	agentProvider agent.AgentProvider,
+) *Handler {
+	return &Handler{
+		log:           log,
+		agentProvider: agentProvider,
+	}
+}
 
 // defaultAgentIconSVG is the fallback compass icon for agents without a valid SVG icon.
 var defaultAgentIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" /></svg>`
@@ -24,7 +42,7 @@ func resolveAgentIcon(a agent.Agent) string {
 }
 
 // ListAgents returns a list of available agents.
-func (h *TaskManagementHandler) ListAgents(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListAgents(w http.ResponseWriter, r *http.Request) {
 	// Try to list user-specific agents if provider supports it
 	var agents []agent.Agent
 
@@ -70,7 +88,7 @@ func (h *TaskManagementHandler) ListAgents(w http.ResponseWriter, r *http.Reques
 }
 
 // GetAgent returns a specific agent's details by ID.
-func (h *TaskManagementHandler) GetAgent(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetAgent(w http.ResponseWriter, r *http.Request) {
 	agentID := r.PathValue("agentId")
 	if agentID == "" {
 		http.Error(w, "agentId is required", http.StatusBadRequest)

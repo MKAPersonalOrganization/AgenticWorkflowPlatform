@@ -1,7 +1,9 @@
-package taskmgmt
+package artifacthandler
 
 import (
 	"aicompass/foundation/artifact"
+	"aicompass/foundation/logger"
+	"aicompass/modules/chat/projection/agui"
 	"aicompass/shared"
 	"encoding/json"
 	"errors"
@@ -14,9 +16,29 @@ import (
 	"github.com/google/uuid"
 )
 
+// Handler handles artifact-related HTTP endpoints.
+type Handler struct {
+	log            *logger.Logger
+	aguiProjection agui.AguiProjection
+	artifactStore  artifact.Service
+}
+
+// New creates a new artifact handler.
+func New(
+	log *logger.Logger,
+	aguiProjection agui.AguiProjection,
+	artifactStore artifact.Service,
+) *Handler {
+	return &Handler{
+		log:            log,
+		aguiProjection: aguiProjection,
+		artifactStore:  artifactStore,
+	}
+}
+
 // ListArtifacts returns a list of artifacts for a thread.
 // GET /v1/threads/{threadId}/artifacts
-func (h *TaskManagementHandler) ListArtifacts(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListArtifacts(w http.ResponseWriter, r *http.Request) {
 	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		jsonError(w, "Unauthorized", http.StatusUnauthorized)
@@ -57,7 +79,7 @@ func (h *TaskManagementHandler) ListArtifacts(w http.ResponseWriter, r *http.Req
 //   - Range requests (HTTP 206 Partial Content) for audio/video streaming
 //   - Content-Length headers
 //   - If-Modified-Since / If-None-Match conditional requests
-func (h *TaskManagementHandler) DownloadArtifact(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DownloadArtifact(w http.ResponseWriter, r *http.Request) {
 	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		jsonError(w, "Unauthorized", http.StatusUnauthorized)
@@ -186,7 +208,7 @@ var allowedUploadTypes = map[string]bool{
 //
 // Accepts multipart/form-data with a single "file" field.
 // Returns JSON: {"url": "/v1/threads/.../artifacts/...", "mimeType": "...", "fileName": "..."}
-func (h *TaskManagementHandler) UploadAttachment(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		jsonError(w, "Unauthorized", http.StatusUnauthorized)

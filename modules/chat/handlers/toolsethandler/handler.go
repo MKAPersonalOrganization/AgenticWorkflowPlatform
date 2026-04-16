@@ -1,34 +1,49 @@
-package taskmgmt
+package toolsethandler
 
 import (
+	"aicompass/foundation/logger"
+	"aicompass/foundation/toolregistry"
+	"aicompass/modules/chat/chatcontracts"
+	"aicompass/modules/chat/handlers/common"
 	"aicompass/shared"
 	"encoding/json"
 	"net/http"
 )
 
-// AgentToolSetResponse represents the API response format for agent tool sets.
-type AgentToolSetResponse struct {
-	ID                string              `json:"id"`
-	Name              string              `json:"name"`
-	Description       string              `json:"description"`
-	Category          string              `json:"category"`
-	RequirementConfig map[string]any      `json:"requirement_config,omitempty"` // Per-toolset requirement config
-	Tools             []ToolInSetResponse `json:"tools"`
+// Handler handles toolset-related HTTP endpoints.
+type Handler struct {
+	log                      *logger.Logger
+	toolRegistry             *toolregistry.Registry
+	requirementConfigService chatcontracts.ToolRequirementConfigService
 }
 
-// ToolInSetResponse represents individual tools within a tool set.
-type ToolInSetResponse struct {
-	ID                string         `json:"id"`
-	Name              string         `json:"name"`
-	Description       string         `json:"description"`
-	Category          string         `json:"category"`
-	RequirementConfig map[string]any `json:"requirement_config,omitempty"` // Per-tool requirement config
+// New creates a new toolset handler.
+func New(
+	log *logger.Logger,
+	toolRegistry *toolregistry.Registry,
+	requirementConfigService chatcontracts.ToolRequirementConfigService,
+) *Handler {
+	return &Handler{
+		log:                      log,
+		toolRegistry:             toolRegistry,
+		requirementConfigService: requirementConfigService,
+	}
+}
+
+// AgentToolSetResponse represents the API response format for agent tool sets.
+type AgentToolSetResponse struct {
+	ID                string                     `json:"id"`
+	Name              string                     `json:"name"`
+	Description       string                     `json:"description"`
+	Category          string                     `json:"category"`
+	RequirementConfig map[string]any             `json:"requirement_config,omitempty"` // Per-toolset requirement config
+	Tools             []common.ToolInSetResponse `json:"tools"`
 }
 
 // ListAgentToolSets returns a list of tool sets available to an agent,
 // with requirement configs populated from the requirement-based system.
 // GET /v1/agents/{agentId}/toolsets
-func (h *TaskManagementHandler) ListAgentToolSets(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListAgentToolSets(w http.ResponseWriter, r *http.Request) {
 	agentID := r.PathValue("agentId")
 	if agentID == "" {
 		http.Error(w, "agentId is required", http.StatusBadRequest)
@@ -66,9 +81,9 @@ func (h *TaskManagementHandler) ListAgentToolSets(w http.ResponseWriter, r *http
 		}
 
 		// Convert tools to response format with requirement configs
-		toolResponses := make([]ToolInSetResponse, 0, len(toolsInSet))
+		toolResponses := make([]common.ToolInSetResponse, 0, len(toolsInSet))
 		for _, tool := range toolsInSet {
-			tr := ToolInSetResponse{
+			tr := common.ToolInSetResponse{
 				ID:          tool.ID,
 				Name:        tool.Name,
 				Description: tool.Description,

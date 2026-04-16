@@ -37,7 +37,15 @@ import (
 	"aicompass/foundation/toolregistry"
 
 	aguihandlers "aicompass/modules/chat/agui"
-	taskmgmthandlers "aicompass/modules/chat/taskmgmt"
+	"aicompass/modules/chat/handlers/agenthandler"
+	"aicompass/modules/chat/handlers/artifacthandler"
+	"aicompass/modules/chat/handlers/common"
+	"aicompass/modules/chat/handlers/documenthandler"
+	"aicompass/modules/chat/handlers/messagehandler"
+	"aicompass/modules/chat/handlers/pluginhandler"
+	"aicompass/modules/chat/handlers/requirementhandler"
+	"aicompass/modules/chat/handlers/threadhandler"
+	"aicompass/modules/chat/handlers/toolsethandler"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"
@@ -61,7 +69,7 @@ type Dependencies struct {
 	DocumentProvider         chatcontracts.DocumentProvider
 	TenantID                 string
 	AllowedOrigin            string
-	SSE                      taskmgmthandlers.SSEConfig
+	SSE                      common.SSEConfig
 }
 
 // Module is the chat bounded context. It owns handlers, services, projections,
@@ -81,8 +89,15 @@ type Module struct {
 	aguiProjection *agui.PostgresAguiProjection
 	llmProjection  *llmcontext.PostgresLLMContextProjection
 	threadQuery    chatcontracts.ThreadQueryService
-	chatHandler    *taskmgmthandlers.TaskManagementHandler
-	aguiHandler    *aguihandlers.AguiProjectionHandler
+	aguiHandler        *aguihandlers.AguiProjectionHandler
+	messageHandler     *messagehandler.Handler
+	threadHandler      *threadhandler.Handler
+	agentHandler       *agenthandler.Handler
+	artifactHandler    *artifacthandler.Handler
+	documentHandler    *documenthandler.Handler
+	requirementHandler *requirementhandler.Handler
+	pluginHandler      *pluginhandler.Handler
+	toolSetHandler     *toolsethandler.Handler
 
 	// Stored for two-phase construction (SetRunner creates handlers).
 	deps Dependencies
@@ -137,22 +152,15 @@ func (m *Module) Orchestrator() *agentorchestrator.Service {
 func (m *Module) SetRunner(runner agentorchestrator.Runner) {
 	m.orchestrator.SetRunner(runner)
 
-	// Create HTTP handlers
-	m.chatHandler = taskmgmthandlers.NewTaskManagementHandler(
-		m.log,
-		m.orchestrator,
-		m.deps.AgentProvider,
-		m.threadQuery,
-		m.aguiProjection,
-		m.threadMgmt,
-		m.deps.ArtifactService,
-		m.deps.ToolRegistry,
-		m.deps.RequirementConfigService,
-		m.deps.DocumentProvider,
-		m.deps.TenantID,
-		m.deps.AllowedOrigin,
-		m.deps.SSE,
-	)
+	// Create focused HTTP handlers
+	m.messageHandler = messagehandler.New(m.log, m.orchestrator, m.deps.AllowedOrigin, m.deps.SSE)
+	m.threadHandler = threadhandler.New(m.log, m.aguiProjection, m.threadMgmt)
+	m.agentHandler = agenthandler.New(m.log, m.deps.AgentProvider)
+	m.artifactHandler = artifacthandler.New(m.log, m.aguiProjection, m.deps.ArtifactService)
+	m.documentHandler = documenthandler.New(m.log, m.deps.DocumentProvider, m.deps.TenantID)
+	m.requirementHandler = requirementhandler.New(m.log, m.deps.RequirementConfigService)
+	m.pluginHandler = pluginhandler.New(m.log, m.deps.ToolRegistry, m.deps.RequirementConfigService)
+	m.toolSetHandler = toolsethandler.New(m.log, m.deps.ToolRegistry, m.deps.RequirementConfigService)
 
 	m.aguiHandler = aguihandlers.NewAguiProjectionHandler(m.aguiProjection, m.threadQuery)
 }
@@ -176,58 +184,54 @@ func (m *Module) RegisterProjection(router interface {
 // RegisterRoutes mounts all chat HTTP routes onto the given chi.Router.
 // Must be called after SetRunner.
 func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
-	h := m.chatHandler
-	ah := m.aguiHandler
-
 	// message:send needs a larger body limit for base64 file attachments.
 	// 5 files × 20 MB raw ≈ 133 MB base64 — round up to 150 MB.
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.BodyLimit(150 << 20))
-		r.Post("/v1/message:send", authMW.RequireAuthFunc(h.SendMessage))
+		r.Post("/v1/message:send", authMW.RequireAuthFunc(m.messageHandler.SendMessage))
 	})
 
 	// tool:confirm handles tool confirmation responses (Allow/Deny).
-	// Uses a separate endpoint for clarity (vs mixing with normal messages).
-	r.Post("/v1/tool:confirm", authMW.RequireAuthFunc(h.ConfirmTool))
+	r.Post("/v1/tool:confirm", authMW.RequireAuthFunc(m.messageHandler.ConfirmTool))
 
 	// tool:provide_input handles custom tool input responses (io.Read).
-	r.Post("/v1/tool:provide_input", authMW.RequireAuthFunc(h.ProvideInput))
+	r.Post("/v1/tool:provide_input", authMW.RequireAuthFunc(m.messageHandler.ProvideInput))
 
 	// Attachment pre-upload (multipart form, 20 MB per file).
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.BodyLimit(25 << 20)) // 25 MB (20 MB file + multipart overhead)
-		r.Post("/v1/threads/{threadId}/attachments:upload", authMW.RequireAuthFunc(h.UploadAttachment))
+		r.Post("/v1/threads/{threadId}/attachments:upload", authMW.RequireAuthFunc(m.artifactHandler.UploadAttachment))
 	})
 
 	// Agents
-	r.Get("/v1/agents", authMW.RequireAuthFunc(h.ListAgents))
-	r.Get("/v1/agents/{agentId}", authMW.RequireAuthFunc(h.GetAgent))
+	r.Get("/v1/agents", authMW.RequireAuthFunc(m.agentHandler.ListAgents))
+	r.Get("/v1/agents/{agentId}", authMW.RequireAuthFunc(m.agentHandler.GetAgent))
 
 	// Artifacts
-	r.Get("/v1/threads/{threadId}/artifacts", authMW.RequireAuthFunc(h.ListArtifacts))
-	r.Get("/v1/threads/{threadId}/artifacts/{fileName}", authMW.RequireAuthFunc(h.DownloadArtifact))
+	r.Get("/v1/threads/{threadId}/artifacts", authMW.RequireAuthFunc(m.artifactHandler.ListArtifacts))
+	r.Get("/v1/threads/{threadId}/artifacts/{fileName}", authMW.RequireAuthFunc(m.artifactHandler.DownloadArtifact))
 
 	// Tool sets (per-agent)
-	r.Get("/v1/agents/{agentId}/toolsets", authMW.RequireAuthFunc(h.ListAgentToolSets))
+	r.Get("/v1/agents/{agentId}/toolsets", authMW.RequireAuthFunc(m.toolSetHandler.ListAgentToolSets))
 
 	// Tool requirement configuration (per-user, per-agent, per-tool)
-	r.Get("/v1/agents/{agentId}/toolsets/{toolSetId}/requirements", authMW.RequireAuthFunc(h.GetToolSetRequirementConfig))
-	r.Put("/v1/agents/{agentId}/toolsets/{toolSetId}/requirements", authMW.RequireAuthFunc(h.SetToolSetRequirementConfig))
-	r.Get("/v1/agents/{agentId}/toolsets/{toolSetId}/tools/requirements", authMW.RequireAuthFunc(h.ListToolRequirementConfigs))
-	r.Get("/v1/agents/{agentId}/toolsets/{toolSetId}/tools/{toolId}/requirements", authMW.RequireAuthFunc(h.GetToolRequirementConfig))
-	r.Put("/v1/agents/{agentId}/toolsets/{toolSetId}/tools/{toolId}/requirements", authMW.RequireAuthFunc(h.SetToolRequirementConfig))
+	r.Get("/v1/agents/{agentId}/toolsets/{toolSetId}/requirements", authMW.RequireAuthFunc(m.requirementHandler.GetToolSetRequirementConfig))
+	r.Put("/v1/agents/{agentId}/toolsets/{toolSetId}/requirements", authMW.RequireAuthFunc(m.requirementHandler.SetToolSetRequirementConfig))
+	r.Get("/v1/agents/{agentId}/toolsets/{toolSetId}/tools/requirements", authMW.RequireAuthFunc(m.requirementHandler.ListToolRequirementConfigs))
+	r.Get("/v1/agents/{agentId}/toolsets/{toolSetId}/tools/{toolId}/requirements", authMW.RequireAuthFunc(m.requirementHandler.GetToolRequirementConfig))
+	r.Put("/v1/agents/{agentId}/toolsets/{toolSetId}/tools/{toolId}/requirements", authMW.RequireAuthFunc(m.requirementHandler.SetToolRequirementConfig))
 
 	// Plugins (agent-agnostic, agent_id via query param)
-	r.Get("/v1/plugins", authMW.RequireAuthFunc(h.ListPlugins))
+	r.Get("/v1/plugins", authMW.RequireAuthFunc(m.pluginHandler.ListPlugins))
 
 	// Documents (Edgequake passthrough)
-	r.Get("/v1/documents", authMW.RequireAuthFunc(h.ListDocuments))
-	r.Post("/v1/documents", authMW.RequireAuthFunc(h.UploadDocument))
+	r.Get("/v1/documents", authMW.RequireAuthFunc(m.documentHandler.ListDocuments))
+	r.Post("/v1/documents", authMW.RequireAuthFunc(m.documentHandler.UploadDocument))
 
 	// AGUI projection query endpoints
-	r.Get("/api/agui/threads", authMW.RequireAuthFunc(ah.ListThreads))
-	r.Get("/api/agui/threads/{threadId}", authMW.RequireAuthFunc(ah.GetThreadState))
-	r.Get("/api/agui/threads/{threadId}/messages", authMW.RequireAuthFunc(ah.GetMessages))
-	r.Delete("/api/agui/threads/{threadId}", authMW.RequireAuthFunc(h.DeleteThread))
-	r.Patch("/api/agui/threads/{threadId}", authMW.RequireAuthFunc(h.UpdateThreadTitle))
+	r.Get("/api/agui/threads", authMW.RequireAuthFunc(m.aguiHandler.ListThreads))
+	r.Get("/api/agui/threads/{threadId}", authMW.RequireAuthFunc(m.aguiHandler.GetThreadState))
+	r.Get("/api/agui/threads/{threadId}/messages", authMW.RequireAuthFunc(m.aguiHandler.GetMessages))
+	r.Delete("/api/agui/threads/{threadId}", authMW.RequireAuthFunc(m.threadHandler.DeleteThread))
+	r.Patch("/api/agui/threads/{threadId}", authMW.RequireAuthFunc(m.threadHandler.UpdateThreadTitle))
 }

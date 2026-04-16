@@ -1,13 +1,13 @@
-package taskmgmt_test
+package messagehandler_test
 
 import (
 	"aicompass/foundation/logger"
+	"aicompass/modules/chat/handlers/common"
+	"aicompass/modules/chat/handlers/messagehandler"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
-
-	taskmgmthandlers "aicompass/modules/chat/taskmgmt"
 )
 
 func newTestLogger() *logger.Logger {
@@ -17,20 +17,11 @@ func newTestLogger() *logger.Logger {
 func TestSSECORSOrigin(t *testing.T) {
 	t.Parallel()
 	const appURL = "https://school.example.com"
-	handler := taskmgmthandlers.NewTaskManagementHandler(
+	handler := messagehandler.New(
 		newTestLogger(),
 		nil, // orchestrator
-		nil, // agentProvider
-		nil, // threadQueryService
-		nil, // aguiProjection
-		nil, // threadMgmt
-		nil, // artifactStore
-		nil, // toolRegistry
-		nil, // requirementConfigService
-		nil, // documentProvider
-		"",  // tenantID
 		appURL,
-		taskmgmthandlers.DefaultSSEConfig(),
+		common.DefaultSSEConfig(),
 	)
 	// Test that the handler doesn't panic on valid requests
 	// Note: CORS header is only set when request is authenticated
@@ -45,20 +36,11 @@ func TestSSECORSOrigin(t *testing.T) {
 
 func TestSSECORSOriginNotWildcard(t *testing.T) {
 	t.Parallel()
-	handler := taskmgmthandlers.NewTaskManagementHandler(
+	handler := messagehandler.New(
 		newTestLogger(),
 		nil, // orchestrator
-		nil, // agentProvider
-		nil, // threadQueryService
-		nil, // aguiProjection
-		nil, // threadMgmt
-		nil, // artifactStore
-		nil, // toolRegistry
-		nil, // requirementConfigService
-		nil, // documentProvider
-		"",  // tenantID
 		"",  // allowedOrigin
-		taskmgmthandlers.DefaultSSEConfig(),
+		common.DefaultSSEConfig(),
 	)
 	req := httptest.NewRequest(http.MethodPost, "/v1/message:send", nil)
 	rec := httptest.NewRecorder()
@@ -71,20 +53,11 @@ func TestSSECORSOriginNotWildcard(t *testing.T) {
 
 func TestErrorResponsesDoNotLeakInternals(t *testing.T) {
 	t.Parallel()
-	handler := taskmgmthandlers.NewTaskManagementHandler(
+	handler := messagehandler.New(
 		newTestLogger(),
 		nil, // orchestrator
-		nil, // agentProvider
-		nil, // threadQueryService
-		nil, // aguiProjection
-		nil, // threadMgmt
-		nil, // artifactStore
-		nil, // toolRegistry
-		nil, // requirementConfigService
-		nil, // documentProvider
-		"",  // tenantID
 		"",  // allowedOrigin
-		taskmgmthandlers.DefaultSSEConfig(),
+		common.DefaultSSEConfig(),
 	)
 	req := httptest.NewRequest(http.MethodPost, "/v1/message:send", nil)
 	rec := httptest.NewRecorder()

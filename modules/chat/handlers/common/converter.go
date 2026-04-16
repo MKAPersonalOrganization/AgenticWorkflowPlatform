@@ -1,4 +1,4 @@
-package taskmgmt
+package common
 
 import (
 	"aicompass/modules/chat/thread"

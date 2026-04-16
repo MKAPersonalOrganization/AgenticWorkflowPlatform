@@ -1,24 +1,30 @@
-package taskmgmt
+package requirementhandler
 
 import (
+	"aicompass/foundation/logger"
+	"aicompass/modules/chat/chatcontracts"
 	"aicompass/shared"
 	"encoding/json"
 	"io"
 	"net/http"
 )
 
-// =============================================================================
-// Requirement configuration handlers
-//
-// These endpoints allow the frontend to read and write per-user, per-agent
-// tool requirement configs (allow / block / require_confirmation, etc.).
-//
-// Endpoints:
-//   GET  /v1/agents/{agentId}/toolsets/{toolSetId}/requirements
-//   GET  /v1/agents/{agentId}/toolsets/{toolSetId}/tools/{toolId}/requirements
-//   PUT  /v1/agents/{agentId}/toolsets/{toolSetId}/tools/{toolId}/requirements
-//   PUT  /v1/agents/{agentId}/toolsets/{toolSetId}/requirements
-// =============================================================================
+// Handler handles tool requirement configuration HTTP endpoints.
+type Handler struct {
+	log                      *logger.Logger
+	requirementConfigService chatcontracts.ToolRequirementConfigService
+}
+
+// New creates a new requirement handler.
+func New(
+	log *logger.Logger,
+	requirementConfigService chatcontracts.ToolRequirementConfigService,
+) *Handler {
+	return &Handler{
+		log:                      log,
+		requirementConfigService: requirementConfigService,
+	}
+}
 
 // ToolRequirementConfigResponse is the JSON shape returned to the frontend.
 type ToolRequirementConfigResponse struct {
@@ -44,7 +50,7 @@ type ToolRequirementConfigRequest struct {
 
 // GetToolRequirementConfig returns the requirement configuration for a single tool.
 // GET /v1/agents/{agentId}/toolsets/{toolSetId}/tools/{toolId}/requirements
-func (h *TaskManagementHandler) GetToolRequirementConfig(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetToolRequirementConfig(w http.ResponseWriter, r *http.Request) {
 	agentID := r.PathValue("agentId")
 	toolSetID := r.PathValue("toolSetId")
 	toolID := r.PathValue("toolId")
@@ -94,7 +100,7 @@ func (h *TaskManagementHandler) GetToolRequirementConfig(w http.ResponseWriter, 
 
 // SetToolRequirementConfig updates the requirement configuration for a single tool.
 // PUT /v1/agents/{agentId}/toolsets/{toolSetId}/tools/{toolId}/requirements
-func (h *TaskManagementHandler) SetToolRequirementConfig(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SetToolRequirementConfig(w http.ResponseWriter, r *http.Request) {
 	agentID := r.PathValue("agentId")
 	toolSetID := r.PathValue("toolSetId")
 	toolID := r.PathValue("toolId")
@@ -155,7 +161,7 @@ func (h *TaskManagementHandler) SetToolRequirementConfig(w http.ResponseWriter, 
 
 // GetToolSetRequirementConfig returns the requirement configuration for a tool set.
 // GET /v1/agents/{agentId}/toolsets/{toolSetId}/requirements
-func (h *TaskManagementHandler) GetToolSetRequirementConfig(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetToolSetRequirementConfig(w http.ResponseWriter, r *http.Request) {
 	agentID := r.PathValue("agentId")
 	toolSetID := r.PathValue("toolSetId")
 
@@ -201,7 +207,7 @@ func (h *TaskManagementHandler) GetToolSetRequirementConfig(w http.ResponseWrite
 
 // SetToolSetRequirementConfig updates the requirement configuration for a tool set.
 // PUT /v1/agents/{agentId}/toolsets/{toolSetId}/requirements
-func (h *TaskManagementHandler) SetToolSetRequirementConfig(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SetToolSetRequirementConfig(w http.ResponseWriter, r *http.Request) {
 	agentID := r.PathValue("agentId")
 	toolSetID := r.PathValue("toolSetId")
 
@@ -258,7 +264,7 @@ func (h *TaskManagementHandler) SetToolSetRequirementConfig(w http.ResponseWrite
 
 // ListToolRequirementConfigs returns all tool requirement configs for a tool set.
 // GET /v1/agents/{agentId}/toolsets/{toolSetId}/tools/requirements
-func (h *TaskManagementHandler) ListToolRequirementConfigs(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListToolRequirementConfigs(w http.ResponseWriter, r *http.Request) {
 	agentID := r.PathValue("agentId")
 	toolSetID := r.PathValue("toolSetId")
 

@@ -1,28 +1,51 @@
-package taskmgmt
+package pluginhandler
 
 import (
+	"aicompass/foundation/logger"
 	"aicompass/foundation/toolregistry"
+	"aicompass/modules/chat/chatcontracts"
+	"aicompass/modules/chat/handlers/common"
 	"aicompass/shared"
 	"encoding/json"
 	"net/http"
 )
 
+// Handler handles plugin-related HTTP endpoints.
+type Handler struct {
+	log                      *logger.Logger
+	toolRegistry             *toolregistry.Registry
+	requirementConfigService chatcontracts.ToolRequirementConfigService
+}
+
+// New creates a new plugin handler.
+func New(
+	log *logger.Logger,
+	toolRegistry *toolregistry.Registry,
+	requirementConfigService chatcontracts.ToolRequirementConfigService,
+) *Handler {
+	return &Handler{
+		log:                      log,
+		toolRegistry:             toolRegistry,
+		requirementConfigService: requirementConfigService,
+	}
+}
+
 // PluginResponse represents a plugin (tool set) in the simplified API.
 type PluginResponse struct {
-	ID                string              `json:"id"`
-	PluginID          string              `json:"plugin_id"` // Parent plugin provider ID for settings lookup
-	Name              string              `json:"name"`
-	Description       string              `json:"description"`
-	Category          string              `json:"category"`
-	Icon              string              `json:"icon"`
-	RequirementConfig map[string]any      `json:"requirement_config,omitempty"` // Per-plugin requirement config
-	Tools             []ToolInSetResponse `json:"tools"`
+	ID                string                     `json:"id"`
+	PluginID          string                     `json:"plugin_id"` // Parent plugin provider ID for settings lookup
+	Name              string                     `json:"name"`
+	Description       string                     `json:"description"`
+	Category          string                     `json:"category"`
+	Icon              string                     `json:"icon"`
+	RequirementConfig map[string]any             `json:"requirement_config,omitempty"` // Per-plugin requirement config
+	Tools             []common.ToolInSetResponse `json:"tools"`
 }
 
 // ListPlugins returns all available plugins with their requirement configs.
 // GET /v1/plugins (global — no per-agent state)
 // GET /v1/plugins?agent_id=xxx (per-agent requirement configs for agent config)
-func (h *TaskManagementHandler) ListPlugins(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListPlugins(w http.ResponseWriter, r *http.Request) {
 	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -53,9 +76,9 @@ func (h *TaskManagementHandler) ListPlugins(w http.ResponseWriter, r *http.Reque
 			toolConfigs, _ = h.requirementConfigService.ListToolRequirementConfigsJSON(r.Context(), user.ID, agentID, toolSet.ID)
 		}
 
-		toolResponses := make([]ToolInSetResponse, 0, len(toolsInSet))
+		toolResponses := make([]common.ToolInSetResponse, 0, len(toolsInSet))
 		for _, tool := range toolsInSet {
-			tr := ToolInSetResponse{
+			tr := common.ToolInSetResponse{
 				ID:          tool.ID,
 				Name:        tool.Name,
 				Description: tool.Description,

@@ -71,7 +71,7 @@ import (
 	analyticsmod "aicompass/modules/analytics"
 	billingmod "aicompass/modules/billing"
 	chatmod "aicompass/modules/chat"
-	taskmgmthandlers "aicompass/modules/chat/taskmgmt"
+	"aicompass/modules/chat/handlers/common"
 	evalmod "aicompass/modules/evaluation"
 	evalhallucinationmod "aicompass/modules/evaluation/hallucination"
 	evalresponsemod "aicompass/modules/evaluation/response"
@@ -519,7 +519,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		DocumentProvider:         &DocumentProviderAdapter{svc: edgequakeService},
 		TenantID:                 cfg.Edgequake.TenantID,
 		AllowedOrigin:            cfg.Auth.AppURL,
-		SSE:                      taskmgmthandlers.DefaultSSEConfig(),
+		SSE:                      common.DefaultSSEConfig(),
 	})
 
 	// Register chat projections (AGUI + LLM context) before starting the updater.

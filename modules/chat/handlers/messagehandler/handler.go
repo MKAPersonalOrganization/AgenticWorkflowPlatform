@@ -1,14 +1,39 @@
-package taskmgmt
+package messagehandler
 
 import (
 	"aicompass/foundation/agent"
+	"aicompass/foundation/logger"
 	"aicompass/modules/chat/agentorchestrator"
+	"aicompass/modules/chat/handlers/common"
 	"aicompass/shared"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 )
+
+// Handler handles message-related HTTP endpoints.
+type Handler struct {
+	log           *logger.Logger
+	orchestrator  common.Orchestrator
+	allowedOrigin string
+	sse           common.SSEConfig
+}
+
+// New creates a new message handler.
+func New(
+	log *logger.Logger,
+	orchestrator common.Orchestrator,
+	allowedOrigin string,
+	sse common.SSEConfig,
+) *Handler {
+	return &Handler{
+		log:           log,
+		orchestrator:  orchestrator,
+		allowedOrigin: allowedOrigin,
+		sse:           sse,
+	}
+}
 
 // FileAttachment represents a file sent with a message (image, audio, PDF, etc.).
 type FileAttachment struct {
@@ -43,7 +68,7 @@ type ProvideInputRequest struct {
 
 // SendMessage handles POST /v1/message:send — runs the agent inline and streams
 // AGUI events back as SSE on the same HTTP response.
-func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -94,7 +119,7 @@ func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Reque
 
 // ConfirmTool handles POST /v1/tool:confirm — responds to a tool confirmation request.
 // Streams AGUI events back as SSE on the same HTTP response.
-func (h *TaskManagementHandler) ConfirmTool(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ConfirmTool(w http.ResponseWriter, r *http.Request) {
 	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -135,7 +160,7 @@ func (h *TaskManagementHandler) ConfirmTool(w http.ResponseWriter, r *http.Reque
 
 // ProvideInput handles POST /v1/tool:provide_input — responds to an io.Read request.
 // Streams AGUI events back as SSE on the same HTTP response.
-func (h *TaskManagementHandler) ProvideInput(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ProvideInput(w http.ResponseWriter, r *http.Request) {
 	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -173,7 +198,7 @@ func (h *TaskManagementHandler) ProvideInput(w http.ResponseWriter, r *http.Requ
 
 // streamRun executes a run and streams SSE events to the client.
 // This is the shared streaming logic used by both SendMessage and ConfirmTool.
-func (h *TaskManagementHandler) streamRun(w http.ResponseWriter, r *http.Request, execReq agentorchestrator.RunExecutionRequest) {
+func (h *Handler) streamRun(w http.ResponseWriter, r *http.Request, execReq agentorchestrator.RunExecutionRequest) {
 	// Set SSE headers — must happen before any writes commit the status code.
 	origin := h.allowedOrigin
 	if origin == "" {
@@ -200,7 +225,7 @@ func (h *TaskManagementHandler) streamRun(w http.ResponseWriter, r *http.Request
 
 	// Send the contextId as the first SSE event so the frontend knows the threadID.
 	_ = rc.SetWriteDeadline(time.Now().Add(h.sse.WriteTimeout))
-	if err := WriteSSEEvent(w, map[string]string{"type": "SESSION_START", "contextId": execReq.ThreadID}, ""); err != nil {
+	if err := common.WriteSSEEvent(w, map[string]string{"type": "SESSION_START", "contextId": execReq.ThreadID}, ""); err != nil {
 		return
 	}
 	flusher.Flush()
@@ -216,14 +241,14 @@ func (h *TaskManagementHandler) streamRun(w http.ResponseWriter, r *http.Request
 
 		if err != nil {
 			h.log.Error(r.Context(), "[API] Run execution error", "error", err)
-			_ = WriteSSEEvent(w, map[string]any{"type": "RUN_ERROR", "message": err.Error()}, "")
+			_ = common.WriteSSEEvent(w, map[string]any{"type": "RUN_ERROR", "message": err.Error()}, "")
 			flusher.Flush()
 			return
 		}
 
-		aguiEvents := ToAguiEvents(event)
+		aguiEvents := common.ToAguiEvents(event)
 		for _, ae := range aguiEvents {
-			if err := WriteSSEEvent(w, ae, ""); err != nil {
+			if err := common.WriteSSEEvent(w, ae, ""); err != nil {
 				h.log.Info(r.Context(), "[API] Write failed, client disconnected")
 				return
 			}
