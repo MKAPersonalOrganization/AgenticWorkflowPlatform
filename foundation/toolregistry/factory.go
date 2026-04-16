@@ -21,6 +21,8 @@ type ExecutableToolFactory struct {
 	ttsVoice            string
 	pluginSettings      map[string]map[string]string // plugin_id → key → value
 	allowedKBNamespaces []string                     // workspace IDs the agent may query
+	groundedSearchCtor  func(apiKey, model string) any
+	agentFilesystem     any
 }
 
 // NewExecutableToolFactory creates a new tool factory.
@@ -62,6 +64,21 @@ func (f *ExecutableToolFactory) SetAllowedKBNamespaces(namespaces []string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.allowedKBNamespaces = namespaces
+}
+
+// SetGroundedSearchClientFactory sets the lazy constructor used by the
+// websearch plugin to create a client from per-user settings.
+func (f *ExecutableToolFactory) SetGroundedSearchClientFactory(factory func(apiKey, model string) any) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.groundedSearchCtor = factory
+}
+
+// SetAgentFilesystem sets the filesystem dependency used by fsplugin tools.
+func (f *ExecutableToolFactory) SetAgentFilesystem(fs any) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.agentFilesystem = fs
 }
 
 // SetToolRegistry sets the tool registry for the factory (used for tool set expansion).
@@ -179,4 +196,16 @@ func (r *depResolver) AllowedKBNamespaces() []string {
 	r.factory.mu.RLock()
 	defer r.factory.mu.RUnlock()
 	return r.factory.allowedKBNamespaces
+}
+
+func (r *depResolver) GroundedSearchClientFactory() func(apiKey, model string) any {
+	r.factory.mu.RLock()
+	defer r.factory.mu.RUnlock()
+	return r.factory.groundedSearchCtor
+}
+
+func (r *depResolver) AgentFilesystem() any {
+	r.factory.mu.RLock()
+	defer r.factory.mu.RUnlock()
+	return r.factory.agentFilesystem
 }

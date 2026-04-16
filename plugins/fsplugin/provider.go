@@ -4,15 +4,14 @@ import (
 	"aicompass/foundation/agent"
 	"aicompass/foundation/toolregistry"
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/a-h/templ"
 )
 
 // Provider implements the toolregistry.PluginProvider interface for agent filesystem tools.
-type Provider struct {
-	FS AgentFilesystem
-}
+type Provider struct{}
 
 func (p *Provider) ID() string { return "filesystem" }
 func (p *Provider) Icon() string {
@@ -50,28 +49,34 @@ func (p *Provider) DefaultTools() []toolregistry.Tool {
 
 func (p *Provider) SettingsSchema() []toolregistry.SettingsField { return nil }
 
-func (p *Provider) CreateExecutable(_ context.Context, toolID string, _ toolregistry.FactoryDeps) (agent.ExecutableTool, error) {
-	if p.FS == nil {
-		return nil, nil // filesystem module not available
+func (p *Provider) CreateExecutable(_ context.Context, toolID string, deps toolregistry.FactoryDeps) (agent.ExecutableTool, error) {
+	fs, ok := deps.AgentFilesystem().(AgentFilesystem)
+	if !ok || fs == nil {
+		switch toolID {
+		case "list_filesystems", "list_directory", "read_file", "write_file", "create_directory", "remove_entry", "file_info", "rename_entry":
+			return nil, fmt.Errorf("filesystem dependency not configured for fsplugin")
+		default:
+			return nil, nil
+		}
 	}
 
 	switch toolID {
 	case "list_filesystems":
-		return &listFilesystemsTool{fs: p.FS}, nil
+		return &listFilesystemsTool{fs: fs}, nil
 	case "list_directory":
-		return &listDirTool{fs: p.FS}, nil
+		return &listDirTool{fs: fs}, nil
 	case "read_file":
-		return &readFileTool{fs: p.FS}, nil
+		return &readFileTool{fs: fs}, nil
 	case "write_file":
-		return &writeFileTool{fs: p.FS}, nil
+		return &writeFileTool{fs: fs}, nil
 	case "create_directory":
-		return &mkdirTool{fs: p.FS}, nil
+		return &mkdirTool{fs: fs}, nil
 	case "remove_entry":
-		return &removeTool{fs: p.FS}, nil
+		return &removeTool{fs: fs}, nil
 	case "file_info":
-		return &statTool{fs: p.FS}, nil
+		return &statTool{fs: fs}, nil
 	case "rename_entry":
-		return &renameTool{fs: p.FS}, nil
+		return &renameTool{fs: fs}, nil
 	default:
 		return nil, nil
 	}

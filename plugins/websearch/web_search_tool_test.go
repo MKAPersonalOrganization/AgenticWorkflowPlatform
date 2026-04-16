@@ -16,6 +16,7 @@ import (
 type mockDeps struct {
 	toolregistry.FactoryDeps
 	settings map[string]map[string]string
+	factory  func(apiKey, model string) any
 }
 
 func (m *mockDeps) PluginSettings(pluginID string) map[string]string {
@@ -23,6 +24,10 @@ func (m *mockDeps) PluginSettings(pluginID string) map[string]string {
 		return nil
 	}
 	return m.settings[pluginID]
+}
+
+func (m *mockDeps) GroundedSearchClientFactory() func(apiKey, model string) any {
+	return m.factory
 }
 
 // stubClient is a GroundedSearchClient test double.
@@ -54,6 +59,10 @@ func (f *stubFactory) factory(apiKey, model string) GroundedSearchClient {
 	f.apiKey = apiKey
 	f.model = model
 	return f.client
+}
+
+func (f *stubFactory) anyFactory(apiKey, model string) any {
+	return f.factory(apiKey, model)
 }
 
 // =========================================================================
@@ -229,7 +238,7 @@ func TestInsertCitationMarkers_MultipleSources(t *testing.T) {
 // =========================================================================
 
 func TestProvider_Interface(t *testing.T) {
-	p := NewProvider(func(_, _ string) GroundedSearchClient { return &stubClient{} })
+	p := &Provider{}
 	if got := p.ID(); got != "websearch" {
 		t.Errorf("ID() = %q, want %q", got, "websearch")
 	}
@@ -272,11 +281,12 @@ func TestProvider_Interface(t *testing.T) {
 
 func TestProvider_CreateExecutable(t *testing.T) {
 	sf := &stubFactory{client: &stubClient{configured: true}}
-	p := NewProvider(sf.factory)
+	p := &Provider{}
 	ctx := context.Background()
 
 	// With plugin settings configured
 	tool, err := p.CreateExecutable(ctx, "web_search", &mockDeps{
+		factory: sf.anyFactory,
 		settings: map[string]map[string]string{
 			"websearch": {"api_key": "test-key", "model": "gemini-2.0-flash"},
 		},
@@ -299,8 +309,8 @@ func TestProvider_CreateExecutable(t *testing.T) {
 
 	// Without plugin settings
 	sf2 := &stubFactory{client: &stubClient{}}
-	p2 := NewProvider(sf2.factory)
-	tool2, err := p2.CreateExecutable(ctx, "web_search", &mockDeps{})
+	p2 := &Provider{}
+	tool2, err := p2.CreateExecutable(ctx, "web_search", &mockDeps{factory: sf2.anyFactory})
 	if err != nil {
 		t.Fatalf("CreateExecutable(web_search) no-settings error = %v", err)
 	}

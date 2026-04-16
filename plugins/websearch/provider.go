@@ -4,29 +4,18 @@ import (
 	"aicompass/foundation/agent"
 	"aicompass/foundation/toolregistry"
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/a-h/templ"
 )
-
-// ClientFactory creates a GroundedSearchClient from per-user plugin settings.
-// The factory is provided at wiring time (e.g. in main.go) so the plugin
-// layer stays independent of any concrete AI SDK.
-type ClientFactory func(apiKey, model string) GroundedSearchClient
 
 // Provider implements the toolregistry.PluginProvider interface for the
 // web search toolset.
 // Inspired by Gemini CLI's google_web_search tool — enables agents to perform
 // grounded Google Searches and return synthesized answers with inline
 // citations and source links.
-type Provider struct {
-	newClient ClientFactory
-}
-
-// NewProvider creates a Provider with the given client factory.
-func NewProvider(factory ClientFactory) *Provider {
-	return &Provider{newClient: factory}
-}
+type Provider struct{}
 
 func (p *Provider) ID() string { return "websearch" }
 
@@ -100,12 +89,23 @@ func (p *Provider) SettingsSchema() []toolregistry.SettingsField {
 func (p *Provider) CreateExecutable(_ context.Context, toolID string, deps toolregistry.FactoryDeps) (agent.ExecutableTool, error) {
 	switch toolID {
 	case "web_search":
+		factory := deps.GroundedSearchClientFactory()
+		if factory == nil {
+			return nil, fmt.Errorf("websearch grounded search client factory not configured")
+		}
+
 		var apiKey, model string
 		if ps := deps.PluginSettings("websearch"); ps != nil {
 			apiKey = ps["api_key"]
 			model = ps["model"]
 		}
-		return NewWebSearchTool(p.newClient(apiKey, model)), nil
+
+		rawClient := factory(apiKey, model)
+		client, ok := rawClient.(GroundedSearchClient)
+		if !ok || client == nil {
+			return nil, fmt.Errorf("websearch grounded search client factory returned %T, want GroundedSearchClient", rawClient)
+		}
+		return NewWebSearchTool(client), nil
 	default:
 		return nil, nil
 	}

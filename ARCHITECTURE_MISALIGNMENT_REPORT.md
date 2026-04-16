@@ -218,49 +218,48 @@ After the moves, `adapters.go` should shrink to ~300 lines of pure wiring code.
 
 ### What is wrong
 
-Of the 15 plugins, 13 are registered as empty struct pointers, but 2 use different patterns:
+This misalignment has been addressed.
+
+All 15 plugins are now registered as empty struct pointers:
 
 ```go
-// Standard pattern (13 plugins)
+// Standard pattern (15 plugins)
 toolregistry.RegisterPlugin(&calculator.Provider{})
 toolregistry.RegisterPlugin(&artifacts.Provider{})
 // ... etc
-
-// Non-standard: factory function
-toolregistry.RegisterPlugin(websearch.NewProvider(func(ctx context.Context, apiKey, model string) websearch.GroundedSearchClient {
-    return gemini.NewSearchClient(ctx, apiKey, model)
-}))
-
-// Non-standard: field injection
-toolregistry.RegisterPlugin(&fsplugin.Provider{FS: &agentFSAdapter{...}})
+toolregistry.RegisterPlugin(&websearch.Provider{})
+toolregistry.RegisterPlugin(&fsplugin.Provider{})
 ```
 
 ### Why this matters
 
-The `PluginProvider` interface from `foundation/toolregistry` was designed so that plugins receive their dependencies lazily via `FactoryDeps` when `CreateExecutable()` is called. This is a clean, uniform pattern. The two non-standard plugins break this:
+The `PluginProvider` interface from `foundation/toolregistry` was designed so that plugins receive their dependencies lazily via `FactoryDeps` when `CreateExecutable()` is called. That pattern is now used consistently.
 
-- `websearch` requires a `ClientFactory` at registration time, before the plugin system has a chance to provide dependencies
-- `fsplugin` requires an `AgentFilesystem` at registration time
+The implementation now does this:
 
-This inconsistency means a developer writing a new plugin has 3 different patterns to choose from, with no guidance on which is correct. It also means the composition root must know implementation details of specific plugins.
+- `websearch.Provider` resolves its client factory from `deps.GroundedSearchClientFactory()` inside `CreateExecutable()`
+- `fsplugin.Provider` resolves its filesystem dependency from `deps.AgentFilesystem()` inside `CreateExecutable()`
+- `main.go` registers both plugins with the standard `&Provider{}` pattern and wires their concrete dependencies into `ExecutableToolFactory`
 
 ### How to fix
 
-**Align both plugins to use the `FactoryDeps` lazy-injection pattern.**
+Implemented via the `FactoryDeps` lazy-injection pattern.
 
 For `websearch`:
-1. Remove the `ClientFactory` field and `NewProvider()` constructor
-2. Add a `GroundedSearchClientFactory` to `toolregistry.FactoryDeps`
-3. In `CreateExecutable()`, get the factory from `deps.GroundedSearchClientFactory`
-4. Register as `toolregistry.RegisterPlugin(&websearch.Provider{})`
+1. Removed the `ClientFactory` field and `NewProvider()` constructor
+2. Added `GroundedSearchClientFactory()` to `toolregistry.FactoryDeps`
+3. Resolved the factory inside `CreateExecutable()`
+4. Registered as `toolregistry.RegisterPlugin(&websearch.Provider{})`
 
 For `fsplugin`:
-1. Remove the `FS` field from `Provider`
-2. Add an `AgentFilesystem` provider to `toolregistry.FactoryDeps`
-3. In `CreateExecutable()`, get the filesystem from deps
-4. Register as `toolregistry.RegisterPlugin(&fsplugin.Provider{})`
+1. Removed the `FS` field from `Provider`
+2. Added `AgentFilesystem()` to `toolregistry.FactoryDeps`
+3. Resolved the filesystem inside `CreateExecutable()`
+4. Registered as `toolregistry.RegisterPlugin(&fsplugin.Provider{})`
 
-**Estimated effort:** 2 hours
+Note: `FactoryDeps` exposes these two dependencies as cycle-safe `any`-typed getters. This keeps `foundation/toolregistry` free of imports from `plugins/websearch` and `plugins/fsplugin`, while preserving lazy injection and a uniform provider lifecycle.
+
+**Status:** Fixed
 
 ---
 

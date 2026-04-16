@@ -16,6 +16,7 @@ import (
 	"aicompass/foundation/i18n"
 	"aicompass/foundation/logger"
 	"aicompass/foundation/middleware"
+	"aicompass/foundation/toolregistry"
 	"aicompass/infra/googleauth"
 	"aicompass/infra/memdb"
 	"aicompass/infra/projection/subscriber"
@@ -25,7 +26,6 @@ import (
 	"aicompass/modules/knowledge/edgequake"
 	"aicompass/modules/knowledge/rag/users"
 	"aicompass/modules/toolreqs"
-	"aicompass/foundation/toolregistry"
 	"aicompass/plugins/agentmemory"
 	"aicompass/plugins/artifacts"
 	"aicompass/plugins/calculator"
@@ -423,10 +423,8 @@ func run(ctx context.Context, log *logger.Logger) error {
 	toolregistry.RegisterPlugin(&todos.Provider{})
 	toolregistry.RegisterPlugin(&tracker.Provider{})
 	toolregistry.RegisterPlugin(&tts.Provider{})
-	toolregistry.RegisterPlugin(websearch.NewProvider(func(apiKey, model string) websearch.GroundedSearchClient {
-		return gemini.NewSearchClient(apiKey, model)
-	}))
-	toolregistry.RegisterPlugin(&fsplugin.Provider{FS: &agentFSAdapter{source: filesystemModule.AgentFS()}})
+	toolregistry.RegisterPlugin(&websearch.Provider{})
+	toolregistry.RegisterPlugin(&fsplugin.Provider{})
 	if err := toolRegistry.Initialize(ctx); err != nil {
 		return fmt.Errorf("failed to initialize tool registry: %w", err)
 	}
@@ -562,6 +560,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 		if ns := cfg.Extra["allowed_kb_namespaces"]; ns != "" {
 			f.SetAllowedKBNamespaces(strings.Split(ns, ","))
 		}
+		f.SetGroundedSearchClientFactory(func(apiKey, model string) any {
+			return gemini.NewSearchClient(apiKey, model)
+		})
+		f.SetAgentFilesystem(&agentFSAdapter{source: filesystemModule.AgentFS()})
 		return f
 	})
 
@@ -1005,4 +1007,3 @@ func validateProductionConfig(log *logger.Logger, buildTag, adminUser, adminPass
 
 	return nil
 }
-

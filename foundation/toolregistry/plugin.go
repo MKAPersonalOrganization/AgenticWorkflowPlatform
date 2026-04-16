@@ -49,16 +49,17 @@ type SettingsField struct {
 //
 // # Plugin usage matrix (15 plugins, 2025-07)
 //
-// Only 5 plugins actively consume FactoryDeps; the other 10 ignore it entirely.
+// Only 7 plugins actively consume FactoryDeps; the other 8 ignore it entirely.
 //
 //	knowledgebase → EdgequakeBaseURL, OpenAIAPIKey, ModelID, PluginSettings, AllowedKBNamespaces
 //	tts           → ArtifactStore, OpenAIAPIKey, TTSConfig, PluginSettings
 //	document      → ArtifactStore
-//	websearch     → PluginSettings
-//	askuser, calculator, codebase, cognitive, fsplugin, library, planmode, todos, tracker → (none)
+//	websearch     → PluginSettings, GroundedSearchClientFactory
+//	fsplugin      → AgentFilesystem
+//	agentmemory, artifacts, calculator, codebase, cognitive, demoinput, library, planmode, todos, tracker → (none)
 //
 // The interface is intentionally kept as a single composite rather than split
-// into narrow per-concern interfaces. With only 8 methods and 15 plugins, the
+// into narrow per-concern interfaces. With only 10 methods and 15 plugins, the
 // ISP trade-off favours simplicity. If many more plugins are added, consider
 // splitting into ArtifactProvider, KBConfigProvider, etc.
 type FactoryDeps interface {
@@ -91,6 +92,20 @@ type FactoryDeps interface {
 	// AllowedKBNamespaces returns workspace IDs the agent may query.
 	// Used by: knowledgebase.
 	AllowedKBNamespaces() []string
+
+	// GroundedSearchClientFactory returns a lazy factory for web-search clients.
+	//
+	// The return type is intentionally `any` to avoid an import cycle between
+	// foundation/toolregistry and plugins/websearch. The websearch plugin is
+	// responsible for asserting the concrete client type it expects.
+	GroundedSearchClientFactory() func(apiKey, model string) any
+
+	// AgentFilesystem returns the filesystem dependency for fsplugin tools.
+	//
+	// The return type is intentionally `any` to avoid an import cycle between
+	// foundation/toolregistry and plugins/fsplugin. The fsplugin package is
+	// responsible for asserting the concrete interface it expects.
+	AgentFilesystem() any
 }
 
 // BuildIconSVG wraps Lucide-style inner SVG paths in a complete <svg> element.
