@@ -397,7 +397,7 @@ services:
   # ===========================================================================
   edgequake-db:
     build:
-      context: ./edgequake/edgequake/docker
+      context: ./infra/edgequake
       dockerfile: Dockerfile.postgres
     container_name: edgequake-db-cluster
     restart: unless-stopped
@@ -409,7 +409,7 @@ services:
       - POSTGRES_DB=edgequake
     volumes:
       - edgequake-db-cluster-data:/var/lib/postgresql/data
-      - ./edgequake/edgequake/docker/init-extensions.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./infra/edgequake/init-extensions.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - intranet
     healthcheck:
@@ -420,9 +420,7 @@ services:
       start_period: 10s
 
   edgequake-api:
-    build:
-      context: ./edgequake/edgequake
-      dockerfile: docker/Dockerfile
+    image: ghcr.io/raphaelmansuy/edgequake:latest
     container_name: edgequake-api-cluster
     restart: unless-stopped
     ports:
