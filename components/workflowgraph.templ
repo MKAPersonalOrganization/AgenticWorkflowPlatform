@@ -85,10 +85,10 @@ templ WorkflowGraphPanel() {
                     :title="isMinimized ? 'Expand pipeline' : 'Collapse pipeline'"
                 >
                     <template x-if="!isMinimized">
-                        @icon.Minus(icon.Props{Size: 12})
+                        @icon.Minus(icon.Props{Class: "size-3"})
                     </template>
                     <template x-if="isMinimized">
-                        @icon.ChevronDown(icon.Props{Size: 12})
+                        @icon.ChevronDown(icon.Props{Class: "size-3"})
                     </template>
                 </button>
 
@@ -98,7 +98,7 @@ templ WorkflowGraphPanel() {
                     class="w-6 h-6 rounded-md flex items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                     title="Dismiss"
                 >
-                    @icon.X(icon.Props{Size: 12})
+                    @icon.X(icon.Props{Class: "size-3"})
                 </button>
             </div>
         </div>

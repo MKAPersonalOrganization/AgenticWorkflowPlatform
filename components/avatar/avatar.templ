@@ -1,4 +1,4 @@
-// templui component avatar - version: v1.6.0 installed by templui v1.6.0
+// templui component avatar - version: v1.9.6 installed by templui v1.9.6
 // 📚 Documentation: https://templui.io/docs/components/avatar
 package avatar
 
@@ -36,7 +36,7 @@ templ Avatar(props ...Props) {
 		}
 		class={
 			utils.TwMerge(
-				"relative flex h-10 w-10 shrink-0 overflow-hidden rounded-xl",
+				"relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full",
 				p.Class,
 			),
 		}
@@ -82,7 +82,7 @@ templ Fallback(props ...FallbackProps) {
 		}
 		class={
 			utils.TwMerge(
-				"flex h-full w-full items-center justify-center rounded-xl bg-muted",
+				"flex h-full w-full items-center justify-center rounded-full bg-muted",
 				p.Class,
 			),
 		}
@@ -92,6 +92,10 @@ templ Fallback(props ...FallbackProps) {
 	</span>
 }
 
+var scriptOnce = templ.NewOnceHandle()
+
 templ Script() {
-	<script defer nonce={ templ.GetNonce(ctx) } src={ utils.ScriptURL("/assets/js/avatar.min.js") }></script>
+	@scriptOnce.Once() {
+		@utils.ComponentScript("avatar")
+	}
 }

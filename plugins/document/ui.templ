@@ -15,13 +15,13 @@ templ toolIcon() {
 		}"
 	>
 		<template x-if="message.name === 'create_markdown'">
-			@icon.Icon("file-plus")(icon.Props{Size: 16})
+			@icon.Icon("file-plus")(icon.Props{Class: "size-4"})
 		</template>
 		<template x-if="message.name === 'update_markdown'">
-			@icon.Icon("file-pen")(icon.Props{Size: 16})
+			@icon.Icon("file-pen")(icon.Props{Class: "size-4"})
 		</template>
 		<template x-if="message.name === 'delete_markdown'">
-			@icon.Icon("trash-2")(icon.Props{Size: 16})
+			@icon.Icon("trash-2")(icon.Props{Class: "size-4"})
 		</template>
 	</div>
 }

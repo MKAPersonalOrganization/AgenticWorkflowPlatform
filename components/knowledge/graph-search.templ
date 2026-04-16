@@ -20,28 +20,27 @@ import (
 )
 
 templ GraphSearch() {
-	@popover.Trigger(popover.TriggerProps{
-		For: "graph-search-popover",
-		Attributes: templ.Attributes{
-			"id": "graph-search-trigger",
-		},
-	}) {
-		<button
-			class="inline-flex items-center justify-center rounded-md border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-8 gap-2 px-3 text-sm font-medium transition-colors"
-			aria-label={ i18n.T(ctx, "Search nodes") }
-		>
-			@icon.Search(icon.Props{Class: "size-4"})
-			<span class="hidden sm:inline text-xs">{ i18n.T(ctx, "Search nodes...") }</span>
-			<kbd class="hidden lg:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-				<span class="text-xs">⌘</span>K
-			</kbd>
-		</button>
-	}
-	@popover.Content(popover.ContentProps{
-		ID:        "graph-search-popover",
-		Placement: popover.PlacementBottomStart,
-		Class:     "w-96 p-0",
-	}) {
+	@popover.Root(popover.RootProps{ID: "graph-search-popover"}) {
+		@popover.Trigger(popover.TriggerProps{
+			Attributes: templ.Attributes{
+				"id": "graph-search-trigger",
+			},
+		}) {
+			<button
+				class="inline-flex items-center justify-center rounded-md border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-8 gap-2 px-3 text-sm font-medium transition-colors"
+				aria-label={ i18n.T(ctx, "Search nodes") }
+			>
+				@icon.Search(icon.Props{Class: "size-4"})
+				<span class="hidden sm:inline text-xs">{ i18n.T(ctx, "Search nodes...") }</span>
+				<kbd class="hidden lg:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+					<span class="text-xs">⌘</span>K
+				</kbd>
+			</button>
+		}
+		@popover.Content(popover.ContentProps{
+			Placement: popover.PlacementBottomStart,
+			Class:     "w-96 p-0",
+		}) {
 		<div
 			x-data="{
 				query: '',
@@ -191,5 +190,6 @@ templ GraphSearch() {
 				</span>
 			</div>
 		</div>
+		}
 	}
 }

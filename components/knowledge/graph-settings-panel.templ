@@ -9,21 +9,20 @@ import (
 )
 
 templ GraphSettingsPanel() {
-	@popover.Trigger(popover.TriggerProps{
-		For:   "graph-settings-popover",
-		Class: "flex items-center justify-center h-8 w-8 rounded-md border bg-background hover:bg-accent hover:text-accent-foreground transition-all duration-200",
-		Attributes: templ.Attributes{
-			"title": i18n.T(ctx, "Graph Settings"),
-		},
-	}) {
-		@icon.Settings2(icon.Props{Class: "size-4"})
-	}
-	@popover.Content(popover.ContentProps{
-		ID:        "graph-settings-popover",
-		Placement: popover.PlacementBottomEnd,
-		Class:     "w-80 p-4 border shadow-2xl bg-background/95 backdrop-blur-md animate-in fade-in zoom-in duration-200",
-		ShowArrow: true,
-	}) {
+	@popover.Root(popover.RootProps{ID: "graph-settings-popover"}) {
+		@popover.Trigger(popover.TriggerProps{
+			Class: "flex items-center justify-center h-8 w-8 rounded-md border bg-background hover:bg-accent hover:text-accent-foreground transition-all duration-200",
+			Attributes: templ.Attributes{
+				"title": i18n.T(ctx, "Graph Settings"),
+			},
+		}) {
+			@icon.Settings2(icon.Props{Class: "size-4"})
+		}
+		@popover.Content(popover.ContentProps{
+			Placement: popover.PlacementBottomEnd,
+			Class:     "w-80 p-4 border shadow-2xl bg-background/95 backdrop-blur-md animate-in fade-in zoom-in duration-200",
+			ShowArrow: true,
+		}) {
 		<div class="space-y-5">
 			<!-- Header -->
 			<div class="flex items-center justify-between pb-2 border-b">
@@ -199,5 +198,6 @@ templ GraphSettingsPanel() {
 				</div>
 			</div>
 		</div>
+		}
 	}
 }

@@ -55,7 +55,7 @@ templ SearchBar(props ...Props) {
 		{ p.Attributes... }
 	>
 		<span class="absolute start-3 text-base-content/60 group-focus-within:text-base-content group-hover:text-base-content transition-colors pointer-events-none">
-			@icon.Search(icon.Props{Size: 16})
+			@icon.Search(icon.Props{Class: "size-4"})
 		</span>
 		<input
 			x-ref="searchInput"
@@ -79,7 +79,7 @@ templ SearchBar(props ...Props) {
 				"tabindex": "-1",
 			},
 		}) {
-			@icon.X(icon.Props{Size: 14})
+			@icon.X(icon.Props{Class: "size-3.5"})
 		}
 	</div>
 }

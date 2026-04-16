@@ -20,7 +20,7 @@ templ Settings() {
 		x-cloak
 		@open-settings-dialog.window="let _tab = ($event.detail || {}).tab; showSettings = true; if (_tab) $nextTick(function() { if (window.tui && window.tui.tabs) window.tui.tabs.setActive('settings-tabs', _tab); })"
 	>
-		@dialog.Dialog(dialog.Props{Open: true, Class: "relative z-50"}) {
+		@dialog.Dialog(dialog.Props{Class: "relative z-50"}) {
 			<!-- Backdrop -->
 			<div
 				class="fixed inset-0 bg-black/50 transition-opacity"
@@ -154,7 +154,7 @@ templ Settings() {
 											</select>
 											<div class="w-full h-9 px-3 py-1 text-base md:text-sm flex items-center justify-between rounded-md border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground">
 												<span x-text="languages[currentLang] ? languages[currentLang].nativeName : currentLang"></span>
-												@icon.ChevronDown(icon.Props{Size: 16, Class: "text-muted-foreground"})
+												@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
 											</div>
 										</div>
 									}

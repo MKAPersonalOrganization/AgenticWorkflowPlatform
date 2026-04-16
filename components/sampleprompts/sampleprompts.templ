@@ -109,7 +109,7 @@ templ CategoryButton(id string, label string, iconFunc func(...icon.Props) templ
 		},
 	}) {
 		<div class="p-3 rounded-xl bg-background/80 group-hover:bg-background transition-all duration-200 shadow-modern-xs ring-1 ring-border/30">
-			@iconFunc(icon.Props{Size: 20, Class: "text-foreground/60 group-hover:text-primary transition-colors duration-200"})
+			@iconFunc(icon.Props{Class: "size-5 text-foreground/60 group-hover:text-primary transition-colors duration-200"})
 		</div>
 		<span class="text-sm font-medium text-foreground/70 group-hover:text-foreground transition-colors duration-200">{ label }</span>
 	}

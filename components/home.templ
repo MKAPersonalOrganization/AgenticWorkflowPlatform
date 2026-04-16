@@ -206,11 +206,14 @@ templ ChatInputScreen(user *shared.User) {
 			<!-- Thread History Dialog -->
 			@threads.ThreadsDialog()
 			<!-- Keyboard Shortcuts Dialog -->
-			<div x-show="showKeyboardShortcuts" x-cloak>
-				@dialog.Dialog(dialog.Props{Open: true}) {
-					<div x-show="showKeyboardShortcuts" @click.away="showKeyboardShortcuts = false">
-						@keyboardshortcuts.KeyboardShortcuts()
-					</div>
+			<div
+				x-init="
+					$watch('showKeyboardShortcuts', v => window.tui.dialog[v ? 'open' : 'close']('keyboard-shortcuts-dialog'));
+					$el.querySelector('dialog')?.addEventListener('close', () => { showKeyboardShortcuts = false });
+				"
+			>
+				@dialog.Dialog(dialog.Props{ID: "keyboard-shortcuts-dialog"}) {
+					@keyboardshortcuts.KeyboardShortcuts()
 				}
 			</div>
 			<!-- Settings Dialog -->
@@ -246,16 +249,16 @@ templ ChatInputScreen(user *shared.User) {
 						<!-- Icon -->
 						<div class="shrink-0 me-3">
 							<template x-if="toast.type === 'success'">
-								@icon.CircleCheck(icon.Props{Size: 22, Class: "text-green-500"})
+								@icon.CircleCheck(icon.Props{Class: "size-[22px] text-green-500"})
 							</template>
 							<template x-if="toast.type === 'error'">
-								@icon.CircleX(icon.Props{Size: 22, Class: "text-red-500"})
+								@icon.CircleX(icon.Props{Class: "size-[22px] text-red-500"})
 							</template>
 							<template x-if="toast.type === 'warning'">
-								@icon.TriangleAlert(icon.Props{Size: 22, Class: "text-yellow-500"})
+								@icon.TriangleAlert(icon.Props{Class: "size-[22px] text-yellow-500"})
 							</template>
 							<template x-if="toast.type === 'info'">
-								@icon.Info(icon.Props{Size: 22, Class: "text-blue-500"})
+								@icon.Info(icon.Props{Class: "size-[22px] text-blue-500"})
 							</template>
 						</div>
 						<!-- Content -->
@@ -271,7 +274,7 @@ templ ChatInputScreen(user *shared.User) {
 							type="button"
 							aria-label="Close notification"
 						>
-							@icon.X(icon.Props{Size: 18})
+							@icon.X(icon.Props{Class: "size-[18px]"})
 						</button>
 					</div>
 				</template>
