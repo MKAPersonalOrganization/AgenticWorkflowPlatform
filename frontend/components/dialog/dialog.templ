@@ -32,6 +32,7 @@ type TriggerProps struct {
 
 type ContentProps struct {
 	Class           string
+	PanelClass      string // Overrides the inner panel classes (default: "relative flex flex-col gap-4 p-6 min-h-0 grow")
 	Attributes      templ.Attributes
 	HideCloseButton bool
 }
@@ -125,14 +126,23 @@ templ Content(props ...ContentProps) {
 	<dialog
 		class={
 			utils.TwMerge(
-				"fixed left-[50%] top-[50%] z-50 m-0 w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-hidden border bg-background text-foreground p-0 shadow-lg outline-none sm:max-w-lg",
+				// Positioning & sizing
+				"fixed left-[50%] top-[50%] z-50 m-0 w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-hidden outline-none sm:max-w-lg",
+				// Surface — elevated card with subtle border
+				"bg-card text-card-foreground border border-border/60 p-0",
+				// Premium radius + layered shadow from the theme's modern shadow system
+				"rounded-xl shadow-modern-xl",
+				// Visibility (templui state-driven)
 				"[&:not([open]):not([data-tui-dialog-closing=true])]:hidden",
-				"rounded-lg",
-				"[&::backdrop]:transition-all [&::backdrop]:duration-200",
+				// Backdrop — blurred cinematic scrim
+				"[&::backdrop]:transition-all [&::backdrop]:duration-300 [&::backdrop]:ease-out",
 				"data-[tui-dialog-open=false]:[&::backdrop]:bg-black/0",
+				"data-[tui-dialog-open=false]:[&::backdrop]:backdrop-blur-none",
 				"data-[tui-dialog-open=true]:[&::backdrop]:bg-black/50",
-				"transition-all duration-200",
-				"data-[tui-dialog-open=false]:scale-95",
+				"data-[tui-dialog-open=true]:[&::backdrop]:backdrop-blur-sm",
+				// Enter/exit — smoother premium easing with subtle scale
+				"transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+				"data-[tui-dialog-open=false]:scale-[0.98]",
 				"data-[tui-dialog-open=true]:scale-100",
 				"data-[tui-dialog-open=false]:opacity-0",
 				"data-[tui-dialog-open=true]:opacity-100",
@@ -144,24 +154,23 @@ templ Content(props ...ContentProps) {
 		data-tui-dialog-initial-open={ utils.IfElse(open, "true", "false") }
 		{ p.Attributes... }
 	>
-		<div class="relative flex flex-col gap-4 p-6 min-h-0 grow" data-tui-dialog-panel>
+		<div class={ utils.TwMerge("relative flex flex-col gap-4 p-6 min-h-0 grow", p.PanelClass) } data-tui-dialog-panel>
 			{ children... }
 			if !p.HideCloseButton {
 				<button
 					class={ utils.TwMerge(
-							// Positioning
-							"absolute top-4 right-4",
-							// Style
-							"rounded-xs opacity-70",
-							// Interactions
-							"transition-opacity hover:opacity-100",
+							// Positioning & proper click target
+							"absolute top-3 right-3",
+							"size-8 inline-flex items-center justify-center",
+							// Surface & radius matching the premium card
+							"rounded-md text-muted-foreground",
+							// Smooth hover treatment
+							"transition-all duration-200 ease-out",
+							"hover:bg-accent hover:text-foreground",
 							// Focus states
 							"focus:outline-none focus:ring-2",
 							"focus:ring-ring focus:ring-offset-2",
 							"ring-offset-background",
-							// Hover/Data states
-							"data-[tui-dialog-open=true]:bg-accent",
-							"data-[tui-dialog-open=true]:text-muted-foreground",
 							// Disabled state
 							"disabled:pointer-events-none",
 							// Icon styles

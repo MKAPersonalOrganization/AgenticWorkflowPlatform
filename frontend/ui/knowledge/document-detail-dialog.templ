@@ -209,13 +209,6 @@ templ DocumentDetailDialog() {
 					</div>
 				}
 			}
-			@dialog.Footer(dialog.FooterProps{}) {
-				@dialog.Close(dialog.CloseProps{}) {
-					@button.Button(button.Props{Variant: button.VariantOutline}) {
-						{ i18n.T(ctx, "Close") }
-					}
-				}
-			}
 		}
 	}
 }

@@ -302,7 +302,7 @@ templ FilesystemDialog() {
 								</div>
 							</div>
 							<!-- GitHub Config (OAuth-based) -->
-							<div x-show="form.type === 'github'" x-cloak class="space-y-3 p-4 rounded-lg border bg-muted/50">
+							<div x-show="form.type === 'github'" x-cloak class="space-y-3 p-4 rounded-lg border">
 								<!-- Connection Status -->
 								<div x-show="!githubStatus.connected" class="text-center py-4">
 									@icon.Github(icon.Props{Class: "size-8 mx-auto text-muted-foreground mb-3"})
@@ -402,7 +402,7 @@ templ FilesystemDialog() {
 					<!-- ═══════════════════════════════════════════════════════ -->
 					<div x-show="view === 'browse'" x-cloak class="flex flex-col h-full">
 						<!-- ── Address Bar ─────────────────────────────────── -->
-						<div class="flex items-center gap-2 px-4 py-2 border-b bg-muted/30 shrink-0">
+						<div class="flex items-center gap-2 px-4 py-2 border-b shrink-0">
 							<!-- Navigation Buttons -->
 							<div class="flex items-center gap-0.5">
 								@button.Button(button.Props{
@@ -477,7 +477,7 @@ templ FilesystemDialog() {
 							}
 						</div>
 						<!-- ── Toolbar ─────────────────────────────────────── -->
-						<div class="flex items-center justify-between gap-2 px-4 py-2 border-b bg-muted/10 shrink-0">
+						<div class="flex items-center justify-between gap-2 px-4 py-2 border-b shrink-0">
 							<div class="flex items-center gap-1">
 								<!-- New Folder + Upload (local only) -->
 								<template x-if="currentFS?.type === 'local'">
@@ -725,7 +725,7 @@ templ FilesystemDialog() {
 				<!-- ═══════════════════════════════════════════════════════════ -->
 				<!-- FOOTER / STATUS BAR                                        -->
 				<!-- ═══════════════════════════════════════════════════════════ -->
-				@dialog.Footer(dialog.FooterProps{Class: "px-4 py-2 border-t shrink-0 bg-muted/20"}) {
+				@dialog.Footer(dialog.FooterProps{Class: "px-4 py-2 border-t shrink-0"}) {
 					<div class="flex items-center justify-between w-full text-xs text-muted-foreground">
 						<div class="flex items-center gap-3">
 							<span x-show="view === 'list'">
@@ -843,7 +843,7 @@ templ fileBrowseContent() {
 	<!-- ── LIST VIEW ──────────────────────────────────────────── -->
 	<div x-show="!browseLoading && sortedEntries.length > 0 && viewMode === 'list'" x-cloak>
 		<!-- Column Header -->
-		<div class="grid grid-cols-[1fr_100px_160px_40px] gap-2 px-4 py-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wider border-b bg-muted/20 select-none sticky top-0 z-10">
+		<div class="grid grid-cols-[1fr_100px_160px_40px] gap-2 px-4 py-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wider border-b select-none sticky top-0 z-10">
 			<button class="flex items-center gap-1 hover:text-foreground text-left" @click="setSortBy('name')">
 				{ i18n.T(ctx, "Name") }
 				<span x-show="sortBy === 'name'" class="text-primary">

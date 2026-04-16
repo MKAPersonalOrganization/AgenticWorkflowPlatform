@@ -98,7 +98,7 @@ templ ToolsDialog() {
 									@input.Input(input.Props{
 										Type:        input.TypeSearch,
 										Placeholder: i18n.T(ctx, "Search plugins..."),
-										Class:       "h-9 bg-muted/40 border-transparent focus-within:bg-background",
+										Class:       "h-9 border-transparent focus-within:bg-background",
 										Attributes: templ.Attributes{
 											"x-model.debounce.300ms": "search",
 										},
@@ -176,7 +176,7 @@ templ ToolsDialog() {
 										@input.Input(input.Props{
 											Type:        input.TypeSearch,
 											Placeholder: i18n.T(ctx, "Search MCP servers..."),
-											Class:       "h-9 bg-muted/40 border-transparent focus-within:bg-background",
+											Class:       "h-9 border-transparent focus-within:bg-background",
 											Attributes: templ.Attributes{
 												"x-model.debounce.300ms": "mcpSearch",
 											},
@@ -225,26 +225,6 @@ templ ToolsDialog() {
 								@MCPAddDialog()
 							</div>
 						</template>
-						@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
-							<div class="flex items-center justify-between w-full">
-								<span class="text-xs text-muted-foreground">
-									<template x-if="activeTab === 'plugins'">
-										<span>
-											<span x-text="pluginSummary.plugins"></span> { i18n.T(ctx, "plugins") } ·
-											<span x-text="pluginSummary.tools"></span> { i18n.T(ctx, "tools") }
-										</span>
-									</template>
-									<template x-if="activeTab === 'mcp'">
-										<span x-text="'MCP servers'"></span>
-									</template>
-								</span>
-								@dialog.Close() {
-									@button.Button(button.Props{Variant: button.VariantGhost, Class: "h-8 px-3 text-xs"}) {
-										{ i18n.T(ctx, "Close") }
-									}
-								}
-							</div>
-						}
 					</div>
 				</template>
 				<!-- ═══════ Unified Detail View (Plugin or MCP) ═══════ -->
@@ -293,7 +273,7 @@ templ ToolsDialog() {
 							</div>
 						}
 						<!-- Info bar -->
-						<div class="px-4 py-2.5 border-b border-border bg-muted/50">
+						<div class="px-4 py-2.5 border-b border-border">
 							<div class="flex items-center justify-between">
 								<div class="flex items-center gap-3 text-xs text-muted-foreground">
 									<!-- Category (plugins) -->
@@ -409,7 +389,7 @@ templ ToolsDialog() {
 													</template>
 												</div>
 												<!-- Settings fields -->
-												<div class="space-y-4 bg-muted/30 rounded-xl p-4 border border-border/50">
+												<div class="space-y-4 rounded-xl p-4 border border-border/50">
 													<template x-for="field in (schemas.find(s => s.plugin_id === detailItem.plugin_id)?.schema || [])" :key="field.key">
 														<div class="flex flex-col gap-1.5">
 															<label class="text-foreground text-xs font-medium flex items-center gap-1">
@@ -523,7 +503,7 @@ templ ToolsDialog() {
 								</div>
 							</div>
 						</div>
-						@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
+						@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto"}) {
 							<div class="flex items-center justify-between w-full">
 								<div class="flex items-center gap-3 text-xs text-muted-foreground">
 									<span class="flex items-center gap-1.5">

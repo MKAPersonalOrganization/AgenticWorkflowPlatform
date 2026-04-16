@@ -82,7 +82,7 @@ templ ResourcesDialog() {
 							<select
 								x-model="selectedAgent"
 								@change="onAgentChange()"
-								class="w-full h-9 rounded-md border border-input bg-muted/40 px-3 pe-8 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring appearance-none transition-colors border-transparent focus-within:bg-background"
+								class="w-full h-9 rounded-md border border-input px-3 pe-8 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring appearance-none transition-colors border-transparent focus-within:bg-background"
 								:disabled="loadingAgents"
 							>
 								<template x-for="agent in agents" :key="agent.id">
@@ -103,7 +103,7 @@ templ ResourcesDialog() {
 						@input.Input(input.Props{
 							Type:        input.TypeSearch,
 							Placeholder: i18n.T(ctx, "Search workspaces..."),
-							Class:       "h-9 bg-muted/40 border-transparent focus-within:bg-background",
+							Class:       "h-9 border-transparent focus-within:bg-background",
 							Attributes: templ.Attributes{
 								"x-model.debounce.300ms": "search",
 							},
@@ -224,22 +224,6 @@ templ ResourcesDialog() {
 						</div>
 					</template>
 				</div>
-				@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
-					<div class="flex items-center justify-between w-full">
-						<div class="flex items-center gap-3 text-xs text-muted-foreground" x-show="workspaces.length > 0">
-							<span class="flex items-center gap-1.5">
-								<span class="size-1.5 rounded-full bg-primary"></span>
-								<span x-text="enabledSummary.enabled"></span>/<span x-text="enabledSummary.total"></span> { i18n.T(ctx, "workspaces attached") }
-							</span>
-						</div>
-						<div x-show="workspaces.length === 0"></div>
-						@dialog.Close() {
-							@button.Button(button.Props{Variant: button.VariantGhost, Class: "h-8 px-3 text-xs"}) {
-								{ i18n.T(ctx, "Close") }
-							}
-						}
-					</div>
-				}
 				}
 			}
 		</div>

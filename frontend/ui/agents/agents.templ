@@ -84,7 +84,7 @@ templ AgentsDialog() {
 									@input.Input(input.Props{
 										Type:        input.TypeSearch,
 										Placeholder: i18n.T(ctx, "Search your agents..."),
-										Class:       "h-9 bg-muted/40 border-transparent focus-within:bg-background",
+										Class:       "h-9 border-transparent focus-within:bg-background",
 										Attributes: templ.Attributes{
 											"x-model.debounce.300ms": "searchQuery",
 											"@input":                 "searchAgents()",
@@ -219,16 +219,6 @@ templ AgentsDialog() {
 								</div>
 							</div>
 						</template>
-						@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
-							<div class="flex items-center justify-between w-full">
-								<span class="text-xs text-muted-foreground" x-text="`${filteredAgents.length} agent${filteredAgents.length !== 1 ? 's' : ''}`"></span>
-								@dialog.Close() {
-									@button.Button(button.Props{Variant: button.VariantGhost, Class: "h-8 px-3 text-xs"}) {
-										{ i18n.T(ctx, "Close") }
-									}
-								}
-							</div>
-						}
 					</div>
 				</template>
 				<!-- Create/Edit Form View -->
@@ -423,7 +413,7 @@ templ AgentsDialog() {
 												type="button"
 												@click="form.includeContents = ''"
 												class="flex-1 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors"
-												:class="!form.includeContents || form.includeContents === 'default' ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted/50 text-muted-foreground border-border hover:bg-accent'"
+												:class="!form.includeContents || form.includeContents === 'default' ? 'bg-primary text-primary-foreground border-primary' : 'text-muted-foreground border-border hover:bg-accent'"
 											>
 												{ i18n.T(ctx, "Include History") }
 											</button>
@@ -431,7 +421,7 @@ templ AgentsDialog() {
 												type="button"
 												@click="form.includeContents = 'none'"
 												class="flex-1 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors"
-												:class="form.includeContents === 'none' ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted/50 text-muted-foreground border-border hover:bg-accent'"
+												:class="form.includeContents === 'none' ? 'bg-primary text-primary-foreground border-primary' : 'text-muted-foreground border-border hover:bg-accent'"
 											>
 												{ i18n.T(ctx, "Fresh Context") }
 											</button>
@@ -539,7 +529,7 @@ templ AgentsDialog() {
 																	</div>
 <!-- Requirement badge — always show state: disabled (no config) / blocked / confirm / (none = enabled) -->
 																<template x-if="!plugin.requirement_config">
-																	<span class="inline-flex items-center rounded-full bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">disabled</span>
+																	<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium text-muted-foreground">disabled</span>
 																</template>
 																<template x-if="plugin.requirement_config && plugin.requirement_config.action === 'block'">
 																	<span class="inline-flex items-center rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">blocked</span>
@@ -556,7 +546,7 @@ templ AgentsDialog() {
 																				<span class="text-[11px] text-muted-foreground truncate flex-1" x-text="tool.name"></span>
 																				<!-- Tool requirement badge — always show state -->
 																				<template x-if="!tool.requirement_config">
-																					<span class="inline-flex items-center rounded-full bg-muted/50 px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">off</span>
+																					<span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">off</span>
 																				</template>
 																				<template x-if="tool.requirement_config && tool.requirement_config.action === 'block'">
 																					<span class="inline-flex items-center rounded-full bg-destructive/10 px-1.5 py-0.5 text-[9px] font-medium text-destructive">blocked</span>
@@ -725,7 +715,7 @@ templ AgentsDialog() {
 							</template>
 							<!-- Tools Notice (create mode only) -->
 							<template x-if="!editingAgent">
-								<div class="border border-border rounded-lg p-3 flex items-start gap-2 bg-muted/30">
+								<div class="border border-border rounded-lg p-3 flex items-start gap-2">
 									@icon.Info(icon.Props{Class: "size-4 text-muted-foreground shrink-0 mt-0.5"})
 									<p class="text-[11px] text-muted-foreground">
 										{ i18n.T(ctx, "After creating the agent, you can configure its tools and knowledge bases by editing it.") }
@@ -776,7 +766,7 @@ templ AgentsDialog() {
 													<div x-html="renderNode(form.graph, 'graph', 0, false)"></div>
 												</div>
 												<!-- Tree stats -->
-												<div class="flex items-center gap-4 p-2 mt-3 rounded-lg bg-muted/30 border border-border">
+												<div class="flex items-center gap-4 p-2 mt-3 rounded-lg border border-border">
 													<span class="text-[11px] text-muted-foreground" x-text="countNodes(form.graph) + ' nodes'"></span>
 													<span class="text-[11px] text-muted-foreground" x-text="'depth ' + nodeDepth(form.graph)"></span>
 													<span class="text-[11px] text-muted-foreground" x-text="collectAgentIds(form.graph).length + ' agents'"></span>
@@ -790,7 +780,7 @@ templ AgentsDialog() {
 								</div>
 							</div>
 						</div>
-						@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
+						@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto"}) {
 							<div class="flex items-center justify-end gap-2 w-full">
 								@button.Button(button.Props{
 									Variant: button.VariantGhost,
@@ -839,7 +829,7 @@ templ AgentsDialog() {
 								<span class="font-semibold" x-text="deletingAgent?.name"></span>?
 							</p>
 						</div>
-						@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
+						@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto"}) {
 							<div class="flex items-center justify-end gap-2 w-full">
 								@button.Button(button.Props{
 									Variant: button.VariantGhost,

@@ -90,7 +90,7 @@ templ AgentDesignerDialog() {
 									@input.Input(input.Props{
 										Type:        input.TypeSearch,
 										Placeholder: i18n.T(ctx, "Search agents..."),
-										Class:       "h-9 bg-muted/40 border-transparent focus-within:bg-background",
+										Class:       "h-9 border-transparent focus-within:bg-background",
 										Attributes: templ.Attributes{
 											"x-model.debounce.300ms": "searchQuery",
 											"@input":                 "searchAgents()",
@@ -403,7 +403,7 @@ templ AgentDesignerDialog() {
 								<span>{ i18n.T(ctx, "Choose YAML file") }</span>
 							</label>
 						</div>
-						<div class="px-4 py-3 border-t bg-muted/50 flex items-center justify-end gap-2 shrink-0">
+						<div class="px-4 py-3 border-t flex items-center justify-end gap-2 shrink-0">
 							@button.Button(button.Props{
 								Variant: button.VariantGhost,
 								Class:   "h-8 px-3 text-xs",
@@ -456,7 +456,7 @@ templ AgentDesignerDialog() {
 								@input.Input(input.Props{
 									Type:        input.TypeSearch,
 									Placeholder: i18n.T(ctx, "Search templates..."),
-									Class:       "h-9 bg-muted/40 border-transparent focus-within:bg-background",
+									Class:       "h-9 border-transparent focus-within:bg-background",
 									Attributes: templ.Attributes{
 										"x-model.debounce.300ms": "catalogSearchQuery",
 										"@input":                 "searchCatalog()",
@@ -643,7 +643,7 @@ templ AgentDesignerDialog() {
 								</template>
 							</div>
 							<!-- Footer -->
-							<div class="px-5 py-3 border-t border-border/50 bg-muted/50 flex items-center justify-end gap-2">
+							<div class="px-5 py-3 border-t border-border/50 flex items-center justify-end gap-2">
 								@button.Button(button.Props{
 									Variant: button.VariantGhost,
 									Class:   "h-8 px-3 text-xs",
@@ -694,7 +694,7 @@ templ AgentDesignerDialog() {
 							@agentNodeForm()
 						</div>
 						<!-- Save Footer -->
-						<div class="px-4 py-3 border-t bg-muted/50 flex items-center justify-end gap-2">
+						<div class="px-4 py-3 border-t flex items-center justify-end gap-2">
 							@button.Button(button.Props{
 								Variant: button.VariantGhost,
 								Class:   "h-8 px-3 text-xs",
@@ -822,7 +822,7 @@ templ AgentDesignerDialog() {
 							</div>
 						</div>
 						<!-- Name + description bar -->
-						<div class="flex items-center gap-2 px-3 py-1.5 border-b border-border/50 bg-muted/20 shrink-0">
+						<div class="flex items-center gap-2 px-3 py-1.5 border-b border-border/50 shrink-0">
 							<span class="text-[10px] text-muted-foreground shrink-0">{ i18n.T(ctx, "Name") }</span>
 							<input
 								x-model="pipelineName"
@@ -839,7 +839,7 @@ templ AgentDesignerDialog() {
 							/>
 						</div>
 						<!-- Status Bar -->
-						<div class="flex items-center gap-4 px-3 py-1 border-b border-border/30 bg-muted/10 shrink-0">
+						<div class="flex items-center gap-4 px-3 py-1 border-b border-border/30 shrink-0">
 							<span
 								class="text-[10px] font-mono tabular-nums"
 								:class="$store.flow.nodeCount() > 40 ? 'text-amber-500' : 'text-muted-foreground'"
@@ -902,7 +902,7 @@ templ AgentDesignerDialog() {
                                                                 <!-- Test Explorer Panel (inlined) -->
                                                                 <div class="flex flex-col h-full bg-background border-r border-border/50 overflow-hidden">
                                                                         <!-- Panel Header -->
-                                                                        <div class="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-muted/30 shrink-0">
+                                                                        <div class="flex items-center gap-2 px-3 py-2 border-b border-border/50 shrink-0">
                                                                                 <span class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-foreground">
                                                                                         @icon.TestTube(icon.Props{Class: "size-3"})
                                                                                         Test Explorer
@@ -925,7 +925,7 @@ templ AgentDesignerDialog() {
                                                                                 <button
                                                                                         @click="loadEvalSets()"
                                                                                         title="Refresh"
-                                                                                        class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                                                                                        class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-muted-foreground hover:text-foreground hover:transition-colors"
                                                                                 >
                                                                                         @icon.RefreshCw(icon.Props{Class: "size-3"})
                                                                                 </button>
@@ -954,7 +954,7 @@ templ AgentDesignerDialog() {
                                                                                         <div class="space-y-0.5">
                                                                                                 <!-- EvalSet Header -->
                                                                                                 <div
-                                                                                                        class="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs cursor-pointer hover:bg-muted/50 group"
+                                                                                                        class="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs cursor-pointer hover:group"
                                                                                                         @click="es.expanded = !es.expanded"
                                                                                                 >
                                                                                                         <span
@@ -971,7 +971,7 @@ templ AgentDesignerDialog() {
                                                                                                         <button
                                                                                                                 @click="runEvalSet(es.id)"
                                                                                                                 :disabled="evalRunning || !currentAgentId"
-                                                                                                                class="w-full flex items-center gap-1.5 px-2 py-1 rounded text-[11px] cursor-pointer hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                                                                                class="w-full flex items-center gap-1.5 px-2 py-1 rounded text-[11px] cursor-pointer hover:disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                                                                         >
                                                                                                                 @icon.Play(icon.Props{Class: "size-3 text-green-600"})
                                                                                                                 <span class="text-green-700 dark:text-green-400">Run All</span>
@@ -981,7 +981,7 @@ templ AgentDesignerDialog() {
                                                                                                         <template x-if="es.cases && es.cases.length > 0">
                                                                                                                 <button
                                                                                                                         @click="es.casesExpanded = !es.casesExpanded"
-                                                                                                                        class="w-full flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
+                                                                                                                        class="w-full flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-muted-foreground hover:text-foreground hover:transition-colors"
                                                                                                                 >
                                                                                                                         <span class="transition-transform duration-150 text-[8px]" :class="es.casesExpanded ? 'rotate-90' : ''">▶</span>
                                                                                                                         <span x-text="(es.cases?.length || 0) + ' cases'"></span>
@@ -995,7 +995,7 @@ templ AgentDesignerDialog() {
                                                                                                                                 <!-- Case row (clickable to expand results) -->
                                                                                                                                 <div
                                                                                                                                         @click="tc.resultsExpanded = !tc.resultsExpanded"
-                                                                                                                                        class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] cursor-pointer hover:bg-muted/30 transition-colors"
+                                                                                                                                        class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] cursor-pointer hover:transition-colors"
                                                                                                                                 >
                                                                                                                                         <!-- Expand indicator -->
                                                                                                                                         <template x-if="getCaseResult(tc.id)?.metrics?.length > 0">
@@ -1055,7 +1055,7 @@ templ AgentDesignerDialog() {
                                                                         </div>
 
                                                                         <!-- Panel Footer -->
-                                                                        <div class="px-3 py-2 border-t border-border/50 bg-muted/20 shrink-0 space-y-1.5">
+                                                                        <div class="px-3 py-2 border-t border-border/50 shrink-0 space-y-1.5">
                                                                                 <button
                                                                                         @click="runAllEvalSets()"
                                                                                         :disabled="evalRunning || !currentAgentId || evalSets.length === 0"
@@ -1190,7 +1190,7 @@ templ AgentDesignerDialog() {
 													<template x-if="selectedAgent">
 <div class="rounded-lg overflow-hidden bg-muted border-border">
 															<!-- Agent name header -->
-															<div class="px-2.5 py-2 bg-muted/50 border-b border-border flex items-center justify-between">
+															<div class="px-2.5 py-2 border-b border-border flex items-center justify-between">
 																<span class="text-[10px] font-semibold text-foreground truncate flex-1" x-text="selectedAgent.name"></span>
 																<!-- Coordinator badge -->
 																<template x-if="isCoordinator">
@@ -1282,28 +1282,28 @@ templ AgentDesignerDialog() {
 														<template x-if="!loadingMetadata">
 															<div class="space-y-1.5">
 																<!-- Tools -->
-																<div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/50">
+																<div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-border/50">
 																	@icon.Blocks(icon.Props{Class: "size-3 text-muted-foreground shrink-0"})
 																	<span class="text-[10px] text-muted-foreground flex-1">Tools</span>
 																	<span class="text-[10px] font-semibold text-foreground" x-text="toolCount + ' tool' + (toolCount !== 1 ? 's' : '')"></span>
 																</div>
 
 																<!-- Subagents -->
-																<div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/50">
+																<div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-border/50">
 																	@icon.Users(icon.Props{Class: "size-3 text-muted-foreground shrink-0"})
 																	<span class="text-[10px] text-muted-foreground flex-1">Subagents</span>
 																	<span class="text-[10px] font-semibold text-foreground" x-text="subAgentCount + ' agent' + (subAgentCount !== 1 ? 's' : '')"></span>
 																</div>
 
 																<!-- Knowledge Bases -->
-																<div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/50">
+																<div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-border/50">
 																	@icon.BookOpenText(icon.Props{Class: "size-3 text-muted-foreground shrink-0"})
 																	<span class="text-[10px] text-muted-foreground flex-1">Knowledge Bases</span>
 																	<span class="text-[10px] font-semibold text-foreground" x-text="kbCount + ' KB' + (kbCount !== 1 ? 's' : '')"></span>
 																</div>
 
 																<!-- Filesystems -->
-																<div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/50">
+																<div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-border/50">
 																	@icon.FolderOpen(icon.Props{Class: "size-3 text-muted-foreground shrink-0"})
 																	<span class="text-[10px] text-muted-foreground flex-1">Filesystems</span>
 																	<span class="text-[10px] font-semibold text-foreground" x-text="fsCount + ' FS' + (fsCount !== 1 ? 's' : '')"></span>
@@ -1495,7 +1495,7 @@ templ AgentDesignerDialog() {
                                                         x-transition:leave-end="opacity-0 translate-y-full"
                                                 >
                                                         <!-- Tab Bar -->
-                                                        <div class="flex items-center gap-0 px-2 shrink-0 border-b border-border/50 bg-muted/30" style="height:32px;">
+                                                        <div class="flex items-center gap-0 px-2 shrink-0 border-b border-border/50" style="height:32px;">
                                                                 <template x-for="tab in bottomTabs" :key="tab.id">
                                                                         <button
                                                                                 @click="activeBottomTab = tab.id"
@@ -1513,7 +1513,7 @@ templ AgentDesignerDialog() {
                                                                 <button
                                                                         @click="bottomPanelCollapsed = !bottomPanelCollapsed"
                                                                         :title="bottomPanelCollapsed ? 'Expand' : 'Minimize'"
-                                                                        class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                                                                        class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-muted-foreground hover:text-foreground hover:transition-colors"
                                                                 >
                                                                         <span class="transition-transform duration-200 inline-flex" :class="bottomPanelCollapsed ? '' : 'rotate-180'">
                                                                                 @icon.ChevronDown(icon.Props{Class: "size-3"})
@@ -1522,7 +1522,7 @@ templ AgentDesignerDialog() {
                                                                 <button
                                                                         @click="bottomPanelActive = false"
                                                                         title="Close"
-                                                                        class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-muted-foreground hover:text-destructive hover:bg-muted/60 transition-colors"
+                                                                        class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-muted-foreground hover:text-destructive hover:transition-colors"
                                                                 >
                                                                         @icon.X(icon.Props{Class: "size-3"})
                                                                 </button>
@@ -1615,7 +1615,7 @@ templ AgentDesignerDialog() {
 									</div>
 								</div>
 								<!-- Tip -->
-								<div class="flex items-start gap-2 p-2.5 bg-muted/30 rounded-lg">
+								<div class="flex items-start gap-2 p-2.5 rounded-lg">
 									@icon.Info(icon.Props{Class: "size-3.5 text-primary shrink-0 mt-0.5"})
 									<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "On macOS, use ⌘ instead of Ctrl") }</p>
 								</div>
@@ -1623,19 +1623,6 @@ templ AgentDesignerDialog() {
 						</div>
 					</div>
 					</div>
-				</template>
-				<!-- Footer (only on list view) -->
-				<template x-if="view === 'list'">
-					@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
-						<div class="flex items-center justify-between w-full">
-							<span class="text-xs text-muted-foreground" x-text="`${filteredAgents.length} agent${filteredAgents.length !== 1 ? 's' : ''}`"></span>
-							@dialog.Close() {
-								@button.Button(button.Props{Variant: button.VariantGhost, Class: "h-8 px-3 text-xs"}) {
-									{ i18n.T(ctx, "Close") }
-								}
-							}
-						</div>
-					}
 				</template>
 			}
 		}
@@ -1782,7 +1769,7 @@ templ agentNodeForm() {
 				<!-- Selected Agents List -->
 				<div class="space-y-1.5">
 					<template x-for="(ref, idx) in (form.subAgents || [])" :key="ref.agent_id">
-						<div class="flex items-center gap-2 p-2 rounded-md border border-border bg-muted/30">
+						<div class="flex items-center gap-2 p-2 rounded-md border border-border">
 							<span class="size-5 rounded bg-primary/10 flex items-center justify-center text-primary shrink-0 text-[10px] font-bold" x-text="idx + 1"></span>
 							<div class="flex-1 min-w-0">
 								<div class="text-xs font-medium truncate" x-text="getAgentName(ref.agent_id)"></div>
@@ -1894,7 +1881,7 @@ templ agentNodeForm() {
 						type="button"
 						@click="form.includeContents = ''"
 						class="flex-1 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors"
-						:class="!form.includeContents || form.includeContents === 'default' ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted/50 text-muted-foreground border-border hover:bg-accent'"
+						:class="!form.includeContents || form.includeContents === 'default' ? 'bg-primary text-primary-foreground border-primary' : 'text-muted-foreground border-border hover:bg-accent'"
 					>
 						{ i18n.T(ctx, "Include History") }
 					</button>
@@ -1902,7 +1889,7 @@ templ agentNodeForm() {
 						type="button"
 						@click="form.includeContents = 'none'"
 						class="flex-1 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors"
-						:class="form.includeContents === 'none' ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted/50 text-muted-foreground border-border hover:bg-accent'"
+						:class="form.includeContents === 'none' ? 'bg-primary text-primary-foreground border-primary' : 'text-muted-foreground border-border hover:bg-accent'"
 					>
 						{ i18n.T(ctx, "Fresh Context") }
 					</button>
@@ -1973,7 +1960,7 @@ templ agentNodeForm() {
 	</template>
 	<!-- Info notice (create mode) -->
 	<template x-if="!editingAgent">
-		<div class="border border-border rounded-lg p-3 flex items-start gap-2 bg-muted/30">
+		<div class="border border-border rounded-lg p-3 flex items-start gap-2">
 			@icon.Info(icon.Props{Class: "size-4 text-muted-foreground shrink-0 mt-0.5"})
 			<p class="text-[11px] text-muted-foreground">
 				{ i18n.T(ctx, "After creating the agent, you can add tools and knowledge bases by editing it.") }
@@ -2007,7 +1994,7 @@ templ toggleSwitch(model string, labelText string, helpText string) {
 
 // shortcutRow renders a single keyboard shortcut row for the help overlay.
 templ shortcutRow(label string, keys string) {
-	<div class="flex items-center justify-between py-1.5 px-2.5 rounded-md hover:bg-muted/50 transition-colors">
+	<div class="flex items-center justify-between py-1.5 px-2.5 rounded-md hover:transition-colors">
 		<span class="text-xs text-foreground">{ label }</span>
 		<div class="flex items-center gap-1">
 			<kbd class="kbd">{ keys }</kbd>
@@ -2694,7 +2681,7 @@ templ deleteConfirmation(cancelAction string, deleteAction string) {
 				<span class="font-semibold" x-text="deletingAgent?.name"></span>?
 			</p>
 		</div>
-		<div class="px-4 py-3 border-t mt-auto bg-muted/50 flex items-center justify-end gap-2">
+		<div class="px-4 py-3 border-t mt-auto flex items-center justify-end gap-2">
 			@button.Button(button.Props{
 				Variant: button.VariantGhost,
 				Class:   "h-8 px-3 text-xs",
@@ -2739,7 +2726,7 @@ templ deleteAllConfirmation() {
 				{ i18n.T(ctx, " agents?") }
 			</p>
 		</div>
-		<div class="px-4 py-3 border-t mt-auto bg-muted/50 flex items-center justify-end gap-2">
+		<div class="px-4 py-3 border-t mt-auto flex items-center justify-end gap-2">
 			@button.Button(button.Props{
 				Variant: button.VariantGhost,
 				Class:   "h-8 px-3 text-xs",

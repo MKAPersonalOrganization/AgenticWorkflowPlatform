@@ -80,7 +80,7 @@ templ A2ADialog() {
 								@input.Input(input.Props{
 									Type:        input.TypeSearch,
 									Placeholder: i18n.T(ctx, "Search A2A agents..."),
-									Class:       "h-9 bg-muted/40 border-transparent focus-within:bg-background",
+									Class:       "h-9 border-transparent focus-within:bg-background",
 									Attributes: templ.Attributes{
 										"x-model.debounce.300ms": "search",
 									},
@@ -151,19 +151,6 @@ templ A2ADialog() {
 								</div>
 							</template>
 						</div>
-						@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
-							<div class="flex items-center justify-between w-full">
-								<span class="text-xs text-muted-foreground">
-									<span x-text="connectors.length"></span> { i18n.T(ctx, "agents") } ·
-									<span x-text="totalSkills"></span> { i18n.T(ctx, "skills") }
-								</span>
-								@dialog.Close() {
-									@button.Button(button.Props{Variant: button.VariantGhost, Class: "h-8 px-3 text-xs"}) {
-										{ i18n.T(ctx, "Close") }
-									}
-								}
-							</div>
-						}
 					</div>
 				</template>
 				<!-- ═══════ Detail View ═══════ -->
@@ -206,7 +193,7 @@ templ A2ADialog() {
 							</div>
 						}
 						<!-- Info bar -->
-						<div class="px-4 py-2.5 border-b border-border bg-muted/50">
+						<div class="px-4 py-2.5 border-b border-border">
 							<div class="flex items-center justify-between">
 								<div class="flex items-center gap-3 text-xs text-muted-foreground">
 									<span class="flex items-center gap-1.5">
@@ -315,7 +302,7 @@ templ A2ADialog() {
 								</div>
 							</div>
 						</div>
-						@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
+						@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto"}) {
 							<div class="flex items-center justify-between w-full">
 								<div class="flex items-center gap-3 text-xs text-muted-foreground">
 									<span class="flex items-center gap-1.5">

@@ -188,18 +188,6 @@ templ MetricConfigDialog() {
 						</div>
 					</div>
 
-					<!-- Footer -->
-					@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
-						<div class="flex items-center justify-between w-full">
-							<span class="text-xs text-muted-foreground" x-show="selectedProfileId">{ i18n.T(ctx, "Editing existing profile") }</span>
-							<span class="text-xs text-muted-foreground" x-show="!selectedProfileId">{ i18n.T(ctx, "Creating new profile") }</span>
-							@dialog.Close() {
-								@button.Button(button.Props{Variant: button.VariantGhost, Class: "h-8 px-3 text-xs"}) {
-									{ i18n.T(ctx, "Close") }
-								}
-							}
-						</div>
-					}
 				</div>
 			}
 		}
