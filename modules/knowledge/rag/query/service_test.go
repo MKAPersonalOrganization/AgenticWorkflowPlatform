@@ -1,7 +1,7 @@
 package query
 
 import (
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -14,7 +14,7 @@ import (
 func TestService_Execute(t *testing.T) {
 	tenantID := uuid.New()
 	workspaceID := uuid.New()
-	tCtx := &shared.TenantContext{
+	tCtx := &tenant.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      "user-123",

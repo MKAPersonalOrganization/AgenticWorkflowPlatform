@@ -1,7 +1,7 @@
 package entities
 
 import (
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -31,7 +31,7 @@ func NewService(baseURL string, httpClient *http.Client) *Service {
 	}
 }
 
-func injectHeaders(req *http.Request, tc shared.TenantContext) {
+func injectHeaders(req *http.Request, tc tenant.TenantContext) {
 	if tc.TenantID != nil {
 		req.Header.Set("X-Tenant-ID", tc.TenantID.String())
 	}
@@ -57,7 +57,7 @@ func (s *Service) handleError(resp *http.Response) error {
 }
 
 // ListEntities retrieves a paginated list of entities.
-func (s *Service) ListEntities(ctx context.Context, tc shared.TenantContext, params *ListEntitiesParams) (*ListEntitiesResponse, error) {
+func (s *Service) ListEntities(ctx context.Context, tc tenant.TenantContext, params *ListEntitiesParams) (*ListEntitiesResponse, error) {
 	u, _ := url.Parse(fmt.Sprintf("%s/api/v1/graph/entities", s.baseURL))
 	if params != nil {
 		q := u.Query()
@@ -100,7 +100,7 @@ func (s *Service) ListEntities(ctx context.Context, tc shared.TenantContext, par
 }
 
 // CreateEntity creates a new entity.
-func (s *Service) CreateEntity(ctx context.Context, tc shared.TenantContext, req CreateEntityRequest) (*CreateEntityResponse, error) {
+func (s *Service) CreateEntity(ctx context.Context, tc tenant.TenantContext, req CreateEntityRequest) (*CreateEntityResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/graph/entities", s.baseURL)
 
 	body, err := json.Marshal(req)
@@ -133,7 +133,7 @@ func (s *Service) CreateEntity(ctx context.Context, tc shared.TenantContext, req
 }
 
 // EntityExists checks whether an entity with the given name exists.
-func (s *Service) EntityExists(ctx context.Context, tc shared.TenantContext, entityName string) (*EntityExistsResponse, error) {
+func (s *Service) EntityExists(ctx context.Context, tc tenant.TenantContext, entityName string) (*EntityExistsResponse, error) {
 	u, _ := url.Parse(fmt.Sprintf("%s/api/v1/graph/entities/exists", s.baseURL))
 	q := u.Query()
 	q.Set("entity_name", entityName)
@@ -163,7 +163,7 @@ func (s *Service) EntityExists(ctx context.Context, tc shared.TenantContext, ent
 }
 
 // MergeEntities merges two entities together.
-func (s *Service) MergeEntities(ctx context.Context, tc shared.TenantContext, req MergeEntitiesRequest) (*MergeEntitiesResponse, error) {
+func (s *Service) MergeEntities(ctx context.Context, tc tenant.TenantContext, req MergeEntitiesRequest) (*MergeEntitiesResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/graph/entities/merge", s.baseURL)
 
 	body, err := json.Marshal(req)
@@ -196,7 +196,7 @@ func (s *Service) MergeEntities(ctx context.Context, tc shared.TenantContext, re
 }
 
 // GetEntity retrieves a specific entity by name.
-func (s *Service) GetEntity(ctx context.Context, tc shared.TenantContext, name string) (*GetEntityResponse, error) {
+func (s *Service) GetEntity(ctx context.Context, tc tenant.TenantContext, name string) (*GetEntityResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/graph/entities/%s", s.baseURL, url.PathEscape(name))
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -223,7 +223,7 @@ func (s *Service) GetEntity(ctx context.Context, tc shared.TenantContext, name s
 }
 
 // UpdateEntity updates an existing entity by name.
-func (s *Service) UpdateEntity(ctx context.Context, tc shared.TenantContext, name string, req UpdateEntityRequest) (*UpdateEntityResponse, error) {
+func (s *Service) UpdateEntity(ctx context.Context, tc tenant.TenantContext, name string, req UpdateEntityRequest) (*UpdateEntityResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/graph/entities/%s", s.baseURL, url.PathEscape(name))
 
 	body, err := json.Marshal(req)
@@ -256,7 +256,7 @@ func (s *Service) UpdateEntity(ctx context.Context, tc shared.TenantContext, nam
 }
 
 // DeleteEntity deletes an entity by name.
-func (s *Service) DeleteEntity(ctx context.Context, tc shared.TenantContext, name string, confirm bool) (*DeleteEntityResponse, error) {
+func (s *Service) DeleteEntity(ctx context.Context, tc tenant.TenantContext, name string, confirm bool) (*DeleteEntityResponse, error) {
 	u, _ := url.Parse(fmt.Sprintf("%s/api/v1/graph/entities/%s", s.baseURL, url.PathEscape(name)))
 	q := u.Query()
 	if confirm {
@@ -289,7 +289,7 @@ func (s *Service) DeleteEntity(ctx context.Context, tc shared.TenantContext, nam
 }
 
 // GetEntityNeighborhood retrieves the neighborhood graph for an entity.
-func (s *Service) GetEntityNeighborhood(ctx context.Context, tc shared.TenantContext, name string, depth int) (*EntityNeighborhoodResponse, error) {
+func (s *Service) GetEntityNeighborhood(ctx context.Context, tc tenant.TenantContext, name string, depth int) (*EntityNeighborhoodResponse, error) {
 	u, _ := url.Parse(fmt.Sprintf("%s/api/v1/graph/entities/%s/neighborhood", s.baseURL, url.PathEscape(name)))
 	if depth > 0 {
 		q := u.Query()

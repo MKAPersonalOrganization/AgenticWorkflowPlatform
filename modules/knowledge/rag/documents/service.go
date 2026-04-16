@@ -2,7 +2,7 @@ package documents
 
 import (
 	"aicompass/modules/knowledge/rag/tasks"
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -39,7 +39,7 @@ func NewService(baseURL string, httpClient *http.Client) *Service {
 }
 
 // List retrieves a paginated list of documents from Edgequake.
-func (s *Service) List(ctx context.Context, tCtx *shared.TenantContext, page, pageSize int, status string) (*ListDocumentsResponse, error) {
+func (s *Service) List(ctx context.Context, tCtx *tenant.TenantContext, page, pageSize int, status string) (*ListDocumentsResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/documents?page=%d&page_size=%d", s.baseURL, page, pageSize)
 	if status != "" {
 		url += fmt.Sprintf("&status=%s", status)
@@ -71,7 +71,7 @@ func (s *Service) List(ctx context.Context, tCtx *shared.TenantContext, page, pa
 }
 
 // Get retrieves a single document by ID.
-func (s *Service) Get(ctx context.Context, tCtx *shared.TenantContext, documentID string) (*DocumentDetail, error) {
+func (s *Service) Get(ctx context.Context, tCtx *tenant.TenantContext, documentID string) (*DocumentDetail, error) {
 	url := fmt.Sprintf("%s/api/v1/documents/%s", s.baseURL, documentID)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -100,7 +100,7 @@ func (s *Service) Get(ctx context.Context, tCtx *shared.TenantContext, documentI
 }
 
 // Upload uploads a document to Edgequake.
-func (s *Service) Upload(ctx context.Context, tCtx *shared.TenantContext, fileName string, contentType string, content io.Reader) (*FileUploadResponse, error) {
+func (s *Service) Upload(ctx context.Context, tCtx *tenant.TenantContext, fileName string, contentType string, content io.Reader) (*FileUploadResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/documents/upload", s.baseURL)
 
 	var b bytes.Buffer
@@ -146,7 +146,7 @@ func (s *Service) Upload(ctx context.Context, tCtx *shared.TenantContext, fileNa
 }
 
 // ListPDFs retrieves a paginated list of PDFs from Edgequake.
-func (s *Service) ListPDFs(ctx context.Context, tCtx *shared.TenantContext, page, pageSize int, status string, search string) (*ListPdfsResponse, error) {
+func (s *Service) ListPDFs(ctx context.Context, tCtx *tenant.TenantContext, page, pageSize int, status string, search string) (*ListPdfsResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/documents/pdf?page=%d&page_size=%d", s.baseURL, page, pageSize)
 	if status != "" {
 		url += fmt.Sprintf("&status=%s", status)
@@ -181,7 +181,7 @@ func (s *Service) ListPDFs(ctx context.Context, tCtx *shared.TenantContext, page
 }
 
 // UploadPDF uploads a PDF document to Edgequake.
-func (s *Service) UploadPDF(ctx context.Context, tCtx *shared.TenantContext, fileName string, content io.Reader) (*PdfUploadResponse, error) {
+func (s *Service) UploadPDF(ctx context.Context, tCtx *tenant.TenantContext, fileName string, content io.Reader) (*PdfUploadResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/documents/pdf", s.baseURL)
 
 	var b bytes.Buffer
@@ -227,7 +227,7 @@ func (s *Service) UploadPDF(ctx context.Context, tCtx *shared.TenantContext, fil
 }
 
 // DeletePDF deletes a PDF document from Edgequake.
-func (s *Service) DeletePDF(ctx context.Context, tCtx *shared.TenantContext, pdfID string) error {
+func (s *Service) DeletePDF(ctx context.Context, tCtx *tenant.TenantContext, pdfID string) error {
 	url := fmt.Sprintf("%s/api/v1/documents/pdf/%s", s.baseURL, pdfID)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
@@ -254,7 +254,7 @@ func (s *Service) DeletePDF(ctx context.Context, tCtx *shared.TenantContext, pdf
 }
 
 // GetPDFProgress retrieves the progress of a PDF upload by track ID.
-func (s *Service) GetPDFProgress(ctx context.Context, tCtx *shared.TenantContext, trackID string) (*PdfUploadProgress, error) {
+func (s *Service) GetPDFProgress(ctx context.Context, tCtx *tenant.TenantContext, trackID string) (*PdfUploadProgress, error) {
 	url := fmt.Sprintf("%s/api/v1/documents/pdf/progress/%s", s.baseURL, trackID)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -283,7 +283,7 @@ func (s *Service) GetPDFProgress(ctx context.Context, tCtx *shared.TenantContext
 }
 
 // GetPDFStatus retrieves the status of a specific PDF.
-func (s *Service) GetPDFStatus(ctx context.Context, tCtx *shared.TenantContext, pdfID string) (*PdfStatusResponse, error) {
+func (s *Service) GetPDFStatus(ctx context.Context, tCtx *tenant.TenantContext, pdfID string) (*PdfStatusResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/documents/pdf/%s", s.baseURL, pdfID)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -312,7 +312,7 @@ func (s *Service) GetPDFStatus(ctx context.Context, tCtx *shared.TenantContext, 
 }
 
 // GetPDFContent retrieves the content of a specific PDF.
-func (s *Service) GetPDFContent(ctx context.Context, tCtx *shared.TenantContext, pdfID string) (*PdfContentResponse, error) {
+func (s *Service) GetPDFContent(ctx context.Context, tCtx *tenant.TenantContext, pdfID string) (*PdfContentResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/documents/pdf/%s/content", s.baseURL, pdfID)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -341,7 +341,7 @@ func (s *Service) GetPDFContent(ctx context.Context, tCtx *shared.TenantContext,
 }
 
 // DownloadPDF retrieves the raw PDF binary from Edgequake.
-func (s *Service) DownloadPDF(ctx context.Context, tCtx *shared.TenantContext, pdfID string) (io.ReadCloser, string, int64, error) {
+func (s *Service) DownloadPDF(ctx context.Context, tCtx *tenant.TenantContext, pdfID string) (io.ReadCloser, string, int64, error) {
 	url := fmt.Sprintf("%s/api/v1/documents/pdf/%s/download", s.baseURL, pdfID)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -365,7 +365,7 @@ func (s *Service) DownloadPDF(ctx context.Context, tCtx *shared.TenantContext, p
 }
 
 // GetPipelineTasks retrieves the current tasks in the pipeline.
-func (s *Service) GetPipelineTasks(ctx context.Context, tCtx *shared.TenantContext, page, pageSize int) (*tasks.TaskListResponse, error) {
+func (s *Service) GetPipelineTasks(ctx context.Context, tCtx *tenant.TenantContext, page, pageSize int) (*tasks.TaskListResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/tasks?page=%d&page_size=%d", s.baseURL, page, pageSize)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -394,7 +394,7 @@ func (s *Service) GetPipelineTasks(ctx context.Context, tCtx *shared.TenantConte
 }
 
 // Reprocess triggers reprocessing for a single document.
-func (s *Service) Reprocess(ctx context.Context, tCtx *shared.TenantContext, documentID string) (*ReprocessResponse, error) {
+func (s *Service) Reprocess(ctx context.Context, tCtx *tenant.TenantContext, documentID string) (*ReprocessResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/documents/reprocess", s.baseURL)
 	reqBody := map[string]interface{}{
 		"document_id":   documentID,
@@ -430,7 +430,7 @@ func (s *Service) Reprocess(ctx context.Context, tCtx *shared.TenantContext, doc
 }
 
 // ReprocessFailed triggers reprocessing for all failed documents.
-func (s *Service) ReprocessFailed(ctx context.Context, tCtx *shared.TenantContext) (*ReprocessFailedResponse, error) {
+func (s *Service) ReprocessFailed(ctx context.Context, tCtx *tenant.TenantContext) (*ReprocessFailedResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/documents/reprocess", s.baseURL)
 
 	// Empty JSON body - the API distinguishes reprocess-all from single-doc reprocess by the absence of document_id
@@ -462,7 +462,7 @@ func (s *Service) ReprocessFailed(ctx context.Context, tCtx *shared.TenantContex
 }
 
 // ScanDocuments triggers scanning of the input directory for new documents.
-func (s *Service) ScanDocuments(ctx context.Context, tCtx *shared.TenantContext, scanReq ScanDocumentsRequest) (*ScanDocumentsResponse, error) {
+func (s *Service) ScanDocuments(ctx context.Context, tCtx *tenant.TenantContext, scanReq ScanDocumentsRequest) (*ScanDocumentsResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/documents/scan", s.baseURL)
 
 	body, _ := json.Marshal(scanReq)
@@ -493,7 +493,7 @@ func (s *Service) ScanDocuments(ctx context.Context, tCtx *shared.TenantContext,
 }
 
 // DeleteAll deletes all documents from the workspace.
-func (s *Service) DeleteAll(ctx context.Context, tCtx *shared.TenantContext) (*DeleteAllDocumentsResponse, error) {
+func (s *Service) DeleteAll(ctx context.Context, tCtx *tenant.TenantContext) (*DeleteAllDocumentsResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/documents", s.baseURL)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
@@ -522,7 +522,7 @@ func (s *Service) DeleteAll(ctx context.Context, tCtx *shared.TenantContext) (*D
 }
 
 // RetryTask retries a failed task.
-func (s *Service) RetryTask(ctx context.Context, tCtx *shared.TenantContext, taskID string) (*TaskRetryResponse, error) {
+func (s *Service) RetryTask(ctx context.Context, tCtx *tenant.TenantContext, taskID string) (*TaskRetryResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/tasks/%s/retry", s.baseURL, taskID)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
@@ -551,7 +551,7 @@ func (s *Service) RetryTask(ctx context.Context, tCtx *shared.TenantContext, tas
 }
 
 // RetryPdfProcessing retries a failed PDF processing.
-func (s *Service) RetryPdfProcessing(ctx context.Context, tCtx *shared.TenantContext, pdfID string) (*PdfRetryResponse, error) {
+func (s *Service) RetryPdfProcessing(ctx context.Context, tCtx *tenant.TenantContext, pdfID string) (*PdfRetryResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/documents/pdf/%s/retry", s.baseURL, pdfID)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
@@ -580,7 +580,7 @@ func (s *Service) RetryPdfProcessing(ctx context.Context, tCtx *shared.TenantCon
 }
 
 // CancelTask cancels a task in the pipeline.
-func (s *Service) CancelTask(ctx context.Context, tCtx *shared.TenantContext, taskID string) error {
+func (s *Service) CancelTask(ctx context.Context, tCtx *tenant.TenantContext, taskID string) error {
 	url := fmt.Sprintf("%s/api/v1/tasks/%s/cancel", s.baseURL, taskID)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
@@ -600,7 +600,7 @@ func (s *Service) CancelTask(ctx context.Context, tCtx *shared.TenantContext, ta
 }
 
 // Delete deletes a document from Edgequake.
-func (s *Service) Delete(ctx context.Context, tCtx *shared.TenantContext, documentID string) error {
+func (s *Service) Delete(ctx context.Context, tCtx *tenant.TenantContext, documentID string) error {
 	url := fmt.Sprintf("%s/api/v1/documents/%s", s.baseURL, documentID)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
@@ -619,7 +619,7 @@ func (s *Service) Delete(ctx context.Context, tCtx *shared.TenantContext, docume
 	return s.handleError(resp)
 }
 
-func (s *Service) injectHeaders(req *http.Request, tCtx *shared.TenantContext) {
+func (s *Service) injectHeaders(req *http.Request, tCtx *tenant.TenantContext) {
 	if tCtx != nil {
 		if tCtx.TenantID != nil {
 			req.Header.Set("X-Tenant-ID", tCtx.TenantID.String())

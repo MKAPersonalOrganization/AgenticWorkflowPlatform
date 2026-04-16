@@ -1,7 +1,7 @@
 package pipeline
 
 import (
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -36,7 +36,7 @@ func NewService(baseURL string, httpClient *http.Client) *Service {
 }
 
 // Status retrieves the pipeline status.
-func (s *Service) Status(ctx context.Context, tCtx *shared.TenantContext) (*EnhancedPipelineStatusResponse, error) {
+func (s *Service) Status(ctx context.Context, tCtx *tenant.TenantContext) (*EnhancedPipelineStatusResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/pipeline/status", s.baseURL)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -65,7 +65,7 @@ func (s *Service) Status(ctx context.Context, tCtx *shared.TenantContext) (*Enha
 }
 
 // Cancel cancels the currently running pipeline.
-func (s *Service) Cancel(ctx context.Context, tCtx *shared.TenantContext) (*CancelPipelineResponse, error) {
+func (s *Service) Cancel(ctx context.Context, tCtx *tenant.TenantContext) (*CancelPipelineResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/pipeline/cancel", s.baseURL)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", urlStr, nil)
@@ -94,7 +94,7 @@ func (s *Service) Cancel(ctx context.Context, tCtx *shared.TenantContext) (*Canc
 }
 
 // Metrics retrieves queue metrics.
-func (s *Service) Metrics(ctx context.Context, tCtx *shared.TenantContext) (*QueueMetricsResponse, error) {
+func (s *Service) Metrics(ctx context.Context, tCtx *tenant.TenantContext) (*QueueMetricsResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/pipeline/queue-metrics", s.baseURL)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -123,7 +123,7 @@ func (s *Service) Metrics(ctx context.Context, tCtx *shared.TenantContext) (*Que
 }
 
 // History retrieves pipeline cost history.
-func (s *Service) History(ctx context.Context, tCtx *shared.TenantContext, params *PipelineHistoryParams) ([]CostHistoryPoint, error) {
+func (s *Service) History(ctx context.Context, tCtx *tenant.TenantContext, params *PipelineHistoryParams) ([]CostHistoryPoint, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/pipeline/history", s.baseURL)
 
 	query := url.Values{}
@@ -169,7 +169,7 @@ func (s *Service) History(ctx context.Context, tCtx *shared.TenantContext, param
 }
 
 // EstimateCost estimates the cost for a given model and token count.
-func (s *Service) EstimateCost(ctx context.Context, tCtx *shared.TenantContext, estReq *EstimateCostRequest) (*EstimateCostResponse, error) {
+func (s *Service) EstimateCost(ctx context.Context, tCtx *tenant.TenantContext, estReq *EstimateCostRequest) (*EstimateCostResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/pipeline/costs/estimate", s.baseURL)
 
 	body, err := json.Marshal(estReq)
@@ -203,7 +203,7 @@ func (s *Service) EstimateCost(ctx context.Context, tCtx *shared.TenantContext, 
 	return &response, nil
 }
 
-func (s *Service) injectHeaders(req *http.Request, tCtx *shared.TenantContext) {
+func (s *Service) injectHeaders(req *http.Request, tCtx *tenant.TenantContext) {
 	if tCtx != nil {
 		if tCtx.TenantID != nil {
 			req.Header.Set("X-Tenant-ID", tCtx.TenantID.String())

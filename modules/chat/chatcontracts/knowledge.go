@@ -1,7 +1,7 @@
 package chatcontracts
 
 import (
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 	"context"
 	"errors"
 	"io"
@@ -14,6 +14,6 @@ var (
 
 // DocumentProvider abstracts the knowledge/document module.
 type DocumentProvider interface {
-	ListDocuments(ctx context.Context, tCtx *shared.TenantContext, page, pageSize int, status string) (any, error)
-	UploadDocument(ctx context.Context, tCtx *shared.TenantContext, fileName string, contentType string, content io.Reader) (any, error)
+	ListDocuments(ctx context.Context, tCtx *tenant.TenantContext, page, pageSize int, status string) (any, error)
+	UploadDocument(ctx context.Context, tCtx *tenant.TenantContext, fileName string, contentType string, content io.Reader) (any, error)
 }

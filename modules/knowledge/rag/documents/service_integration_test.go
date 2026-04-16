@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 
 	"github.com/google/uuid"
 )
@@ -165,7 +165,7 @@ func TestService_Integration_PDF_Lifecycle(t *testing.T) {
 	fmt.Printf("PDF deleted successfully\n")
 }
 
-func getIntegrationContext() *shared.TenantContext {
+func getIntegrationContext() *tenant.TenantContext {
 	tenantIDStr := "00000000-0000-0000-0000-000000000002"
 	workspaceIDStr := "00000000-0000-0000-0000-000000000003"
 	userID := "00000000-0000-0000-0000-000000000001"
@@ -174,7 +174,7 @@ func getIntegrationContext() *shared.TenantContext {
 	id1, _ := uuid.Parse(tenantIDStr)
 	id2, _ := uuid.Parse(workspaceIDStr)
 
-	return &shared.TenantContext{
+	return &tenant.TenantContext{
 		TenantID:    &id1,
 		WorkspaceID: &id2,
 		UserID:      userID,

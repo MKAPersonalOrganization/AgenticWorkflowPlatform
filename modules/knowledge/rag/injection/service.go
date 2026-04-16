@@ -1,7 +1,7 @@
 package injection
 
 import (
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -90,7 +90,7 @@ type DeleteInjectionResponse struct {
 	Message string `json:"message"`
 }
 
-func (s *Service) doRequest(ctx context.Context, tCtx *shared.TenantContext, method, url string, body io.Reader) (*http.Response, error) {
+func (s *Service) doRequest(ctx context.Context, tCtx *tenant.TenantContext, method, url string, body io.Reader) (*http.Response, error) {
 	httpReq, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		return nil, err
@@ -116,7 +116,7 @@ func (s *Service) doRequest(ctx context.Context, tCtx *shared.TenantContext, met
 }
 
 // PutInjection creates or updates a knowledge injection entry.
-func (s *Service) PutInjection(ctx context.Context, tCtx *shared.TenantContext, workspaceID string, req *PutInjectionRequest) (*PutInjectionResponse, error) {
+func (s *Service) PutInjection(ctx context.Context, tCtx *tenant.TenantContext, workspaceID string, req *PutInjectionRequest) (*PutInjectionResponse, error) {
 	if len(req.Content) > MaxInjectionContentBytes {
 		return nil, fmt.Errorf("content exceeds %d byte limit", MaxInjectionContentBytes)
 	}
@@ -148,7 +148,7 @@ func (s *Service) PutInjection(ctx context.Context, tCtx *shared.TenantContext, 
 }
 
 // PutInjectionFile creates a knowledge injection from a file.
-func (s *Service) PutInjectionFile(ctx context.Context, tCtx *shared.TenantContext, workspaceID, name, filename string, content []byte) (*PutInjectionResponse, error) {
+func (s *Service) PutInjectionFile(ctx context.Context, tCtx *tenant.TenantContext, workspaceID, name, filename string, content []byte) (*PutInjectionResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/workspaces/%s/injection/file", s.baseURL, workspaceID)
 
 	body := &bytes.Buffer{}
@@ -215,7 +215,7 @@ func (s *Service) PutInjectionFile(ctx context.Context, tCtx *shared.TenantConte
 }
 
 // ListInjections returns all injection entries for a workspace.
-func (s *Service) ListInjections(ctx context.Context, tCtx *shared.TenantContext, workspaceID string) (*ListInjectionsResponse, error) {
+func (s *Service) ListInjections(ctx context.Context, tCtx *tenant.TenantContext, workspaceID string) (*ListInjectionsResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/workspaces/%s/injections", s.baseURL, workspaceID)
 
 	resp, err := s.doRequest(ctx, tCtx, "GET", url, nil)
@@ -238,7 +238,7 @@ func (s *Service) ListInjections(ctx context.Context, tCtx *shared.TenantContext
 }
 
 // GetInjection returns a single injection entry by ID.
-func (s *Service) GetInjection(ctx context.Context, tCtx *shared.TenantContext, workspaceID, injectionID string) (*InjectionDetailResponse, error) {
+func (s *Service) GetInjection(ctx context.Context, tCtx *tenant.TenantContext, workspaceID, injectionID string) (*InjectionDetailResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/workspaces/%s/injections/%s", s.baseURL, workspaceID, injectionID)
 
 	resp, err := s.doRequest(ctx, tCtx, "GET", url, nil)
@@ -261,7 +261,7 @@ func (s *Service) GetInjection(ctx context.Context, tCtx *shared.TenantContext, 
 }
 
 // UpdateInjection updates an existing injection entry.
-func (s *Service) UpdateInjection(ctx context.Context, tCtx *shared.TenantContext, workspaceID, injectionID string, req *UpdateInjectionRequest) (*InjectionDetailResponse, error) {
+func (s *Service) UpdateInjection(ctx context.Context, tCtx *tenant.TenantContext, workspaceID, injectionID string, req *UpdateInjectionRequest) (*InjectionDetailResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/workspaces/%s/injections/%s", s.baseURL, workspaceID, injectionID)
 
 	body, err := json.Marshal(req)
@@ -289,7 +289,7 @@ func (s *Service) UpdateInjection(ctx context.Context, tCtx *shared.TenantContex
 }
 
 // DeleteInjection removes an injection entry.
-func (s *Service) DeleteInjection(ctx context.Context, tCtx *shared.TenantContext, workspaceID, injectionID string) (*DeleteInjectionResponse, error) {
+func (s *Service) DeleteInjection(ctx context.Context, tCtx *tenant.TenantContext, workspaceID, injectionID string) (*DeleteInjectionResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/workspaces/%s/injections/%s", s.baseURL, workspaceID, injectionID)
 
 	resp, err := s.doRequest(ctx, tCtx, "DELETE", url, nil)

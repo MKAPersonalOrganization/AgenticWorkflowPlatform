@@ -1,7 +1,7 @@
 package workspaces
 
 import (
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -29,7 +29,7 @@ func NewService(baseURL string, httpClient *http.Client) *Service {
 }
 
 // List retrieves a list of workspaces for a specific tenant.
-func (s *Service) List(ctx context.Context, tCtx *shared.TenantContext, page, pageSize int) (*WorkspaceListResponse, error) {
+func (s *Service) List(ctx context.Context, tCtx *tenant.TenantContext, page, pageSize int) (*WorkspaceListResponse, error) {
 	if tCtx == nil || tCtx.TenantID == nil {
 		return nil, fmt.Errorf("tenant ID is required")
 	}
@@ -75,7 +75,7 @@ func (s *Service) List(ctx context.Context, tCtx *shared.TenantContext, page, pa
 }
 
 // Create creates a new workspace for a specific tenant.
-func (s *Service) Create(ctx context.Context, tCtx *shared.TenantContext, req *CreateWorkspaceRequest) (*WorkspaceResponse, error) {
+func (s *Service) Create(ctx context.Context, tCtx *tenant.TenantContext, req *CreateWorkspaceRequest) (*WorkspaceResponse, error) {
 	if tCtx == nil || tCtx.TenantID == nil {
 		return nil, fmt.Errorf("tenant ID is required")
 	}
@@ -124,7 +124,7 @@ func (s *Service) Create(ctx context.Context, tCtx *shared.TenantContext, req *C
 }
 
 // Get retrieves a specific workspace by its ID.
-func (s *Service) Get(ctx context.Context, tCtx *shared.TenantContext, workspaceID uuid.UUID) (*WorkspaceResponse, error) {
+func (s *Service) Get(ctx context.Context, tCtx *tenant.TenantContext, workspaceID uuid.UUID) (*WorkspaceResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/workspaces/%s", s.baseURL, workspaceID.String())
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -168,7 +168,7 @@ func (s *Service) Get(ctx context.Context, tCtx *shared.TenantContext, workspace
 }
 
 // Delete removes a specific workspace by its ID.
-func (s *Service) Delete(ctx context.Context, tCtx *shared.TenantContext, workspaceID uuid.UUID) error {
+func (s *Service) Delete(ctx context.Context, tCtx *tenant.TenantContext, workspaceID uuid.UUID) error {
 	url := fmt.Sprintf("%s/api/v1/workspaces/%s", s.baseURL, workspaceID.String())
 
 	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
@@ -207,7 +207,7 @@ func (s *Service) Delete(ctx context.Context, tCtx *shared.TenantContext, worksp
 }
 
 // GetStats retrieves statistics for a specific workspace.
-func (s *Service) GetStats(ctx context.Context, tCtx *shared.TenantContext, workspaceID uuid.UUID) (*WorkspaceStatsResponse, error) {
+func (s *Service) GetStats(ctx context.Context, tCtx *tenant.TenantContext, workspaceID uuid.UUID) (*WorkspaceStatsResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/workspaces/%s/stats", s.baseURL, workspaceID.String())
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -251,7 +251,7 @@ func (s *Service) GetStats(ctx context.Context, tCtx *shared.TenantContext, work
 }
 
 // Update modifies an existing workspace's fields.
-func (s *Service) Update(ctx context.Context, tCtx *shared.TenantContext, workspaceID uuid.UUID, req *UpdateWorkspaceRequest) (*WorkspaceResponse, error) {
+func (s *Service) Update(ctx context.Context, tCtx *tenant.TenantContext, workspaceID uuid.UUID, req *UpdateWorkspaceRequest) (*WorkspaceResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/workspaces/%s", s.baseURL, workspaceID.String())
 
 	body, err := json.Marshal(req)
@@ -302,7 +302,7 @@ func (s *Service) Update(ctx context.Context, tCtx *shared.TenantContext, worksp
 }
 
 // RebuildGraph clears the knowledge graph and triggers a rebuild.
-func (s *Service) RebuildGraph(ctx context.Context, tCtx *shared.TenantContext, workspaceID uuid.UUID, req *RebuildKnowledgeGraphRequest) (*RebuildKnowledgeGraphResponse, error) {
+func (s *Service) RebuildGraph(ctx context.Context, tCtx *tenant.TenantContext, workspaceID uuid.UUID, req *RebuildKnowledgeGraphRequest) (*RebuildKnowledgeGraphResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/workspaces/%s/rebuild-knowledge-graph", s.baseURL, workspaceID.String())
 
 	body, err := json.Marshal(req)
@@ -337,7 +337,7 @@ func (s *Service) RebuildGraph(ctx context.Context, tCtx *shared.TenantContext, 
 }
 
 // RebuildEmbeddings clears all embeddings and triggers a re-indexing.
-func (s *Service) RebuildEmbeddings(ctx context.Context, tCtx *shared.TenantContext, workspaceID uuid.UUID, req *RebuildEmbeddingsRequest) (*RebuildEmbeddingsResponse, error) {
+func (s *Service) RebuildEmbeddings(ctx context.Context, tCtx *tenant.TenantContext, workspaceID uuid.UUID, req *RebuildEmbeddingsRequest) (*RebuildEmbeddingsResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/workspaces/%s/rebuild-embeddings", s.baseURL, workspaceID.String())
 
 	body, err := json.Marshal(req)
@@ -371,7 +371,7 @@ func (s *Service) RebuildEmbeddings(ctx context.Context, tCtx *shared.TenantCont
 	return &response, nil
 }
 
-func (s *Service) injectHeaders(req *http.Request, tCtx *shared.TenantContext) {
+func (s *Service) injectHeaders(req *http.Request, tCtx *tenant.TenantContext) {
 	if tCtx != nil {
 		if tCtx.TenantID != nil {
 			req.Header.Set("X-Tenant-ID", tCtx.TenantID.String())

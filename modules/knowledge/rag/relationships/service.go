@@ -1,7 +1,7 @@
 package relationships
 
 import (
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -31,7 +31,7 @@ func NewService(baseURL string, httpClient *http.Client) *Service {
 	}
 }
 
-func injectHeaders(req *http.Request, tc shared.TenantContext) {
+func injectHeaders(req *http.Request, tc tenant.TenantContext) {
 	if tc.TenantID != nil {
 		req.Header.Set("X-Tenant-ID", tc.TenantID.String())
 	}
@@ -57,7 +57,7 @@ func (s *Service) handleError(resp *http.Response) error {
 }
 
 // ListRelationships retrieves a paginated list of relationships.
-func (s *Service) ListRelationships(ctx context.Context, tc shared.TenantContext, params *ListRelationshipsParams) (*ListRelationshipsResponse, error) {
+func (s *Service) ListRelationships(ctx context.Context, tc tenant.TenantContext, params *ListRelationshipsParams) (*ListRelationshipsResponse, error) {
 	u, _ := url.Parse(fmt.Sprintf("%s/api/v1/graph/relationships", s.baseURL))
 	if params != nil {
 		q := u.Query()
@@ -97,7 +97,7 @@ func (s *Service) ListRelationships(ctx context.Context, tc shared.TenantContext
 }
 
 // CreateRelationship creates a new relationship.
-func (s *Service) CreateRelationship(ctx context.Context, tc shared.TenantContext, req CreateRelationshipRequest) (*CreateRelationshipResponse, error) {
+func (s *Service) CreateRelationship(ctx context.Context, tc tenant.TenantContext, req CreateRelationshipRequest) (*CreateRelationshipResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/graph/relationships", s.baseURL)
 
 	body, err := json.Marshal(req)
@@ -130,7 +130,7 @@ func (s *Service) CreateRelationship(ctx context.Context, tc shared.TenantContex
 }
 
 // GetRelationship retrieves a specific relationship by ID.
-func (s *Service) GetRelationship(ctx context.Context, tc shared.TenantContext, id string) (*GetRelationshipResponse, error) {
+func (s *Service) GetRelationship(ctx context.Context, tc tenant.TenantContext, id string) (*GetRelationshipResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/graph/relationships/%s", s.baseURL, url.PathEscape(id))
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -157,7 +157,7 @@ func (s *Service) GetRelationship(ctx context.Context, tc shared.TenantContext, 
 }
 
 // UpdateRelationship updates an existing relationship by ID.
-func (s *Service) UpdateRelationship(ctx context.Context, tc shared.TenantContext, id string, req UpdateRelationshipRequest) (*UpdateRelationshipResponse, error) {
+func (s *Service) UpdateRelationship(ctx context.Context, tc tenant.TenantContext, id string, req UpdateRelationshipRequest) (*UpdateRelationshipResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/graph/relationships/%s", s.baseURL, url.PathEscape(id))
 
 	body, err := json.Marshal(req)
@@ -190,7 +190,7 @@ func (s *Service) UpdateRelationship(ctx context.Context, tc shared.TenantContex
 }
 
 // DeleteRelationship deletes a relationship by ID.
-func (s *Service) DeleteRelationship(ctx context.Context, tc shared.TenantContext, id string) (*DeleteRelationshipResponse, error) {
+func (s *Service) DeleteRelationship(ctx context.Context, tc tenant.TenantContext, id string) (*DeleteRelationshipResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/graph/relationships/%s", s.baseURL, url.PathEscape(id))
 
 	req, err := http.NewRequestWithContext(ctx, "DELETE", urlStr, nil)

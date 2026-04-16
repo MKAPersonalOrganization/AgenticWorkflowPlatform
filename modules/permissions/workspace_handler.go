@@ -3,6 +3,7 @@ package permissions
 import (
 	"aicompass/foundation/agent"
 	"aicompass/foundation/logger"
+	"aicompass/modules/knowledge/tenant"
 	"aicompass/modules/permissions/workspace"
 	"aicompass/shared"
 	"encoding/json"
@@ -70,7 +71,7 @@ func (h *workspacePermHandler) ListAgentWorkspaces(w http.ResponseWriter, r *htt
 		return
 	}
 
-	tCtx := &shared.TenantContext{
+	tCtx := &tenant.TenantContext{
 		TenantID: &tenantUUID,
 		UserID:   user.ID,
 		Role:     "user",

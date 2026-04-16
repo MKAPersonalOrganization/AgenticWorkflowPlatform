@@ -1,7 +1,7 @@
 package workspaces
 
 import (
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,7 +15,7 @@ import (
 
 func TestService_List(t *testing.T) {
 	tenantID := uuid.New()
-	tCtx := &shared.TenantContext{
+	tCtx := &tenant.TenantContext{
 		TenantID: &tenantID,
 	}
 
@@ -52,7 +52,7 @@ func TestService_List(t *testing.T) {
 
 func TestService_Create(t *testing.T) {
 	tenantID := uuid.New()
-	tCtx := &shared.TenantContext{
+	tCtx := &tenant.TenantContext{
 		TenantID: &tenantID,
 	}
 

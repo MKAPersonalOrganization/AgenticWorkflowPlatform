@@ -8,17 +8,17 @@ import (
 	"os"
 	"testing"
 
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func testFolderContext() *shared.TenantContext {
+func testFolderContext() *tenant.TenantContext {
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	return &shared.TenantContext{
+	return &tenant.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      "00000000-0000-0000-0000-000000000001",
@@ -373,7 +373,7 @@ func TestService_Integration_EmptyList(t *testing.T) {
 	// Use a different tenant to ensure empty list
 	tenantID := uuid.New()
 	workspaceID := uuid.New()
-	tCtx := &shared.TenantContext{
+	tCtx := &tenant.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      "test-user-empty",

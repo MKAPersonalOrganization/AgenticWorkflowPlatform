@@ -1,7 +1,7 @@
 package chat
 
 import (
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -31,7 +31,7 @@ func NewService(baseURL string, httpClient *http.Client) *Service {
 }
 
 // Complete sends a chat completion request and returns the response.
-func (s *Service) Complete(ctx context.Context, tCtx *shared.TenantContext, req ChatCompletionRequest) (*ChatCompletionResponse, error) {
+func (s *Service) Complete(ctx context.Context, tCtx *tenant.TenantContext, req ChatCompletionRequest) (*ChatCompletionResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/chat/completions", s.baseURL)
 
 	body, err := json.Marshal(req)
@@ -65,7 +65,7 @@ func (s *Service) Complete(ctx context.Context, tCtx *shared.TenantContext, req 
 	return &response, nil
 }
 
-func (s *Service) injectHeaders(req *http.Request, tCtx *shared.TenantContext) {
+func (s *Service) injectHeaders(req *http.Request, tCtx *tenant.TenantContext) {
 	if tCtx != nil {
 		if tCtx.TenantID != nil {
 			req.Header.Set("X-Tenant-ID", tCtx.TenantID.String())

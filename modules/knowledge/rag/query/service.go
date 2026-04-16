@@ -1,7 +1,7 @@
 package query
 
 import (
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 	"bufio"
 	"bytes"
 	"context"
@@ -30,7 +30,7 @@ func NewService(baseURL string, httpClient *http.Client) *Service {
 }
 
 // Execute performs a standard RAG query.
-func (s *Service) Execute(ctx context.Context, tCtx *shared.TenantContext, req *QueryRequest) (*QueryResponse, error) {
+func (s *Service) Execute(ctx context.Context, tCtx *tenant.TenantContext, req *QueryRequest) (*QueryResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/query", s.baseURL)
 
 	body, err := json.Marshal(req)
@@ -78,7 +78,7 @@ func (s *Service) Execute(ctx context.Context, tCtx *shared.TenantContext, req *
 }
 
 // Stream performs a streaming RAG query with v2 structured JSON events.
-func (s *Service) Stream(ctx context.Context, tCtx *shared.TenantContext, req *StreamQueryRequest) (<-chan *QueryStreamEvent, <-chan error) {
+func (s *Service) Stream(ctx context.Context, tCtx *tenant.TenantContext, req *StreamQueryRequest) (<-chan *QueryStreamEvent, <-chan error) {
 	eventChan := make(chan *QueryStreamEvent)
 	errChan := make(chan error, 1)
 

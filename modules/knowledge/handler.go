@@ -7,6 +7,7 @@ import (
 	"aicompass/modules/knowledge/rag/documents"
 	"aicompass/modules/knowledge/rag/graph"
 	"aicompass/modules/knowledge/rag/workspaces"
+	"aicompass/modules/knowledge/tenant"
 	"aicompass/shared"
 	"encoding/json"
 	"errors"
@@ -40,7 +41,7 @@ func newHandler(log *logger.Logger, edgequakeService *edgequake.Service, aiSetti
 }
 
 // resolveTenantContext resolves the tenant context for the authenticated user.
-func (h *handler) resolveTenantContext(r *http.Request) (*shared.TenantContext, error) {
+func (h *handler) resolveTenantContext(r *http.Request) (*tenant.TenantContext, error) {
 	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		return nil, fmt.Errorf("no authenticated user")
@@ -56,10 +57,10 @@ func (h *handler) resolveTenantContext(r *http.Request) (*shared.TenantContext, 
 	if err != nil {
 		return nil, fmt.Errorf("invalid configured tenant ID: %w", err)
 	}
-	return &shared.TenantContext{
+	return &tenant.TenantContext{
 		TenantID: &tID,
 		UserID:   user.ID,
-		Role:     string(shared.RoleAdmin), // Assume admin for static tenant
+		Role:     string(tenant.RoleAdmin), // Assume admin for static tenant
 	}, nil
 }
 

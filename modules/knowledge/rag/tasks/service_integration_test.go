@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -26,7 +26,7 @@ func TestService_Integration_ListTasks(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	tCtx := &shared.TenantContext{
+	tCtx := &tenant.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      uuid.MustParse("00000000-0000-0000-0000-000000000004").String(),
@@ -60,7 +60,7 @@ func TestService_Integration_ListTasksWithPagination(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	tCtx := &shared.TenantContext{
+	tCtx := &tenant.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      uuid.MustParse("00000000-0000-0000-0000-000000000004").String(),
@@ -93,7 +93,7 @@ func TestService_Integration_ListTasksWithStatusFilter(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	tCtx := &shared.TenantContext{
+	tCtx := &tenant.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      uuid.MustParse("00000000-0000-0000-0000-000000000004").String(),
@@ -128,7 +128,7 @@ func TestService_Integration_ListTasksWithTaskTypeFilter(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	tCtx := &shared.TenantContext{
+	tCtx := &tenant.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      uuid.MustParse("00000000-0000-0000-0000-000000000004").String(),
@@ -159,7 +159,7 @@ func TestService_Integration_ListTasksWithSorting(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	tCtx := &shared.TenantContext{
+	tCtx := &tenant.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      uuid.MustParse("00000000-0000-0000-0000-000000000004").String(),
@@ -200,7 +200,7 @@ func TestService_Integration_ListTasksWithMultipleFilters(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	tCtx := &shared.TenantContext{
+	tCtx := &tenant.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      uuid.MustParse("00000000-0000-0000-0000-000000000004").String(),
@@ -243,7 +243,7 @@ func TestService_Integration_GetNonExistentTask(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	tCtx := &shared.TenantContext{
+	tCtx := &tenant.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      uuid.MustParse("00000000-0000-0000-0000-000000000004").String(),
@@ -267,7 +267,7 @@ func TestService_Integration_CancelNonExistentTask(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	tCtx := &shared.TenantContext{
+	tCtx := &tenant.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      uuid.MustParse("00000000-0000-0000-0000-000000000004").String(),
@@ -290,7 +290,7 @@ func TestService_Integration_RetryNonExistentTask(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	tCtx := &shared.TenantContext{
+	tCtx := &tenant.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      uuid.MustParse("00000000-0000-0000-0000-000000000004").String(),
@@ -313,7 +313,7 @@ func TestService_Integration_TaskResponseFields(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	tCtx := &shared.TenantContext{
+	tCtx := &tenant.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      uuid.MustParse("00000000-0000-0000-0000-000000000004").String(),
@@ -356,7 +356,7 @@ func TestService_Integration_StatisticsAccuracy(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	tCtx := &shared.TenantContext{
+	tCtx := &tenant.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      uuid.MustParse("00000000-0000-0000-0000-000000000004").String(),
@@ -391,7 +391,7 @@ func TestService_Integration_PaginationConsistency(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	tCtx := &shared.TenantContext{
+	tCtx := &tenant.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      uuid.MustParse("00000000-0000-0000-0000-000000000004").String(),
@@ -438,7 +438,7 @@ func TestService_Integration_GetTaskIfExists(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	tCtx := &shared.TenantContext{
+	tCtx := &tenant.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      uuid.MustParse("00000000-0000-0000-0000-000000000004").String(),
@@ -471,7 +471,7 @@ func TestService_Integration_FilterByMultipleStatuses(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	tCtx := &shared.TenantContext{
+	tCtx := &tenant.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      uuid.MustParse("00000000-0000-0000-0000-000000000004").String(),
@@ -505,7 +505,7 @@ func TestService_Integration_SortOrderVerification(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	tCtx := &shared.TenantContext{
+	tCtx := &tenant.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      uuid.MustParse("00000000-0000-0000-0000-000000000004").String(),
@@ -561,7 +561,7 @@ func TestService_Integration_EmptyResultSet(t *testing.T) {
 
 	tenantID := uuid.New()
 	workspaceID := uuid.New()
-	tCtx := &shared.TenantContext{
+	tCtx := &tenant.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      uuid.New().String(),

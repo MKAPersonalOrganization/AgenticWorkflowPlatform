@@ -1,7 +1,7 @@
 package permissions
 
 import (
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 	"context"
 
 	"github.com/google/uuid"
@@ -24,5 +24,5 @@ type WorkspaceList struct {
 // WorkspaceProvider abstracts the dependency on the knowledge module.
 type WorkspaceProvider interface {
 	// ListWorkspaces retrieves a list of workspaces accessible in the given tenant context.
-	ListWorkspaces(ctx context.Context, tCtx *shared.TenantContext, page, pageSize int) (*WorkspaceList, error)
+	ListWorkspaces(ctx context.Context, tCtx *tenant.TenantContext, page, pageSize int) (*WorkspaceList, error)
 }

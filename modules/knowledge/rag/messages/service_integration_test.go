@@ -8,17 +8,17 @@ import (
 	"os"
 	"testing"
 
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 	"aicompass/modules/knowledge/rag/messages"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
-func testTenantContext() *shared.TenantContext {
+func testTenantContext() *tenant.TenantContext {
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	workspaceID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	return &shared.TenantContext{
+	return &tenant.TenantContext{
 		TenantID:    &tenantID,
 		WorkspaceID: &workspaceID,
 		UserID:      "00000000-0000-0000-0000-000000000001",

@@ -1,7 +1,7 @@
 package conversations
 
 import (
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -38,7 +38,7 @@ func NewService(baseURL string, httpClient *http.Client) *Service {
 }
 
 // List retrieves a paginated list of conversations.
-func (s *Service) List(ctx context.Context, tCtx *shared.TenantContext, params *ListConversationsParams) (*PaginatedConversationsResponse, error) {
+func (s *Service) List(ctx context.Context, tCtx *tenant.TenantContext, params *ListConversationsParams) (*PaginatedConversationsResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/conversations", s.baseURL)
 
 	query := url.Values{}
@@ -102,7 +102,7 @@ func (s *Service) List(ctx context.Context, tCtx *shared.TenantContext, params *
 }
 
 // Create creates a new conversation.
-func (s *Service) Create(ctx context.Context, tCtx *shared.TenantContext, req *CreateConversationRequest) (*ConversationResponse, error) {
+func (s *Service) Create(ctx context.Context, tCtx *tenant.TenantContext, req *CreateConversationRequest) (*ConversationResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/conversations", s.baseURL)
 
 	body, err := json.Marshal(req)
@@ -137,7 +137,7 @@ func (s *Service) Create(ctx context.Context, tCtx *shared.TenantContext, req *C
 }
 
 // Get retrieves a conversation by ID.
-func (s *Service) Get(ctx context.Context, tCtx *shared.TenantContext, conversationID uuid.UUID) (*ConversationWithMessagesResponse, error) {
+func (s *Service) Get(ctx context.Context, tCtx *tenant.TenantContext, conversationID uuid.UUID) (*ConversationWithMessagesResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/conversations/%s", s.baseURL, conversationID.String())
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -166,7 +166,7 @@ func (s *Service) Get(ctx context.Context, tCtx *shared.TenantContext, conversat
 }
 
 // Update updates a conversation.
-func (s *Service) Update(ctx context.Context, tCtx *shared.TenantContext, conversationID uuid.UUID, req *UpdateConversationRequest) (*ConversationResponse, error) {
+func (s *Service) Update(ctx context.Context, tCtx *tenant.TenantContext, conversationID uuid.UUID, req *UpdateConversationRequest) (*ConversationResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/conversations/%s", s.baseURL, conversationID.String())
 
 	body, err := json.Marshal(req)
@@ -201,7 +201,7 @@ func (s *Service) Update(ctx context.Context, tCtx *shared.TenantContext, conver
 }
 
 // Delete deletes a conversation.
-func (s *Service) Delete(ctx context.Context, tCtx *shared.TenantContext, conversationID uuid.UUID) error {
+func (s *Service) Delete(ctx context.Context, tCtx *tenant.TenantContext, conversationID uuid.UUID) error {
 	urlStr := fmt.Sprintf("%s/api/v1/conversations/%s", s.baseURL, conversationID.String())
 
 	req, err := http.NewRequestWithContext(ctx, "DELETE", urlStr, nil)
@@ -221,7 +221,7 @@ func (s *Service) Delete(ctx context.Context, tCtx *shared.TenantContext, conver
 }
 
 // ListMessages retrieves messages for a conversation.
-func (s *Service) ListMessages(ctx context.Context, tCtx *shared.TenantContext, conversationID uuid.UUID, params *ListMessagesParams) (*PaginatedMessagesResponse, error) {
+func (s *Service) ListMessages(ctx context.Context, tCtx *tenant.TenantContext, conversationID uuid.UUID, params *ListMessagesParams) (*PaginatedMessagesResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/conversations/%s/messages", s.baseURL, conversationID.String())
 
 	query := url.Values{}
@@ -264,7 +264,7 @@ func (s *Service) ListMessages(ctx context.Context, tCtx *shared.TenantContext, 
 }
 
 // CreateMessage creates a new message in a conversation.
-func (s *Service) CreateMessage(ctx context.Context, tCtx *shared.TenantContext, conversationID uuid.UUID, req *CreateMessageRequest) (*MessageResponse, error) {
+func (s *Service) CreateMessage(ctx context.Context, tCtx *tenant.TenantContext, conversationID uuid.UUID, req *CreateMessageRequest) (*MessageResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/conversations/%s/messages", s.baseURL, conversationID.String())
 
 	body, err := json.Marshal(req)
@@ -299,7 +299,7 @@ func (s *Service) CreateMessage(ctx context.Context, tCtx *shared.TenantContext,
 }
 
 // UpdateMessage updates a message.
-func (s *Service) UpdateMessage(ctx context.Context, tCtx *shared.TenantContext, messageID uuid.UUID, req *UpdateMessageRequest) (*MessageResponse, error) {
+func (s *Service) UpdateMessage(ctx context.Context, tCtx *tenant.TenantContext, messageID uuid.UUID, req *UpdateMessageRequest) (*MessageResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/messages/%s", s.baseURL, messageID.String())
 
 	body, err := json.Marshal(req)
@@ -334,7 +334,7 @@ func (s *Service) UpdateMessage(ctx context.Context, tCtx *shared.TenantContext,
 }
 
 // DeleteMessage deletes a message.
-func (s *Service) DeleteMessage(ctx context.Context, tCtx *shared.TenantContext, messageID uuid.UUID) error {
+func (s *Service) DeleteMessage(ctx context.Context, tCtx *tenant.TenantContext, messageID uuid.UUID) error {
 	urlStr := fmt.Sprintf("%s/api/v1/messages/%s", s.baseURL, messageID.String())
 
 	req, err := http.NewRequestWithContext(ctx, "DELETE", urlStr, nil)
@@ -354,7 +354,7 @@ func (s *Service) DeleteMessage(ctx context.Context, tCtx *shared.TenantContext,
 }
 
 // BulkDelete deletes multiple conversations.
-func (s *Service) BulkDelete(ctx context.Context, tCtx *shared.TenantContext, req *BulkOperationRequest) (*BulkOperationResponse, error) {
+func (s *Service) BulkDelete(ctx context.Context, tCtx *tenant.TenantContext, req *BulkOperationRequest) (*BulkOperationResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/conversations/bulk/delete", s.baseURL)
 
 	body, err := json.Marshal(req)
@@ -389,7 +389,7 @@ func (s *Service) BulkDelete(ctx context.Context, tCtx *shared.TenantContext, re
 }
 
 // BulkArchive archives or unarchives multiple conversations.
-func (s *Service) BulkArchive(ctx context.Context, tCtx *shared.TenantContext, req *BulkArchiveRequest) (*BulkOperationResponse, error) {
+func (s *Service) BulkArchive(ctx context.Context, tCtx *tenant.TenantContext, req *BulkArchiveRequest) (*BulkOperationResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/conversations/bulk/archive", s.baseURL)
 
 	body, err := json.Marshal(req)
@@ -424,7 +424,7 @@ func (s *Service) BulkArchive(ctx context.Context, tCtx *shared.TenantContext, r
 }
 
 // BulkMove moves multiple conversations to a folder.
-func (s *Service) BulkMove(ctx context.Context, tCtx *shared.TenantContext, req *BulkMoveRequest) (*BulkOperationResponse, error) {
+func (s *Service) BulkMove(ctx context.Context, tCtx *tenant.TenantContext, req *BulkMoveRequest) (*BulkOperationResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/conversations/bulk/move", s.baseURL)
 
 	body, err := json.Marshal(req)
@@ -458,7 +458,7 @@ func (s *Service) BulkMove(ctx context.Context, tCtx *shared.TenantContext, req 
 	return &response, nil
 }
 
-func (s *Service) injectHeaders(req *http.Request, tCtx *shared.TenantContext) {
+func (s *Service) injectHeaders(req *http.Request, tCtx *tenant.TenantContext) {
 	if tCtx != nil {
 		if tCtx.TenantID != nil {
 			req.Header.Set("X-Tenant-ID", tCtx.TenantID.String())

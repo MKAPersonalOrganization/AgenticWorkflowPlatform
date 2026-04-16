@@ -1,7 +1,7 @@
 package costs
 
 import (
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -36,7 +36,7 @@ func NewService(baseURL string, httpClient *http.Client) *Service {
 }
 
 // Summary retrieves the cost summary for the workspace.
-func (s *Service) Summary(ctx context.Context, tCtx *shared.TenantContext) (*WorkspaceCostSummaryResponse, error) {
+func (s *Service) Summary(ctx context.Context, tCtx *tenant.TenantContext) (*WorkspaceCostSummaryResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/costs/summary", s.baseURL)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -65,7 +65,7 @@ func (s *Service) Summary(ctx context.Context, tCtx *shared.TenantContext) (*Wor
 }
 
 // History retrieves cost history.
-func (s *Service) History(ctx context.Context, tCtx *shared.TenantContext, params *CostHistoryParams) ([]CostHistoryPoint, error) {
+func (s *Service) History(ctx context.Context, tCtx *tenant.TenantContext, params *CostHistoryParams) ([]CostHistoryPoint, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/costs/history", s.baseURL)
 
 	query := url.Values{}
@@ -111,7 +111,7 @@ func (s *Service) History(ctx context.Context, tCtx *shared.TenantContext, param
 }
 
 // GetBudget retrieves the budget for the workspace.
-func (s *Service) GetBudget(ctx context.Context, tCtx *shared.TenantContext) (*BudgetInfo, error) {
+func (s *Service) GetBudget(ctx context.Context, tCtx *tenant.TenantContext) (*BudgetInfo, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/costs/budget", s.baseURL)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -140,7 +140,7 @@ func (s *Service) GetBudget(ctx context.Context, tCtx *shared.TenantContext) (*B
 }
 
 // UpdateBudget updates the budget for the workspace.
-func (s *Service) UpdateBudget(ctx context.Context, tCtx *shared.TenantContext, budget *BudgetInfo) (*BudgetInfo, error) {
+func (s *Service) UpdateBudget(ctx context.Context, tCtx *tenant.TenantContext, budget *BudgetInfo) (*BudgetInfo, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/costs/budget", s.baseURL)
 
 	body, err := json.Marshal(budget)
@@ -174,7 +174,7 @@ func (s *Service) UpdateBudget(ctx context.Context, tCtx *shared.TenantContext, 
 	return &response, nil
 }
 
-func (s *Service) injectHeaders(req *http.Request, tCtx *shared.TenantContext) {
+func (s *Service) injectHeaders(req *http.Request, tCtx *tenant.TenantContext) {
 	if tCtx != nil {
 		if tCtx.TenantID != nil {
 			req.Header.Set("X-Tenant-ID", tCtx.TenantID.String())

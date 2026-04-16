@@ -3,7 +3,7 @@ package pipeline
 // Extended service methods for additional pipeline endpoints.
 
 import (
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -16,7 +16,7 @@ type PricingResponse struct {
 }
 
 // GetPricing retrieves pipeline cost pricing.
-func (s *Service) GetPricing(ctx context.Context, tCtx *shared.TenantContext) (*PricingResponse, error) {
+func (s *Service) GetPricing(ctx context.Context, tCtx *tenant.TenantContext) (*PricingResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/pipeline/costs/pricing", s.baseURL)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)

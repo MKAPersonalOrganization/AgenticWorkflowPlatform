@@ -2,7 +2,7 @@ package taskmgmt
 
 import (
 	"aicompass/modules/chat/chatcontracts"
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -20,7 +20,7 @@ func (h *TaskManagementHandler) ListDocuments(w http.ResponseWriter, r *http.Req
 	}
 
 	// 2. Resolve Multitenancy Context
-	var tCtx *shared.TenantContext
+	var tCtx *tenant.TenantContext
 	if h.tenantID == "" {
 		h.log.Error(r.Context(), "Tenant ID not configured")
 		http.Error(w, "Server configuration error", http.StatusInternalServerError)
@@ -34,10 +34,10 @@ func (h *TaskManagementHandler) ListDocuments(w http.ResponseWriter, r *http.Req
 		http.Error(w, "Invalid server configuration", http.StatusInternalServerError)
 		return
 	}
-	tCtx = &shared.TenantContext{
+	tCtx = &tenant.TenantContext{
 		TenantID: &tID,
 		UserID:   user.ID,
-		Role:     string(shared.RoleAdmin),
+		Role:     string(tenant.RoleAdmin),
 	}
 
 	// 3. Delegate to Document Provider (Passive Enforcement)
@@ -74,7 +74,7 @@ func (h *TaskManagementHandler) UploadDocument(w http.ResponseWriter, r *http.Re
 	}
 
 	// 2. Resolve Multitenancy Context
-	var tCtx *shared.TenantContext
+	var tCtx *tenant.TenantContext
 	if h.tenantID == "" {
 		h.log.Error(r.Context(), "Tenant ID not configured")
 		http.Error(w, "Server configuration error", http.StatusInternalServerError)
@@ -88,10 +88,10 @@ func (h *TaskManagementHandler) UploadDocument(w http.ResponseWriter, r *http.Re
 		http.Error(w, "Invalid server configuration", http.StatusInternalServerError)
 		return
 	}
-	tCtx = &shared.TenantContext{
+	tCtx = &tenant.TenantContext{
 		TenantID: &tID,
 		UserID:   user.ID,
-		Role:     string(shared.RoleAdmin),
+		Role:     string(tenant.RoleAdmin),
 	}
 
 	// 3. Parse Multipart Form

@@ -1,7 +1,7 @@
 package tasks
 
 import (
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -36,7 +36,7 @@ func NewService(baseURL string, httpClient *http.Client) *Service {
 }
 
 // Get retrieves a task by its track ID.
-func (s *Service) Get(ctx context.Context, tCtx *shared.TenantContext, trackID string) (*TaskResponse, error) {
+func (s *Service) Get(ctx context.Context, tCtx *tenant.TenantContext, trackID string) (*TaskResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/tasks/%s", s.baseURL, trackID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -65,7 +65,7 @@ func (s *Service) Get(ctx context.Context, tCtx *shared.TenantContext, trackID s
 }
 
 // List retrieves a list of tasks with filters and pagination.
-func (s *Service) List(ctx context.Context, tCtx *shared.TenantContext, params *ListTasksParams) (*TaskListResponse, error) {
+func (s *Service) List(ctx context.Context, tCtx *tenant.TenantContext, params *ListTasksParams) (*TaskListResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/tasks", s.baseURL)
 
 	// Build query parameters
@@ -127,7 +127,7 @@ func (s *Service) List(ctx context.Context, tCtx *shared.TenantContext, params *
 }
 
 // Cancel cancels a task by its track ID.
-func (s *Service) Cancel(ctx context.Context, tCtx *shared.TenantContext, trackID string) (*TaskResponse, error) {
+func (s *Service) Cancel(ctx context.Context, tCtx *tenant.TenantContext, trackID string) (*TaskResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/tasks/%s/cancel", s.baseURL, trackID)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", urlStr, bytes.NewReader([]byte{}))
@@ -156,7 +156,7 @@ func (s *Service) Cancel(ctx context.Context, tCtx *shared.TenantContext, trackI
 }
 
 // Retry retries a failed task by its track ID.
-func (s *Service) Retry(ctx context.Context, tCtx *shared.TenantContext, trackID string) (*TaskResponse, error) {
+func (s *Service) Retry(ctx context.Context, tCtx *tenant.TenantContext, trackID string) (*TaskResponse, error) {
 	urlStr := fmt.Sprintf("%s/api/v1/tasks/%s/retry", s.baseURL, trackID)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", urlStr, bytes.NewReader([]byte{}))
@@ -184,7 +184,7 @@ func (s *Service) Retry(ctx context.Context, tCtx *shared.TenantContext, trackID
 	return &response, nil
 }
 
-func (s *Service) injectHeaders(req *http.Request, tCtx *shared.TenantContext) {
+func (s *Service) injectHeaders(req *http.Request, tCtx *tenant.TenantContext) {
 	if tCtx != nil {
 		if tCtx.TenantID != nil {
 			req.Header.Set("X-Tenant-ID", tCtx.TenantID.String())

@@ -8,6 +8,7 @@ import (
 	"aicompass/modules/chat/chatcontracts"
 	"aicompass/modules/filesystem"
 	"aicompass/modules/knowledge/edgequake"
+	"aicompass/modules/knowledge/tenant"
 	"aicompass/modules/permissions"
 	"aicompass/modules/userprofile/identity"
 	"aicompass/plugins/fsplugin"
@@ -53,7 +54,7 @@ type DocumentProviderAdapter struct {
 	svc *edgequake.Service
 }
 
-func (a *DocumentProviderAdapter) ListDocuments(ctx context.Context, tCtx *shared.TenantContext, page, pageSize int, status string) (any, error) {
+func (a *DocumentProviderAdapter) ListDocuments(ctx context.Context, tCtx *tenant.TenantContext, page, pageSize int, status string) (any, error) {
 	resp, err := a.svc.ListDocuments(ctx, tCtx, page, pageSize, status)
 	if err != nil {
 		if err == edgequake.ErrEdgequakeUnauthorized {
@@ -67,7 +68,7 @@ func (a *DocumentProviderAdapter) ListDocuments(ctx context.Context, tCtx *share
 	return resp, nil
 }
 
-func (a *DocumentProviderAdapter) UploadDocument(ctx context.Context, tCtx *shared.TenantContext, fileName string, contentType string, content io.Reader) (any, error) {
+func (a *DocumentProviderAdapter) UploadDocument(ctx context.Context, tCtx *tenant.TenantContext, fileName string, contentType string, content io.Reader) (any, error) {
 	resp, err := a.svc.UploadDocument(ctx, tCtx, fileName, contentType, content)
 	if err != nil {
 		if err == edgequake.ErrEdgequakeUnauthorized {
@@ -86,7 +87,7 @@ type WorkspaceProviderAdapter struct {
 	svc *edgequake.Service
 }
 
-func (a *WorkspaceProviderAdapter) ListWorkspaces(ctx context.Context, tCtx *shared.TenantContext, page, pageSize int) (*permissions.WorkspaceList, error) {
+func (a *WorkspaceProviderAdapter) ListWorkspaces(ctx context.Context, tCtx *tenant.TenantContext, page, pageSize int) (*permissions.WorkspaceList, error) {
 	resp, err := a.svc.ListWorkspaces(ctx, tCtx, page, pageSize)
 	if err != nil {
 		return nil, err

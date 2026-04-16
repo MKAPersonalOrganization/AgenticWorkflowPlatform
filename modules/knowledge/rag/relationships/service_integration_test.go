@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"aicompass/shared"
+	"aicompass/modules/knowledge/tenant"
 	"aicompass/modules/knowledge/rag/relationships"
 
 	"github.com/google/uuid"
@@ -24,10 +24,10 @@ func baseURL(t *testing.T) string {
 	return u
 }
 
-func tenantCtx() shared.TenantContext {
+func tenantCtx() tenant.TenantContext {
 	tid := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	wid := uuid.MustParse("00000000-0000-0000-0000-000000000003")
-	return shared.TenantContext{
+	return tenant.TenantContext{
 		TenantID:    &tid,
 		WorkspaceID: &wid,
 		UserID:      "00000000-0000-0000-0000-000000000001",

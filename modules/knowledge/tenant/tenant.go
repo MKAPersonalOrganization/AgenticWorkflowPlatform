@@ -1,4 +1,4 @@
-package shared
+package tenant
 
 import (
 	"github.com/google/uuid"
