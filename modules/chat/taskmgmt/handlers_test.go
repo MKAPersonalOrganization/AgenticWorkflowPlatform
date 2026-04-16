@@ -2,8 +2,6 @@ package taskmgmt_test
 
 import (
 	"aicompass/foundation/logger"
-	"aicompass/shared"
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,14 +14,6 @@ func newTestLogger() *logger.Logger {
 	return logger.NewTextWithEvents(os.Stdout, logger.LevelInfo, "TEST", nil, logger.Events{})
 }
 
-// mockAuthService implements shared.AuthService for testing.
-type mockAuthService struct{}
-
-var _ shared.AuthService = (*mockAuthService)(nil)
-
-func (m *mockAuthService) GetUserFromContext(ctx context.Context) *shared.User { return nil }
-func (m *mockAuthService) IsAuthenticated(ctx context.Context) bool            { return false }
-
 func TestSSECORSOrigin(t *testing.T) {
 	t.Parallel()
 	const appURL = "https://school.example.com"
@@ -31,7 +21,6 @@ func TestSSECORSOrigin(t *testing.T) {
 		newTestLogger(),
 		nil, // orchestrator
 		nil, // agentProvider
-		&mockAuthService{},
 		nil, // threadQueryService
 		nil, // aguiProjection
 		nil, // threadMgmt
@@ -60,7 +49,6 @@ func TestSSECORSOriginNotWildcard(t *testing.T) {
 		newTestLogger(),
 		nil, // orchestrator
 		nil, // agentProvider
-		&mockAuthService{},
 		nil, // threadQueryService
 		nil, // aguiProjection
 		nil, // threadMgmt
@@ -87,7 +75,6 @@ func TestErrorResponsesDoNotLeakInternals(t *testing.T) {
 		newTestLogger(),
 		nil, // orchestrator
 		nil, // agentProvider
-		&mockAuthService{},
 		nil, // threadQueryService
 		nil, // aguiProjection
 		nil, // threadMgmt

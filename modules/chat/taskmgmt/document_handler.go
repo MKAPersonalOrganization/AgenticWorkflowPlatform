@@ -3,6 +3,7 @@ package taskmgmt
 import (
 	"aicompass/modules/chat/chatcontracts"
 	"aicompass/modules/knowledge/tenant"
+	"aicompass/shared"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -13,7 +14,7 @@ import (
 // ListDocuments handles GET /v1/documents - retrieves documents from Edgequake using passive context resolution.
 func (h *TaskManagementHandler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 	// 1. Authenticate user
-	user := h.authService.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -67,7 +68,7 @@ func (h *TaskManagementHandler) ListDocuments(w http.ResponseWriter, r *http.Req
 // UploadDocument handles POST /v1/documents - uploads a document to Edgequake using passive context resolution.
 func (h *TaskManagementHandler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	// 1. Authenticate user
-	user := h.authService.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return

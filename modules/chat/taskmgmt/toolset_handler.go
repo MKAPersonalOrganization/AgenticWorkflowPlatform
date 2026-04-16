@@ -1,6 +1,7 @@
 package taskmgmt
 
 import (
+	"aicompass/shared"
 	"encoding/json"
 	"net/http"
 )
@@ -42,7 +43,7 @@ func (h *TaskManagementHandler) ListAgentToolSets(w http.ResponseWriter, r *http
 		return
 	}
 
-	user := h.authService.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return

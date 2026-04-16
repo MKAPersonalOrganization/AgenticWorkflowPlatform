@@ -1,6 +1,7 @@
 package taskmgmt
 
 import (
+	"aicompass/shared"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -53,7 +54,7 @@ func (h *TaskManagementHandler) GetToolRequirementConfig(w http.ResponseWriter, 
 		return
 	}
 
-	user := h.authService.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -103,7 +104,7 @@ func (h *TaskManagementHandler) SetToolRequirementConfig(w http.ResponseWriter, 
 		return
 	}
 
-	user := h.authService.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -163,7 +164,7 @@ func (h *TaskManagementHandler) GetToolSetRequirementConfig(w http.ResponseWrite
 		return
 	}
 
-	user := h.authService.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -209,7 +210,7 @@ func (h *TaskManagementHandler) SetToolSetRequirementConfig(w http.ResponseWrite
 		return
 	}
 
-	user := h.authService.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -266,7 +267,7 @@ func (h *TaskManagementHandler) ListToolRequirementConfigs(w http.ResponseWriter
 		return
 	}
 
-	user := h.authService.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return

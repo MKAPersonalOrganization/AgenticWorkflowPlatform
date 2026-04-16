@@ -3,6 +3,7 @@ package taskmgmt
 import (
 	"aicompass/foundation/agent"
 	"aicompass/modules/chat/agentorchestrator"
+	"aicompass/shared"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -43,7 +44,7 @@ type ProvideInputRequest struct {
 // SendMessage handles POST /v1/message:send — runs the agent inline and streams
 // AGUI events back as SSE on the same HTTP response.
 func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
-	user := h.authService.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -94,7 +95,7 @@ func (h *TaskManagementHandler) SendMessage(w http.ResponseWriter, r *http.Reque
 // ConfirmTool handles POST /v1/tool:confirm — responds to a tool confirmation request.
 // Streams AGUI events back as SSE on the same HTTP response.
 func (h *TaskManagementHandler) ConfirmTool(w http.ResponseWriter, r *http.Request) {
-	user := h.authService.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -135,7 +136,7 @@ func (h *TaskManagementHandler) ConfirmTool(w http.ResponseWriter, r *http.Reque
 // ProvideInput handles POST /v1/tool:provide_input — responds to an io.Read request.
 // Streams AGUI events back as SSE on the same HTTP response.
 func (h *TaskManagementHandler) ProvideInput(w http.ResponseWriter, r *http.Request) {
-	user := h.authService.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return

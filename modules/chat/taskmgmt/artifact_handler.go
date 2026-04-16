@@ -2,6 +2,7 @@ package taskmgmt
 
 import (
 	"aicompass/foundation/artifact"
+	"aicompass/shared"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,7 +17,7 @@ import (
 // ListArtifacts returns a list of artifacts for a thread.
 // GET /v1/threads/{threadId}/artifacts
 func (h *TaskManagementHandler) ListArtifacts(w http.ResponseWriter, r *http.Request) {
-	user := h.authService.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		jsonError(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -57,7 +58,7 @@ func (h *TaskManagementHandler) ListArtifacts(w http.ResponseWriter, r *http.Req
 //   - Content-Length headers
 //   - If-Modified-Since / If-None-Match conditional requests
 func (h *TaskManagementHandler) DownloadArtifact(w http.ResponseWriter, r *http.Request) {
-	user := h.authService.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		jsonError(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -186,7 +187,7 @@ var allowedUploadTypes = map[string]bool{
 // Accepts multipart/form-data with a single "file" field.
 // Returns JSON: {"url": "/v1/threads/.../artifacts/...", "mimeType": "...", "fileName": "..."}
 func (h *TaskManagementHandler) UploadAttachment(w http.ResponseWriter, r *http.Request) {
-	user := h.authService.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		jsonError(w, "Unauthorized", http.StatusUnauthorized)
 		return

@@ -21,7 +21,6 @@ import (
 	"aicompass/modules/chat/projection/agui"
 	"aicompass/modules/chat/threadmgmt"
 	"aicompass/foundation/toolregistry"
-	"aicompass/shared"
 	"time"
 )
 
@@ -46,7 +45,6 @@ type TaskManagementHandler struct {
 	log                      *logger.Logger
 	orchestrator             Orchestrator
 	agentProvider            agent.AgentProvider
-	authService              shared.AuthService
 	threadQueryService       chatcontracts.ThreadQueryService
 	aguiProjection           agui.AguiProjection
 	threadMgmt               *threadmgmt.Manager
@@ -64,7 +62,6 @@ func NewTaskManagementHandler(
 	log *logger.Logger,
 	orchestrator Orchestrator,
 	agentProvider agent.AgentProvider,
-	authService shared.AuthService,
 	threadQueryService chatcontracts.ThreadQueryService,
 	aguiProjection agui.AguiProjection,
 	threadMgmt *threadmgmt.Manager,
@@ -80,7 +77,6 @@ func NewTaskManagementHandler(
 		log:                      log,
 		orchestrator:             orchestrator,
 		agentProvider:            agentProvider,
-		authService:              authService,
 		threadQueryService:       threadQueryService,
 		aguiProjection:           aguiProjection,
 		threadMgmt:               threadMgmt,

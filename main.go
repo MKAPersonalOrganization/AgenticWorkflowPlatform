@@ -505,7 +505,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// -------------------------------------------------------------------------
 	// Initialize Chat Module (core chat bounded context — ADR 014)
 
-	authSvc := &contextAuthService{}
 	chatModule := chatmod.New(chatmod.Dependencies{
 		Log:                      log,
 		DB:                       db,
@@ -514,7 +513,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 		ArtifactService:          artifactService,
 		UserProfileRepo:          &chatProfileAdapter{repo: userProfileRepo},
 		AgentProvider:            agentProvider,
-		AuthService:              authSvc,
 		ToolRegistry:             toolRegistry,
 		RequirementConfigService: toolReqsService,
 		DocumentProvider:         &DocumentProviderAdapter{svc: edgequakeService},
@@ -996,15 +994,3 @@ func validateProductionConfig(log *logger.Logger, buildTag, adminUser, adminPass
 	return nil
 }
 
-// contextAuthService implements shared.AuthService by reading the
-// authenticated user directly from the request context. This replaces
-// the former services/auth package (a trivial delegation wrapper).
-type contextAuthService struct{}
-
-func (*contextAuthService) GetUserFromContext(ctx context.Context) *shared.User {
-	return shared.GetUserFromContext(ctx)
-}
-
-func (s *contextAuthService) IsAuthenticated(ctx context.Context) bool {
-	return s.GetUserFromContext(ctx) != nil
-}

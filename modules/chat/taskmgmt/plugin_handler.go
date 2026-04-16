@@ -2,6 +2,7 @@ package taskmgmt
 
 import (
 	"aicompass/foundation/toolregistry"
+	"aicompass/shared"
 	"encoding/json"
 	"net/http"
 )
@@ -22,7 +23,7 @@ type PluginResponse struct {
 // GET /v1/plugins (global — no per-agent state)
 // GET /v1/plugins?agent_id=xxx (per-agent requirement configs for agent config)
 func (h *TaskManagementHandler) ListPlugins(w http.ResponseWriter, r *http.Request) {
-	user := h.authService.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return

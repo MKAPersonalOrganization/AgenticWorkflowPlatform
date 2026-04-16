@@ -38,11 +38,11 @@ graph TB
 graph TB
     Browser["<b>Web Browser</b><br/>[Container: Alpine.js + Tailwind CSS]<br/>Server-rendered HTML via Templ<br/>with SSE for real-time updates."]
 
-    GoApp["<b>Go Application</b><br/>[Container: Go + Chi + Asynq]<br/>Event-sourced multi-agent system<br/>with CQRS projections."]
+    GoApp["<b>Go Application</b><br/>[Container: Go + Chi + Templ]<br/>Event-sourced modular monolith<br/>with CQRS projections."]
 
     AppPostgres[("<b>PostgreSQL</b><br/>[Container: Postgres 16]<br/>Events + materialized projections<br/>(AGUI, LLM context, payments, stats).")]
 
-    Redis["<b>Redis</b><br/>[Container: Redis 7]<br/>Task queue (Asynq) + Pub/Sub<br/>broadcast + rate limiting."]
+    Redis["<b>Redis</b><br/>[Container: Redis 7]<br/>Pub/Sub broadcast + permission<br/>cache + rate limiting."]
 
     MinIO["<b>MinIO</b><br/>[Container: S3-Compatible]<br/>Artifact storage (files, audio,<br/>images, long-term memory)."]
 
@@ -57,9 +57,8 @@ graph TB
     Browser -->|"HTTPS / SSE"| GoApp
     GoApp -->|"Append + Read Events"| AppPostgres
     GoApp -->|"Update + Query Projections"| AppPostgres
-    GoApp -->|"Enqueue + Process Tasks"| Redis
     GoApp -->|"Pub/Sub Broadcast"| Redis
-    GoApp -->|"Rate Limit Counters"| Redis
+    GoApp -->|"Permission Cache + Rate Limits"| Redis
     GoApp -->|"Store / Retrieve Artifacts"| MinIO
     GoApp -->|"REST API (Query, Ingest, Pipeline)"| EdgeQuakeAPI
     GoApp -->|"OAuth 2.0"| GoogleOAuth
@@ -73,9 +72,9 @@ graph TB
 | Container | Technology | Description |
 | :--- | :--- | :--- |
 | **Web Browser** | Alpine.js, Tailwind CSS v4, Templ | Server-rendered HTML with client-side reactivity and SSE streaming. |
-| **Go Application** | Go, Chi, Asynq, Templ | Event-sourced multi-agent system. Single binary serving HTTP, background workers, and projections. |
+| **Go Application** | Go, Chi, Templ | Event-sourced modular monolith. Single binary serving HTTP, background projection workers, and real-time SSE streaming. 16 bounded-context modules, 15 tool plugins, ADK-Go agent framework adapter. |
 | **PostgreSQL** | PostgreSQL 16 | Single database for both the append-only event log and all materialized read-model projections. |
-| **Redis** | Redis 7 | Triple-duty: Asynq distributed task queue, cross-pod Pub/Sub for real-time SSE delivery, and distributed per-IP rate limiting. |
+| **Redis** | Redis 7 | Triple-duty: cross-pod Pub/Sub for real-time SSE delivery, distributed permission cache (TTL-based), and distributed per-IP rate limiting. |
 | **MinIO** | MinIO (S3-compatible) | Private artifact storage for user uploads, audio recordings, images, and long-term memory files. Served via pre-signed URLs. |
 | **EdgeQuake API** | Rust, Axum | Advanced RAG framework with document ingestion pipeline, knowledge graph extraction, and hybrid vector + graph search. |
 | **EdgeQuake PostgreSQL** | PostgreSQL + Apache AGE + pgvector | Dedicated graph database with vector embeddings for knowledge representation. |
@@ -85,7 +84,7 @@ graph TB
 
 ## Components Diagram (Level 3)
 
-The following diagram zooms into the **Go Application** container. Components are grouped by architectural layer.
+The following diagram zooms into the **Go Application** container. The system follows a **modular monolith** architecture (ADR-012, ADR-013) where each module is a self-contained bounded context under `modules/`. Components are grouped by architectural layer.
 
 ```mermaid
 %%{init: {'flowchart': {'curve': 'linear'}}}%%
@@ -97,54 +96,46 @@ graph TB
         subgraph HTTP["HTTP Layer"]
             Router["<b>Chi Router</b><br/>Routing + global middleware"]
             MWStack["<b>Middleware Stack</b><br/>Security headers, rate limiting,<br/>body limit, i18n, metrics,<br/>recovery, logging"]
-            AuthMW["<b>Google OAuth Auth</b><br/>Session-based authentication"]
+            AuthMW["<b>Auth Middleware</b><br/>Session-based authentication<br/>with user caching"]
             HealthH["<b>Health Handlers</b><br/>Liveness + readiness probes"]
         end
 
-        subgraph Handlers["Handler Layer (27 packages)"]
-            TaskH["<b>Task Management</b><br/>Command side: send message,<br/>agent run, artifacts, memory,<br/>toolsets, plugins"]
-            AGUIH["<b>AGUI Handlers</b><br/>Query side: thread state,<br/>messages, SSE streaming"]
-            KnowledgeH["<b>Knowledge Handlers</b><br/>KB UI + API: documents,<br/>workspaces, graph, pipeline"]
-            MCPH["<b>MCP Handlers</b><br/>Connector CRUD, OAuth,<br/>connect/disconnect, tool proxy"]
-            BillingH["<b>Billing Handlers</b><br/>Stripe intents, status,<br/>webhooks"]
-            OtherH["<b>Other Handlers</b><br/>AI settings, catalog, resources,<br/>profile, preferences,<br/>statistics, ratings, co-writer"]
+        subgraph Modules["Modules Layer (16 bounded contexts)"]
+            ChatMod["<b>Chat Module</b><br/>Thread aggregate, orchestrator,<br/>AGUI + task handlers,<br/>projections (AGUI, LLM context)"]
+            KnowledgeMod["<b>Knowledge Module</b><br/>RAG API facade (EdgeQuake),<br/>26 subdomains, documents,<br/>workspaces, graph, pipeline"]
+            MCPMod["<b>MCP Module</b><br/>Connector CRUD, OAuth 2.1,<br/>circuit breakers, tool proxy"]
+            BillingMod["<b>Billing Module</b><br/>Event-sourced Stripe<br/>payment aggregate"]
+            AgentDefMod["<b>Agent Definition Module</b><br/>User-owned agents, sharing,<br/>workflow composition"]
+            PermsMod["<b>Permissions Module</b><br/>Per-agent + workspace<br/>granular permissions"]
+            OtherMods["<b>Other Modules</b><br/>a2a, aisettings, analytics,<br/>evaluation, filesystem,<br/>pluginsettings, resources,<br/>templates, toolreqs, userprofile"]
         end
 
-        subgraph Services["Service Layer"]
-            Orchestrator["<b>Agent Orchestrator</b><br/>Event classification (durable vs transient),<br/>persistence, broadcast, error handling"]
-            TaskMgr["<b>Asynq Task Manager</b><br/>Async job queue with<br/>retry + priority"]
-            ThreadMgmt["<b>Thread Management</b><br/>Thread lifecycle via<br/>event store"]
-            ToolReg["<b>Tool Registry</b><br/>Plugin registration +<br/>DB persistence"]
-            MCPDiscovery["<b>MCP Plugin Discovery</b><br/>Remote connector lifecycle,<br/>OAuth, circuit breaker"]
-            BillingS["<b>Billing Service</b><br/>Event-sourced Stripe<br/>payment aggregate"]
-            EdgequakeS["<b>EdgeQuake Service</b><br/>REST facade to RAG API"]
-            ArtifactS["<b>Artifact Service</b><br/>S3/MinIO storage"]
-            MemoryS["<b>Memory Service</b><br/>Long-term memory (S3)"]
-            OtherS["<b>Other Services</b><br/>AI settings, permissions,<br/>resources, student profile, title gen"]
+        subgraph Adapters["Adapter Layer"]
+            ADKGoAdapter["<b>ADK-Go Adapter</b><br/>Google ADK-Go framework bridge,<br/>workflow builder, event translation"]
+            GeminiAdapter["<b>Gemini Adapter</b><br/>Grounded search client"]
         end
 
-        subgraph Plugins["Plugin Layer (9 plugins)"]
-            PluginList["<b>calculator</b> · <b>codebase</b> · <b>cognitive</b><br/><b>document</b> · <b>elicitation</b> · <b>knowledgebase</b><br/><b>library</b> · <b>memory</b> · <b>tts</b>"]
+        subgraph Plugins["Plugin Layer (15 plugins)"]
+            PluginList["<b>agentmemory</b> · <b>artifacts</b> · <b>calculator</b><br/><b>codebase</b> · <b>cognitive</b> · <b>demoinput</b><br/><b>document</b> · <b>fsplugin</b> · <b>knowledgebase</b><br/><b>library</b> · <b>planmode</b> · <b>todos</b><br/><b>tracker</b> · <b>tts</b> · <b>websearch</b>"]
         end
 
-        subgraph Foundation["Foundation Layer"]
-            AgentSDK["<b>Agent SDK</b><br/>Core abstractions, engine,<br/>LLM adapters (OpenAI,<br/>Gemini, Ollama), I/O"]
-            AgentFW["<b>Agent Framework</b><br/>Agent, Runner, Tool,<br/>Middleware interfaces"]
+        subgraph Foundation["Foundation Layer (15 packages)"]
+            AgentFW["<b>Agent Framework</b><br/>Agent, Runner, Tool,<br/>Middleware, IO interfaces"]
+            EventSourcing["<b>Event Sourcing</b><br/>Generic Repository, Aggregate,<br/>EventStore, Snapshots"]
             EventRouter["<b>Event Router</b><br/>Persistence router +<br/>transient router"]
+            ToolReg["<b>Tool Registry</b><br/>PluginProvider registration,<br/>DB persistence, UI injection"]
             UnifiedMW["<b>Unified Middleware</b><br/>Agent / Chat / Function<br/>interception pipeline"]
-            Metrics["<b>Metrics + OTel</b><br/>Counters, spans, traces"]
+            FoundOther["<b>Other Foundation</b><br/>auth, artifact, errs, i18n,<br/>logger, metrics, otel,<br/>health, debug, permcache"]
         end
 
-        subgraph Infra["Infrastructure Layer"]
+        subgraph Infra["Infrastructure Layer (7 packages)"]
             EventStore["<b>PostgreSQL Event Store</b><br/>Append-only log with<br/>optimistic concurrency"]
-            Projections["<b>Projection Updater</b><br/>Polls event store, updates<br/>4 projections in real-time"]
-            AGUIProj["<b>AGUI Projection</b>"]
-            LLMProj["<b>LLM Context Projection</b>"]
-            PayProj["<b>Payment Projection</b>"]
-            StatsProj["<b>Statistics Projection</b>"]
+            Projections["<b>Projection Subscriber</b><br/>Polls event store, dispatches<br/>to module projections"]
             RedisB["<b>Redis Broadcaster</b><br/>Cross-pod SSE delivery"]
-            DBRepos["<b>SQL Repositories</b><br/>11 repos + migrations"]
+            SQLDb["<b>SQL Database</b><br/>Connection pool + migrations"]
+            MemDb["<b>MemDB</b><br/>Persistent key-value store<br/>(PostgreSQL-backed)"]
             GoogleAuth["<b>Google Auth Client</b><br/>OAuth + session store"]
+            EdgequakeClient["<b>EdgeQuake Client</b><br/>REST client for RAG API"]
         end
     end
 
@@ -155,98 +146,88 @@ graph TB
     GoogleOAuthExt["<b>Google OAuth</b>"]
     LLMAPIs["<b>LLM APIs</b>"]
     StripeAPI["<b>Stripe API</b>"]
+    MCPServers["<b>Remote MCP Servers</b>"]
 
     User -->|"HTTPS / SSE"| Router
     Router --> MWStack --> AuthMW
-    AuthMW --> TaskH & AGUIH & KnowledgeH & MCPH & BillingH & OtherH
+    AuthMW --> ChatMod & KnowledgeMod & MCPMod & BillingMod & AgentDefMod & PermsMod & OtherMods
     Router --> HealthH
 
-    TaskH --> TaskMgr --> Orchestrator
-    TaskH --> ThreadMgmt
-    AGUIH --> AGUIProj
-    AGUIH -->|"Live SSE"| RedisB
-    KnowledgeH --> EdgequakeS
-    MCPH --> MCPDiscovery
-    BillingH --> BillingS
+    ChatMod --> ADKGoAdapter
+    ChatMod --> EventStore
+    ChatMod --> EventRouter
+    ChatMod --> RedisB
+    KnowledgeMod --> EdgequakeClient
+    MCPMod --> ToolReg
+    MCPMod -.->|"Streamable HTTP"| MCPServers
+    BillingMod --> StripeAPI
 
-    Orchestrator --> AgentSDK
-    Orchestrator --> EventStore
-    Orchestrator --> EventRouter
-    Orchestrator --> RedisB
-
-    AgentSDK --> UnifiedMW
-    AgentSDK --> LLMAPIs
+    ADKGoAdapter --> AgentFW
+    ADKGoAdapter --> LLMAPIs
 
     ToolReg --> PluginList
-    MCPDiscovery --> ToolReg
 
     EventRouter --> Projections
-    Projections --> AGUIProj & LLMProj & PayProj & StatsProj
     Projections --> RedisB
 
     EventStore --> AppPostgres
-    AGUIProj --> AppPostgres
-    LLMProj --> AppPostgres
-    PayProj --> AppPostgres
-    StatsProj --> AppPostgres
-    DBRepos --> AppPostgres
-    TaskMgr --> Redis
+    SQLDb --> AppPostgres
+    MemDb --> AppPostgres
     RedisB --> Redis
-    ArtifactS --> MinIO
-    MemoryS --> MinIO
-    EdgequakeS --> EdgeQuake
+    ChatMod -->|"Artifact storage"| MinIO
+    EdgequakeClient --> EdgeQuake
     GoogleAuth --> GoogleOAuthExt
-    BillingS --> StripeAPI
-    ThreadMgmt --> EventStore
 ```
 
 ### Components Overview
 
-| Component | Technology | Description |
+| Component | Location | Description |
 | :--- | :--- | :--- |
-| **Chi Router** | Go Chi | HTTP routing with middleware pipeline (recovery, logging, metrics, security headers, rate limiting, body limit, i18n). |
-| **Google OAuth Auth** | `infra/googleauth` | Session-based authentication via Google OAuth 2.0 with cookie session store. |
-| **Health Handlers** | — | Public `/liveness` and `/readiness` endpoints with dependency health checks. |
-| **Task Management** | `handlers/taskmgmt` | Command side of CQRS — message send, agent runs, artifact upload, memory, toolset management, plugin UI. |
-| **AGUI Handlers** | `handlers/agui` | Query side of CQRS — thread listing, message history, live SSE streaming via AG-UI protocol. |
-| **Knowledge Handlers** | `handlers/knowledge` | Full knowledge base UI and API — document upload, workspace management, graph exploration, pipeline control. |
-| **MCP Handlers** | `handlers/mcp` | MCP connector CRUD, OAuth callback, connect/disconnect, tool discovery, request proxy. |
-| **Billing Handlers** | `handlers/billing` | Stripe payment intents, subscription status, webhook processing. |
-| **Agent Orchestrator** | `services/agentorchestrator` | Core orchestration loop — classifies events as **durable** (persisted to event store) or **transient** (broadcast-only), then persists and/or broadcasts accordingly (ADR-003, ADR-007). |
-| **Asynq Task Manager** | `services/taskmanagement` | Distributed background job queue via Asynq/Redis with retry logic and AG-UI event conversion. |
-| **Thread Management** | `services/threadmgmt` | Thread lifecycle (create, delete) via event store aggregate. |
-| **Tool Registry** | `services/toolregistry` | Central registry for all tool plugins. Manages `PluginProvider` registration, tool/toolset DB persistence, and dynamic UI injection (ADR-008). |
-| **MCP Plugin Discovery** | `services/plugindiscovery` | Remote MCP connector lifecycle — OAuth 2.1 + PKCE, circuit breakers, bounded concurrency, ephemeral toolset registration (ADR-010). |
-| **Billing Service** | `services/billing` | Event-sourced payment aggregate with Stripe SDK. Subscription lifecycle, lazy expiration, idempotent webhook processing. |
-| **EdgeQuake Service** | `services/edgequake` | HTTP facade to the Rust RAG API — documents, query, workspaces, pipeline, graph, entities, relationships. |
-| **Artifact Service** | `services/artifact` | S3/MinIO storage for user files, audio, images. Pre-upload pattern with HTTP Range streaming (ADR-011). |
-| **Memory Service** | `services/memory` | Long-term memory stored as `MEMORIES.md` in S3. Read/write via memory plugin tool. |
-| **Plugin Layer** | `plugins/*` | 9 self-contained plugins each implementing `PluginProvider`: calculator, codebase, cognitive, document, elicitation, knowledgebase, library, memory, tts. Each provides backend logic + Templ UI templates (ADR-008). |
-| **Agent SDK** | `foundation/agentsdk` | Framework-isolated agent engine with LLM iteration loop, tool execution, stream processing, and human-in-the-loop I/O. LLM adapters for OpenAI, Gemini, and Ollama (ADR-001, ADR-005). |
-| **Agent Framework** | `foundation/agent` | Framework-agnostic interfaces: `Agent`, `Runner`, `ExecutableTool`, `StreamingExecutor`, `AgentProvider`, `Middleware`. Supports workflow composition: sequential, parallel, loop, and conditional routing (ADR-006). |
-| **Event Router** | `foundation/event` | Dual-router event dispatch — persistence router (feeds projection updater) and transient router (feeds Redis broadcaster). |
-| **Unified Middleware** | `foundation/agent` | Echo-inspired middleware pipeline intercepting three operation kinds: Agent runs, Chat (LLM) calls, and Function (tool) calls (ADR-006). |
+| **Chi Router** | `main.go` | HTTP routing with middleware pipeline (recovery, logging, metrics, security headers, rate limiting, body limit, i18n). |
+| **Auth Middleware** | `foundation/auth` | Session-based authentication with 30s user caching (max 10k entries). Implements `RequireAuth()` and `OptionalAuth()` middleware. |
+| **Health Handlers** | `foundation/health` | Public `/liveness` and `/readiness` endpoints with pluggable dependency health checks. |
+| **Chat Module** | `modules/chat` | Core bounded context. Owns the event-sourced `ThreadAggregate`, `AgentOrchestrator` (event classification: durable vs transient), `ThreadManagement` (lifecycle), AGUI handlers (query side), task management handlers (command side), and two projections (AGUI read model, LLM context). Internal subdomains: `thread/`, `threadmgmt/`, `agentorchestrator/`, `agui/`, `taskmgmt/`, `projection/`, `chatread/`, `chatcontracts/`. |
+| **Knowledge Module** | `modules/knowledge` | RAG bounded context wrapping EdgeQuake. 26 RAG subdomains (documents, workspaces, graph, pipeline, entities, chunks, conversations, etc.) plus the `edgequake/` service facade. |
+| **MCP Module** | `modules/mcp` | MCP connector lifecycle — CRUD, OAuth 2.1 + PKCE, circuit breakers, bounded concurrency, tool discovery, and request proxy. Bridges remote MCP servers into the tool registry as ephemeral toolsets (ADR-010). |
+| **Billing Module** | `modules/billing` | Event-sourced Stripe payment aggregate. Subscription lifecycle, lazy expiration, idempotent webhook processing, payment projection. |
+| **Agent Definition Module** | `modules/agentdefinition` | User-owned agent definitions with CRUD, sharing, forking, and multi-agent workflow composition (sequential, parallel, loop via ADR-019). |
+| **Permissions Module** | `modules/permissions` | Per-agent and workspace-level granular permissions. Tool requirement configuration and workspace provider abstraction. |
+| **Other Modules** | `modules/*` | `a2a` (Agent-to-Agent protocol), `aisettings` (per-user LLM config), `analytics` (usage stats + statistics projection), `evaluation` (hallucination, rubric, safety evals), `filesystem` (S3/GitHub file management), `pluginsettings` (plugin config UI), `resources` (user uploads), `templates` (agent catalog), `toolreqs` (tool requirement specs), `userprofile` (identity + preferences). |
+| **ADK-Go Adapter** | `adapters/adkgo` | Bridges the application to Google's ADK-Go agent framework. Builds workflow agents from composition graphs, translates ADK session events to thread domain events, resolves tools, and builds system prompts. 17 files. |
+| **Gemini Adapter** | `adapters/gemini` | Implements `websearch.GroundedSearchClient` using the Google Gemini API for grounded web search. |
+| **Plugin Layer** | `plugins/*` | 15 self-contained plugins each implementing `PluginProvider` from `foundation/toolregistry`. Each provides backend tool logic + optional Templ UI templates (ADR-008). |
+| **Agent Framework** | `foundation/agent` | Framework-agnostic interfaces: `Agent`, `Runner`, `ExecutableTool`, `StreamingExecutableTool`, `AgentProvider`, `Middleware`. Supports hierarchical agent composition and multimodal content (text, images, audio, files, tool calls). Includes `agent/io` sub-package for human-in-the-loop I/O (ADR-001, ADR-006). |
+| **Event Sourcing** | `foundation/eventsourcing` | Generic `Repository[T]` with optimistic concurrency, `BaseAggregate` with event queuing/replay, `SnapshotStore` (snapshots every 50 events), and typed `Deserializer` registry. |
+| **Event Router** | `foundation/event` | Type-safe dual-router event dispatch — persistence router (feeds projection subscriber) and transient router (feeds Redis broadcaster). |
+| **Tool Registry** | `foundation/toolregistry` | Central registry for all tool plugins. Manages `PluginProvider` registration, tool/toolset DB persistence, built-in tool caching, settings schema, and dynamic UI injection (ADR-008). |
+| **Unified Middleware** | `foundation/agent` | Middleware pipeline intercepting three operation kinds: Agent runs, Chat (LLM) calls, and Function (tool) calls (ADR-006). |
+| **Other Foundation** | `foundation/*` | `auth` (session middleware), `artifact` (S3 storage abstraction), `errs` (error types with HTTP mapping), `i18n` (English + Arabic RTL), `logger` (structured slog), `metrics` (expvar counters), `otel` (OpenTelemetry tracing), `health` (health checks), `debug` (pprof/expvar/statsviz), `permcache` (Redis-backed permission cache), `middleware` (HTTP middleware stack). |
 | **PostgreSQL Event Store** | `infra/eventstore/postgres` | Append-only event log with optimistic concurrency and typed event deserialization. |
-| **Projection Updater** | `infra/projection` | Background worker polling the event store, updating 4 PostgreSQL projections (AGUI, LLM context, payment, statistics) with leader election. |
+| **Projection Subscriber** | `infra/projection/subscriber` | Background worker polling the event store and dispatching events to module-owned projections. |
 | **Redis Broadcaster** | `infra/projection` | Cross-pod event broadcaster via Redis Pub/Sub. Both durable and ephemeral events are broadcast synchronously for zero-latency SSE delivery (ADR-007). |
-| **SQL Repositories** | `infra/sqldb` | 11 PostgreSQL repositories (agent catalog, agent definitions, AI settings, MCP connectors, permissions, resources, student profiles, tool registry, user preferences, workspace permissions) + migration runner. |
+| **SQL Database** | `infra/sqldb` | PostgreSQL connection pool management and migration runner. Each module owns its own repository — repos are distributed across 18+ module packages, not centralized. |
+| **Google Auth Client** | `infra/googleauth` | Google OAuth 2.0 client with session store. Handles consent flow, token exchange, and user upsert. |
+| **EdgeQuake Client** | `infra/edgequake` | REST client for the EdgeQuake RAG API. |
 
 ### Key Architectural Patterns
 
 | Pattern | Description | Relevant ADRs |
 | :--- | :--- | :--- |
+| **Modular Monolith** | 16 bounded-context modules under `modules/`, each owning its full vertical slice (handlers, services, domain, repository). Zero cross-module imports enforced by convention. Cross-module communication via interfaces wired at the composition root (`main.go`, `adapters.go`). | ADR-012, ADR-013 |
 | **Event Sourcing** | All state changes persisted as an ordered sequence of events in a PostgreSQL-backed event store. Two aggregates: `ThreadAggregate` (conversations) and `PaymentAccountAggregate` (billing). | — |
-| **CQRS** | Strict separation — command side (Task Handlers → Orchestrator → Event Store) and query side (AGUI Handlers → Projections). | — |
-| **Materialized Projections** | Four PostgreSQL projections (AGUI, LLM context, payment, statistics) updated in real-time by a background projection updater. Fast reads (~3-8ms) vs query-time aggregation (~50-500ms). | — |
+| **CQRS** | Strict separation — command side (task handlers -> orchestrator -> event store) and query side (AGUI handlers -> projections). | — |
+| **Materialized Projections** | Four PostgreSQL projections (AGUI, LLM context, payment, statistics) updated in real-time by a background projection subscriber. Projections are owned by their respective modules (`modules/chat/projection/`, `modules/billing/`, `modules/analytics/`). | — |
 | **Event Classification** | Every event is explicitly classified as **durable** (persisted then broadcast) or **transient** (broadcast-only, never persisted). System recovers from durable events alone. | ADR-003, ADR-007 |
 | **Synchronous Broadcast** | Durable events are broadcast to Redis immediately alongside persistence (outbox bypass), eliminating latency gaps between transient and durable event delivery. | ADR-007 |
-| **Agent SDK Boundary** | Strict architectural boundary — the application interacts with agent frameworks only through `foundation/agent` interfaces. Each framework adapter translates `core.Event` → `domain.Event`. | ADR-001, ADR-002, ADR-005 |
-| **Plugin Architecture** | Every toolset is a self-contained package under `plugins/` implementing `PluginProvider`. Backend logic + frontend Templ UI. Dynamic registry replaces hardcoded tool lists. | ADR-008 |
+| **Agent Framework Boundary** | Strict architectural boundary — the application interacts with agent frameworks only through `foundation/agent` interfaces. The `adapters/adkgo` adapter translates ADK-Go session events to thread domain events. | ADR-001, ADR-002, ADR-005 |
+| **Multi-Agent Workflows** | Recursive tree composition of agents: sequential, parallel, and loop composites. Mapped directly to ADK-Go's nested agent model via the adapter layer. | ADR-019 |
+| **Plugin Architecture** | Every toolset is a self-contained package under `plugins/` implementing `PluginProvider`. Backend logic + optional frontend Templ UI. Dynamic registry replaces hardcoded tool lists. | ADR-008 |
 | **MCP Connectors** | User-registered remote MCP servers bridged into the plugin/permissions system as ephemeral toolsets. OAuth 2.1 + PKCE, circuit breakers, SSRF protection. | ADR-010 |
 | **Unified Middleware** | Single middleware pipeline intercepting three operation kinds (Agent, Chat, Function) — enables cross-cutting concerns like tracing, rate limiting, and permission checks. | ADR-006 |
 | **Pre-Upload Artifacts** | Files uploaded to S3 on attach (before send). Only ~100-byte URL references flow through the event/message pipeline instead of multi-MB base64 blobs. | ADR-011 |
 | **Multi-Pod Scalability** | Redis Pub/Sub ensures real-time SSE delivery across all pods. A user connected to Pod A receives events from background tasks running on Pod B. | — |
 | **Pointer-Based Domain Events** | All domain events handled as pointers throughout the lifecycle for compile-time type safety and correct type-switch matching. | ADR-004 |
+| **Zero Leaf Files** | Domain types are localized into subdirectories within modules, not scattered at the module root. Leaf nodes of the directory tree represent logical components. | ADR-015 |
 
 ## Tech Stack
 
@@ -257,7 +238,7 @@ graph TB
 | **Styling** | Tailwind CSS v4 |
 | **Protocol** | [AG-UI](https://github.com/ag-ui-protocol/ag-ui) for server-sent events |
 | **Event Store** | PostgreSQL (append-only log with optimistic concurrency) |
-| **Task Queue** | [Asynq](https://github.com/hibiken/asynq) (Redis-backed distributed workers) |
+| **Agent Framework** | [ADK-Go](https://google.github.io/adk-go/) (Google Agent Development Kit) via adapter layer |
 | **RAG** | [EdgeQuake](edgequake/) — Rust framework with Apache AGE graph + pgvector |
 | **Object Storage** | MinIO (S3-compatible) for artifacts and long-term memory |
 | **Authentication** | Google OAuth 2.0 with cookie sessions |

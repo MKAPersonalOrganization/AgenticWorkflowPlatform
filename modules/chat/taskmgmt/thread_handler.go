@@ -2,6 +2,7 @@ package taskmgmt
 
 import (
 	"aicompass/modules/chat/thread"
+	"aicompass/shared"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -10,7 +11,7 @@ import (
 // DeleteThread deletes a thread.
 func (h *TaskManagementHandler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
-	user := h.authService.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 
@@ -67,7 +68,7 @@ type UpdateThreadTitleRequest struct {
 // PATCH /api/agui/threads/{threadId}
 func (h *TaskManagementHandler) UpdateThreadTitle(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
-	user := h.authService.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return

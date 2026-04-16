@@ -35,7 +35,6 @@ import (
 	"aicompass/modules/chat/threadmgmt"
 	"aicompass/foundation/artifact"
 	"aicompass/foundation/toolregistry"
-	"aicompass/shared"
 
 	aguihandlers "aicompass/modules/chat/agui"
 	taskmgmthandlers "aicompass/modules/chat/taskmgmt"
@@ -57,7 +56,6 @@ type Dependencies struct {
 	UserProfileRepo          chatcontracts.UserProfileRepository
 	Emitter                  agentorchestrator.EventEmitter // transient event router (optional)
 	AgentProvider            agent.AgentProvider
-	AuthService              shared.AuthService
 	ToolRegistry             *toolregistry.Registry
 	RequirementConfigService chatcontracts.ToolRequirementConfigService
 	DocumentProvider         chatcontracts.DocumentProvider
@@ -144,7 +142,6 @@ func (m *Module) SetRunner(runner agentorchestrator.Runner) {
 		m.log,
 		m.orchestrator,
 		m.deps.AgentProvider,
-		m.deps.AuthService,
 		m.threadQuery,
 		m.aguiProjection,
 		m.threadMgmt,

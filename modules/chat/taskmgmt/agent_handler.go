@@ -2,6 +2,7 @@ package taskmgmt
 
 import (
 	"aicompass/foundation/agent"
+	"aicompass/shared"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -27,7 +28,7 @@ func (h *TaskManagementHandler) ListAgents(w http.ResponseWriter, r *http.Reques
 	// Try to list user-specific agents if provider supports it
 	var agents []agent.Agent
 
-	user := h.authService.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 
 	type userAwareProvider interface {
 		ListForUser(ctx context.Context, userID string) ([]agent.Agent, error)
@@ -76,7 +77,7 @@ func (h *TaskManagementHandler) GetAgent(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	user := h.authService.GetUserFromContext(r.Context())
+	user := shared.GetUserFromContext(r.Context())
 
 	type userAwareProvider interface {
 		GetForUser(ctx context.Context, name, userID string) (agent.Agent, error)
