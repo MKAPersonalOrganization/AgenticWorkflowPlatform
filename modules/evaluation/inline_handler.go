@@ -1,12 +1,11 @@
 package evaluation
 
 import (
-	"log/slog"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"time"
 
-	"aicompass/modules/chat/taskmgmt"
 	"aicompass/shared"
 
 	"github.com/google/uuid"
@@ -51,7 +50,7 @@ func RunEvalInline(svc *service) http.HandlerFunc {
 		// Send SESSION_START (same as AGUI)
 		_ = rc.SetWriteDeadline(time.Now().Add(15 * time.Second))
 		runID := uuid.New()
-		if err := taskmgmt.WriteSSEEvent(w, map[string]string{
+		if err := writeSSEEvent(w, map[string]string{
 			"type":      "SESSION_START",
 			"contextId": runID.String(),
 		}, ""); err != nil {
@@ -69,7 +68,7 @@ func RunEvalInline(svc *service) http.HandlerFunc {
 
 			if err != nil {
 				slog.Error("Evaluation execution error", "error", err)
-				_ = taskmgmt.WriteSSEEvent(w, map[string]any{
+				_ = writeSSEEvent(w, map[string]any{
 					"type":    "RUN_ERROR",
 					"message": err.Error(),
 				}, "")
@@ -77,7 +76,7 @@ func RunEvalInline(svc *service) http.HandlerFunc {
 				return
 			}
 
-			if err := taskmgmt.WriteSSEEvent(w, event, ""); err != nil {
+			if err := writeSSEEvent(w, event, ""); err != nil {
 				slog.Info("Write failed, client disconnected")
 				return
 			}

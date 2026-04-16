@@ -1,7 +1,6 @@
 package evaluation
 
 import (
-	"aicompass/modules/chat/taskmgmt"
 	"aicompass/shared"
 	"encoding/json"
 	"fmt"
@@ -23,6 +22,22 @@ type handler struct {
 // newHandler creates a new evaluation handler.
 func newHandler(svc *service) *handler {
 	return &handler{svc: svc}
+}
+
+func writeSSEEvent(w io.Writer, event any, seqID string) error {
+	eventBytes, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal event: %w", err)
+	}
+	if seqID != "" {
+		_, err = fmt.Fprintf(w, "id: %s\ndata: %s\n\n", seqID, eventBytes)
+	} else {
+		_, err = fmt.Fprintf(w, "data: %s\n\n", eventBytes)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to write SSE event: %w", err)
+	}
+	return nil
 }
 
 // ─── EvalSet Handlers ────────────────────────────────────────────────────────
@@ -750,7 +765,7 @@ func (h *handler) streamEvalRun(w http.ResponseWriter, r *http.Request) {
 	flusher.Flush()
 
 	// Send current status
-	_ = taskmgmt.WriteSSEEvent(w, map[string]any{
+	_ = writeSSEEvent(w, map[string]any{
 		"type":   "status",
 		"status": run.Status,
 		"run":    run,
@@ -773,7 +788,7 @@ func (h *handler) streamEvalRun(w http.ResponseWriter, r *http.Request) {
 		case <-ticker.C:
 			run, err := h.svc.getEvalRun(r.Context(), id, user.ID)
 			if err != nil || run.Status != "running" {
-				_ = taskmgmt.WriteSSEEvent(w, map[string]any{
+				_ = writeSSEEvent(w, map[string]any{
 					"type":   "status",
 					"status": run.Status,
 					"run":    run,
@@ -781,7 +796,7 @@ func (h *handler) streamEvalRun(w http.ResponseWriter, r *http.Request) {
 				flusher.Flush()
 				return
 			}
-			_ = taskmgmt.WriteSSEEvent(w, map[string]any{
+			_ = writeSSEEvent(w, map[string]any{
 				"type":   "progress",
 				"status": run.Status,
 			}, "")
@@ -874,17 +889,17 @@ func (h *handler) exportEvalRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type ExportCase struct {
-		ID       uuid.UUID       `json:"id"`
-		Name     *string         `json:"name,omitempty"`
-		Input    string          `json:"input"`
-		Metrics  []ExportMetric  `json:"metrics"`
+		ID      uuid.UUID      `json:"id"`
+		Name    *string        `json:"name,omitempty"`
+		Input   string         `json:"input"`
+		Metrics []ExportMetric `json:"metrics"`
 	}
 
 	type ExportPayload struct {
-		Run        *EvalRun      `json:"run"`
-		EvalSet    *EvalSet      `json:"eval_set"`
-		Cases      []ExportCase  `json:"cases"`
-		ExportedAt time.Time     `json:"exported_at"`
+		Run        *EvalRun     `json:"run"`
+		EvalSet    *EvalSet     `json:"eval_set"`
+		Cases      []ExportCase `json:"cases"`
+		ExportedAt time.Time    `json:"exported_at"`
 	}
 
 	exportCases := make([]ExportCase, 0)
@@ -1148,7 +1163,3 @@ func (h *handler) exportEvalSet(w http.ResponseWriter, r *http.Request) {
 }
 
 // ─── IDE Test Runner Endpoints ───────────────────────────────────────────────
-
-
-
-
