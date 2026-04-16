@@ -1,7 +1,7 @@
 package resources
 
 import (
-	"aicompass/platform/artifact"
+	"aicompass/foundation/artifact"
 	"context"
 	"fmt"
 	"io"

@@ -2,7 +2,7 @@ package tts
 
 import (
 	"aicompass/foundation/agent"
-	"aicompass/platform/artifact"
+	"aicompass/foundation/artifact"
 	"bytes"
 	"context"
 	"encoding/json"

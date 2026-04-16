@@ -4,7 +4,7 @@ import (
 	"aicompass/foundation/agent"
 	"aicompass/foundation/i18n"
 	"aicompass/modules/chat/agentorchestrator/prompts"
-	"aicompass/platform/artifact"
+	"aicompass/foundation/artifact"
 	"context"
 )
 

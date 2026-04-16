@@ -33,7 +33,7 @@ import (
 	"aicompass/modules/chat/projection"
 	"aicompass/modules/chat/thread"
 	"aicompass/modules/chat/threadmgmt"
-	"aicompass/platform/artifact"
+	"aicompass/foundation/artifact"
 	"aicompass/platform/toolregistry"
 	"aicompass/shared"
 

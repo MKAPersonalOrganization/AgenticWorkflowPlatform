@@ -15,11 +15,11 @@ package taskmgmt
 
 import (
 	"aicompass/foundation/agent"
+	"aicompass/foundation/artifact"
 	"aicompass/foundation/logger"
 	"aicompass/modules/chat/chatcontracts"
 	"aicompass/modules/chat/projection/agui"
 	"aicompass/modules/chat/threadmgmt"
-	"aicompass/platform/artifact"
 	"aicompass/platform/toolregistry"
 	"aicompass/shared"
 	"time"

@@ -2,7 +2,7 @@ package toolregistry
 
 import (
 	"aicompass/foundation/agent"
-	"aicompass/platform/artifact"
+	"aicompass/foundation/artifact"
 	"context"
 	"fmt"
 	"sync"

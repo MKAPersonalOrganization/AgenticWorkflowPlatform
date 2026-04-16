@@ -1,7 +1,7 @@
 package taskmgmt
 
 import (
-	"aicompass/platform/artifact"
+	"aicompass/foundation/artifact"
 	"encoding/json"
 	"errors"
 	"fmt"

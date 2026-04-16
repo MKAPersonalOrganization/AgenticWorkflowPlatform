@@ -6,7 +6,7 @@ import (
 	"aicompass/modules/chat/chatcontracts"
 	"aicompass/modules/chat/thread"
 	"aicompass/modules/chat/threadmgmt"
-	"aicompass/platform/artifact"
+	"aicompass/foundation/artifact"
 	"context"
 	"encoding/base64"
 	"fmt"

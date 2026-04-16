@@ -2,7 +2,7 @@ package document
 
 import (
 	"aicompass/foundation/agent"
-	"aicompass/platform/artifact"
+	"aicompass/foundation/artifact"
 	"context"
 	"encoding/json"
 	"fmt"

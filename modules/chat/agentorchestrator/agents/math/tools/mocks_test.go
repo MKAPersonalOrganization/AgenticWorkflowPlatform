@@ -1,7 +1,7 @@
 package tools
 
 import (
-	"aicompass/platform/artifact"
+	"aicompass/foundation/artifact"
 	"context"
 	"io"
 )
