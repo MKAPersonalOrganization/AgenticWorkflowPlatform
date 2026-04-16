@@ -21,9 +21,9 @@ templ Settings() {
 		@open-settings-dialog.window="let _tab = ($event.detail || {}).tab; showSettings = true; if (_tab) $nextTick(function() { if (window.tui && window.tui.tabs) window.tui.tabs.setActive('settings-tabs', _tab); })"
 	>
 		@dialog.Dialog(dialog.Props{Class: "relative z-50"}) {
-			<!-- Backdrop -->
+			<!-- Backdrop — mode-aware scrim + blur, matches premium dialog pattern -->
 			<div
-				class="fixed inset-0 bg-black/50 transition-opacity"
+				class="fixed inset-0 bg-black/30 dark:bg-black/60 backdrop-blur-sm transition-opacity"
 				aria-hidden="true"
 				x-show="showSettings"
 				x-transition:enter="ease-out duration-300"
@@ -45,7 +45,7 @@ templ Settings() {
 				@click.self="showSettings = false"
 			>
 				<div
-					class="w-full md:w-[800px] max-h-[90vh] bg-background rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-border relative z-10"
+					class="w-full md:w-[800px] max-h-[90vh] bg-card rounded-2xl shadow-modern-xl flex flex-col overflow-hidden border border-border/60 relative z-10"
 					@keydown.escape.window="showSettings = false"
 				>
 					<!-- Header -->

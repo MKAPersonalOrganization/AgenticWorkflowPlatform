@@ -138,7 +138,8 @@ templ Content(props ...ContentProps) {
 				"[&::backdrop]:transition-all [&::backdrop]:duration-300 [&::backdrop]:ease-out",
 				"data-[tui-dialog-open=false]:[&::backdrop]:bg-black/0",
 				"data-[tui-dialog-open=false]:[&::backdrop]:backdrop-blur-none",
-				"data-[tui-dialog-open=true]:[&::backdrop]:bg-black/50",
+				"data-[tui-dialog-open=true]:[&::backdrop]:bg-black/30",
+				"data-[tui-dialog-open=true]:dark:[&::backdrop]:bg-black/60",
 				"data-[tui-dialog-open=true]:[&::backdrop]:backdrop-blur-sm",
 				// Enter/exit — smoother premium easing with subtle scale
 				"transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
