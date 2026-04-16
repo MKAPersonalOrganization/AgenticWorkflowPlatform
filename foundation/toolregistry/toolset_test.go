@@ -4,7 +4,6 @@ import (
 	"aicompass/foundation/logger"
 	"aicompass/foundation/toolregistry"
 	"aicompass/foundation/toolregistry/mocks"
-	"aicompass/plugins/calculator"
 	"context"
 	"os"
 	"testing"
@@ -15,7 +14,7 @@ func TestToolSetFunctionality(t *testing.T) {
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
 
 	// Register required plugins for the test
-	toolregistry.RegisterPlugin(&calculator.Provider{})
+	toolregistry.RegisterPlugin(&testPlugin{})
 
 	// Create in-memory repository and registry
 	repo := mocks.NewInMemoryRepository()
