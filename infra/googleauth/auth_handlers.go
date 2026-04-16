@@ -3,7 +3,7 @@ package googleauth
 import (
 	"aicompass/foundation/i18n"
 	"aicompass/foundation/logger"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -33,7 +33,7 @@ func NewAuthHandlers(log *logger.Logger, client *Client, sessions *SessionStore,
 // LoginPage handles GET /auth/login — redirects directly to Google OAuth.
 func (h *AuthHandlers) LoginPage(w http.ResponseWriter, r *http.Request) {
 	// If already authenticated, redirect to chat
-	if user := shared.GetUserFromContext(r.Context()); user != nil {
+	if user := auth.GetUserFromContext(r.Context()); user != nil {
 		http.Redirect(w, r, "/chat", http.StatusSeeOther)
 		return
 	}
@@ -150,7 +150,7 @@ func (h *AuthHandlers) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 
 // MeHandler handles GET /api/me — returns the current user as JSON.
 func (h *AuthHandlers) MeHandler(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 		return
@@ -169,7 +169,7 @@ type AuthErrorData struct {
 	ErrorMessage string
 	LoginURL     string
 	HomeURL      string
-	User         *shared.User
+	User         *auth.User
 }
 
 // ErrorPageData extracts authentication error data from the request.
@@ -184,7 +184,7 @@ func (h *AuthHandlers) ErrorPageData(r *http.Request) AuthErrorData {
 		ErrorMessage: errorMessage,
 		LoginURL:     h.appURL + "/auth/login",
 		HomeURL:      h.appURL + "/",
-		User:         shared.GetUserFromContext(r.Context()),
+		User:         auth.GetUserFromContext(r.Context()),
 	}
 }
 

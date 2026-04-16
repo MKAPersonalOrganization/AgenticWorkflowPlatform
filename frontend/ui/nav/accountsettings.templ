@@ -8,11 +8,11 @@ import (
 	"aicompass/frontend/components/icon"
 	"aicompass/frontend/components/popover"
 	"aicompass/frontend/components/sidebar"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 )
 
 type AccountSettingsProps struct {
-	User    *shared.User
+	User    *auth.User
 	ID      string // Unique popover ID (required when multiple instances exist)
 	Compact bool   // True: icon-only trigger (navbar). False: avatar+name trigger (sidebar footer).
 }
@@ -137,7 +137,7 @@ templ accountMenuSeparator() {
 	<div class="my-1 h-px bg-border/50"></div>
 }
 
-templ authenticatedMenu(user *shared.User) {
+templ authenticatedMenu(user *auth.User) {
 	<!-- User Info -->
 	<div class="px-3 py-2">
 		<div class="text-sm font-semibold truncate">{ user.GetDisplayName() }</div>

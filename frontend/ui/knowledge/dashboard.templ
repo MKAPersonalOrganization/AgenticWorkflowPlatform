@@ -13,11 +13,11 @@ import (
 	"aicompass/frontend/components/table"
 	"aicompass/frontend/components/tabs"
 	"aicompass/frontend/components/tooltip"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 )
 
 type DashboardPageProps struct {
-	User *shared.User
+	User *auth.User
 }
 
 templ knowledgeExtraHead() {

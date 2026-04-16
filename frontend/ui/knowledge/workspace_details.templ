@@ -7,11 +7,11 @@ import (
 	"aicompass/frontend/components/icon"
 	"aicompass/frontend/components/separator"
 	"aicompass/frontend/components/tabs"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 )
 
 type WorkspaceDetailsPageProps struct {
-	User      *shared.User
+	User      *auth.User
 	Workspace *WorkspaceViewModel
 }
 

@@ -2,7 +2,7 @@ package agui
 
 import (
 	"aicompass/modules/chat/projection/agui"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -86,8 +86,8 @@ type mockProjectionService struct{}
 
 // Helper to create test user context.
 func contextWithUser(userID string) context.Context {
-	user := &shared.User{ID: userID, Email: "test@example.com"}
-	return context.WithValue(context.Background(), shared.UserContextKey, user)
+	user := &auth.User{ID: userID, Email: "test@example.com"}
+	return context.WithValue(context.Background(), auth.UserContextKey, user)
 }
 
 func TestListThreads_FirstPage(t *testing.T) {

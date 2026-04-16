@@ -4,7 +4,7 @@ import (
 	"aicompass/foundation/logger"
 	"aicompass/modules/chat/chatcontracts"
 	"aicompass/modules/knowledge/tenant"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -35,7 +35,7 @@ func New(
 // ListDocuments handles GET /v1/documents - retrieves documents from Edgequake using passive context resolution.
 func (h *Handler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 	// 1. Authenticate user
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -89,7 +89,7 @@ func (h *Handler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 // UploadDocument handles POST /v1/documents - uploads a document to Edgequake using passive context resolution.
 func (h *Handler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	// 1. Authenticate user
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return

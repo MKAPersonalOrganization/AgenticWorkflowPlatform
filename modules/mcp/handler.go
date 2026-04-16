@@ -3,7 +3,7 @@ package mcp
 import (
 	"aicompass/foundation/i18n"
 	"aicompass/foundation/logger"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"encoding/json"
 	"errors"
 	"io"
@@ -97,7 +97,7 @@ func toConnectorResponse(c MCPConnector, toolCount int) connectorResponse {
 
 // listConnectors handles GET /v1/mcp/connectors
 func (h *handler) listConnectors(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -128,7 +128,7 @@ func (h *handler) listConnectors(w http.ResponseWriter, r *http.Request) {
 
 // createConnector handles POST /v1/mcp/connectors
 func (h *handler) createConnector(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -161,7 +161,7 @@ func (h *handler) createConnector(w http.ResponseWriter, r *http.Request) {
 
 // getConnector handles GET /v1/mcp/connectors/{id}
 func (h *handler) getConnector(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -182,7 +182,7 @@ func (h *handler) getConnector(w http.ResponseWriter, r *http.Request) {
 
 // deleteConnector handles DELETE /v1/mcp/connectors/{id}
 func (h *handler) deleteConnector(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -201,7 +201,7 @@ func (h *handler) deleteConnector(w http.ResponseWriter, r *http.Request) {
 
 // connect handles POST /v1/mcp/connectors/{id}/connect
 func (h *handler) connect(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -248,7 +248,7 @@ func (h *handler) connect(w http.ResponseWriter, r *http.Request) {
 
 // disconnect handles POST /v1/mcp/connectors/{id}/disconnect
 func (h *handler) disconnect(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -271,7 +271,7 @@ func (h *handler) disconnect(w http.ResponseWriter, r *http.Request) {
 
 // listTools handles GET /v1/mcp/connectors/{id}/tools
 func (h *handler) listTools(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -308,7 +308,7 @@ func (h *handler) listTools(w http.ResponseWriter, r *http.Request) {
 
 // refreshTools handles POST /v1/mcp/connectors/{id}/refresh
 func (h *handler) refreshTools(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -365,7 +365,7 @@ func (h *handler) listPresets(w http.ResponseWriter, r *http.Request) {
 // This is agentstack's core pattern: the platform forwards raw MCP protocol
 // messages so external clients can use connectors directly.
 func (h *handler) mcpProxy(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return

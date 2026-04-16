@@ -1,7 +1,7 @@
 package adkgo
 
 import (
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"context"
 	"errors"
 	"strings"
@@ -18,7 +18,7 @@ func (s *stubWorkspacePermissions) GetEnabledWorkspaces(context.Context, string,
 }
 
 func TestKnowledgeBasePromptInjectorBuildPromptAddition(t *testing.T) {
-	ctx := shared.SetUserInContext(context.Background(), &shared.User{ID: "u1"})
+	ctx := auth.SetUserInContext(context.Background(), &auth.User{ID: "u1"})
 	injector := NewKnowledgeBasePromptInjector(&stubWorkspacePermissions{ids: []string{"ws-1", "ws-2"}})
 
 	got := injector.BuildPromptAddition(ctx, "agent-1", "")
@@ -33,7 +33,7 @@ func TestKnowledgeBasePromptInjectorBuildPromptAdditionEmptyCases(t *testing.T) 
 		t.Fatalf("expected empty prompt without user, got %q", got)
 	}
 
-	ctx := shared.SetUserInContext(context.Background(), &shared.User{ID: "u1"})
+	ctx := auth.SetUserInContext(context.Background(), &auth.User{ID: "u1"})
 	if got := injector.BuildPromptAddition(ctx, "agent-1", ""); got != "" {
 		t.Fatalf("expected empty prompt on permission error, got %q", got)
 	}

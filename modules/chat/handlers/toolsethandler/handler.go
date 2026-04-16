@@ -5,7 +5,7 @@ import (
 	"aicompass/foundation/toolregistry"
 	"aicompass/modules/chat/chatcontracts"
 	"aicompass/modules/chat/handlers/common"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"encoding/json"
 	"net/http"
 )
@@ -58,7 +58,7 @@ func (h *Handler) ListAgentToolSets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return

@@ -3,11 +3,11 @@ package landing
 import (
 	"aicompass/frontend/components/button"
 	"aicompass/frontend/components/icon"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 )
 
 // ─── Hero Section ────────────────────────────────────────────────────────────
-templ heroSection(user *shared.User) {
+templ heroSection(user *auth.User) {
 	<section class="relative overflow-hidden bg-background">
 		<!-- Subtle gradient background orb -->
 		<div class="absolute top-0 start-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] bg-linear-to-b from-primary/3 via-primary/2 to-transparent rounded-full blur-3xl pointer-events-none"></div>

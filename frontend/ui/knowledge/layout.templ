@@ -11,12 +11,12 @@ import (
 	"aicompass/frontend/components/popover"
 	"aicompass/frontend/components/progress"
 	"aicompass/frontend/components/tabs"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 )
 
 type knowledgeLayoutProps struct {
 	Title string
-	User  *shared.User
+	User  *auth.User
 }
 
 templ knowledgeLayout(props knowledgeLayoutProps) {

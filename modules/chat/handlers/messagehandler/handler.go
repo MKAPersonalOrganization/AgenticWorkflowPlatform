@@ -5,7 +5,7 @@ import (
 	"aicompass/foundation/logger"
 	"aicompass/modules/chat/agentorchestrator"
 	"aicompass/modules/chat/handlers/common"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -69,7 +69,7 @@ type ProvideInputRequest struct {
 // SendMessage handles POST /v1/message:send — runs the agent inline and streams
 // AGUI events back as SSE on the same HTTP response.
 func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -120,7 +120,7 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 // ConfirmTool handles POST /v1/tool:confirm — responds to a tool confirmation request.
 // Streams AGUI events back as SSE on the same HTTP response.
 func (h *Handler) ConfirmTool(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -161,7 +161,7 @@ func (h *Handler) ConfirmTool(w http.ResponseWriter, r *http.Request) {
 // ProvideInput handles POST /v1/tool:provide_input — responds to an io.Read request.
 // Streams AGUI events back as SSE on the same HTTP response.
 func (h *Handler) ProvideInput(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return

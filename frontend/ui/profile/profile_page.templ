@@ -9,7 +9,7 @@ import (
 	"aicompass/frontend/components/input"
 	"aicompass/frontend/components/label"
 	"aicompass/frontend/components/textarea"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"strings"
 )
 
@@ -23,7 +23,7 @@ type UserProfileDTO struct {
 }
 
 type ProfilePageProps struct {
-	User    *shared.User
+	User    *auth.User
 	Profile UserProfileDTO
 }
 

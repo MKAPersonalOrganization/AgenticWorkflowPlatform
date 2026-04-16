@@ -23,7 +23,7 @@ import (
 	"aicompass/frontend/components/tabs"
 	"aicompass/frontend/components/textarea"
 	"aicompass/frontend/ui/threads"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 )
 
 templ HomeExtraHead() {
@@ -109,7 +109,7 @@ templ HomeExtraHead() {
 	</style>
 }
 
-templ ChatInputScreen(user *shared.User) {
+templ ChatInputScreen(user *auth.User) {
 	@BaseLayout(LayoutProps{
 		Title:     "Chat",
 		User:      user,

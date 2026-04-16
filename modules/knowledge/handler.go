@@ -8,7 +8,7 @@ import (
 	"aicompass/modules/knowledge/rag/graph"
 	"aicompass/modules/knowledge/rag/workspaces"
 	"aicompass/modules/knowledge/tenant"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -42,7 +42,7 @@ func newHandler(log *logger.Logger, edgequakeService *edgequake.Service, aiSetti
 
 // resolveTenantContext resolves the tenant context for the authenticated user.
 func (h *handler) resolveTenantContext(r *http.Request) (*tenant.TenantContext, error) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		return nil, fmt.Errorf("no authenticated user")
 	}
@@ -66,7 +66,7 @@ func (h *handler) resolveTenantContext(r *http.Request) (*tenant.TenantContext, 
 
 // WorkspacesPage renders the workspaces listing page.
 func (h *handler) WorkspacesPage(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 
 	component := knowledge.WorkspacesPage(knowledge.WorkspacesPageProps{
 		User: user,
@@ -78,7 +78,7 @@ func (h *handler) WorkspacesPage(w http.ResponseWriter, r *http.Request) {
 
 // WorkspaceDetailsPage renders the workspace details and document list.
 func (h *handler) WorkspaceDetailsPage(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	tCtx, err := h.resolveTenantContext(r)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to resolve tenant context", "error", err)
@@ -116,7 +116,7 @@ func (h *handler) WorkspaceDetailsPage(w http.ResponseWriter, r *http.Request) {
 
 // DashboardPage renders the knowledge dashboard page.
 func (h *handler) DashboardPage(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 
 	component := knowledge.DashboardPage(knowledge.DashboardPageProps{
 		User: user,
@@ -531,7 +531,7 @@ func (h *handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 	var embeddingModel, embeddingProvider *string
 	var embeddingDimension *int
 
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user != nil && h.aiSettings != nil {
 		embCfg, err := h.aiSettings.GetEmbeddingConfigForUser(r.Context(), user.ID)
 		if err != nil {

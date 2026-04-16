@@ -3,11 +3,11 @@ package landing
 import (
 	"aicompass/frontend/components/button"
 	"aicompass/frontend/components/icon"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 )
 
 // ─── CTA Section ─────────────────────────────────────────────────────────────
-templ ctaSection(user *shared.User) {
+templ ctaSection(user *auth.User) {
 	<section class="py-32 bg-background border-t border-border/50 relative overflow-hidden">
 		<!-- Subtle radial gradient in background -->
 		<div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/[0.02] via-transparent to-transparent pointer-events-none"></div>

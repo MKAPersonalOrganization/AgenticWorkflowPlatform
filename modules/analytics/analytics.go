@@ -3,7 +3,7 @@ package analytics
 import (
 	"aicompass/foundation/logger"
 	"aicompass/modules/analytics/statistics"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"crypto/subtle"
 	"encoding/json"
 	"net/http"
@@ -100,7 +100,7 @@ func (h *handler) serveDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := shared.GetUserFromContext(ctx)
+	user := auth.GetUserFromContext(ctx)
 
 	// Map domain types to component view models to keep the presentation
 	// layer decoupled from the analytics module's internal types.

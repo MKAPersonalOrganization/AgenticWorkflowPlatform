@@ -6,7 +6,7 @@ import (
 	"aicompass/modules/chat/thread"
 	"aicompass/plugins/agentmemory"
 	"aicompass/plugins/artifacts"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"context"
 	"errors"
 	"fmt"
@@ -443,7 +443,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 
 		// 12. Inject user into context.
 		if req.UserID != "" {
-			ctx = context.WithValue(ctx, shared.UserContextKey, &shared.User{ID: req.UserID})
+			ctx = context.WithValue(ctx, auth.UserContextKey, &auth.User{ID: req.UserID})
 		}
 
 		// 12b. Inject IO handler for tools that use io.Read() / io.Confirm().

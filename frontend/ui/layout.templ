@@ -12,14 +12,14 @@ import (
 	"aicompass/frontend/ui/resources"
 	"aicompass/frontend/ui/tools"
 	"aicompass/foundation/toolregistry"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 
 	"fmt"
 )
 
 type LayoutProps struct {
 	Title      string
-	User       *shared.User
+	User       *auth.User
 	ExtraHead  templ.Component
 	HideNavbar bool
 }

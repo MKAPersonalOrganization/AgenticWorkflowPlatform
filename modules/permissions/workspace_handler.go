@@ -5,7 +5,7 @@ import (
 	"aicompass/foundation/logger"
 	"aicompass/modules/knowledge/tenant"
 	"aicompass/modules/permissions/workspace"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"encoding/json"
 	"net/http"
 
@@ -57,7 +57,7 @@ func (h *workspacePermHandler) ListAgentWorkspaces(w http.ResponseWriter, r *htt
 		return
 	}
 
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -137,7 +137,7 @@ func (h *workspacePermHandler) ToggleAgentWorkspace(w http.ResponseWriter, r *ht
 		return
 	}
 
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return

@@ -5,7 +5,7 @@ import (
 	"aicompass/foundation/toolregistry"
 	"aicompass/modules/chat/chatcontracts"
 	"aicompass/modules/chat/handlers/common"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"encoding/json"
 	"net/http"
 )
@@ -46,7 +46,7 @@ type PluginResponse struct {
 // GET /v1/plugins (global — no per-agent state)
 // GET /v1/plugins?agent_id=xxx (per-agent requirement configs for agent config)
 func (h *Handler) ListPlugins(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return

@@ -3,11 +3,11 @@ package docs
 import (
 	"aicompass/frontend/ui"
 	"aicompass/frontend/ui/landing"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 )
 
 type DocsPageProps struct {
-	User *shared.User
+	User *auth.User
 }
 
 templ DocsPage(props DocsPageProps) {

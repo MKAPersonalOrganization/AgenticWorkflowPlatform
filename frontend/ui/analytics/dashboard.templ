@@ -4,14 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"aicompass/frontend/components/chart"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 )
 
 type DashboardProps struct {
 	Stats        []StatRow
 	Agents       []string
 	CurrentAgent string
-	User         *shared.User
+	User         *auth.User
 	TimeSeries   []TimeSeriesPoint
 	ToolList     []ToolSummary
 }

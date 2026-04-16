@@ -1,7 +1,7 @@
 package adkgo
 
 import (
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"context"
 	"fmt"
 	"strings"
@@ -23,7 +23,7 @@ func NewKnowledgeBasePromptInjector(workspaceSvc WorkspacePromptPermissions) *Kn
 }
 
 func (k *KnowledgeBasePromptInjector) BuildPromptAddition(ctx context.Context, agentName, _ string) string {
-	user := shared.GetUserFromContext(ctx)
+	user := auth.GetUserFromContext(ctx)
 	if user == nil {
 		return ""
 	}

@@ -2,7 +2,7 @@ package agui
 
 import (
 	"aicompass/modules/chat/projection/agui"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"bytes"
 	"encoding/json"
 	"net/http"
@@ -37,7 +37,7 @@ func (h *AguiProjectionHandler) GetThreadState(w http.ResponseWriter, r *http.Re
 	}
 
 	// Verify ownership: the authenticated user must own this thread.
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -69,7 +69,7 @@ func (h *AguiProjectionHandler) GetMessages(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Verify ownership: the authenticated user must own this thread.
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -123,7 +123,7 @@ func (h *AguiProjectionHandler) writeThreadResponse(w http.ResponseWriter, state
 // GET /api/agui/threads?cursor=<timestamp>&limit=<int>.
 func (h *AguiProjectionHandler) ListThreads(w http.ResponseWriter, r *http.Request) {
 	// Get user from auth context
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return

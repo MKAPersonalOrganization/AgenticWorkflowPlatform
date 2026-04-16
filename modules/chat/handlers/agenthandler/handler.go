@@ -3,7 +3,7 @@ package agenthandler
 import (
 	"aicompass/foundation/agent"
 	"aicompass/foundation/logger"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -46,7 +46,7 @@ func (h *Handler) ListAgents(w http.ResponseWriter, r *http.Request) {
 	// Try to list user-specific agents if provider supports it
 	var agents []agent.Agent
 
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 
 	type userAwareProvider interface {
 		ListForUser(ctx context.Context, userID string) ([]agent.Agent, error)
@@ -95,7 +95,7 @@ func (h *Handler) GetAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 
 	type userAwareProvider interface {
 		GetForUser(ctx context.Context, name, userID string) (agent.Agent, error)

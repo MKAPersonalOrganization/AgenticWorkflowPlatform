@@ -4,7 +4,7 @@ import (
 	"aicompass/foundation/artifact"
 	"aicompass/foundation/logger"
 	"aicompass/modules/chat/projection/agui"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,7 +39,7 @@ func New(
 // ListArtifacts returns a list of artifacts for a thread.
 // GET /v1/threads/{threadId}/artifacts
 func (h *Handler) ListArtifacts(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		jsonError(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -80,7 +80,7 @@ func (h *Handler) ListArtifacts(w http.ResponseWriter, r *http.Request) {
 //   - Content-Length headers
 //   - If-Modified-Since / If-None-Match conditional requests
 func (h *Handler) DownloadArtifact(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		jsonError(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -209,7 +209,7 @@ var allowedUploadTypes = map[string]bool{
 // Accepts multipart/form-data with a single "file" field.
 // Returns JSON: {"url": "/v1/threads/.../artifacts/...", "mimeType": "...", "fileName": "..."}
 func (h *Handler) UploadAttachment(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		jsonError(w, "Unauthorized", http.StatusUnauthorized)
 		return

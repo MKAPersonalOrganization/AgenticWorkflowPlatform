@@ -2,7 +2,7 @@ package preferences
 
 import (
 	"aicompass/foundation/logger"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"encoding/json"
 	"net/http"
 )
@@ -20,7 +20,7 @@ func newHandler(log *logger.Logger, repo UserPreferenceRepository) *handler {
 
 // getPreference handles GET /api/preferences/{key}
 func (h *handler) getPreference(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -51,7 +51,7 @@ func (h *handler) getPreference(w http.ResponseWriter, r *http.Request) {
 
 // setPreference handles PUT /api/preferences/{key}
 func (h *handler) setPreference(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -88,7 +88,7 @@ func (h *handler) setPreference(w http.ResponseWriter, r *http.Request) {
 
 // getAllPreferences handles GET /api/preferences
 func (h *handler) getAllPreferences(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return

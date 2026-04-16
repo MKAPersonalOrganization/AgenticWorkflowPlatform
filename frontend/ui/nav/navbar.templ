@@ -9,12 +9,12 @@ import (
 	"aicompass/frontend/ui/resources"
 	"aicompass/frontend/ui/threads"
 	"aicompass/frontend/ui/tools"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 )
 
 type NavbarProps struct {
 	Class string
-	User  *shared.User // Authenticated user (nil if not authenticated)
+	User  *auth.User // Authenticated user (nil if not authenticated)
 }
 
 templ Navbar(props ...NavbarProps) {

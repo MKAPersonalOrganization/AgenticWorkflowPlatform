@@ -42,7 +42,6 @@ import (
 	"aicompass/plugins/tracker"
 	"aicompass/plugins/tts"
 	"aicompass/plugins/websearch"
-	"aicompass/shared"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -888,12 +887,12 @@ func HandleViewChatInputScreen(log *logger.Logger, edgequakeService *edgequake.S
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get authenticated user from context
-		user := shared.GetUserFromContext(r.Context())
+		user := auth.GetUserFromContext(r.Context())
 
 		// Sync user to RAG at most once per process lifetime (idempotent create).
 		if user != nil {
 			if _, alreadySynced := syncedUsers.LoadOrStore(user.ID, struct{}{}); !alreadySynced {
-				go func(u *shared.User) {
+				go func(u *auth.User) {
 					// Generate a random password since RAG requires one, but we don't use it for auth
 					randomPass := uuid.New().String()
 
@@ -930,7 +929,7 @@ func HandleViewChatInputScreen(log *logger.Logger, edgequakeService *edgequake.S
 
 func HandlePricingPage(log *logger.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user := shared.GetUserFromContext(r.Context())
+		user := auth.GetUserFromContext(r.Context())
 
 		component := pricing.PricingPage(pricing.PricingPageProps{
 			User: user,
@@ -943,7 +942,7 @@ func HandlePricingPage(log *logger.Logger) http.HandlerFunc {
 
 func HandleLandingPage(log *logger.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user := shared.GetUserFromContext(r.Context())
+		user := auth.GetUserFromContext(r.Context())
 
 		component := landing.LandingPage(landing.LandingPageProps{
 			User: user,
@@ -956,7 +955,7 @@ func HandleLandingPage(log *logger.Logger) http.HandlerFunc {
 
 func HandleDocsPage(log *logger.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user := shared.GetUserFromContext(r.Context())
+		user := auth.GetUserFromContext(r.Context())
 
 		component := docs.DocsPage(docs.DocsPageProps{
 			User: user,

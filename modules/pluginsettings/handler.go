@@ -4,7 +4,7 @@ import (
 	"aicompass/foundation/i18n"
 	"aicompass/foundation/logger"
 	"aicompass/foundation/toolregistry"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"encoding/json"
 	"net/http"
 
@@ -57,7 +57,7 @@ func (h *handler) listSchemas(w http.ResponseWriter, r *http.Request) {
 // getAll handles GET /api/plugin-settings
 // Returns every plugin's settings for the authenticated user (values masked).
 func (h *handler) getAll(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -85,7 +85,7 @@ func (h *handler) getAll(w http.ResponseWriter, r *http.Request) {
 
 // getOne handles GET /api/plugin-settings/{pluginID}
 func (h *handler) getOne(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -123,7 +123,7 @@ func (h *handler) getOne(w http.ResponseWriter, r *http.Request) {
 
 // save handles PUT /api/plugin-settings/{pluginID}
 func (h *handler) save(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -154,7 +154,7 @@ func (h *handler) save(w http.ResponseWriter, r *http.Request) {
 
 // remove handles DELETE /api/plugin-settings/{pluginID}
 func (h *handler) remove(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return

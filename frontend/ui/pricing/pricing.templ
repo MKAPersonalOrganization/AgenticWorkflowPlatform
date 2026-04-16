@@ -5,11 +5,11 @@ import "aicompass/frontend/components/button"
 import "aicompass/frontend/components/icon"
 import "aicompass/frontend/ui/pageheader"
 import "aicompass/frontend/ui"
-import "aicompass/shared"
+import "aicompass/foundation/auth"
 import "aicompass/frontend/ui/i18n"
 
 type PricingPageProps struct {
-	User *shared.User
+	User *auth.User
 }
 
 templ PricingPage(props PricingPageProps) {

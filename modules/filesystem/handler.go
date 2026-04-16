@@ -1,7 +1,7 @@
 package filesystem
 
 import (
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,8 +32,8 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
-func userFromRequest(r *http.Request) (*shared.User, bool) {
-	u := shared.GetUserFromContext(r.Context())
+func userFromRequest(r *http.Request) (*auth.User, bool) {
+	u := auth.GetUserFromContext(r.Context())
 	return u, u != nil
 }
 

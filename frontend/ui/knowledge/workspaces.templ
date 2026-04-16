@@ -7,11 +7,11 @@ import (
 	"aicompass/frontend/components/icon"
 	"aicompass/frontend/components/input"
 	"aicompass/frontend/components/separator"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 )
 
 type WorkspacesPageProps struct {
-	User *shared.User
+	User *auth.User
 }
 
 templ WorkspacesPage(props WorkspacesPageProps) {

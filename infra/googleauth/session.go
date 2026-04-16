@@ -1,7 +1,7 @@
 package googleauth
 
 import (
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"crypto/sha256"
 	"encoding/gob"
 	"net/http"
@@ -17,8 +17,8 @@ const (
 )
 
 func init() {
-	// Register shared.User so gob can serialize it.
-	gob.Register(&shared.User{})
+	// Register auth.User so gob can serialize it.
+	gob.Register(&auth.User{})
 }
 
 // SessionStore wraps gorilla/sessions for cookie-based session management.

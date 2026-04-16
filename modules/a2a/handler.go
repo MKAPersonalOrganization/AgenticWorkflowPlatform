@@ -3,7 +3,7 @@ package a2a
 import (
 	"aicompass/foundation/i18n"
 	"aicompass/foundation/logger"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -102,7 +102,7 @@ func toSkillResponse(s A2ADiscoveredSkill) skillResponse {
 
 // listConnectors handles GET /v1/a2a/connectors
 func (h *handler) listConnectors(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -132,7 +132,7 @@ func (h *handler) listConnectors(w http.ResponseWriter, r *http.Request) {
 
 // createConnector handles POST /v1/a2a/connectors
 func (h *handler) createConnector(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -165,7 +165,7 @@ func (h *handler) createConnector(w http.ResponseWriter, r *http.Request) {
 
 // getConnector handles GET /v1/a2a/connectors/{id}
 func (h *handler) getConnector(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -186,7 +186,7 @@ func (h *handler) getConnector(w http.ResponseWriter, r *http.Request) {
 
 // deleteConnector handles DELETE /v1/a2a/connectors/{id}
 func (h *handler) deleteConnector(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -205,7 +205,7 @@ func (h *handler) deleteConnector(w http.ResponseWriter, r *http.Request) {
 
 // connect handles POST /v1/a2a/connectors/{id}/connect
 func (h *handler) connect(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -234,7 +234,7 @@ func (h *handler) connect(w http.ResponseWriter, r *http.Request) {
 
 // disconnect handles POST /v1/a2a/connectors/{id}/disconnect
 func (h *handler) disconnect(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -255,7 +255,7 @@ func (h *handler) disconnect(w http.ResponseWriter, r *http.Request) {
 
 // listSkills handles GET /v1/a2a/connectors/{id}/skills
 func (h *handler) listSkills(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -280,7 +280,7 @@ func (h *handler) listSkills(w http.ResponseWriter, r *http.Request) {
 
 // refreshSkills handles POST /v1/a2a/connectors/{id}/refresh
 func (h *handler) refreshSkills(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return

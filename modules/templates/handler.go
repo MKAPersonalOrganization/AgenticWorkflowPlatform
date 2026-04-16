@@ -3,7 +3,7 @@ package templates
 import (
 	"aicompass/foundation/logger"
 	"aicompass/modules/agentdefinition"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -70,7 +70,7 @@ func toCatalogResponse(e *agentdefinition.AgentCatalogEntry) catalogEntryRespons
 
 // list handles GET /v1/agent-catalog
 func (h *catalogHandler) list(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -111,7 +111,7 @@ func (h *catalogHandler) list(w http.ResponseWriter, r *http.Request) {
 
 // search handles GET /v1/agent-catalog/search?q=...
 func (h *catalogHandler) search(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -158,7 +158,7 @@ type addToMyAgentsRequest struct {
 // AgentDefinitions. Composed catalog entries create sub-agents as standalone
 // reusable agents plus a composed agent with the graph referencing them.
 func (h *catalogHandler) addToMyAgents(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return

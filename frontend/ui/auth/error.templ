@@ -1,6 +1,6 @@
 package auth
 
-import "aicompass/shared"
+import "aicompass/foundation/auth"
 import "aicompass/frontend/ui/i18n"
 
 type ErrorPageProps struct {
@@ -8,7 +8,7 @@ type ErrorPageProps struct {
 	ErrorDetails string
 	LoginURL     string
 	HomeURL      string
-	User         *shared.User
+	User         *auth.User
 }
 
 // ErrorPage renders the authentication error page

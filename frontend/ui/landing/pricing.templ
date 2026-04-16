@@ -2,11 +2,11 @@ package landing
 
 import (
 	"aicompass/frontend/components/button"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 )
 
 // ─── Pricing Section ─────────────────────────────────────────────────────────
-templ pricingSection(user *shared.User) {
+templ pricingSection(user *auth.User) {
 	<section id="pricing" class="border-t border-border bg-muted/20 py-24">
 		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 			<div class="mx-auto max-w-2xl text-center">

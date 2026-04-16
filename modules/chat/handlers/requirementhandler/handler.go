@@ -3,7 +3,7 @@ package requirementhandler
 import (
 	"aicompass/foundation/logger"
 	"aicompass/modules/chat/chatcontracts"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -60,7 +60,7 @@ func (h *Handler) GetToolRequirementConfig(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -110,7 +110,7 @@ func (h *Handler) SetToolRequirementConfig(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -170,7 +170,7 @@ func (h *Handler) GetToolSetRequirementConfig(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -216,7 +216,7 @@ func (h *Handler) SetToolSetRequirementConfig(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -273,7 +273,7 @@ func (h *Handler) ListToolRequirementConfigs(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return

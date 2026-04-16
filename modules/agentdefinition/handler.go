@@ -2,7 +2,7 @@ package agentdefinition
 
 import (
 	"aicompass/foundation/logger"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -174,7 +174,7 @@ func toAgentResponse(a *AgentDefinition) agentResponse {
 
 // create handles POST /v1/agent-definitions
 func (h *storeHandler) create(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -224,7 +224,7 @@ func (h *storeHandler) create(w http.ResponseWriter, r *http.Request) {
 
 // importYAML handles POST /v1/agent-definitions/import-yaml
 func (h *storeHandler) importYAML(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -279,7 +279,7 @@ func (h *storeHandler) importYAML(w http.ResponseWriter, r *http.Request) {
 
 // update handles PUT /v1/agent-definitions/{id}
 func (h *storeHandler) update(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -355,7 +355,7 @@ func (h *storeHandler) update(w http.ResponseWriter, r *http.Request) {
 
 // delete handles DELETE /v1/agent-definitions/{id}
 func (h *storeHandler) delete(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -379,7 +379,7 @@ func (h *storeHandler) delete(w http.ResponseWriter, r *http.Request) {
 
 // deleteAll handles DELETE /v1/agent-definitions
 func (h *storeHandler) deleteAll(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -415,7 +415,7 @@ func (h *storeHandler) deleteAll(w http.ResponseWriter, r *http.Request) {
 
 // list handles GET /v1/agent-definitions
 func (h *storeHandler) list(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -441,7 +441,7 @@ func (h *storeHandler) list(w http.ResponseWriter, r *http.Request) {
 
 // get handles GET /v1/agent-definitions/{id}
 func (h *storeHandler) get(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -467,7 +467,7 @@ func (h *storeHandler) get(w http.ResponseWriter, r *http.Request) {
 
 // search handles GET /v1/agent-definitions/search?q=...
 func (h *storeHandler) search(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -500,7 +500,7 @@ func (h *storeHandler) search(w http.ResponseWriter, r *http.Request) {
 
 // consumers handles GET /v1/agent-definitions/{id}/consumers
 func (h *storeHandler) consumers(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -535,7 +535,7 @@ func (h *storeHandler) consumers(w http.ResponseWriter, r *http.Request) {
 
 // shareAgent handles POST /v1/agent-definitions/{id}/share
 func (h *storeHandler) shareAgent(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -563,7 +563,7 @@ func (h *storeHandler) shareAgent(w http.ResponseWriter, r *http.Request) {
 
 // unshareAgent handles DELETE /v1/agent-definitions/{id}/share
 func (h *storeHandler) unshareAgent(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -622,7 +622,7 @@ func (h *storeHandler) getSharedAgent(w http.ResponseWriter, r *http.Request) {
 
 // forkSharedAgent handles POST /v1/shared/agents/{token}/fork
 func (h *storeHandler) forkSharedAgent(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return

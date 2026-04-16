@@ -3,14 +3,14 @@ package auth
 import "aicompass/frontend/ui"
 import "aicompass/frontend/components/card"
 import "aicompass/frontend/components/icon"
-import "aicompass/shared"
+import "aicompass/foundation/auth"
 import "aicompass/frontend/ui/i18n"
 
 type LayoutProps struct {
 	Title       string
 	Description string
 	LogoURL     string
-	User        *shared.User // Optional: if provided, navbar will show user info
+	User        *auth.User // Optional: if provided, navbar will show user info
 }
 
 // AuthLayout provides a centered card layout for authentication pages

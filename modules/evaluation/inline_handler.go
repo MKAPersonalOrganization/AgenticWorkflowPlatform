@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 
 	"github.com/google/uuid"
 )
@@ -15,7 +15,7 @@ import (
 // Streams evaluation events inline using the same pattern as AGUI message streaming.
 func RunEvalInline(svc *service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user := shared.GetUserFromContext(r.Context())
+		user := auth.GetUserFromContext(r.Context())
 		if user == nil {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return

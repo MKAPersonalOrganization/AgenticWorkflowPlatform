@@ -3,12 +3,12 @@ package analytics
 import (
 	"aicompass/frontend/ui"
 	"aicompass/frontend/components/chart"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 )
 
 type LayoutProps struct {
 	Title      string
-	User       *shared.User
+	User       *auth.User
 	HideNavbar bool
 }
 

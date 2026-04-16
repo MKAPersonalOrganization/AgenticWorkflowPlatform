@@ -1,7 +1,7 @@
 package evaluation
 
 import (
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -44,7 +44,7 @@ func writeSSEEvent(w io.Writer, event any, seqID string) error {
 
 // listEvalSets handles GET /api/eval-sets.
 func (h *handler) listEvalSets(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -66,7 +66,7 @@ func (h *handler) listEvalSets(w http.ResponseWriter, r *http.Request) {
 
 // createEvalSet handles POST /api/eval-sets.
 func (h *handler) createEvalSet(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -100,7 +100,7 @@ func (h *handler) createEvalSet(w http.ResponseWriter, r *http.Request) {
 
 // getEvalSet handles GET /api/eval-sets/{id}.
 func (h *handler) getEvalSet(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -123,7 +123,7 @@ func (h *handler) getEvalSet(w http.ResponseWriter, r *http.Request) {
 
 // updateEvalSet handles PUT /api/eval-sets/{id}.
 func (h *handler) updateEvalSet(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -165,7 +165,7 @@ func (h *handler) updateEvalSet(w http.ResponseWriter, r *http.Request) {
 
 // deleteEvalSet handles DELETE /api/eval-sets/{id}.
 func (h *handler) deleteEvalSet(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -189,7 +189,7 @@ func (h *handler) deleteEvalSet(w http.ResponseWriter, r *http.Request) {
 
 // listEvalCases handles GET /api/eval-sets/{id}/cases.
 func (h *handler) listEvalCases(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -224,7 +224,7 @@ func (h *handler) listEvalCases(w http.ResponseWriter, r *http.Request) {
 
 // createEvalCase handles POST /api/eval-sets/{id}/cases.
 func (h *handler) createEvalCase(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -266,7 +266,7 @@ func (h *handler) createEvalCase(w http.ResponseWriter, r *http.Request) {
 
 // updateEvalCase handles PUT /api/eval-cases/{id}.
 func (h *handler) updateEvalCase(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -306,7 +306,7 @@ func (h *handler) updateEvalCase(w http.ResponseWriter, r *http.Request) {
 
 // deleteEvalCase handles DELETE /api/eval-cases/{id}.
 func (h *handler) deleteEvalCase(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -336,7 +336,7 @@ func (h *handler) deleteEvalCase(w http.ResponseWriter, r *http.Request) {
 
 // reorderEvalCases handles POST /api/eval-sets/{id}/reorder.
 func (h *handler) reorderEvalCases(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -455,7 +455,7 @@ func (h *handler) getMetric(w http.ResponseWriter, r *http.Request) {
 
 // listMetricProfiles handles GET /api/evaluation/profiles.
 func (h *handler) listMetricProfiles(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -474,7 +474,7 @@ func (h *handler) listMetricProfiles(w http.ResponseWriter, r *http.Request) {
 
 // createMetricProfile handles POST /api/evaluation/profiles.
 func (h *handler) createMetricProfile(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -504,7 +504,7 @@ func (h *handler) createMetricProfile(w http.ResponseWriter, r *http.Request) {
 
 // getMetricProfile handles GET /api/evaluation/profiles/{id}.
 func (h *handler) getMetricProfile(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -524,7 +524,7 @@ func (h *handler) getMetricProfile(w http.ResponseWriter, r *http.Request) {
 
 // updateMetricProfile handles PUT /api/evaluation/profiles/{id}.
 func (h *handler) updateMetricProfile(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -560,7 +560,7 @@ func (h *handler) updateMetricProfile(w http.ResponseWriter, r *http.Request) {
 
 // deleteMetricProfile handles DELETE /api/evaluation/profiles/{id}.
 func (h *handler) deleteMetricProfile(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -579,7 +579,7 @@ func (h *handler) deleteMetricProfile(w http.ResponseWriter, r *http.Request) {
 
 // setDefaultProfile handles POST /api/evaluation/profiles/{id}/set-default.
 func (h *handler) setDefaultProfile(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -608,7 +608,7 @@ func (h *handler) setDefaultProfile(w http.ResponseWriter, r *http.Request) {
 
 // createEvalRun handles POST /api/evaluation/runs.
 func (h *handler) createEvalRun(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -638,7 +638,7 @@ func (h *handler) createEvalRun(w http.ResponseWriter, r *http.Request) {
 
 // listEvalRuns handles GET /api/evaluation/runs.
 func (h *handler) listEvalRuns(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -657,7 +657,7 @@ func (h *handler) listEvalRuns(w http.ResponseWriter, r *http.Request) {
 
 // getEvalRun handles GET /api/evaluation/runs/{id}.
 func (h *handler) getEvalRun(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -677,7 +677,7 @@ func (h *handler) getEvalRun(w http.ResponseWriter, r *http.Request) {
 
 // getEvalResults handles GET /api/evaluation/runs/{id}/results.
 func (h *handler) getEvalResults(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -700,7 +700,7 @@ func (h *handler) getEvalResults(w http.ResponseWriter, r *http.Request) {
 
 // cancelEvalRun handles POST /api/evaluation/runs/{id}/cancel.
 func (h *handler) cancelEvalRun(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -727,7 +727,7 @@ func (h *handler) cancelEvalRun(w http.ResponseWriter, r *http.Request) {
 // streamEvalRun handles GET /api/evaluation/runs/{id}/stream.
 // Streams evaluation run status changes via SSE.
 func (h *handler) streamEvalRun(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -807,7 +807,7 @@ func (h *handler) streamEvalRun(w http.ResponseWriter, r *http.Request) {
 
 // deleteEvalRun handles DELETE /api/evaluation/runs/{id}.
 func (h *handler) deleteEvalRun(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -827,7 +827,7 @@ func (h *handler) deleteEvalRun(w http.ResponseWriter, r *http.Request) {
 // exportEvalRun handles GET /api/evaluation/runs/{id}/export.
 // Exports evaluation results as a JSON file.
 func (h *handler) exportEvalRun(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -943,7 +943,7 @@ func (h *handler) exportEvalRun(w http.ResponseWriter, r *http.Request) {
 
 // listRubrics handles GET /api/evaluation/rubrics.
 func (h *handler) listRubrics(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -962,7 +962,7 @@ func (h *handler) listRubrics(w http.ResponseWriter, r *http.Request) {
 
 // createRubric handles POST /api/evaluation/rubrics.
 func (h *handler) createRubric(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -992,7 +992,7 @@ func (h *handler) createRubric(w http.ResponseWriter, r *http.Request) {
 
 // getRubric handles GET /api/evaluation/rubrics/{id}.
 func (h *handler) getRubric(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -1012,7 +1012,7 @@ func (h *handler) getRubric(w http.ResponseWriter, r *http.Request) {
 
 // updateRubric handles PUT /api/evaluation/rubrics/{id}.
 func (h *handler) updateRubric(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -1048,7 +1048,7 @@ func (h *handler) updateRubric(w http.ResponseWriter, r *http.Request) {
 
 // deleteRubric handles DELETE /api/evaluation/rubrics/{id}.
 func (h *handler) deleteRubric(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -1070,7 +1070,7 @@ func (h *handler) deleteRubric(w http.ResponseWriter, r *http.Request) {
 // importEvalSet handles POST /api/eval-sets/import.
 // Accepts a multipart form with a JSON file.
 func (h *handler) importEvalSet(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -1116,7 +1116,7 @@ func (h *handler) importEvalSet(w http.ResponseWriter, r *http.Request) {
 // exportEvalSet handles GET /api/eval-sets/{id}/export.
 // Returns a JSON file download.
 func (h *handler) exportEvalSet(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return

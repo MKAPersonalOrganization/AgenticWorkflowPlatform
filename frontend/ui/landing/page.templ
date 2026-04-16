@@ -3,11 +3,11 @@ package landing
 import (
 	"aicompass/frontend/ui"
 	"aicompass/frontend/components/icon"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 )
 
 type LandingPageProps struct {
-	User *shared.User
+	User *auth.User
 }
 
 templ LandingPage(props LandingPageProps) {

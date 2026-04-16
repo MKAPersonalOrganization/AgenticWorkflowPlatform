@@ -4,7 +4,7 @@ import (
 	"aicompass/frontend/ui/profile"
 	"aicompass/foundation/i18n"
 	"aicompass/foundation/logger"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -23,7 +23,7 @@ func newHandler(log *logger.Logger, repo UserProfileRepository) *handler {
 
 // handleProfilePage serves the HTML profile page.
 func (h *handler) handleProfilePage(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
 		return
@@ -57,7 +57,7 @@ func (h *handler) handleProfilePage(w http.ResponseWriter, r *http.Request) {
 
 // getProfile handles GET /api/profile
 func (h *handler) getProfile(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -82,7 +82,7 @@ func (h *handler) getProfile(w http.ResponseWriter, r *http.Request) {
 
 // updateProfile handles PUT /api/profile
 func (h *handler) updateProfile(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return

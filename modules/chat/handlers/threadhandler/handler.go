@@ -5,7 +5,7 @@ import (
 	"aicompass/modules/chat/projection/agui"
 	"aicompass/modules/chat/thread"
 	"aicompass/modules/chat/threadmgmt"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -34,7 +34,7 @@ func New(
 // DeleteThread deletes a thread.
 func (h *Handler) DeleteThread(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 
@@ -91,7 +91,7 @@ type UpdateThreadTitleRequest struct {
 // PATCH /api/agui/threads/{threadId}
 func (h *Handler) UpdateThreadTitle(w http.ResponseWriter, r *http.Request) {
 	// Get authenticated user from context
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return

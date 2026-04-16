@@ -1,7 +1,7 @@
 package googleauth
 
 import (
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -89,7 +89,7 @@ func (c *Client) FetchUserInfo(ctx context.Context, token *oauth2.Token) (*Googl
 
 // UpsertUser creates or updates a user in the database from Google profile data.
 // Returns the user (created or existing).
-func (c *Client) UpsertUser(ctx context.Context, info *GoogleUserInfo) (*shared.User, error) {
+func (c *Client) UpsertUser(ctx context.Context, info *GoogleUserInfo) (*auth.User, error) {
 	now := time.Now().UTC()
 
 	query := `
@@ -104,7 +104,7 @@ func (c *Client) UpsertUser(ctx context.Context, info *GoogleUserInfo) (*shared.
 		RETURNING id, email, google_sub, first_name, last_name, picture, role, created_at, updated_at
 	`
 
-	var user shared.User
+	var user auth.User
 	err := c.db.QueryRowxContext(ctx, query,
 		uuid.New().String(),
 		info.Email,
@@ -124,8 +124,8 @@ func (c *Client) UpsertUser(ctx context.Context, info *GoogleUserInfo) (*shared.
 }
 
 // GetUserByID retrieves a user by their ID.
-func (c *Client) GetUserByID(ctx context.Context, userID string) (*shared.User, error) {
-	var user shared.User
+func (c *Client) GetUserByID(ctx context.Context, userID string) (*auth.User, error) {
+	var user auth.User
 	err := c.db.QueryRowxContext(ctx,
 		`SELECT id, email, google_sub, first_name, last_name, picture, role, created_at, updated_at
 		 FROM users WHERE id = $1`, userID).StructScan(&user)
@@ -137,8 +137,8 @@ func (c *Client) GetUserByID(ctx context.Context, userID string) (*shared.User, 
 }
 
 // GetUserByEmail retrieves a user by email.
-func (c *Client) GetUserByEmail(ctx context.Context, email string) (*shared.User, error) {
-	var user shared.User
+func (c *Client) GetUserByEmail(ctx context.Context, email string) (*auth.User, error) {
+	var user auth.User
 	err := c.db.QueryRowxContext(ctx,
 		`SELECT id, email, google_sub, first_name, last_name, picture, role, created_at, updated_at
 		 FROM users WHERE email = $1`, email).StructScan(&user)

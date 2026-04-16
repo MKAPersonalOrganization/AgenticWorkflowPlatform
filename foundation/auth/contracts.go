@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"aicompass/shared"
 	"context"
 	"net/http"
 )
@@ -15,5 +14,5 @@ type SessionReader interface {
 
 // UserResolver loads a User by their unique identifier.
 type UserResolver interface {
-	GetUserByID(ctx context.Context, userID string) (*shared.User, error)
+	GetUserByID(ctx context.Context, userID string) (*User, error)
 }

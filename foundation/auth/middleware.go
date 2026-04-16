@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"aicompass/shared"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -14,7 +13,7 @@ import (
 
 // sessionCacheEntry holds a cached user with its expiration time.
 type sessionCacheEntry struct {
-	user      *shared.User
+	user      *User
 	expiresAt time.Time
 }
 
@@ -82,7 +81,7 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), shared.UserContextKey, user)
+		ctx := context.WithValue(r.Context(), UserContextKey, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -96,13 +95,13 @@ func (m *Middleware) OptionalAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), shared.UserContextKey, user)
+		ctx := context.WithValue(r.Context(), UserContextKey, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
 // resolveUser checks the session cookie and resolves the user (with caching).
-func (m *Middleware) resolveUser(r *http.Request) (*shared.User, error) {
+func (m *Middleware) resolveUser(r *http.Request) (*User, error) {
 	userID, ok := m.sessions.GetUserID(r)
 	if !ok {
 		return nil, nil

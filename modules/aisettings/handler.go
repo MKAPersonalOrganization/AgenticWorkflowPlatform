@@ -3,7 +3,7 @@ package aisettings
 import (
 	"aicompass/foundation/i18n"
 	"aicompass/foundation/logger"
-	"aicompass/shared"
+	"aicompass/foundation/auth"
 	"encoding/json"
 	"net/http"
 
@@ -87,7 +87,7 @@ func (h *handler) listProviders(w http.ResponseWriter, r *http.Request) {
 
 // getSettings handles GET /api/ai-settings
 func (h *handler) getSettings(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -114,7 +114,7 @@ func (h *handler) getSettings(w http.ResponseWriter, r *http.Request) {
 
 // saveSettings handles PUT /api/ai-settings
 func (h *handler) saveSettings(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -161,7 +161,7 @@ func (h *handler) saveSettings(w http.ResponseWriter, r *http.Request) {
 
 // deleteSettings handles DELETE /api/ai-settings/{id}
 func (h *handler) deleteSettings(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -184,7 +184,7 @@ func (h *handler) deleteSettings(w http.ResponseWriter, r *http.Request) {
 
 // setDefault handles PUT /api/ai-settings/{id}/default
 func (h *handler) setDefault(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -221,7 +221,7 @@ func providerDisplayName(p AIProvider) string {
 // listProviderModels handles GET /api/ai-settings/providers/{provider}/models
 // It proxies the call to the provider's model-listing API using the user's stored key.
 func (h *handler) listProviderModels(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -263,7 +263,7 @@ func (h *handler) getTTSVoices(w http.ResponseWriter, r *http.Request) {
 
 // getCapabilityConfigs handles GET /api/ai-settings/capabilities
 func (h *handler) getCapabilityConfigs(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -296,7 +296,7 @@ func (h *handler) getCapabilityConfigs(w http.ResponseWriter, r *http.Request) {
 
 // saveCapabilityConfig handles PUT /api/ai-settings/capabilities/{capability}
 func (h *handler) saveCapabilityConfig(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
@@ -345,7 +345,7 @@ func (h *handler) saveCapabilityConfig(w http.ResponseWriter, r *http.Request) {
 
 // deleteCapabilityConfig handles DELETE /api/ai-settings/capabilities/{capability}
 func (h *handler) deleteCapabilityConfig(w http.ResponseWriter, r *http.Request) {
-	user := shared.GetUserFromContext(r.Context())
+	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
