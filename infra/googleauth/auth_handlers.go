@@ -10,8 +10,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-
-	authcomp "aicompass/components/auth"
 )
 
 // AuthHandlers contains handlers for authentication routes.
@@ -164,24 +162,29 @@ func (h *AuthHandlers) MeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ErrorPage handles GET /auth/error — displays authentication errors.
-func (h *AuthHandlers) ErrorPage(w http.ResponseWriter, r *http.Request) {
-	errorParam := r.URL.Query().Get("error")
-	errorMessage := errorParam
+// AuthErrorData holds the data needed to render an authentication error page.
+// The rendering itself is handled at the route-wiring layer (main.go) to keep
+// the infrastructure package free of presentation-layer (components/) imports.
+type AuthErrorData struct {
+	ErrorMessage string
+	LoginURL     string
+	HomeURL      string
+	User         *shared.User
+}
+
+// ErrorPageData extracts authentication error data from the request.
+// The caller is responsible for rendering the result into a UI component.
+func (h *AuthHandlers) ErrorPageData(r *http.Request) AuthErrorData {
+	errorMessage := r.URL.Query().Get("error")
 	if errorMessage == "" {
 		errorMessage = i18n.T(r.Context(), "An unexpected error occurred")
 	}
 
-	props := authcomp.ErrorPageProps{
+	return AuthErrorData{
 		ErrorMessage: errorMessage,
 		LoginURL:     h.appURL + "/auth/login",
 		HomeURL:      h.appURL + "/",
 		User:         shared.GetUserFromContext(r.Context()),
-	}
-
-	component := authcomp.ErrorPage(props)
-	if err := component.Render(r.Context(), w); err != nil {
-		http.Error(w, i18n.T(r.Context(), "Internal server error"), http.StatusInternalServerError)
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"aicompass/adapters/adkgo"
 	"aicompass/adapters/gemini"
 	"aicompass/components"
+	authcomp "aicompass/components/auth"
 	"aicompass/components/docs"
 	"aicompass/components/landing"
 	"aicompass/components/pricing"
@@ -855,7 +856,18 @@ func registerRoutes(
 	r.Get("/auth/login", authHandlers.LoginPage)
 	r.Get("/auth/callback", authHandlers.CallbackHandler)
 	r.Get("/auth/logout", authHandlers.LogoutHandler)
-	r.Get("/auth/error", authHandlers.ErrorPage)
+	r.Get("/auth/error", func(w http.ResponseWriter, r *http.Request) {
+		data := authHandlers.ErrorPageData(r)
+		component := authcomp.ErrorPage(authcomp.ErrorPageProps{
+			ErrorMessage: data.ErrorMessage,
+			LoginURL:     data.LoginURL,
+			HomeURL:      data.HomeURL,
+			User:         data.User,
+		})
+		if err := component.Render(r.Context(), w); err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+	})
 	r.Get("/api/me", authMW.RequireAuthFunc(authHandlers.MeHandler))
 
 	// Page routes
