@@ -21,7 +21,7 @@ package a2a
 import (
 	"aicompass/foundation/auth"
 	"aicompass/foundation/logger"
-	"aicompass/platform/toolregistry"
+	"aicompass/foundation/toolregistry"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"

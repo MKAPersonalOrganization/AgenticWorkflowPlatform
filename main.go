@@ -24,7 +24,7 @@ import (
 	"aicompass/modules/knowledge/edgequake"
 	"aicompass/modules/knowledge/rag/users"
 	"aicompass/modules/toolreqs"
-	"aicompass/platform/toolregistry"
+	"aicompass/foundation/toolregistry"
 	"aicompass/plugins/agentmemory"
 	"aicompass/plugins/artifacts"
 	"aicompass/plugins/calculator"

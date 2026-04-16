@@ -3,7 +3,7 @@ package mcp
 import (
 	"aicompass/foundation/agent"
 	"aicompass/foundation/logger"
-	"aicompass/platform/toolregistry"
+	"aicompass/foundation/toolregistry"
 	"context"
 	"database/sql"
 	"encoding/json"

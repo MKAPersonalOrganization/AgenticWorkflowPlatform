@@ -1,7 +1,7 @@
 package taskmgmt
 
 import (
-	"aicompass/platform/toolregistry"
+	"aicompass/foundation/toolregistry"
 	"encoding/json"
 	"net/http"
 )

@@ -1,7 +1,7 @@
 package pluginsettings
 
 import (
-	"aicompass/platform/toolregistry"
+	"aicompass/foundation/toolregistry"
 	"context"
 	"fmt"
 )

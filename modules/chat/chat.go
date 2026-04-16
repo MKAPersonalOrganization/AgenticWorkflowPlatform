@@ -34,7 +34,7 @@ import (
 	"aicompass/modules/chat/thread"
 	"aicompass/modules/chat/threadmgmt"
 	"aicompass/foundation/artifact"
-	"aicompass/platform/toolregistry"
+	"aicompass/foundation/toolregistry"
 	"aicompass/shared"
 
 	aguihandlers "aicompass/modules/chat/agui"

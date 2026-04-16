@@ -2,7 +2,7 @@ package a2a
 
 import (
 	"aicompass/foundation/agent"
-	"aicompass/platform/toolregistry"
+	"aicompass/foundation/toolregistry"
 	"context"
 	"encoding/json"
 

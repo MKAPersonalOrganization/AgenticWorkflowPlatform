@@ -3,7 +3,7 @@ package a2a
 import (
 	"aicompass/foundation/agent"
 	"aicompass/foundation/logger"
-	"aicompass/platform/toolregistry"
+	"aicompass/foundation/toolregistry"
 	"context"
 	"encoding/base64"
 	"encoding/json"

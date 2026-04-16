@@ -3,7 +3,7 @@ package pluginsettings
 import (
 	"aicompass/foundation/i18n"
 	"aicompass/foundation/logger"
-	"aicompass/platform/toolregistry"
+	"aicompass/foundation/toolregistry"
 	"aicompass/shared"
 	"encoding/json"
 	"net/http"

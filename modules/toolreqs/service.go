@@ -4,7 +4,7 @@ import (
 	"aicompass/foundation/agent"
 	"aicompass/foundation/logger"
 	"aicompass/foundation/permcache"
-	"aicompass/platform/toolregistry"
+	"aicompass/foundation/toolregistry"
 	"context"
 	"fmt"
 	"time"

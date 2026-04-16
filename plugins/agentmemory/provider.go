@@ -7,7 +7,7 @@ package agentmemory
 
 import (
 	"aicompass/foundation/agent"
-	"aicompass/platform/toolregistry"
+	"aicompass/foundation/toolregistry"
 	"context"
 	"time"
 

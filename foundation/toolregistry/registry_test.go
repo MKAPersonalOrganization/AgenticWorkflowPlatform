@@ -2,8 +2,8 @@ package toolregistry_test
 
 import (
 	"aicompass/foundation/logger"
-	"aicompass/platform/toolregistry"
-	"aicompass/platform/toolregistry/mocks"
+	"aicompass/foundation/toolregistry"
+	"aicompass/foundation/toolregistry/mocks"
 	"aicompass/plugins/calculator"
 	"context"
 	"os"

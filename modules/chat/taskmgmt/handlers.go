@@ -20,7 +20,7 @@ import (
 	"aicompass/modules/chat/chatcontracts"
 	"aicompass/modules/chat/projection/agui"
 	"aicompass/modules/chat/threadmgmt"
-	"aicompass/platform/toolregistry"
+	"aicompass/foundation/toolregistry"
 	"aicompass/shared"
 	"time"
 )

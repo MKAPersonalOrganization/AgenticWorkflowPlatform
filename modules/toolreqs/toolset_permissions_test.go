@@ -4,12 +4,12 @@ import (
 	"aicompass/foundation/logger"
 	"aicompass/modules/toolreqs"
 	"aicompass/modules/toolreqs/mocks"
-	"aicompass/platform/toolregistry"
+	"aicompass/foundation/toolregistry"
 	"context"
 	"os"
 	"testing"
 
-	toolregistry_mocks "aicompass/platform/toolregistry/mocks"
+	toolregistry_mocks "aicompass/foundation/toolregistry/mocks"
 
 	"github.com/alicebob/miniredis/v2"
 	goredis "github.com/redis/go-redis/v9"

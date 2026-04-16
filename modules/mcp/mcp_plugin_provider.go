@@ -2,7 +2,7 @@ package mcp
 
 import (
 	"aicompass/foundation/agent"
-	"aicompass/platform/toolregistry"
+	"aicompass/foundation/toolregistry"
 	"context"
 	"encoding/json"
 

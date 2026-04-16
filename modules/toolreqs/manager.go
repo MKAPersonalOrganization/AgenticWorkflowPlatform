@@ -2,7 +2,7 @@ package toolreqs
 
 import (
 	"aicompass/foundation/logger"
-	"aicompass/platform/toolregistry"
+	"aicompass/foundation/toolregistry"
 
 	"github.com/redis/go-redis/v9"
 )
