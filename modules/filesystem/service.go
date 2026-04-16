@@ -1,13 +1,13 @@
 package filesystem
 
 import (
-	"aicompass/infra/githubauth"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"time"
 
+	"aicompass/modules/filesystem/githubauth"
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -19,7 +19,7 @@ type service struct {
 	s3Client *minio.Client
 	s3Bucket string
 	s3Config S3Config
-	ghStore  *githubauth.Store // may be nil when GitHub OAuth is not configured
+	ghStore  *githubauth.Store
 }
 
 func newService(repo repository, cfg S3Config, ghStore *githubauth.Store) (*service, error) {

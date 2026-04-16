@@ -10,7 +10,6 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// Connection represents a stored GitHub OAuth connection for a user.
 type Connection struct {
 	UserID         string    `json:"user_id" db:"user_id"`
 	AccessToken    string    `json:"-" db:"access_token"`
@@ -20,17 +19,14 @@ type Connection struct {
 	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
 }
 
-// Store persists GitHub OAuth connections in PostgreSQL.
 type Store struct {
 	db *sqlx.DB
 }
 
-// NewStore creates a new GitHub connection store.
 func NewStore(db *sqlx.DB) *Store {
 	return &Store{db: db}
 }
 
-// Upsert creates or updates a GitHub connection for the given user.
 func (s *Store) Upsert(ctx context.Context, conn Connection) error {
 	const q = `
 		INSERT INTO github_connections (user_id, access_token, github_username, github_avatar, connected_at, updated_at)
@@ -55,8 +51,6 @@ func (s *Store) Upsert(ctx context.Context, conn Connection) error {
 	return nil
 }
 
-// Get retrieves the GitHub connection for the given user.
-// Returns nil, nil when no connection exists.
 func (s *Store) Get(ctx context.Context, userID string) (*Connection, error) {
 	var conn Connection
 	const q = `SELECT * FROM github_connections WHERE user_id = $1`
@@ -70,8 +64,6 @@ func (s *Store) Get(ctx context.Context, userID string) (*Connection, error) {
 	return &conn, nil
 }
 
-// GetToken retrieves just the access token for the given user.
-// Returns empty string when no connection exists.
 func (s *Store) GetToken(ctx context.Context, userID string) (string, error) {
 	var token string
 	const q = `SELECT access_token FROM github_connections WHERE user_id = $1`
@@ -85,7 +77,6 @@ func (s *Store) GetToken(ctx context.Context, userID string) (string, error) {
 	return token, nil
 }
 
-// Delete removes the GitHub connection for the given user.
 func (s *Store) Delete(ctx context.Context, userID string) error {
 	const q = `DELETE FROM github_connections WHERE user_id = $1`
 	_, err := s.db.ExecContext(ctx, q, userID)

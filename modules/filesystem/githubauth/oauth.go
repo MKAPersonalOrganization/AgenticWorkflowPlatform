@@ -11,31 +11,27 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// GitHub OAuth2 endpoints.
 var githubEndpoint = oauth2.Endpoint{
 	AuthURL:  "https://github.com/login/oauth/authorize",
 	TokenURL: "https://github.com/login/oauth/access_token",
 }
 
-// GitHubUser represents the authenticated GitHub user profile.
-type GitHubUser struct {
+type ghUser struct {
 	Login     string `json:"login"`
 	AvatarURL string `json:"avatar_url"`
 	Name      string `json:"name"`
 }
 
-// GitHubRepo represents a repository returned by the GitHub API.
-type GitHubRepo struct {
+type ghRepo struct {
 	FullName      string `json:"full_name"`
 	Name          string `json:"name"`
-	Owner         string `json:"owner_login"` // populated manually
+	Owner         string `json:"owner_login"`
 	Private       bool   `json:"private"`
 	DefaultBranch string `json:"default_branch"`
 	Description   string `json:"description"`
 	HTMLURL       string `json:"html_url"`
 }
 
-// ghRepoRaw is the raw JSON shape returned by the GitHub repos API.
 type ghRepoRaw struct {
 	FullName      string `json:"full_name"`
 	Name          string `json:"name"`
@@ -48,14 +44,12 @@ type ghRepoRaw struct {
 	} `json:"owner"`
 }
 
-// Client wraps GitHub OAuth2 functionality.
 type Client struct {
 	oauthConfig *oauth2.Config
 	httpClient  *http.Client
 }
 
-// NewClient creates a new GitHub OAuth2 client.
-func NewClient(cfg Config) *Client {
+func NewClient(cfg GitHubOAuthConfig) *Client {
 	oauthConfig := &oauth2.Config{
 		ClientID:     cfg.ClientID,
 		ClientSecret: cfg.ClientSecret,
@@ -70,18 +64,15 @@ func NewClient(cfg Config) *Client {
 	}
 }
 
-// AuthCodeURL returns the URL for the GitHub OAuth2 consent page.
 func (c *Client) AuthCodeURL(state string) string {
 	return c.oauthConfig.AuthCodeURL(state)
 }
 
-// Exchange exchanges an authorization code for a token.
 func (c *Client) Exchange(ctx context.Context, code string) (*oauth2.Token, error) {
 	return c.oauthConfig.Exchange(ctx, code)
 }
 
-// FetchUser retrieves the authenticated GitHub user profile.
-func (c *Client) FetchUser(ctx context.Context, token *oauth2.Token) (*GitHubUser, error) {
+func (c *Client) FetchUser(ctx context.Context, token *oauth2.Token) (*ghUser, error) {
 	client := c.oauthConfig.Client(ctx, token)
 	resp, err := client.Get("https://api.github.com/user")
 	if err != nil {
@@ -98,7 +89,7 @@ func (c *Client) FetchUser(ctx context.Context, token *oauth2.Token) (*GitHubUse
 		return nil, fmt.Errorf("githubauth: user API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
-	var user GitHubUser
+	var user ghUser
 	if err := json.Unmarshal(body, &user); err != nil {
 		return nil, fmt.Errorf("githubauth: decode user: %w", err)
 	}
@@ -106,9 +97,7 @@ func (c *Client) FetchUser(ctx context.Context, token *oauth2.Token) (*GitHubUse
 	return &user, nil
 }
 
-// ListRepos lists repositories accessible by the authenticated user.
-// Returns up to 100 repos sorted by most recently pushed.
-func (c *Client) ListRepos(ctx context.Context, accessToken string) ([]GitHubRepo, error) {
+func (c *Client) ListRepos(ctx context.Context, accessToken string) ([]ghRepo, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
 		"https://api.github.com/user/repos?per_page=100&sort=pushed&affiliation=owner,collaborator,organization_member", nil)
 	if err != nil {
@@ -133,9 +122,9 @@ func (c *Client) ListRepos(ctx context.Context, accessToken string) ([]GitHubRep
 		return nil, fmt.Errorf("githubauth: decode repos: %w", err)
 	}
 
-	repos := make([]GitHubRepo, len(raw))
+	repos := make([]ghRepo, len(raw))
 	for i, r := range raw {
-		repos[i] = GitHubRepo{
+		repos[i] = ghRepo{
 			FullName:      r.FullName,
 			Name:          r.Name,
 			Owner:         r.Owner.Login,
@@ -149,7 +138,6 @@ func (c *Client) ListRepos(ctx context.Context, accessToken string) ([]GitHubRep
 	return repos, nil
 }
 
-// Configured returns true when GitHub OAuth credentials are present.
 func (c *Client) Configured() bool {
 	return c.oauthConfig.ClientID != "" && c.oauthConfig.ClientSecret != ""
 }

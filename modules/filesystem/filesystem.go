@@ -2,12 +2,14 @@ package filesystem
 
 import (
 	"aicompass/foundation/auth"
-	"aicompass/infra/githubauth"
+	"aicompass/modules/filesystem/githubauth"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"
 )
+
+type GitHubOAuthConfig = githubauth.GitHubOAuthConfig
 
 // Module is the filesystem bounded context entry point.
 type Module struct {
@@ -17,9 +19,14 @@ type Module struct {
 }
 
 // New creates a new filesystem module.
-// ghClient and ghStore may be nil when GitHub OAuth is not configured.
-func New(db *sqlx.DB, s3Cfg S3Config, ghClient *githubauth.Client, ghStore *githubauth.Store, appURL string) (*Module, error) {
+func New(db *sqlx.DB, s3Cfg S3Config, ghCfg githubauth.GitHubOAuthConfig, appURL string) (*Module, error) {
 	repo := newPostgresRepo(db)
+
+	var ghStore *githubauth.Store
+	if ghCfg.ClientID != "" && ghCfg.ClientSecret != "" {
+		ghStore = githubauth.NewStore(db)
+	}
+
 	svc, err := newService(repo, s3Cfg, ghStore)
 	if err != nil {
 		return nil, err
@@ -27,7 +34,8 @@ func New(db *sqlx.DB, s3Cfg S3Config, ghClient *githubauth.Client, ghStore *gith
 	h := newHandler(svc)
 
 	var ghh *githubHandler
-	if ghClient != nil && ghStore != nil {
+	if ghStore != nil {
+		ghClient := githubauth.NewClient(ghCfg)
 		ghh = newGitHubHandler(ghClient, ghStore, appURL)
 	}
 

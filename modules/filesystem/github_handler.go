@@ -1,7 +1,7 @@
 package filesystem
 
 import (
-	"aicompass/infra/githubauth"
+	"aicompass/modules/filesystem/githubauth"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"

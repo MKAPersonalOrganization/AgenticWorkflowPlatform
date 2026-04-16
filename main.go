@@ -13,7 +13,6 @@ import (
 	"aicompass/foundation/i18n"
 	"aicompass/foundation/logger"
 	"aicompass/foundation/middleware"
-	"aicompass/infra/githubauth"
 	"aicompass/infra/googleauth"
 	"aicompass/infra/memdb"
 	"aicompass/infra/projection/subscriber"
@@ -30,8 +29,8 @@ import (
 	"aicompass/plugins/artifacts"
 	"aicompass/plugins/calculator"
 	"aicompass/plugins/codebase"
-	"aicompass/plugins/demoinput"
 	"aicompass/plugins/cognitive"
+	"aicompass/plugins/demoinput"
 	"aicompass/plugins/document"
 	"aicompass/plugins/fsplugin"
 	"aicompass/plugins/knowledgebase"
@@ -391,18 +390,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	var evalRunner evalmod.AgentInvoker
 
 	// Initialize filesystem module (VFS backed by S3/MinIO)
-	var ghClient *githubauth.Client
-	var ghStore *githubauth.Store
-	if cfg.Auth.GitHubClientID != "" && cfg.Auth.GitHubClientSecret != "" {
-		ghClient = githubauth.NewClient(githubauth.Config{
-			ClientID:     cfg.Auth.GitHubClientID,
-			ClientSecret: cfg.Auth.GitHubClientSecret,
-			RedirectURL:  cfg.Auth.AppURL + "/api/github/callback",
-		})
-		ghStore = githubauth.NewStore(db)
-		log.Info(ctx, "startup", "status", "GitHub OAuth configured for filesystem module")
-	}
-
 	filesystemModule, err := filesystemmod.New(db, filesystemmod.S3Config{
 		Endpoint:        cfg.Artifacts.S3Endpoint,
 		AccessKeyID:     cfg.Artifacts.S3AccessKey,
@@ -410,7 +397,11 @@ func run(ctx context.Context, log *logger.Logger) error {
 		UseSSL:          cfg.Artifacts.S3UseSSL,
 		BucketName:      cfg.Artifacts.S3Bucket,
 		Region:          cfg.Artifacts.S3Region,
-	}, ghClient, ghStore, cfg.Auth.AppURL)
+	}, filesystemmod.GitHubOAuthConfig{
+		ClientID:     cfg.Auth.GitHubClientID,
+		ClientSecret: cfg.Auth.GitHubClientSecret,
+		RedirectURL:  cfg.Auth.AppURL + "/api/github/callback",
+	}, cfg.Auth.AppURL)
 	if err != nil {
 		return fmt.Errorf("initializing filesystem module: %w", err)
 	}
