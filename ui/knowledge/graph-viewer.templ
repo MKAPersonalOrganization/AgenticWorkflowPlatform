@@ -1,0 +1,185 @@
+package knowledge
+
+/**
+ * GraphViewer - Main graph container with all overlays.
+ * Matches EdgeQuake edgequake_webui/src/components/graph/graph-viewer.tsx
+ *
+ * Contains: Sigma.js WebGL container, overlays (zoom, controls, legend, minimap, context menu),
+ * loading state, empty state, and the node details side panel.
+ */
+
+import (
+	"aicompass/ui/i18n"
+	"aicompass/components/icon"
+	"aicompass/components/separator"
+	"aicompass/components/tooltip"
+)
+
+templ GraphViewer() {
+	<div class="flex flex-col h-full overflow-hidden">
+		<!-- Graph Toolbar -->
+		@GraphToolbar()
+		<!-- Keyboard Shortcuts Dialog (rendered outside toolbar to avoid stacking context issues) -->
+		@KeyboardShortcutsDialog()
+		<!-- Main Content Area -->
+		<div
+			class="flex-1 relative overflow-hidden bg-background text-foreground"
+			data-graph-container
+			data-tour="graph-canvas"
+			role="application"
+			aria-label="Knowledge Graph Visualization - use Tab to navigate nodes, Enter to focus, Escape to deselect"
+		>
+			<!-- Loading state overlays -->
+			<div x-show="graphLoading" class="absolute inset-0 z-50 flex items-center justify-center bg-background/50 backdrop-blur-sm">
+				@GraphLoadingOverlay()
+			</div>
+			<!-- Empty state -->
+			<div x-show="!graphLoading && (!graphData || !graphData.nodes || graphData.nodes.length === 0)" x-cloak class="absolute inset-0 flex items-center justify-center">
+				<div class="text-center max-w-md px-4">
+					<div class="bg-background p-6 rounded-full shadow-lg border mb-6 inline-block">
+						@icon.Network(icon.Props{Class: "size-12 text-muted-foreground opacity-50"})
+					</div>
+					<h3 class="text-xl font-semibold tracking-tight">{ i18n.T(ctx, "No knowledge graph yet") }</h3>
+					<p class="text-sm text-muted-foreground mt-2 mb-6">
+						{ i18n.T(ctx, "Your knowledge graph is empty. Upload documents to automatically extract entities and relationships.") }
+					</p>
+					<button
+						@click="window.location.href = '/documents'"
+						class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+					>
+						@icon.Upload(icon.Props{Class: "size-4 me-2"})
+						{ i18n.T(ctx, "Upload Documents") }
+					</button>
+				</div>
+			</div>
+			<!-- Graph Area (Nodes > 0) -->
+			<div x-show="!graphLoading && graphData && graphData.nodes && graphData.nodes.length > 0" x-cloak class="flex h-full overflow-hidden">
+				@EntityBrowserPanel()
+				<!-- Sigma.js WebGL Graph Container -->
+				<div class="flex-1 relative overflow-hidden" id="graph-container">
+					<div id="sigma-container" class="w-full h-full" style="display: block; position: relative; min-height: 400px;"></div>
+					<!-- Overlays -->
+					<div class="absolute top-4 start-4 flex flex-col gap-2 z-20">
+						@GraphControls()
+					</div>
+					<div class="absolute top-4 end-4 flex flex-col gap-2">
+						@ZoomControls()
+					</div>
+					<div class="absolute bottom-4 end-4">
+						@GraphLegend()
+					</div>
+					<div class="absolute top-20 start-4 z-10">
+						@GraphMinimap()
+					</div>
+					<!-- Truncation banner -->
+					<div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-30">
+						@TruncationBanner()
+					</div>
+				</div>
+				<!-- Right Side Panel - Node Details -->
+				@NodeDetails()
+			</div>
+		</div>
+	</div>
+}
+
+templ GraphToolbar() {
+	<header class="flex items-center justify-between border-b px-4 py-2 shrink-0 bg-card/50 backdrop-blur-sm" data-tour="graph-header">
+		<div class="flex items-center gap-2.5">
+			<h2 class="text-base font-semibold tracking-tight">{ i18n.T(ctx, "Knowledge Graph") }</h2>
+			<!-- Loading pulse -->
+			<div x-show="graphLoading" class="size-3.5">
+				@icon.Loader(icon.Props{Class: "size-3.5 animate-spin text-muted-foreground"})
+			</div>
+			<!-- Node/Edge counts -->
+			<div x-show="graphData" x-cloak class="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-md">
+				<span x-text="(graphData?.nodes?.length || 0).toLocaleString() + ' nodes'"></span>
+				<span class="opacity-50">· </span>
+				<span x-text="(graphData?.edges?.length || 0).toLocaleString() + ' edges'"></span>
+			</div>
+		</div>
+		<div class="flex items-center gap-1" data-tour="graph-toolbar-actions">
+			<div data-tour="graph-search">
+				@GraphSearch()
+			</div>
+			@TruncationIndicator()
+			<div data-tour="keyboard-help">
+				@KeyboardShortcutsHelp()
+			</div>
+			@separator.Separator(separator.Props{Orientation: separator.OrientationVertical, Class: "h-5 mx-1"})
+			@tooltip.Tooltip() {
+				@tooltip.Trigger(tooltip.TriggerProps{}) {
+					<button
+						@click="loadGraph()"
+						class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-7 w-7"
+						:class="{ 'animate-spin': graphLoading }"
+					>
+						@icon.RefreshCw(icon.Props{Class: "size-3.5"})
+					</button>
+				}
+				@tooltip.Content(tooltip.ContentProps{}) {
+					Refresh
+				}
+			}
+			@tooltip.Tooltip() {
+				@tooltip.Trigger(tooltip.TriggerProps{}) {
+					<button
+						@click="graphZoomIn()"
+						class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-7 w-7"
+					>
+						@icon.ZoomIn(icon.Props{Class: "size-3.5"})
+					</button>
+				}
+				@tooltip.Content(tooltip.ContentProps{}) {
+					Zoom In
+				}
+			}
+			@tooltip.Tooltip() {
+				@tooltip.Trigger(tooltip.TriggerProps{}) {
+					<button
+						@click="graphZoomOut()"
+						class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-7 w-7"
+					>
+						@icon.ZoomOut(icon.Props{Class: "size-3.5"})
+					</button>
+				}
+				@tooltip.Content(tooltip.ContentProps{}) {
+					Zoom Out
+				}
+			}
+			@tooltip.Tooltip() {
+				@tooltip.Trigger(tooltip.TriggerProps{}) {
+					<button
+						@click="graphExportPNG()"
+						class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-7 w-7"
+					>
+						@icon.Image(icon.Props{Class: "size-3.5"})
+					</button>
+				}
+				@tooltip.Content(tooltip.ContentProps{}) {
+					Export PNG
+				}
+			}
+			@tooltip.Tooltip() {
+				@tooltip.Trigger(tooltip.TriggerProps{}) {
+					<button
+						@click="graphExportJSON()"
+						class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-7 w-7"
+					>
+						@icon.Download(icon.Props{Class: "size-3.5"})
+					</button>
+				}
+				@tooltip.Content(tooltip.ContentProps{}) {
+					Export JSON
+				}
+			}
+		</div>
+	</header>
+}
+
+templ GraphLoadingOverlay() {
+	<div class="flex flex-col items-center gap-3">
+		<span class="animate-spin size-8 border-2 border-primary border-t-transparent rounded-full"></span>
+		<p class="text-sm text-muted-foreground">{ i18n.T(ctx, "Loading knowledge graph...") }</p>
+	</div>
+}

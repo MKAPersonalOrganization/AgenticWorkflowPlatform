@@ -1,0 +1,2808 @@
+package agenteditor
+
+import (
+	"aicompass/components/badge"
+	"aicompass/components/button"
+	"aicompass/components/dialog"
+	"aicompass/ui/i18n"
+	"aicompass/components/icon"
+	"aicompass/components/input"
+	"aicompass/components/label"
+	"aicompass/components/textarea"
+)
+
+// AgentDesignerDialog is the unified dialog for creating and managing AI agents.
+// Supports single agents and multi-agent workflows (sequential, parallel, loop).
+templ AgentDesignerDialog() {
+	<div
+		x-data="agentDesigner"
+		x-init="init()"
+		@open-agent-designer.window="open()"
+		@open-agent-designer-node.window="open(); $nextTick(() => showEditNodeForm($event.detail))"
+		@open-agent-designer-pipeline.window="open(); $nextTick(() => showEditPipelineForm($event.detail))"
+		@open-agent-designer-with-id.window="open(); $nextTick(() => { fetchAgentById($event.detail.agentId).then(agent => { if (agent.isComposed) showEditPipelineForm(agent); else showEditNodeForm(agent); }) })"
+		@open-agent-designer-templates.window="open(); $nextTick(() => openTemplatesView())"
+		@agents-updated.window="fetchAgents()"
+	>
+		@dialog.Dialog(dialog.Props{
+			ID: "agent-designer-dialog",
+		}) {
+			@dialog.Content(dialog.ContentProps{
+				HideCloseButton: true,
+				Class:           "sm:max-w-5xl max-h-[90vh] flex flex-col p-0 overflow-hidden transition-all duration-300 ease-in-out",
+				Attributes: templ.Attributes{
+					":class": "expanded ? '!max-w-[calc(100vw-2rem)] !max-h-[calc(100vh-2rem)] !w-[calc(100vw-2rem)] !h-[calc(100vh-2rem)]' : ''",
+				},
+			}) {
+				@dialog.Header(dialog.HeaderProps{Class: "p-4 pb-3 border-b border-border"}) {
+					<div class="flex items-center justify-between">
+						<div>
+							@dialog.Title() {
+								<span class="flex items-center gap-2">
+									@icon.Workflow(icon.Props{Class: "size-5"})
+									{ i18n.T(ctx, "Agent Designer") }
+								</span>
+							}
+							@dialog.Description() {
+								{ i18n.T(ctx, "Create AI agents and orchestrate workflows.") }
+							}
+						</div>
+						<div class="flex items-center gap-1">
+							@button.Button(button.Props{
+								Size:    button.SizeIcon,
+								Variant: button.VariantGhost,
+								Class:   "size-7 text-muted-foreground",
+								Attributes: templ.Attributes{
+									"@click": "toggleExpand()",
+									"title":  i18n.T(ctx, "Toggle fullscreen"),
+								},
+							}) {
+								<span x-show="!expanded">
+									@icon.Maximize2(icon.Props{Class: "size-3.5"})
+								</span>
+								<span x-show="expanded">
+									@icon.Minimize2(icon.Props{Class: "size-3.5"})
+								</span>
+							}
+							@dialog.Close() {
+								@button.Button(button.Props{
+									Size:    button.SizeIcon,
+									Variant: button.VariantGhost,
+									Class:   "size-7 text-muted-foreground",
+									Attributes: templ.Attributes{
+										"title": i18n.T(ctx, "Close"),
+									},
+								}) {
+									@icon.X(icon.Props{Class: "size-3.5"})
+								}
+							}
+						</div>
+					</div>
+				}
+				<!-- ═══════════════════════════════════════════ -->
+				<!-- UNIFIED AGENT LIST                         -->
+				<!-- ═══════════════════════════════════════════ -->
+				<template x-if="view === 'list'">
+					<div class="flex flex-col flex-1 overflow-hidden" :class="expanded ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[calc(90vh-8rem)]'">
+						<div class="flex flex-col flex-1 overflow-hidden">
+							<div class="px-4 pt-3 pb-2 flex items-center gap-2">
+								<div class="flex-1">
+									@input.Input(input.Props{
+										Type:        input.TypeSearch,
+										Placeholder: i18n.T(ctx, "Search agents..."),
+										Class:       "h-9 bg-muted/40 border-transparent focus-within:bg-background",
+										Attributes: templ.Attributes{
+											"x-model.debounce.300ms": "searchQuery",
+											"@input":                 "searchAgents()",
+										},
+									})
+								</div>
+								@button.Button(button.Props{
+									Size:    button.SizeSm,
+									Variant: button.VariantDefault,
+									Class:   "gap-1.5 shrink-0",
+									Attributes: templ.Attributes{
+										"@click": "view = 'typeSelect'",
+									},
+								}) {
+									@icon.Plus(icon.Props{Class: "size-4"})
+									{ i18n.T(ctx, "New Agent") }
+								}
+								@button.Button(button.Props{
+									Size:    button.SizeSm,
+									Variant: button.VariantGhost,
+									Class:   "gap-1.5 shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10",
+									Attributes: templ.Attributes{
+										"@click":   "confirmDeleteAll()",
+										"x-show":   "agents.length > 0",
+									},
+								}) {
+									@icon.Trash2(icon.Props{Class: "size-4"})
+									{ i18n.T(ctx, "Delete All") }
+								}
+							</div>
+							<div class="flex-1 overflow-y-auto px-4 pb-4 scrollbar-thin min-h-[300px]">
+								<template x-if="loading">
+									<div class="space-y-3">
+										<template x-for="i in 3" :key="i">
+											<div class="flex items-center gap-3 p-3 animate-pulse rounded-lg border border-border">
+												<div class="size-10 rounded-lg bg-muted"></div>
+												<div class="flex-1 space-y-2">
+													<div class="h-4 bg-muted rounded-md w-1/3"></div>
+													<div class="h-3 bg-muted rounded-md w-2/3"></div>
+												</div>
+											</div>
+										</template>
+									</div>
+								</template>
+								<template x-if="!loading">
+									<div>
+										<template x-if="filteredAgents.length === 0">
+											<div class="flex flex-col items-center justify-center py-12 gap-4">
+												<!-- Decorative icon ring -->
+												<div class="relative">
+													<div class="size-20 rounded-full bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center ring-1 ring-primary/10">
+														@icon.Workflow(icon.Props{Class: "size-8 opacity-30 text-primary"})
+													</div>
+													<!-- Floating dots -->
+													<div class="absolute -top-1 -right-2 size-2.5 rounded-full bg-emerald-400/30 animate-pulse"></div>
+													<div class="absolute -bottom-1 -left-3 size-2 rounded-full bg-indigo-400/30 animate-pulse" style="animation-delay: 0.5s"></div>
+													<div class="absolute top-1 -left-2 size-1.5 rounded-full bg-amber-400/30 animate-pulse" style="animation-delay: 1s"></div>
+												</div>
+												<template x-if="searchQuery">
+													<div class="text-center">
+														<p class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "No agents found") }</p>
+														<p class="text-xs mt-1 text-muted-foreground">{ i18n.T(ctx, "Try a different search term.") }</p>
+													</div>
+												</template>
+												<template x-if="!searchQuery">
+													<div class="text-center max-w-xs">
+														<p class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Build your first AI agent") }</p>
+														<p class="text-xs mt-1.5 text-muted-foreground leading-relaxed">{ i18n.T(ctx, "Create a single agent with custom instructions, or orchestrate multiple agents in a workflow.") }</p>
+														<!-- Quick action steps -->
+														<div class="mt-5 space-y-2.5">
+															<button
+																@click="view = 'typeSelect'"
+																class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm"
+															>
+																@icon.Plus(icon.Props{Class: "size-3.5"})
+																{ i18n.T(ctx, "Create an Agent") }
+															</button>
+															<div class="flex items-center gap-3 text-[10px] text-muted-foreground justify-center pt-1">
+																<span class="flex items-center gap-1"><span class="size-1.5 rounded-full bg-emerald-400/60 inline-block"></span> Single Agent</span>
+																<span class="flex items-center gap-1"><span class="size-1.5 rounded-full bg-indigo-400/60 inline-block"></span> Workflow</span>
+																<span class="flex items-center gap-1"><span class="size-1.5 rounded-full bg-amber-400/60 inline-block"></span> Import YAML</span>
+															</div>
+														</div>
+													</div>
+												</template>
+											</div>
+										</template>
+										<!-- Agent Cards Grid -->
+										<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+											<template x-for="ag in filteredAgents" :key="ag.id">
+												<div
+													class="group relative rounded-xl border border-border hover:border-primary/40 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer overflow-hidden bg-card"
+													:class="ag.isComposed ? 'hover:border-indigo-400/40 hover:shadow-indigo-500/5' : 'hover:shadow-primary/5'"
+													@click="ag.isComposed ? showEditPipelineForm(ag) : showEditNodeForm(ag)"
+												>
+													<!-- Subtle gradient overlay on hover -->
+													<div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+														:class="ag.isComposed
+															? 'bg-gradient-to-br from-indigo-500/5 via-transparent to-transparent'
+															: 'bg-gradient-to-br from-primary/5 via-transparent to-transparent'">
+													</div>
+													<div class="relative p-4">
+														<div class="flex items-start gap-3">
+															<!-- Agent Icon -->
+															<div
+																class="size-10 rounded-lg flex items-center justify-center shrink-0 [&_svg]:size-5 ring-1 ring-border/50 group-hover:ring-primary/20 transition-all duration-200"
+																:class="ag.isComposed ? 'bg-gradient-to-br from-indigo-500/15 to-indigo-500/5 text-indigo-600 dark:text-indigo-400 group-hover:ring-indigo-400/30' : 'bg-gradient-to-br from-primary/15 to-primary/5 text-primary'"
+															>
+																<template x-if="ag.isComposed">
+																	@icon.GitBranch(icon.Props{Class: "size-5"})
+																</template>
+																<template x-if="!ag.isComposed">
+																	<span x-html="ag.icon"></span>
+																</template>
+															</div>
+															<div class="flex-1 min-w-0">
+																<h3 class="text-sm font-semibold text-foreground truncate group-hover:text-primary/80 transition-colors" x-text="ag.name"></h3>
+																<p class="text-xs text-muted-foreground mt-0.5 line-clamp-2" x-text="ag.description || 'No description'"></p>
+															</div>
+														</div>
+														<!-- Metadata -->
+														<div class="flex items-center gap-2 mt-3 pt-2 border-t border-border/50">
+															<template x-if="!ag.isComposed">
+																@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "text-[9px] px-1.5 py-0 h-4"}) {
+																	@icon.Bot(icon.Props{Class: "size-2.5 me-0.5"})
+																	{ i18n.T(ctx, "LLM Agent") }
+																}
+															</template>
+															<template x-if="ag.isComposed">
+																@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "text-[9px] px-1.5 py-0 h-4 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"}) {
+																	@icon.GitBranch(icon.Props{Class: "size-2.5 me-0.5"})
+																	{ i18n.T(ctx, "Workflow") }
+																}
+															</template>
+															<template x-if="ag.isComposed && ag.graph">
+																<span class="text-[10px] text-muted-foreground">
+																	<span x-text="collectAgentIds(ag.graph).length"></span> agents
+																</span>
+															</template>
+															<span class="text-[10px] text-muted-foreground" x-text="formatDate(ag.createdAt || ag.created_at)"></span>
+															<div class="flex-1"></div>
+															<div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" @click.stop>
+																@button.Button(button.Props{
+																	Size:    button.SizeIcon,
+																	Variant: button.VariantGhost,
+																	Class:   "size-7 text-destructive hover:text-destructive",
+																	Attributes: templ.Attributes{
+																		"@click.stop": "ag.isComposed ? confirmDeletePipeline(ag) : confirmDeleteNode(ag)",
+																		"title":       i18n.T(ctx, "Delete"),
+																	},
+																}) {
+																	@icon.Trash2(icon.Props{Class: "size-3.5"})
+																}
+															</div>
+														</div>
+													</div>
+												</div>
+											</template>
+										</div>
+									</div>
+								</template>
+							</div>
+						</div>
+					</div>
+				</template>
+				<!-- ═══════════════════════════════════════════ -->
+				<!-- TYPE SELECTOR                               -->
+				<!-- ═══════════════════════════════════════════ -->
+				<template x-if="view === 'typeSelect'">
+					<div class="flex flex-col flex-1 overflow-hidden">
+						<div class="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/50">
+							@button.Button(button.Props{
+								Size:    button.SizeIcon,
+								Variant: button.VariantGhost,
+								Class:   "size-8",
+								Attributes: templ.Attributes{
+									"@click": "view = 'list'",
+								},
+							}) {
+								@icon.ArrowLeft(icon.Props{Class: "size-4"})
+							}
+							<h3 class="text-sm font-semibold">{ i18n.T(ctx, "What would you like to create?") }</h3>
+						</div>
+						<div class="flex-1 flex flex-col items-center justify-center p-8 gap-6 overflow-y-auto">
+							<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-lg">
+								<!-- LLM Agent Card -->
+								<button
+									type="button"
+									@click="showCreateNodeForm()"
+									class="group relative flex flex-col items-center gap-4 p-6 rounded-xl border-2 border-border hover:border-emerald-400/50 hover:shadow-lg hover:shadow-emerald-500/5 hover:-translate-y-0.5 bg-card transition-all duration-200 text-center cursor-pointer overflow-hidden"
+								>
+									<!-- Gradient overlay -->
+									<div class="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+									<div class="relative size-14 rounded-2xl bg-gradient-to-br from-emerald-500/15 to-emerald-500/5 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 group-hover:shadow-md transition-all duration-200 ring-1 ring-emerald-500/20 group-hover:ring-emerald-400/40">
+										@icon.Bot(icon.Props{Class: "size-7"})
+									</div>
+									<div class="relative">
+										<h4 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "LLM Agent") }</h4>
+										<p class="text-xs text-muted-foreground mt-1.5 leading-relaxed max-w-[220px]">{ i18n.T(ctx, "An AI agent with custom instructions, tools, and the ability to delegate to sub-agents.") }</p>
+									</div>
+									<!-- Feature pills -->
+									<div class="relative flex flex-wrap gap-1 mt-1 justify-center">
+										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">System Prompt</span>
+										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/50">Tools</span>
+										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/50">Sub-agents</span>
+									</div>
+								</button>
+								<!-- Workflow Orchestrator Card -->
+								<button
+									type="button"
+									@click="showCreatePipelineForm()"
+									class="group relative flex flex-col items-center gap-4 p-6 rounded-xl border-2 border-border hover:border-indigo-400/50 hover:shadow-lg hover:shadow-indigo-500/5 hover:-translate-y-0.5 bg-card transition-all duration-200 text-center cursor-pointer overflow-hidden"
+								>
+									<!-- Gradient overlay -->
+									<div class="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+									<div class="relative size-14 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-indigo-500/5 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-110 group-hover:shadow-md transition-all duration-200 ring-1 ring-indigo-500/20 group-hover:ring-indigo-400/40">
+										@icon.GitBranch(icon.Props{Class: "size-7"})
+									</div>
+									<div class="relative">
+										<h4 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Workflow Orchestrator") }</h4>
+										<p class="text-xs text-muted-foreground mt-1.5 leading-relaxed max-w-[220px]">{ i18n.T(ctx, "Orchestrate multiple agents with sequential, parallel, loop, or conditional execution.") }</p>
+									</div>
+									<!-- Feature pills -->
+									<div class="relative flex flex-wrap gap-1 mt-1 justify-center">
+										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">Sequential</span>
+										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/50">Parallel</span>
+										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/50">Conditional</span>
+									</div>
+								</button>
+								<!-- From Template Card -->
+								<button
+									type="button"
+									@click="openTemplatesView()"
+									class="group relative flex flex-col items-center gap-4 p-6 rounded-xl border-2 border-border hover:border-amber-400/50 hover:shadow-lg hover:shadow-amber-500/5 hover:-translate-y-0.5 bg-card transition-all duration-200 text-center cursor-pointer overflow-hidden"
+								>
+									<!-- Gradient overlay -->
+									<div class="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+									<div class="relative size-14 rounded-2xl bg-gradient-to-br from-amber-500/15 to-amber-500/5 flex items-center justify-center text-amber-600 dark:text-amber-400 group-hover:scale-110 group-hover:shadow-md transition-all duration-200 ring-1 ring-amber-500/20 group-hover:ring-amber-400/40">
+										@icon.LayoutGrid(icon.Props{Class: "size-7"})
+									</div>
+									<div class="relative">
+										<h4 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "From Template") }</h4>
+										<p class="text-xs text-muted-foreground mt-1.5 leading-relaxed max-w-[220px]">{ i18n.T(ctx, "Start from a pre-built agent template and customize it.") }</p>
+									</div>
+									<!-- Feature pills -->
+									<div class="relative flex flex-wrap gap-1 mt-1 justify-center">
+										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">Pre-built</span>
+										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/50">One-click</span>
+										<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/50">Customizable</span>
+									</div>
+								</button>
+							</div>
+							<div class="flex items-center gap-4">
+								<button
+									type="button"
+									@click="showImportYamlView()"
+									class="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors group"
+								>
+									@icon.Upload(icon.Props{Class: "size-3.5 group-hover:-translate-y-0.5 transition-transform"})
+									{ i18n.T(ctx, "Import from YAML") }
+								</button>
+							</div>
+						</div>
+					</div>
+				</template>
+				<!-- ═══════════════════════════════════════════ -->
+				<!-- IMPORT YAML                                 -->
+				<!-- ═══════════════════════════════════════════ -->
+				<template x-if="view === 'importYaml'">
+					<div class="flex flex-col flex-1 overflow-hidden">
+						<div class="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/50 shrink-0">
+							@button.Button(button.Props{
+								Size:    button.SizeIcon,
+								Variant: button.VariantGhost,
+								Class:   "size-8",
+								Attributes: templ.Attributes{
+									"@click": "view = 'typeSelect'",
+								},
+							}) {
+								@icon.ArrowLeft(icon.Props{Class: "size-4"})
+							}
+							@icon.FileText(icon.Props{Class: "size-4 text-muted-foreground"})
+							<h3 class="text-sm font-semibold">{ i18n.T(ctx, "Import YAML") }</h3>
+						</div>
+						<div class="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
+							<p class="text-xs text-muted-foreground leading-relaxed">
+								{ i18n.T(ctx, "Paste YAML below, upload a file, or use a public HTTPS URL. Same shape as catalog templates: name, workflow, sub_agents.") }
+							</p>
+							<div class="space-y-1.5">
+								<label class="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">{ i18n.T(ctx, "HTTPS URL (optional if YAML is pasted)") }</label>
+								<input
+									type="url"
+									x-model="importYamlURL"
+									placeholder="https://…"
+									class="w-full rounded-md border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
+								/>
+							</div>
+							<div class="space-y-1.5">
+								<label class="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">{ i18n.T(ctx, "YAML document") }</label>
+								<textarea
+									x-model="importYamlText"
+									rows="14"
+									spellcheck="false"
+									class="w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-mono text-foreground outline-none focus:ring-1 focus:ring-primary resize-y min-h-[200px]"
+								></textarea>
+							</div>
+							<label class="inline-flex items-center gap-2 text-xs text-primary cursor-pointer hover:underline">
+								<input type="file" accept=".yaml,.yml,.txt,text/yaml,text/plain" class="sr-only" @change="onImportYamlFile($event)"/>
+								@icon.FileText(icon.Props{Class: "size-3.5"})
+								<span>{ i18n.T(ctx, "Choose YAML file") }</span>
+							</label>
+						</div>
+						<div class="px-4 py-3 border-t bg-muted/50 flex items-center justify-end gap-2 shrink-0">
+							@button.Button(button.Props{
+								Variant: button.VariantGhost,
+								Class:   "h-8 px-3 text-xs",
+								Attributes: templ.Attributes{
+									"@click": "view = 'typeSelect'",
+								},
+							}) {
+								{ i18n.T(ctx, "Cancel") }
+							}
+							@button.Button(button.Props{
+								Variant: button.VariantDefault,
+								Class:   "h-8 px-4 text-xs gap-1.5",
+								Attributes: templ.Attributes{
+									"@click":    "submitImportYaml()",
+									":disabled": "importYamlLoading",
+								},
+							}) {
+								<span x-show="!importYamlLoading">{ i18n.T(ctx, "Import YAML") }</span>
+								<span x-show="importYamlLoading" class="flex items-center gap-1.5">
+									<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
+									{ i18n.T(ctx, "Importing…") }
+								</span>
+							}
+						</div>
+					</div>
+				</template>
+				<!-- ═══════════════════════════════════════════ -->
+				<!-- TEMPLATES / CATALOG                         -->
+				<!-- ═══════════════════════════════════════════ -->
+				<template x-if="view === 'templates'">
+					<div class="flex flex-col flex-1 overflow-hidden" :class="expanded ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[calc(90vh-8rem)]'">
+						<!-- Header -->
+						<div class="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/50 shrink-0">
+							@button.Button(button.Props{
+								Size:    button.SizeIcon,
+								Variant: button.VariantGhost,
+								Class:   "size-8",
+								Attributes: templ.Attributes{
+									"@click": "view = 'typeSelect'",
+								},
+							}) {
+								@icon.ArrowLeft(icon.Props{Class: "size-4"})
+							}
+							<h3 class="text-sm font-semibold">{ i18n.T(ctx, "Browse Templates") }</h3>
+							<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Pick a template to customize and edit") }</span>
+						</div>
+						<!-- Search + Category Filter -->
+						<div class="px-4 pt-3 pb-2 flex items-center gap-2 shrink-0">
+							<div class="flex-1">
+								@input.Input(input.Props{
+									Type:        input.TypeSearch,
+									Placeholder: i18n.T(ctx, "Search templates..."),
+									Class:       "h-9 bg-muted/40 border-transparent focus-within:bg-background",
+									Attributes: templ.Attributes{
+										"x-model.debounce.300ms": "catalogSearchQuery",
+										"@input":                 "searchCatalog()",
+									},
+								})
+							</div>
+						</div>
+						<!-- Category Pills -->
+						<div class="px-4 pb-2 flex gap-1.5 overflow-x-auto shrink-0 scrollbar-thin">
+							<button
+								type="button"
+								@click="catalogSelectedCategory = ''"
+								class="shrink-0 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border"
+								:class="!catalogSelectedCategory ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30' : 'bg-muted text-muted-foreground border-border hover:bg-accent'"
+							>
+								{ i18n.T(ctx, "All") }
+							</button>
+							<template x-for="cat in catalogCategories" :key="cat">
+								<button
+									type="button"
+									@click="catalogSelectedCategory = cat"
+									class="shrink-0 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border capitalize"
+									:class="catalogSelectedCategory === cat ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30' : 'bg-muted text-muted-foreground border-border hover:bg-accent'"
+									x-text="cat"
+								></button>
+							</template>
+						</div>
+						<!-- Template Cards Grid -->
+						<div class="flex-1 overflow-y-auto px-4 pb-4 scrollbar-thin min-h-[300px]">
+							<template x-if="catalogLoading">
+								<div class="space-y-3">
+									<template x-for="i in 3" :key="i">
+										<div class="flex items-center gap-3 p-3 animate-pulse rounded-lg border border-border">
+											<div class="size-10 rounded-lg bg-muted"></div>
+											<div class="flex-1 space-y-2">
+												<div class="h-4 bg-muted rounded w-1/3"></div>
+												<div class="h-3 bg-muted rounded w-2/3"></div>
+											</div>
+										</div>
+									</template>
+								</div>
+							</template>
+							<template x-if="!catalogLoading">
+								<div>
+									<template x-if="filteredCatalogEntries.length === 0">
+										<div class="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
+											@icon.LayoutGrid(icon.Props{Class: "size-12 opacity-20"})
+											<div class="text-center">
+												<p class="text-sm font-medium">{ i18n.T(ctx, "No templates found") }</p>
+												<p class="text-xs mt-1">{ i18n.T(ctx, "Try a different search or create from scratch.") }</p>
+											</div>
+										</div>
+									</template>
+									<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+										<template x-for="entry in filteredCatalogEntries" :key="entry.id">
+											<div
+												class="group relative rounded-xl border border-border hover:border-amber-400/30 hover:shadow-sm transition-all duration-200 overflow-hidden bg-card"
+											>
+												<!-- Gradient overlay on hover -->
+												<div class="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+												<div class="relative p-4">
+													<div class="flex items-start gap-3">
+														<!-- Template Icon -->
+														<div
+															class="size-10 rounded-lg flex items-center justify-center shrink-0 [&_svg]:size-5 bg-gradient-to-br from-amber-500/15 to-amber-500/5 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/20"
+														>
+															<template x-if="entry.icon">
+																<span x-html="entry.icon"></span>
+															</template>
+															<template x-if="!entry.icon">
+																@icon.LayoutGrid(icon.Props{Class: "size-5"})
+															</template>
+														</div>
+														<div class="flex-1 min-w-0">
+															<div class="flex items-center gap-2">
+																<h3 class="text-sm font-semibold text-foreground truncate" x-text="entry.name"></h3>
+															</div>
+															<p class="text-xs text-muted-foreground mt-0.5 line-clamp-2" x-text="entry.description || 'No description'"></p>
+															<!-- Category + Tags -->
+															<div class="flex items-center gap-1.5 mt-2 flex-wrap">
+																<template x-if="entry.category">
+																	<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 capitalize" x-text="entry.category"></span>
+																</template>
+																<template x-for="tag in (entry.tags || []).slice(0, 3)" :key="tag">
+																	<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/50" x-text="tag"></span>
+																</template>
+															</div>
+														</div>
+													</div>
+													<!-- Action Button -->
+													<div class="mt-3 pt-2 border-t border-border/50 flex items-center gap-2">
+														<div class="flex-1"></div>
+														<template x-if="catalogAddingIds.includes(entry.id)">
+															<span class="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground">
+																<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
+																{ i18n.T(ctx, "Forking...") }
+															</span>
+														</template>
+														<template x-if="!catalogAddingIds.includes(entry.id)">
+															@button.Button(button.Props{
+																Variant: button.VariantDefault,
+																Size:    button.SizeSm,
+																Class:   "gap-1.5 text-xs",
+																Attributes: templ.Attributes{
+																	"@click": "promptForForkName(entry)",
+																},
+															}) {
+																@icon.GitBranch(icon.Props{Class: "size-3.5"})
+																{ i18n.T(ctx, "Fork & Edit") }
+															}
+														</template>
+													</div>
+												</div>
+											</div>
+										</template>
+									</div>
+								</div>
+							</template>
+						</div>
+					</div>
+				</template>
+				<!-- ═══════════════════════════════════════════ -->
+				<!-- FORK NAME DIALOG                          -->
+				<!-- ═══════════════════════════════════════════ -->
+				<template x-if="showForkNameDialog">
+					<div>
+						<!-- Backdrop -->
+						<div
+							x-show="showForkNameDialog"
+							x-transition:enter="transition ease-out duration-200"
+							x-transition:enter-start="opacity-0"
+							x-transition:enter-end="opacity-100"
+							x-transition:leave="transition ease-in duration-150"
+							x-transition:leave-start="opacity-100"
+							x-transition:leave-end="opacity-0"
+							@click="cancelForkNameDialog()"
+							class="fixed inset-0 z-[60] bg-black/40 backdrop-blur-[3px]"
+						></div>
+						<!-- Content -->
+						<div
+							x-show="showForkNameDialog"
+							x-transition:enter="transition ease-out duration-200"
+							x-transition:enter-start="opacity-0 scale-[0.97]"
+							x-transition:enter-end="opacity-100 scale-100"
+							x-transition:leave="transition ease-in duration-150"
+							x-transition:leave-start="opacity-100 scale-100"
+							x-transition:leave-end="opacity-0 scale-[0.97]"
+							@keydown.escape.window="cancelForkNameDialog()"
+							class="fixed z-[60] left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] bg-background rounded-2xl border border-border/60 shadow-modern-xl w-full max-w-md"
+						>
+							<!-- Header -->
+							<div class="flex items-center justify-between px-5 pt-5 pb-0">
+								<div class="flex items-center gap-2.5">
+									<div class="size-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+										@icon.GitBranch(icon.Props{Class: "size-4"})
+									</div>
+									<div>
+										<h3 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Name Your Agent") }</h3>
+										<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Choose a name for your new agent") }</p>
+									</div>
+								</div>
+								<button type="button" @click="cancelForkNameDialog()" class="size-8 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground">
+									@icon.X(icon.Props{Class: "size-4"})
+								</button>
+							</div>
+							<!-- Body -->
+							<div class="px-5 py-4 space-y-4">
+								<div class="space-y-1.5">
+									<label class="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">{ i18n.T(ctx, "Agent Name") }</label>
+									<input
+										type="text"
+										x-model="forkNameInput"
+										@keydown.enter="confirmForkName()"
+										placeholder={ i18n.T(ctx, "Enter agent name") }
+										class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
+										autofocus
+									/>
+								</div>
+								<template x-if="forkNameEntry?.description">
+									<div class="space-y-1">
+										<label class="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">{ i18n.T(ctx, "Description") }</label>
+										<p class="text-xs text-muted-foreground leading-relaxed" x-text="forkNameEntry.description"></p>
+									</div>
+								</template>
+							</div>
+							<!-- Footer -->
+							<div class="px-5 py-3 border-t border-border/50 bg-muted/50 flex items-center justify-end gap-2">
+								@button.Button(button.Props{
+									Variant: button.VariantGhost,
+									Class:   "h-8 px-3 text-xs",
+									Attributes: templ.Attributes{
+										"@click": "cancelForkNameDialog()",
+									},
+								}) {
+									{ i18n.T(ctx, "Cancel") }
+								}
+								@button.Button(button.Props{
+									Variant: button.VariantDefault,
+									Class:   "h-8 px-4 text-xs gap-1.5",
+									Attributes: templ.Attributes{
+										"@click":    "confirmForkName()",
+										":disabled": "forkNameAdding || !forkNameInput.trim()",
+									},
+								}) {
+									<span x-show="!forkNameAdding">{ i18n.T(ctx, "Fork & Edit") }</span>
+									<span x-show="forkNameAdding" class="flex items-center gap-1.5">
+										<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
+										{ i18n.T(ctx, "Forking...") }
+									</span>
+								}
+							</div>
+						</div>
+					</div>
+				</template>
+				<!-- ═══════════════════════════════════════════ -->
+				<!-- AGENT FORM                                  -->
+				<!-- ═══════════════════════════════════════════ -->
+				<template x-if="view === 'agentForm'">
+					<div class="flex flex-col flex-1 overflow-hidden" :class="expanded ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[calc(90vh-8rem)]'">
+						<div class="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/50">
+							@button.Button(button.Props{
+								Size:    button.SizeIcon,
+								Variant: button.VariantGhost,
+								Class:   "size-8",
+								Attributes: templ.Attributes{
+									"@click": "view = 'list'",
+								},
+							}) {
+								@icon.ArrowLeft(icon.Props{Class: "size-4"})
+							}
+							<h3 class="text-sm font-semibold" x-text="editingAgent ? 'Edit Agent' : 'New Agent'"></h3>
+							<span class="text-[10px] text-muted-foreground" x-text="editingAgent ? 'Configure your agent' : 'Set up your new agent'"></span>
+						</div>
+						<div class="flex-1 overflow-y-auto p-4 scrollbar-thin space-y-4">
+							@agentNodeForm()
+						</div>
+						<!-- Save Footer -->
+						<div class="px-4 py-3 border-t bg-muted/50 flex items-center justify-end gap-2">
+							@button.Button(button.Props{
+								Variant: button.VariantGhost,
+								Class:   "h-8 px-3 text-xs",
+								Attributes: templ.Attributes{
+									"@click": "view = 'list'",
+								},
+							}) {
+								{ i18n.T(ctx, "Cancel") }
+							}
+							@button.Button(button.Props{
+								Variant: button.VariantDefault,
+								Class:   "h-8 px-4 text-xs gap-1.5",
+								Attributes: templ.Attributes{
+									"@click":    "saveNode()",
+									":disabled": "saving || !form.name.trim()",
+								},
+							}) {
+								<span x-show="!saving" x-text="editingAgent ? 'Save Changes' : 'Create Agent'"></span>
+								<span x-show="saving" class="flex items-center gap-1.5">
+									<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
+									{ i18n.T(ctx, "Saving...") }
+								</span>
+							}
+						</div>
+					</div>
+				</template>
+				<!-- ═══════════════════════════════════════════ -->
+				<!-- DELETE CONFIRMATION                         -->
+				<!-- ═══════════════════════════════════════════ -->
+				<template x-if="view === 'delete'">
+					@deleteConfirmation("view = 'list'", "deletingAgent?.isComposed ? deletePipeline() : deleteNode()")
+				</template>
+				<!-- DELETE ALL CONFIRMATION                     -->
+				<!-- ═══════════════════════════════════════════ -->
+				<template x-if="view === 'deleteAll'">
+					@deleteAllConfirmation()
+				</template>
+				<!-- ═══════════════════════════════════════════ -->
+				<!-- WORKFLOW AGENT FORM                         -->
+				<!-- ═══════════════════════════════════════════ -->
+				<!-- ═══════════════════════════════════════════ -->
+				<!-- WORKFLOW TREE EDITOR                        -->
+				<!-- ═══════════════════════════════════════════ -->
+				<template x-if="view === 'flow'">
+					<div
+							class="relative flex flex-col flex-1 overflow-hidden"
+							:class="expanded ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[calc(90vh-8rem)]'"
+							@keydown.window="if ($event.key === '?' && $event.target.tagName !== 'INPUT' && $event.target.tagName !== 'TEXTAREA' && $event.target.tagName !== 'SELECT' && view === 'flow') { $event.preventDefault(); $store.flow._showHelp = !$store.flow._showHelp; }"
+						>
+						<!-- Header -->
+						<div class="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/50 shrink-0">
+							@button.Button(button.Props{
+								Size:    button.SizeIcon,
+								Variant: button.VariantGhost,
+								Class:   "size-8",
+								Attributes: templ.Attributes{
+									"@click": "_syncGraphFromStore(); view = 'list'",
+									"title":  i18n.T(ctx, "Back to agent list"),
+								},
+							}) {
+								@icon.ArrowLeft(icon.Props{Class: "size-4"})
+							}
+							<h3 class="text-sm font-semibold" x-text="(editingPipeline ? 'Edit' : 'New') + ' Workflow'"></h3>
+							<div class="flex-1"></div>
+							<!-- Consumers indicator -->
+							<template x-if="editingPipeline && pipelineConsumers.length > 0">
+								<div class="flex items-center gap-1.5 text-[10px] text-muted-foreground mr-2">
+									<span class="text-[10px] text-muted-foreground" x-text="pipelineConsumers.length + ' workflow' + (pipelineConsumers.length !== 1 ? 's' : '') + ' use this'"></span>
+									<template x-for="consumer in pipelineConsumers.slice(0, 3)" :key="consumer.id">
+										<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20" x-text="consumer.name"></span>
+									</template>
+									<template x-if="pipelineConsumers.length > 3">
+										<span class="text-[10px] text-muted-foreground">+</span>
+									</template>
+								</div>
+							</template>
+							<div class="flex items-center gap-1">
+								<template x-if="isPipelineValid">
+									<span class="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
+										@icon.CircleCheck(icon.Props{Class: "size-3.5"})
+										{ i18n.T(ctx, "Valid") }
+									</span>
+								</template>
+								<template x-if="!isPipelineValid">
+									<span class="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400">
+										@icon.TriangleAlert(icon.Props{Class: "size-3.5"})
+										<span x-text="pipelineErrors.length + ' issue' + (pipelineErrors.length !== 1 ? 's' : '')"></span>
+									</span>
+								</template>
+							</div>
+							<!-- Save button -->
+							@button.Button(button.Props{
+								Variant: button.VariantDefault,
+								Class:   "h-8 px-4 text-xs gap-1.5",
+								Attributes: templ.Attributes{
+									"@click":    "saveFromFlowView()",
+									":disabled": "pipelineSaving || !pipelineName.trim()",
+								},
+							}) {
+								<span x-show="!pipelineSaving" x-text="editingPipeline ? 'Save' : 'Create'"></span>
+								<span x-show="pipelineSaving" class="flex items-center gap-1.5">
+									<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
+								</span>
+							}
+							<!-- Panel visibility toggles (VS Code style) -->
+							<div class="flex items-center gap-0.5 ml-2 pl-2 border-l border-border/50">
+								<!-- Bottom Panel toggle (Terminal/Results) -->
+								<button
+									@click="bottomPanelActive = !bottomPanelActive"
+									:title="bottomPanelActive ? 'Hide Bottom Panel' : 'Show Bottom Panel'"
+									class="flex items-center justify-center w-7 h-7 rounded text-xs transition-all duration-150"
+									:class="bottomPanelActive ? 'text-foreground bg-accent hover:bg-accent/60' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'"
+								>
+									@icon.PanelBottom(icon.Props{Class: "size-3.5"})
+								</button>
+								<!-- Right Panel toggle (Properties) -->
+								<button
+									@click="togglePropertyPanel()"
+									:title="propertyPanelVisible ? 'Hide Properties' : 'Show Properties'"
+									class="flex items-center justify-center w-7 h-7 rounded text-xs transition-all duration-150"
+									:class="propertyPanelVisible ? 'text-indigo-400 bg-indigo-500/15 hover:bg-indigo-500/25' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'"
+								>
+									@icon.PanelRight(icon.Props{Class: "size-3.5"})
+								</button>
+							</div>
+						</div>
+						<!-- Name + description bar -->
+						<div class="flex items-center gap-2 px-3 py-1.5 border-b border-border/50 bg-muted/20 shrink-0">
+							<span class="text-[10px] text-muted-foreground shrink-0">{ i18n.T(ctx, "Name") }</span>
+							<input
+								x-model="pipelineName"
+								type="text"
+								placeholder="Workflow name..."
+								class="flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
+							/>
+							<span class="text-[10px] text-muted-foreground shrink-0 border-l border-border/50 pl-2">{ i18n.T(ctx, "Desc") }</span>
+							<input
+								x-model="pipelineDescription"
+								type="text"
+								placeholder="Optional description..."
+								class="flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
+							/>
+						</div>
+						<!-- Status Bar -->
+						<div class="flex items-center gap-4 px-3 py-1 border-b border-border/30 bg-muted/10 shrink-0">
+							<span
+								class="text-[10px] font-mono tabular-nums"
+								:class="$store.flow.nodeCount() > 40 ? 'text-amber-500' : 'text-muted-foreground'"
+								x-text="$store.flow.nodeCount() + ' / 50 nodes'"
+							></span>
+							<span
+								class="text-[10px] font-mono tabular-nums"
+								:class="$store.flow.maxDepth() > 4 ? 'text-amber-500' : 'text-muted-foreground'"
+								x-text="'depth ' + $store.flow.maxDepth() + ' / 5'"
+							></span>
+							<span class="flex-1"></span>
+							<button
+								x-show="$store.flow.canUndo()"
+								@click="$store.flow.undo()"
+								class="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+								title="Undo (Ctrl+Z)"
+							>
+								{ i18n.T(ctx, "undo") }
+							</button>
+							<button
+								x-show="$store.flow.canRedo()"
+								@click="$store.flow.redo()"
+								class="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+								title="Redo (Ctrl+Shift+Z)"
+							>
+								{ i18n.T(ctx, "redo") }
+							</button>
+							<span class="text-[10px] text-muted-foreground/50">{ i18n.T(ctx, "? for shortcuts") }</span>
+						</div>
+
+						<!-- ═══════════════════════════════════════════ -->
+						<!-- IDE LAYOUT (VS Code / IntelliJ pattern)     -->
+						<!-- ═══════════════════════════════════════════ -->
+						<div class="flex flex-1 overflow-hidden min-h-0">
+							<!-- Activity Bar (far left) - Primary actions only -->
+							<div class="shrink-0 w-12 flex flex-col items-center py-2 bg-sidebar border-e border-sidebar-border/50 gap-1">
+								<!-- Test Explorer toggle -->
+								<button
+									@click="evalPanelActive = !evalPanelActive"
+									:title="evalPanelActive ? 'Hide Test Explorer' : 'Show Test Explorer'"
+									class="flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-150 hover:bg-accent hover:text-foreground"
+									:class="evalPanelActive ? 'text-foreground border-l-2 border-foreground bg-accent/50' : 'text-muted-foreground'"
+								>
+									@icon.TestTube(icon.Props{Class: "size-5"})
+								</button>
+
+                                                        </div>
+
+							<!-- Left Panel: Test Explorer -->
+							<template x-if="evalPanelActive">
+								<div
+									class="shrink-0 w-64 overflow-hidden"
+									x-transition:enter="transition-all duration-200 ease-out"
+									x-transition:enter-start="opacity-0 -translate-x-full"
+									x-transition:enter-end="opacity-100 translate-x-0"
+									x-transition:leave="transition-all duration-150 ease-in"
+									x-transition:leave-start="opacity-100 translate-x-0"
+									x-transition:leave-end="opacity-0 -translate-x-full"
+								>
+                                                                <!-- Test Explorer Panel (inlined) -->
+                                                                <div class="flex flex-col h-full bg-background border-r border-border/50 overflow-hidden">
+                                                                        <!-- Panel Header -->
+                                                                        <div class="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-muted/30 shrink-0">
+                                                                                <span class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-foreground">
+                                                                                        @icon.TestTube(icon.Props{Class: "size-3"})
+                                                                                        Test Explorer
+                                                                                </span>
+                                                                                <span class="flex-1"></span>
+                                                                                @dialog.Trigger(dialog.TriggerProps{
+                                                                                        For: "evalsets-manager-dialog",
+                                                                                }) {
+                                                                                        @button.Button(button.Props{
+                                                                                                Size:    button.SizeIcon,
+                                                                                                Variant: button.VariantGhost,
+                                                                                                Class:   "size-6",
+                                                                                                Attributes: templ.Attributes{
+                                                                                                        "title": "Manage Eval Sets",
+                                                                                                },
+                                                                                        }) {
+                                                                                                @icon.Settings(icon.Props{Class: "size-3"})
+                                                                                        }
+                                                                                }
+                                                                                <button
+                                                                                        @click="loadEvalSets()"
+                                                                                        title="Refresh"
+                                                                                        class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                                                                                >
+                                                                                        @icon.RefreshCw(icon.Props{Class: "size-3"})
+                                                                                </button>
+
+                                                                        </div>
+                                                                        <!-- Panel Content -->
+                                                                        <div class="flex-1 overflow-y-auto p-2 space-y-1">
+                                                                                <!-- Loading State -->
+                                                                                <template x-if="evalSetsLoading">
+                                                                                        <div class="flex items-center justify-center py-8">
+                                                                                                <span class="animate-spin size-4 border-2 border-muted-foreground border-t-transparent rounded-full"></span>
+                                                                                        </div>
+                                                                                </template>
+
+                                                                                <!-- Empty State -->
+                                                                                <template x-if="!evalSetsLoading && evalSets.length === 0">
+                                                                                        <div class="text-center py-8 text-muted-foreground">
+                                                                                                @icon.TestTube(icon.Props{Class: "size-8 opacity-20 mx-auto mb-2"})
+                                                                                                <p class="text-xs">No eval sets found</p>
+                                                                                                <p class="text-[10px] mt-1">Create one to start testing</p>
+                                                                                        </div>
+                                                                                </template>
+
+                                                                                <!-- Eval Sets Tree -->
+                                                                                <template x-for="es in evalSets" :key="es.id">
+                                                                                        <div class="space-y-0.5">
+                                                                                                <!-- EvalSet Header -->
+                                                                                                <div
+                                                                                                        class="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs cursor-pointer hover:bg-muted/50 group"
+                                                                                                        @click="es.expanded = !es.expanded"
+                                                                                                >
+                                                                                                        <span
+                                                                                                                class="transition-transform duration-150 text-muted-foreground text-[8px]"
+                                                                                                                :class="es.expanded ? 'rotate-90' : ''"
+                                                                                                        >▶</span>
+                                                                                                        @icon.FileText(icon.Props{Class: "size-3.5 text-muted-foreground"})
+                                                                                                        <span class="flex-1 truncate font-medium" x-text="es.name"></span>
+                                                                                                        <span class="text-[9px] text-muted-foreground" x-text="es.case_count"></span>
+                                                                                                </div>
+
+                                                                                                <!-- Cases List (expandable) -->
+                                                                                                <div x-show="es.expanded" class="ml-4 space-y-0.5" x-transition>
+                                                                                                        <button
+                                                                                                                @click="runEvalSet(es.id)"
+                                                                                                                :disabled="evalRunning || !currentAgentId"
+                                                                                                                class="w-full flex items-center gap-1.5 px-2 py-1 rounded text-[11px] cursor-pointer hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                                                                        >
+                                                                                                                @icon.Play(icon.Props{Class: "size-3 text-green-600"})
+                                                                                                                <span class="text-green-700 dark:text-green-400">Run All</span>
+                                                                                                        </button>
+
+                                                                                                        <!-- Toggle to show/hide individual cases -->
+                                                                                                        <template x-if="es.cases && es.cases.length > 0">
+                                                                                                                <button
+                                                                                                                        @click="es.casesExpanded = !es.casesExpanded"
+                                                                                                                        class="w-full flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
+                                                                                                                >
+                                                                                                                        <span class="transition-transform duration-150 text-[8px]" :class="es.casesExpanded ? 'rotate-90' : ''">▶</span>
+                                                                                                                        <span x-text="(es.cases?.length || 0) + ' cases'"></span>
+                                                                                                                </button>
+                                                                                                        </template>
+
+                                                                                                        <!-- Individual cases -->
+                                                                                                        <div x-show="es.casesExpanded" class="ml-2 space-y-0.5" x-transition>
+                                                                                                                <template x-for="tc in es.cases" :key="tc.id">
+                                                                                                                        <div class="space-y-0.5">
+                                                                                                                                <!-- Case row (clickable to expand results) -->
+                                                                                                                                <div
+                                                                                                                                        @click="tc.resultsExpanded = !tc.resultsExpanded"
+                                                                                                                                        class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] cursor-pointer hover:bg-muted/30 transition-colors"
+                                                                                                                                >
+                                                                                                                                        <!-- Expand indicator -->
+                                                                                                                                        <template x-if="getCaseResult(tc.id)?.metrics?.length > 0">
+                                                                                                                                                <span class="transition-transform duration-150 text-[8px]" :class="tc.resultsExpanded ? 'rotate-90' : ''">▶</span>
+                                                                                                                                        </template>
+                                                                                                                                        <template x-if="!getCaseResult(tc.id)?.metrics?.length">
+                                                                                                                                                <span class="w-2"></span>
+                                                                                                                                        </template>
+                                                                                                                                        <!-- Status icon from testResults -->
+                                                                                                                                        <template x-if="getCaseResult(tc.id)?.status === 'passed'">
+                                                                                                                                                @icon.CircleCheck(icon.Props{Class: "size-3 text-green-600 flex-shrink-0"})
+                                                                                                                                        </template>
+                                                                                                                                        <template x-if="getCaseResult(tc.id)?.status === 'failed' || getCaseResult(tc.id)?.status === 'error'">
+                                                                                                                                                @icon.CircleX(icon.Props{Class: "size-3 text-red-600 flex-shrink-0"})
+                                                                                                                                        </template>
+                                                                                                                                        <template x-if="getCaseResult(tc.id)?.status === 'running'">
+                                                                                                                                                <span class="animate-spin size-3 border border-blue-500 border-t-transparent rounded-full flex-shrink-0"></span>
+                                                                                                                                        </template>
+                                                                                                                                        <template x-if="!getCaseResult(tc.id)">
+                                                                                                                                                @icon.Circle(icon.Props{Class: "size-3 text-muted-foreground flex-shrink-0"})
+                                                                                                                                        </template>
+                                                                                                                                        <!-- Case name -->
+                                                                                                                                        <span class="flex-1 truncate text-muted-foreground" x-text="tc.name"></span>
+                                                                                                                                        <!-- Score badge -->
+                                                                                                                                        <template x-if="getCaseResult(tc.id)?.score != null">
+                                                                                                                                                <span
+                                                                                                                                                        class="text-[9px] font-mono px-1 rounded"
+                                                                                                                                                        :class="getCaseResult(tc.id).score >= 0.8 ? 'text-green-700 dark:text-green-400' : getCaseResult(tc.id).score >= 0.5 ? 'text-yellow-700 dark:text-yellow-400' : 'text-red-700 dark:text-red-400'"
+                                                                                                                                                        x-text="getCaseResult(tc.id).score.toFixed(2)"
+                                                                                                                                                ></span>
+                                                                                                                                        </template>
+                                                                                                                                </div>
+
+                                                                                                                                <!-- Expandable metrics -->
+                                                                                                                                <template x-if="tc.resultsExpanded && getCaseResult(tc.id)?.metrics?.length > 0">
+                                                                                                                                        <div class="ml-4 space-y-0.5">
+                                                                                                                                                <template x-for="metric in getCaseResult(tc.id).metrics" :key="metric.metric_id">
+                                                                                                                                                        <div class="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground">
+                                                                                                                                                                <template x-if="metric.status === 'passed'">
+                                                                                                                                                                        @icon.CircleCheck(icon.Props{Class: "size-2.5 text-green-600 flex-shrink-0"})
+                                                                                                                                                                </template>
+                                                                                                                                                                <template x-if="metric.status !== 'passed'">
+                                                                                                                                                                        @icon.CircleX(icon.Props{Class: "size-2.5 text-red-600 flex-shrink-0"})
+                                                                                                                                                                </template>
+                                                                                                                                                                <span class="flex-1 truncate font-mono" x-text="metric.metric_id"></span>
+                                                                                                                                                                <span class="font-mono" x-text="metric.score?.toFixed(2) ?? '-'"></span>
+                                                                                                                                                        </div>
+                                                                                                                                                </template>
+                                                                                                                                        </div>
+                                                                                                                                </template>
+                                                                                                                        </div>
+                                                                                                                </template>
+                                                                                                        </div>
+                                                                                                </div>
+                                                                                        </div>
+                                                                                </template>
+                                                                        </div>
+
+                                                                        <!-- Panel Footer -->
+                                                                        <div class="px-3 py-2 border-t border-border/50 bg-muted/20 shrink-0 space-y-1.5">
+                                                                                <button
+                                                                                        @click="runAllEvalSets()"
+                                                                                        :disabled="evalRunning || !currentAgentId || evalSets.length === 0"
+                                                                                        class="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                                        :class="!evalRunning && currentAgentId && evalSets.length > 0 ? 'bg-violet-500 text-white hover:bg-violet-600 shadow-sm' : 'bg-muted text-muted-foreground'"
+                                                                                >
+                                                                                        @icon.Play(icon.Props{Class: "size-3.5"})
+                                                                                        Run All Tests
+                                                                                </button>
+                                                                                <button
+                                                                                        @click="exportTestResults()"
+                                                                                        :disabled="testResults.length === 0"
+                                                                                        class="w-full flex items-center justify-center gap-2 px-3 py-1 rounded text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                                        :class="testResults.length > 0 ? 'bg-muted text-muted-foreground hover:bg-muted/80' : 'bg-muted text-muted-foreground'"
+                                                                                >
+                                                                                        @icon.Download(icon.Props{Class: "size-3"})
+                                                                                        Export Results
+                                                                                </button>
+                                                                        </div>
+                                                                </div>
+								</div>
+							</template>
+
+							<!-- Main Content Area (Tree + Bottom Panel) -->
+							<div class="flex-1 flex flex-col overflow-hidden min-w-0">
+						<!-- Tree + Property Panel (resizable) -->
+						<div
+							class="flex flex-1 overflow-hidden"
+							x-data="{ panelW: 288, dragging: false }"
+							@mousemove.window="if (dragging) { const r = $el.getBoundingClientRect(); panelW = Math.min(Math.max(r.right - $event.clientX, 200), r.width * 0.6); }"
+							@mouseup.window="dragging = false; document.body.style.cursor = ''; document.body.style.userSelect = '';"
+						>
+							<!-- Tree View -->
+							<div
+								x-data="editableWorkflowTree()"
+								x-init="init()"
+								class="flex-1 overflow-auto bg-background"
+							>
+								<div class="ewt-pipeline-canvas">
+									<!-- Tree will be rendered here -->
+								</div>
+							</div>
+							<!-- Resize Handle -->
+							<div
+								x-show="propertyPanelVisible"
+								@mousedown.prevent="dragging = true; document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none';"
+								class="shrink-0 w-1 cursor-col-resize group relative z-10"
+								class="shrink-0 w-1 cursor-col-resize group relative z-10 bg-muted"
+							>
+								<div
+									class="absolute inset-y-0 -left-1 -right-1 group-hover:bg-indigo-500/20 transition-colors duration-150"
+									:class="dragging ? 'bg-indigo-500/30' : ''"
+								></div>
+							</div>
+							<!-- Property Panel -->
+							<div
+								x-data="alpineflowPropertyPanel"
+								x-show="propertyPanelVisible"
+								x-transition:enter="transition-all duration-200 ease-out"
+								x-transition:enter-start="opacity-0 translate-x-full"
+								x-transition:enter-end="opacity-100 translate-x-0"
+								x-transition:leave="transition-all duration-150 ease-in"
+								x-transition:leave-start="opacity-100 translate-x-0"
+								x-transition:leave-end="opacity-0 translate-x-full"
+								class="shrink-0 overflow-y-auto scrollbar-thin flex flex-col bg-card border-border"
+								:style="'width:' + panelW + 'px;'"
+							>
+								<template x-if="!node">
+									<div class="flex flex-col h-full">
+										<div class="flex flex-col items-center justify-center flex-1 px-4 py-12 text-center space-y-3">
+											<div class="w-9 h-9 rounded-lg flex items-center justify-center bg-muted border-border">
+												@icon.MousePointerClick(icon.Props{Class: "size-4 text-muted-foreground"})
+											</div>
+											<div class="space-y-1">
+												<p class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "Properties") }</p>
+												<p class="text-[10px] text-muted-foreground leading-relaxed">{ i18n.T(ctx, "Select a node to view and edit its settings.") }</p>
+											</div>
+										</div>
+										<div class="border-t p-3 space-y-2 border-border">
+											<p class="text-[8px] uppercase tracking-widest text-muted-foreground font-semibold">{ i18n.T(ctx, "Workflow Instructions") }</p>
+											<textarea
+												x-model="$store.flow.systemPrompt"
+												rows="6"
+												placeholder="Shared instructions for all agents in this workflow..."
+												class="w-full text-[11px] rounded-lg px-2.5 py-2 text-foreground placeholder:text-muted-foreground outline-none resize-none focus:ring-1 focus:ring-primary/40 bg-background border-border"
+											></textarea>
+										</div>
+									</div>
+								</template>
+								<template x-if="node">
+									<div class="flex flex-col h-full">
+										<!-- Node Header -->
+										<div class="flex items-center gap-2 px-3 py-2 border-b shrink-0 border-border">
+											<div
+												class="shrink-0 w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold"
+												:style="'background:' + nodeTypeColor + '12; color:' + nodeTypeColor + '; border: 1px solid ' + nodeTypeColor + '20'"
+												x-text="nodeTypeChar"
+											></div>
+											<div class="flex-1 min-w-0">
+												<span class="text-[10px] font-semibold text-foreground uppercase tracking-wider block truncate" x-text="nodeTypeLabel"></span>
+												<span class="text-[9px] text-muted-foreground block truncate" x-text="node.label || 'unlabeled'"></span>
+											</div>
+											<div class="flex items-center gap-0.5 shrink-0">
+												<button @click="moveUp()" :disabled="!canMoveUp" title="Move up" class="w-6 h-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors">↑</button>
+												<button @click="moveDown()" :disabled="!canMoveDown" title="Move down" class="w-6 h-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors">↓</button>
+												<button x-show="!isRoot" @click="deleteNode()" title="Delete node" class="w-6 h-6 flex items-center justify-center rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors">✕</button>
+											</div>
+										</div>
+										<!-- Scrollable Content -->
+										<div class="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-thin">
+											<!-- Label Field -->
+											<div>
+												<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">Label</label>
+												<input :value="node.label" @input="set('label', $event.target.value)" type="text" placeholder="Display name..." class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border"/>
+											</div>
+
+											<!-- Agent Node -->
+											<template x-if="node.type === 'agent'">
+												<div class="space-y-3">
+													<!-- Agent Selector -->
+													<div>
+														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">LLM Agent <span class="text-rose-500">*</span></label>
+														<select :value="node.agent_id" @change="set('agent_id', $event.target.value)" class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border">
+															<option value="">— select agent —</option>
+															<template x-for="ag in agents" :key="ag.id">
+																<option :value="ag.id" x-text="ag.name"></option>
+															</template>
+														</select>
+													</div>
+
+													<!-- Agent Info Card -->
+													<template x-if="selectedAgent">
+<div class="rounded-lg overflow-hidden bg-muted border-border">
+															<!-- Agent name header -->
+															<div class="px-2.5 py-2 bg-muted/50 border-b border-border flex items-center justify-between">
+																<span class="text-[10px] font-semibold text-foreground truncate flex-1" x-text="selectedAgent.name"></span>
+																<!-- Coordinator badge -->
+																<template x-if="isCoordinator">
+																	<span class="shrink-0 ml-2 text-[8px] px-1.5 py-0.5 rounded-full bg-violet-500/15 text-violet-600 dark:text-violet-400 border border-violet-500/20 flex items-center gap-1">
+																		@icon.Users(icon.Props{Class: "size-2.5"})
+																		<span x-text="selectedAgent.subAgents?.length + ' sub'"></span>
+																	</span>
+																</template>
+															</div>
+															<!-- Model -->
+																<template x-if="selectedAgent.modelOverride && selectedAgent.modelOverride.modelName">
+															<div class="px-2.5 py-1.5 flex items-center gap-2 border-b border-border">
+																@icon.Cpu(icon.Props{Class: "size-3 text-muted-foreground"})
+																<span class="text-[9px] font-mono rounded px-1.5 py-0.5 text-muted-foreground bg-muted" x-text="(selectedAgent.modelOverride.provider ? selectedAgent.modelOverride.provider + '/' : '') + selectedAgent.modelOverride.modelName"></span>
+															</div>
+														</template>
+															<!-- Description -->
+															<template x-if="selectedAgent.description">
+																<div class="px-2.5 py-2 border-b border-border">
+																	<p class="text-[10px] text-muted-foreground leading-relaxed line-clamp-2" x-text="selectedAgent.description"></p>
+																</div>
+															</template>
+															<!-- Subagents team hierarchy -->
+															<template x-if="isCoordinator">
+																<div class="px-2.5 py-2 border-b border-border">
+																	<div class="text-[8px] uppercase tracking-widest text-violet-500 font-semibold mb-1.5 flex items-center gap-1">
+																		@icon.Users(icon.Props{Class: "size-2.5"})
+																		Team
+																	</div>
+																	<div class="space-y-1">
+																		<template x-for="subAgent in selectedAgent.subAgents" :key="subAgent.agent_id">
+																			<div class="flex items-center gap-1.5 px-2 py-1 rounded bg-background border border-violet-500/20 text-[9px]">
+																				<span class="text-[8px] flex-shrink-0">🤖</span>
+																				<span class="flex-1 min-w-0 truncate text-foreground font-medium" x-text="getSubAgentName(subAgent.agent_id)"></span>
+																				<template x-if="subAgent.output_key">
+																					<span class="text-[8px] font-mono text-violet-600 dark:text-violet-400 flex-shrink-0" x-text="'→'+subAgent.output_key"></span>
+																				</template>
+																			</div>
+																		</template>
+																	</div>
+																</div>
+															</template>
+															<!-- Agent Config Summary -->
+															<div class="px-2.5 py-2">
+																<div class="flex items-center gap-2 text-[9px] text-muted-foreground flex-wrap">
+																	<template x-if="selectedAgent.output_key">
+																		<span class="flex items-center gap-1">
+																			@icon.Key(icon.Props{Class: "size-2.5"})
+																			<span class="font-mono text-muted-foreground" x-text="'{'+selectedAgent.output_key+'}'"></span>
+																		</span>
+																	</template>
+																</div>
+																<template x-if="!selectedAgent.systemPrompt && !selectedAgent.description && !(selectedAgent.modelOverride && selectedAgent.modelOverride.modelName)">
+																	<p class="text-[10px] text-muted-foreground italic">{ i18n.T(ctx, "No configuration yet — edit the agent to set it up.") }</p>
+																</template>
+															</div>
+														</div>
+													</template>
+
+													<!-- Agent Configuration Summary -->
+													<div class="border-t pt-2 border-border">
+														<div class="flex items-center justify-between mb-2">
+															<h4 class="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold">
+																@icon.Settings(icon.Props{Class: "size-3 inline me-0.5"})
+																Agent Configuration
+															</h4>
+															<button
+																@click="editAgent()"
+																class="text-[9px] text-indigo-400 hover:text-indigo-300 font-medium transition-colors px-2 py-0.5 rounded border border-indigo-400/30 hover:border-indigo-400/60 hover:bg-indigo-500/5"
+															>
+																@icon.Pencil(icon.Props{Class: "size-2.5 inline me-1"})
+																Edit Agent
+															</button>
+														</div>
+
+														<!-- Loading state -->
+														<template x-if="loadingMetadata">
+															<div class="space-y-1.5">
+																<template x-for="i in 3" :key="i">
+																	<div class="flex items-center gap-2 p-2 rounded-lg animate-pulse bg-muted">
+																		<div class="size-4 rounded bg-muted-foreground/20"></div>
+																		<div class="flex-1 h-3 bg-muted-foreground/20 rounded"></div>
+																	</div>
+																</template>
+															</div>
+														</template>
+
+														<!-- Configuration summary -->
+														<template x-if="!loadingMetadata">
+															<div class="space-y-1.5">
+																<!-- Tools -->
+																<div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/50">
+																	@icon.Blocks(icon.Props{Class: "size-3 text-muted-foreground shrink-0"})
+																	<span class="text-[10px] text-muted-foreground flex-1">Tools</span>
+																	<span class="text-[10px] font-semibold text-foreground" x-text="toolCount + ' tool' + (toolCount !== 1 ? 's' : '')"></span>
+																</div>
+
+																<!-- Subagents -->
+																<div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/50">
+																	@icon.Users(icon.Props{Class: "size-3 text-muted-foreground shrink-0"})
+																	<span class="text-[10px] text-muted-foreground flex-1">Subagents</span>
+																	<span class="text-[10px] font-semibold text-foreground" x-text="subAgentCount + ' agent' + (subAgentCount !== 1 ? 's' : '')"></span>
+																</div>
+
+																<!-- Knowledge Bases -->
+																<div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/50">
+																	@icon.BookOpenText(icon.Props{Class: "size-3 text-muted-foreground shrink-0"})
+																	<span class="text-[10px] text-muted-foreground flex-1">Knowledge Bases</span>
+																	<span class="text-[10px] font-semibold text-foreground" x-text="kbCount + ' KB' + (kbCount !== 1 ? 's' : '')"></span>
+																</div>
+
+																<!-- Filesystems -->
+																<div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/50">
+																	@icon.FolderOpen(icon.Props{Class: "size-3 text-muted-foreground shrink-0"})
+																	<span class="text-[10px] text-muted-foreground flex-1">Filesystems</span>
+																	<span class="text-[10px] font-semibold text-foreground" x-text="fsCount + ' FS' + (fsCount !== 1 ? 's' : '')"></span>
+																</div>
+															</div>
+														</template>
+													</div>
+
+													<!-- Output Variable (for storing result in session state) -->
+													<div>
+														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">
+															@icon.Key(icon.Props{Class: "size-3 inline me-0.5"})
+															Output Variable
+														</label>
+														<input :value="node.output_key || ''" @input="set('output_key', $event.target.value)" type="text" placeholder="e.g. research_results" class="w-full text-[11px] font-mono rounded-lg px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border"/>
+														<p class="text-[9px] text-muted-foreground mt-1">{ i18n.T(ctx, "Stores output in session state for other agents to use via {variable}") }</p>
+													</div>
+
+													<!-- Condition (only for branches of a conditional node) -->
+													<template x-if="isConditionalBranch">
+														<div>
+															<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">
+																@icon.GitBranch(icon.Props{Class: "size-3 inline me-0.5"})
+																Branch Condition
+															</label>
+															<input :value="node.condition || ''" @input="set('condition', $event.target.value)" type="text" placeholder="e.g. technical, billing" class="w-full text-[11px] font-mono rounded-lg px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-red-400/40 bg-background border-border"/>
+															<p class="text-[9px] text-muted-foreground mt-1">{ i18n.T(ctx, "Value to match against evaluator output. Use * for fallback/default branch.") }</p>
+														</div>
+													</template>
+												</div>
+											</template>
+
+											<!-- Remote Node -->
+											<template x-if="node.type === 'remote'">
+												<div class="space-y-3">
+													<div>
+														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">A2A Connector <span class="text-rose-500">*</span></label>
+														<select :value="node.a2a_connector_id" @change="set('a2a_connector_id', $event.target.value)" class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border">
+															<option value="">— select connector —</option>
+															<template x-for="conn in connectors" :key="conn.id">
+																<option :value="conn.id" x-text="conn.name || conn.id"></option>
+															</template>
+														</select>
+													</div>
+												</div>
+											</template>
+
+											<!-- Loop Node -->
+											<template x-if="node.type === 'loop'">
+												<div class="space-y-3">
+													<div>
+														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">Max Iterations</label>
+														<input :value="node.max_iterations||3" @input="set('max_iterations', parseInt($event.target.value)||1)" type="number" min="1" max="100" class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border"/>
+														<p class="text-[9px] text-muted-foreground mt-1">{ i18n.T(ctx, "How many times the agents in this loop will repeat.") }</p>
+													</div>
+													<label class="flex items-center gap-2 cursor-pointer group">
+														<input type="checkbox" :checked="node.allow_early_exit" @change="setBool('allow_early_exit', $event.target.checked)" class="rounded accent-primary"/>
+														<span class="text-[10px] text-muted-foreground group-hover:text-foreground transition-colors">{ i18n.T(ctx, "Allow the agent to exit the loop early when done") }</span>
+													</label>
+												</div>
+											</template>
+
+											<!-- Sequential/Parallel Node -->
+											<template x-if="node.type === 'sequential' || node.type === 'parallel'">
+												<div class="rounded-lg p-3 text-center bg-muted border-border">
+													<p class="text-[10px] text-muted-foreground">
+														<template x-if="node.type === 'sequential'">{ i18n.T(ctx, "Runs agents one after another, in order.") }</template>
+														<template x-if="node.type === 'parallel'">{ i18n.T(ctx, "Runs all agents at the same time, then collects results.") }</template>
+													</p>
+													<p class="text-[9px] text-muted-foreground mt-1">
+														<template x-if="node.children && node.children.length" x-text="node.children.length + ' sub-agent(s)'"></template>
+														<template x-if="!node.children || node.children.length === 0">No sub-agents yet</template>
+													</p>
+												</div>
+											</template>
+
+											<!-- Conditional Node -->
+											<template x-if="node.type === 'conditional'">
+												<div class="space-y-3">
+													<!-- Info card -->
+													<div class="rounded-lg p-3 bg-muted border-border">
+														<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Routes to one branch based on an evaluator's output.") }</p>
+														<p class="text-[9px] text-muted-foreground mt-1">{ i18n.T(ctx, "First child = evaluator (runs always). Remaining children = branches (only one executes).") }</p>
+													</div>
+
+													<!-- Evaluator warning: missing -->
+													<template x-if="!node.children || node.children.length < 2">
+														<div class="rounded-lg p-2.5 bg-amber-500/10 border border-amber-500/20">
+															<p class="text-[10px] text-amber-600 dark:text-amber-400 flex items-start gap-1.5">
+																<span class="shrink-0 mt-0.5">⚠️</span>
+																<span>{ i18n.T(ctx, "Needs at least an evaluator + 1 branch. Add agents as children.") }</span>
+															</p>
+														</div>
+													</template>
+
+													<!-- Evaluator warning: missing output_key -->
+													<template x-if="node.children && node.children.length >= 2 && evaluatorNode && !evaluatorHasOutputKey">
+														<div class="rounded-lg p-2.5 bg-red-500/10 border border-red-500/20">
+															<p class="text-[10px] text-red-600 dark:text-red-400 flex items-start gap-1.5">
+																<span class="shrink-0 mt-0.5">🔑</span>
+																<span>
+																	{ i18n.T(ctx, "Evaluator agent needs output_key set in the agent settings. This is how the router reads the classification.") }
+																	<button type="button" @click="editEvaluatorAgent()" class="underline font-semibold hover:text-red-500 transition-colors inline">{ i18n.T(ctx, "Open agent → State & Context → Output Variable") }</button>
+																</span>
+															</p>
+														</div>
+													</template>
+
+													<!-- Branch summary -->
+													<template x-if="node.children && node.children.length >= 2">
+														<div class="space-y-1.5">
+															<!-- Evaluator status -->
+															<div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border"
+																:class="evaluatorHasOutputKey ? 'bg-blue-500/10 border-blue-500/20' : 'bg-red-500/10 border-red-500/20'">
+																<span class="text-[8px]">🎯</span>
+																<span class="text-[10px] font-medium" :class="evaluatorHasOutputKey ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'">
+																	<template x-if="evaluatorAgent" x-text="'Evaluator: ' + evaluatorAgent.name"></template>
+																	<template x-if="!evaluatorAgent">No evaluator agent set</template>
+																</span>
+																<template x-if="evaluatorHasOutputKey">
+																	<span class="text-[8px] font-mono px-1 py-0.5 rounded bg-blue-500/20 text-blue-500" x-text="'→ ' + evaluatorAgent.output_key"></span>
+																</template>
+																<template x-if="!evaluatorHasOutputKey && evaluatorAgent">
+																	<span class="text-[8px] font-mono text-red-400">no output_key</span>
+																</template>
+															</div>
+															<!-- Branches -->
+															<template x-for="(child, idx) in node.children.slice(1)" :key="child.id">
+																<div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted border-border">
+																	<span class="text-[8px]">🔀</span>
+																	<span class="text-[10px] text-muted-foreground" x-text="'Branch ' + (idx + 1)"></span>
+																	<!-- Branch agent name -->
+																	<template x-if="child.type === 'agent' && child.agent_id">
+																		<span class="text-[9px] font-medium text-foreground truncate max-w-[100px]" x-text="$store.flow.agentName(child.agent_id)"></span>
+																	</template>
+																	<!-- Condition badge -->
+																	<template x-if="child.condition">
+																		<span class="text-[8px] font-mono px-1 py-0.5 rounded bg-red-500/10 text-red-500" x-text="child.condition === '*' ? '*' : child.condition"></span>
+																	</template>
+																	<template x-if="!child.condition">
+																		<span class="text-[8px] font-mono text-muted-foreground/50">no condition</span>
+																	</template>
+																</div>
+															</template>
+														</div>
+													</template>
+												</div>
+											</template>
+										</div>
+										<!-- Footer -->
+										<div class="px-3 py-1.5 border-t shrink-0 border-border">
+											<p class="text-[8px] text-muted-foreground font-mono truncate tracking-wide" x-text="node.id"></p>
+										</div>
+									</div>
+								</template>
+							</div>
+							</div>
+							<!-- Validation errors footer -->
+							<template x-if="pipelineErrors.length > 0">
+								<div class="shrink-0 px-4 py-2 border-t border-amber-500/20 bg-amber-500/5 flex items-start gap-2">
+									@icon.TriangleAlert(icon.Props{Class: "size-3.5 text-amber-500 shrink-0 mt-0.5"})
+									<div class="flex-1 min-w-0">
+										<template x-for="(err, idx) in pipelineErrors.slice(0,3)" :key="idx">
+											<p class="text-[10px] text-amber-600 dark:text-amber-400 truncate" x-text="err"></p>
+										</template>
+										<template x-if="pipelineErrors.length > 3">
+											<p class="text-[10px] text-amber-500/70" x-text="'+ ' + (pipelineErrors.length - 3) + ' more'"></p>
+										</template>
+									</div>
+								</div>
+							</template>
+
+
+						<!-- ═══════════════════════════════════════════ -->
+						<!-- BOTTOM PANEL (VS Code pattern)             -->
+						<!-- ═══════════════════════════════════════════ -->
+                                                <!-- ═══════════════════════════════════════════ -->
+                                                <!-- BOTTOM PANEL (VS Code pattern)             -->
+                                                <!-- ═══════════════════════════════════════════ -->
+                                                <div
+                                                        x-show="bottomPanelActive"
+                                                        class="flex flex-col border-t border-border/50 bg-background overflow-hidden transition-all duration-300 ease-in-out"
+                                                        :style="bottomPanelCollapsed ? 'height:32px' : 'height:220px'"
+                                                        x-transition:enter="transition-all duration-200 ease-out"
+                                                        x-transition:enter-start="opacity-0 translate-y-full"
+                                                        x-transition:enter-end="opacity-100 translate-y-0"
+                                                        x-transition:leave="transition-all duration-150 ease-in"
+                                                        x-transition:leave-start="opacity-100 translate-y-0"
+                                                        x-transition:leave-end="opacity-0 translate-y-full"
+                                                >
+                                                        <!-- Tab Bar -->
+                                                        <div class="flex items-center gap-0 px-2 shrink-0 border-b border-border/50 bg-muted/30" style="height:32px;">
+                                                                <template x-for="tab in bottomTabs" :key="tab.id">
+                                                                        <button
+                                                                                @click="activeBottomTab = tab.id"
+                                                                                class="flex items-center gap-1.5 px-3 h-full text-[10px] font-medium border-b-2 transition-colors"
+                                                                                :class="activeBottomTab === tab.id ? 'border-foreground text-foreground bg-background/50' : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'"
+                                                                        >
+                                                                                <span x-html="tab.icon"></span>
+                                                                                <span x-text="tab.label"></span>
+                                                                                <template x-if="tab.badge">
+                                                                                        <span class="text-[8px] px-1 rounded bg-muted-foreground/20" x-text="tab.badge"></span>
+                                                                                </template>
+                                                                        </button>
+                                                                </template>
+                                                                <span class="flex-1"></span>
+                                                                <button
+                                                                        @click="bottomPanelCollapsed = !bottomPanelCollapsed"
+                                                                        :title="bottomPanelCollapsed ? 'Expand' : 'Minimize'"
+                                                                        class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                                                                >
+                                                                        <span class="transition-transform duration-200 inline-flex" :class="bottomPanelCollapsed ? '' : 'rotate-180'">
+                                                                                @icon.ChevronDown(icon.Props{Class: "size-3"})
+                                                                        </span>
+                                                                </button>
+                                                                <button
+                                                                        @click="bottomPanelActive = false"
+                                                                        title="Close"
+                                                                        class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-muted-foreground hover:text-destructive hover:bg-muted/60 transition-colors"
+                                                                >
+                                                                        @icon.X(icon.Props{Class: "size-3"})
+                                                                </button>
+                                                        </div>
+
+                                                        <!-- Tab Content -->
+                                                        <div x-show="!bottomPanelCollapsed" class="flex-1 overflow-hidden min-h-0">
+                                                                <!-- Terminal Tab -->
+                                                                <template x-if="activeBottomTab === 'terminal'">
+                                                                        <div x-ref="terminalPanel" class="h-full overflow-y-auto p-3 font-mono text-[10px] space-y-0.5 bg-zinc-950 text-zinc-100">
+                                                                                <template x-if="evalLogs.length === 0">
+                                                                                        <div class="flex flex-col items-center justify-center h-full text-zinc-500">
+                                                                                                @icon.Terminal(icon.Props{Class: "size-8 opacity-30 mb-2"})
+                                                                                                <span class="text-xs">No terminal output yet</span>
+                                                                                                <span class="text-[10px]">Run an evaluation to see logs here</span>
+                                                                                        </div>
+                                                                                </template>
+                                                                                <template x-for="(log, idx) in evalLogs" :key="idx">
+                                                                                        <div class="whitespace-pre-wrap" x-text="log"></div>
+                                                                                </template>
+                                                                        </div>
+                                                                </template>
+
+                                                                <!-- Output Tab -->
+                                                                <template x-if="activeBottomTab === 'output'">
+                                                                        <div class="h-full overflow-y-auto p-3 font-mono text-[10px] space-y-1">
+                                                                                <div class="text-muted-foreground text-center py-8">
+                                                                                        @icon.Info(icon.Props{Class: "size-8 opacity-30 mx-auto mb-2"})
+                                                                                        <p>Evaluation output will appear here</p>
+                                                                                </div>
+                                                                        </div>
+                                                                </template>
+
+                                                        </div>
+                                                </div>
+
+							</div><!-- /Main Content Area -->
+						</div><!-- /IDE LAYOUT -->
+					<!-- Blinking cursor keyframe -->
+					<style>@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}</style>
+					<!-- Keyboard Shortcuts Overlay -->
+					<div
+						x-show="$store.flow?._showHelp"
+						x-transition:enter="transition ease-out duration-150"
+						x-transition:enter-start="opacity-0"
+						x-transition:enter-end="opacity-100"
+						x-transition:leave="transition ease-in duration-100"
+						x-transition:leave-start="opacity-100"
+						x-transition:leave-end="opacity-0"
+						@click="$store.flow._showHelp = false"
+						@keydown.escape.window="if ($store.flow?._showHelp) $store.flow._showHelp = false"
+						class="absolute inset-0 z-50 flex items-center justify-center"
+						style="background:rgba(0,0,0,0.5); backdrop-filter:blur(2px);"
+					>
+						<div @click.stop class="rounded-xl border border-border shadow-2xl max-w-md w-full bg-background">
+							<div class="px-5 pt-5 pb-3">
+								<h3 class="text-sm font-semibold text-foreground flex items-center gap-2">
+									@icon.Keyboard(icon.Props{Class: "size-4 text-muted-foreground"})
+									{ i18n.T(ctx, "Workflow Editor Shortcuts") }
+								</h3>
+								<p class="text-xs text-muted-foreground mt-1">{ i18n.T(ctx, "Navigate and edit your workflow faster.") }</p>
+							</div>
+							<div class="px-5 pb-4 space-y-4">
+								<!-- Editing -->
+								<div>
+									<h4 class="text-xs font-semibold text-muted-foreground mb-2">{ i18n.T(ctx, "Editing") }</h4>
+									<div class="space-y-1">
+										@shortcutRow(i18n.T(ctx, "Delete selected node"), "Delete")
+										@shortcutRow(i18n.T(ctx, "Duplicate selected node"), "Ctrl+D")
+										@shortcutRow(i18n.T(ctx, "Undo"), "Ctrl+Z")
+										@shortcutRow(i18n.T(ctx, "Redo"), "Ctrl+Shift+Z")
+									</div>
+								</div>
+								<!-- Navigation -->
+								<div>
+									<h4 class="text-xs font-semibold text-muted-foreground mb-2">{ i18n.T(ctx, "Navigation") }</h4>
+									<div class="space-y-1">
+										@shortcutRow(i18n.T(ctx, "Move node up"), "Ctrl+↑")
+										@shortcutRow(i18n.T(ctx, "Move node down"), "Ctrl+↓")
+										@shortcutRow(i18n.T(ctx, "Collapse node"), "←")
+										@shortcutRow(i18n.T(ctx, "Expand node"), "→")
+									</div>
+								</div>
+								<!-- General -->
+								<div>
+									<h4 class="text-xs font-semibold text-muted-foreground mb-2">{ i18n.T(ctx, "General") }</h4>
+									<div class="space-y-1">
+										@shortcutRow(i18n.T(ctx, "Toggle property panel"), "Ctrl+]")
+										@shortcutRow(i18n.T(ctx, "Show this help"), "?")
+									</div>
+								</div>
+								<!-- Tip -->
+								<div class="flex items-start gap-2 p-2.5 bg-muted/30 rounded-lg">
+									@icon.Info(icon.Props{Class: "size-3.5 text-primary shrink-0 mt-0.5"})
+									<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "On macOS, use ⌘ instead of Ctrl") }</p>
+								</div>
+							</div>
+						</div>
+					</div>
+					</div>
+				</template>
+				<!-- Footer (only on list view) -->
+				<template x-if="view === 'list'">
+					@dialog.Footer(dialog.FooterProps{Class: "px-4 py-3 border-t mt-auto bg-muted/50"}) {
+						<div class="flex items-center justify-between w-full">
+							<span class="text-xs text-muted-foreground" x-text="`${filteredAgents.length} agent${filteredAgents.length !== 1 ? 's' : ''}`"></span>
+							@dialog.Close() {
+								@button.Button(button.Props{Variant: button.VariantGhost, Class: "h-8 px-3 text-xs"}) {
+									{ i18n.T(ctx, "Close") }
+								}
+							}
+						</div>
+					}
+				</template>
+			}
+		}
+		<!-- Toast Notifications -->
+		<div class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
+			<template x-for="t in toasts" :key="t.id">
+				<div
+					class="pointer-events-auto max-w-xs px-4 py-3 rounded-xl shadow-lg text-xs font-medium transition-all duration-300 flex items-center gap-2.5 backdrop-blur-sm"
+					:class="{
+						'bg-emerald-600/95 text-white': t.type === 'success',
+						'bg-red-600/95 text-white': t.type === 'error',
+						'bg-sky-600/95 text-white': t.type === 'info',
+						'bg-amber-600/95 text-white': t.type === 'warning',
+						'opacity-0 translate-y-4 scale-95': t.leaving,
+						'opacity-100 translate-y-0 scale-100': !t.leaving,
+					}"
+					x-show="t.visible"
+					x-transition:enter="transition-all duration-300 ease-out"
+					x-transition:enter-start="opacity-0 translate-y-4 scale-95"
+					x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+					x-transition:leave="transition-all duration-200 ease-in"
+					x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+					x-transition:leave-end="opacity-0 translate-y-4 scale-95"
+				>
+					<!-- Success icon -->
+					<template x-if="t.type === 'success'">
+						@icon.CircleCheck(icon.Props{Class: "size-4 shrink-0"})
+					</template>
+					<!-- Error icon -->
+					<template x-if="t.type === 'error'">
+						@icon.CircleX(icon.Props{Class: "size-4 shrink-0"})
+					</template>
+					<!-- Info icon -->
+					<template x-if="t.type === 'info'">
+						@icon.Info(icon.Props{Class: "size-4 shrink-0"})
+					</template>
+					<!-- Warning icon -->
+					<template x-if="t.type === 'warning'">
+						@icon.TriangleAlert(icon.Props{Class: "size-4 shrink-0"})
+					</template>
+					<span class="flex-1" x-text="t.message"></span>
+					<button @click="dismissToast(t.id)" class="opacity-70 hover:opacity-100 shrink-0 transition-opacity">&times;</button>
+				</div>
+			</template>
+		</div>
+	</div>
+}
+
+// agentNodeForm renders the form fields for creating/editing a single agent.
+templ agentNodeForm() {
+	<!-- Identity Section -->
+	<div class="rounded-xl border border-border bg-card overflow-hidden">
+		<div class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary/5 to-transparent border-b border-border/50">
+			<div class="size-6 rounded-md bg-primary/10 flex items-center justify-center">
+				@icon.Bot(icon.Props{Class: "size-3.5 text-primary"})
+			</div>
+			<span class="text-xs font-semibold text-foreground">{ i18n.T(ctx, "Identity") }</span>
+			<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Basic information about this agent") }</span>
+		</div>
+		<div class="p-4 space-y-4">
+			<div class="space-y-1.5">
+				@label.Label(label.Props{Class: "text-xs"}) {
+					{ i18n.T(ctx, "Name") }
+					<span class="text-destructive">*</span>
+				}
+				@input.Input(input.Props{
+					Placeholder: i18n.T(ctx, "e.g., Writing Coach, Code Reviewer..."),
+					Class:       "h-9 text-sm",
+					Attributes: templ.Attributes{
+						"x-model":   "form.name",
+						"maxlength": "100",
+					},
+				})
+			</div>
+			<div class="space-y-1.5">
+				@label.Label(label.Props{Class: "text-xs"}) {
+					{ i18n.T(ctx, "Description") }
+				}
+				@input.Input(input.Props{
+					Placeholder: i18n.T(ctx, "Brief description of what this agent does..."),
+					Class:       "h-9 text-sm",
+					Attributes: templ.Attributes{
+						"x-model":   "form.description",
+						"maxlength": "500",
+					},
+				})
+			</div>
+		</div>
+	</div>
+	<!-- Instructions Section -->
+	<div class="rounded-xl border border-border bg-card overflow-hidden">
+		<div class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500/5 to-transparent border-b border-border/50">
+			<div class="size-6 rounded-md bg-amber-500/10 flex items-center justify-center">
+				@icon.FileText(icon.Props{Class: "size-3.5 text-amber-600 dark:text-amber-400"})
+			</div>
+			<span class="text-xs font-semibold text-foreground">{ i18n.T(ctx, "Instructions") }</span>
+			<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Define the agent's behavior") }</span>
+		</div>
+		<div class="p-4 space-y-3">
+			@textarea.Textarea(textarea.Props{
+				Placeholder: i18n.T(ctx, "Define this agent's role, expertise, and behavior..."),
+				Class:       "min-h-[140px] resize-y text-sm leading-relaxed",
+				Rows:        6,
+				Attributes: templ.Attributes{
+					"x-model": "form.systemPrompt",
+				},
+			})
+			<p class="text-[10px] text-muted-foreground leading-relaxed">
+				@icon.Info(icon.Props{Class: "size-3 inline me-0.5"})
+				{ i18n.T(ctx, "Describe the agent's role, expertise, and behavior. Use {variable_name} to reference data from other agents in a workflow.") }
+			</p>
+		</div>
+	</div>
+	<!-- Sub-Agents (Coordinator) Section -->
+	<div class="rounded-xl border border-border bg-card overflow-hidden">
+		<button
+			type="button"
+			@click="showSubAgents = !showSubAgents"
+			class="flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent/30 transition-colors"
+			:class="showSubAgents ? 'bg-gradient-to-r from-violet-500/5 to-transparent border-b border-border/50' : ''"
+		>
+			<span class="flex items-center gap-2">
+				<div class="size-6 rounded-md bg-violet-500/10 flex items-center justify-center">
+					@icon.Users(icon.Props{Class: "size-3.5 text-violet-600 dark:text-violet-400"})
+				</div>
+				{ i18n.T(ctx, "Sub-Agents") }
+				<span class="text-[10px] text-muted-foreground" x-text="(form.subAgents || []).length > 0 ? '(' + (form.subAgents || []).length + ')' : ''"></span>
+			</span>
+			<span class="transition-transform duration-200" :class="showSubAgents ? 'rotate-180' : ''">
+				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+			</span>
+		</button>
+		<div x-show="showSubAgents" x-collapse>
+			<div class="p-4 space-y-4 border-t border-border/50">
+				<p class="text-xs text-muted-foreground leading-relaxed">
+					@icon.Info(icon.Props{Class: "size-3.5 inline me-1 text-violet-500"})
+					{ i18n.T(ctx, "This agent will act as a coordinator, delegating tasks to specialist sub-agents. The coordinator LLM decides which sub-agent to use based on conversation context.") }
+				</p>
+
+				<button type="button" @click="openSubAgentDialog()" class="w-full text-center text-xs text-primary hover:text-primary/80 py-1.5 border border-dashed border-border rounded-lg hover:border-primary/40 transition-colors">
+					+ { i18n.T(ctx, "Select Sub-Agents") }
+				</button>
+
+				<!-- Selected Agents List -->
+				<div class="space-y-1.5">
+					<template x-for="(ref, idx) in (form.subAgents || [])" :key="ref.agent_id">
+						<div class="flex items-center gap-2 p-2 rounded-md border border-border bg-muted/30">
+							<span class="size-5 rounded bg-primary/10 flex items-center justify-center text-primary shrink-0 text-[10px] font-bold" x-text="idx + 1"></span>
+							<div class="flex-1 min-w-0">
+								<div class="text-xs font-medium truncate" x-text="getAgentName(ref.agent_id)"></div>
+							</div>
+							<button type="button" @click="removeSubAgent(idx)" class="text-muted-foreground hover:text-destructive transition-colors shrink-0">
+								@icon.X(icon.Props{Class: "size-3"})
+							</button>
+						</div>
+					</template>
+					<template x-if="(form.subAgents || []).length === 0">
+						<div class="text-center text-xs text-muted-foreground py-2">{ i18n.T(ctx, "No sub-agents selected") }</div>
+					</template>
+				</div>
+
+				<!-- Delegation Controls (part of coordinator config) -->
+				<div class="pt-2 border-t border-border/50">
+					<span class="text-[10px] font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5 mb-2">
+						@icon.Shield(icon.Props{Class: "size-3 text-muted-foreground"})
+						{ i18n.T(ctx, "Delegation Policy") }
+					</span>
+					<p class="text-[10px] text-muted-foreground mb-2">{ i18n.T(ctx, "Control how the coordinator delegates to sub-agents.") }</p>
+					<div class="space-y-1.5">
+						@toggleSwitch("form.disallowTransferToParent", i18n.T(ctx, "Prevent escalation to parent"), i18n.T(ctx, "Sub-agents cannot hand work back to the coordinator's parent."))
+						@toggleSwitch("form.disallowTransferToPeers", i18n.T(ctx, "Prevent delegation to siblings"), i18n.T(ctx, "Sub-agents cannot pass work to other agents at the same level."))
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Sub-Agent Selection Dialog -->
+	<template x-if="subAgentDialogOpen">
+		<div class="fixed inset-0 z-[60] flex items-center justify-center p-4">
+			<div class="fixed inset-0 bg-black/60 backdrop-blur-sm" @click="subAgentDialogOpen = false"></div>
+			<div class="relative w-full max-w-2xl bg-card border border-border rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+				<div class="flex items-center justify-between px-4 py-3 border-b border-border/50 shrink-0">
+					<h3 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Select Sub-Agents") }</h3>
+					<button type="button" @click="subAgentDialogOpen = false" class="text-muted-foreground hover:text-foreground transition-colors">
+						@icon.X(icon.Props{Class: "size-4"})
+					</button>
+				</div>
+				<div class="flex-1 overflow-y-auto p-4 space-y-1.5">
+					<template x-for="agent in availableAgentsForSubAgent" :key="agent.id">
+						<button type="button" @click="toggleSubAgentFromDialog(agent.id)" class="w-full flex items-center gap-3 p-2.5 rounded-lg border transition-colors text-left"
+							:class="isAgentSelected(agent.id) ? 'border-primary/40 bg-primary/5' : 'border-border hover:bg-accent/30'"
+						>
+							<div class="size-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+								<template x-if="isAgentSelected(agent.id)">
+									@icon.Check(icon.Props{Class: "size-4"})
+								</template>
+								<template x-if="!isAgentSelected(agent.id)">
+									@icon.Circle(icon.Props{Class: "size-4"})
+								</template>
+							</div>
+							<div class="flex-1 min-w-0">
+								<div class="text-xs font-medium text-foreground truncate" x-text="agent.name"></div>
+								<div class="text-[10px] text-muted-foreground truncate" x-text="agent.description"></div>
+							</div>
+						</button>
+					</template>
+					<template x-if="availableAgentsForSubAgent.length === 0">
+						<div class="text-center text-xs text-muted-foreground py-8">{ i18n.T(ctx, "No other agents available") }</div>
+					</template>
+				</div>
+				<div class="flex items-center justify-end gap-2 px-4 py-3 border-t border-border/50 shrink-0">
+					<button type="button" @click="subAgentDialogOpen = false" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-xs font-medium transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-8 px-3">
+						{ i18n.T(ctx, "Done") }
+					</button>
+				</div>
+			</div>
+		</div>
+	</template>
+	<!-- State & Context -->
+	<div class="rounded-xl border border-border bg-card overflow-hidden">
+		<div class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500/5 to-transparent border-b border-border/50">
+			<div class="size-6 rounded-md bg-blue-500/10 flex items-center justify-center">
+				@icon.Key(icon.Props{Class: "size-3.5 text-blue-600 dark:text-blue-400"})
+			</div>
+			<span class="text-xs font-semibold text-foreground">{ i18n.T(ctx, "State & Context") }</span>
+			<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "How this agent reads and writes session state") }</span>
+		</div>
+		<div class="p-4 space-y-4">
+			<!-- Output Key -->
+			<div class="space-y-2">
+				<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
+					@icon.ArrowRight(icon.Props{Class: "size-3.5 text-muted-foreground"})
+					{ i18n.T(ctx, "Output Variable") }
+				</span>
+				@input.Input(input.Props{
+					Placeholder: i18n.T(ctx, "e.g., research_results, draft_content..."),
+					Class:       "h-8 text-xs",
+					Attributes: templ.Attributes{
+						"x-model":   "form.outputKey",
+						"maxlength": "100",
+					},
+				})
+				<p class="text-[10px] text-muted-foreground">
+					{ i18n.T(ctx, "Store this agent's output in session state for other agents to reference via {variable_name}.") }
+				</p>
+			</div>
+			<!-- Context Control -->
+			<div class="space-y-2">
+				<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
+					@icon.MessageSquare(icon.Props{Class: "size-3.5 text-muted-foreground"})
+					{ i18n.T(ctx, "Conversation Context") }
+				</span>
+				<div class="flex gap-2">
+					<button
+						type="button"
+						@click="form.includeContents = ''"
+						class="flex-1 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors"
+						:class="!form.includeContents || form.includeContents === 'default' ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted/50 text-muted-foreground border-border hover:bg-accent'"
+					>
+						{ i18n.T(ctx, "Include History") }
+					</button>
+					<button
+						type="button"
+						@click="form.includeContents = 'none'"
+						class="flex-1 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors"
+						:class="form.includeContents === 'none' ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted/50 text-muted-foreground border-border hover:bg-accent'"
+					>
+						{ i18n.T(ctx, "Fresh Context") }
+					</button>
+				</div>
+				<p class="text-[10px] text-muted-foreground">
+					{ i18n.T(ctx, "Choose whether this agent sees the full conversation history or only the current message.") }
+				</p>
+			</div>
+		</div>
+	</div>
+	<!-- Data Contracts -->
+	<div class="rounded-xl border border-border bg-card overflow-hidden">
+		<div class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-slate-500/5 to-transparent border-b border-border/50">
+			<div class="size-6 rounded-md bg-slate-500/10 flex items-center justify-center">
+				@icon.Braces(icon.Props{Class: "size-3.5 text-slate-600 dark:text-slate-400"})
+			</div>
+			<span class="text-xs font-semibold text-foreground">{ i18n.T(ctx, "Data Contracts") }</span>
+			<span class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Input/output schema validation") }</span>
+		</div>
+		<div class="p-4 space-y-4">
+			<!-- Input Schema -->
+			<div class="space-y-2">
+				<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
+					@icon.ArrowDownToLine(icon.Props{Class: "size-3.5 text-muted-foreground"})
+					{ i18n.T(ctx, "Input Schema") }
+				</span>
+				@textarea.Textarea(textarea.Props{
+					Placeholder: i18n.T(ctx, `{"type": "object", "properties": {"topic": {"type": "string"}}, "required": ["topic"]}`),
+					Class:       "min-h-[60px] resize-y font-mono text-[11px]",
+					Rows:        2,
+					Attributes: templ.Attributes{
+						"x-model": "form.inputSchema",
+					},
+				})
+				<p class="text-[10px] text-muted-foreground">
+					{ i18n.T(ctx, "Expected input format when another agent calls this one. JSON Schema format.") }
+				</p>
+			</div>
+			<!-- Output Schema -->
+			<div class="space-y-2">
+				<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
+					@icon.ArrowUpToLine(icon.Props{Class: "size-3.5 text-muted-foreground"})
+					{ i18n.T(ctx, "Output Schema") }
+				</span>
+				@textarea.Textarea(textarea.Props{
+					Placeholder: i18n.T(ctx, `{"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]}`),
+					Class:       "min-h-[60px] resize-y font-mono text-[11px]",
+					Rows:        2,
+					Attributes: templ.Attributes{
+						"x-model": "form.outputSchema",
+					},
+				})
+				<p class="text-[10px] text-muted-foreground">
+					{ i18n.T(ctx, "Forces structured JSON output. When set, tool use is disabled.") }
+				</p>
+			</div>
+		</div>
+	</div>
+	<!-- Model Configuration -->
+	@modelConfigurationSection()
+	<!-- Tools, KBs, Filesystems (edit mode only) -->
+	<template x-if="editingAgent">
+		<div class="space-y-4">
+			@toolsSection()
+			@knowledgeBasesSection()
+			@filesystemsSection()
+		</div>
+	</template>
+	<!-- Info notice (create mode) -->
+	<template x-if="!editingAgent">
+		<div class="border border-border rounded-lg p-3 flex items-start gap-2 bg-muted/30">
+			@icon.Info(icon.Props{Class: "size-4 text-muted-foreground shrink-0 mt-0.5"})
+			<p class="text-[11px] text-muted-foreground">
+				{ i18n.T(ctx, "After creating the agent, you can add tools and knowledge bases by editing it.") }
+			</p>
+		</div>
+	</template>
+}
+
+// toggleSwitch renders a labeled toggle switch for boolean form fields.
+templ toggleSwitch(model string, labelText string, helpText string) {
+	<label class="flex items-center justify-between gap-2 py-1.5 cursor-pointer">
+		<div class="flex-1 min-w-0">
+			<span class="text-xs font-medium text-foreground">{ labelText }</span>
+			<p class="text-[10px] text-muted-foreground mt-0.5">{ helpText }</p>
+		</div>
+		<button
+			type="button"
+			x-on:click={ model + " = !" + model }
+			class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
+			x-bind:class={ model + " ? 'bg-primary' : 'bg-input'" }
+			role="switch"
+			x-bind:aria-checked={ model }
+		>
+			<span
+				class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
+				x-bind:class={ model + " ? 'translate-x-4' : 'translate-x-0'" }
+			></span>
+		</button>
+	</label>
+}
+
+// shortcutRow renders a single keyboard shortcut row for the help overlay.
+templ shortcutRow(label string, keys string) {
+	<div class="flex items-center justify-between py-1.5 px-2.5 rounded-md hover:bg-muted/50 transition-colors">
+		<span class="text-xs text-foreground">{ label }</span>
+		<div class="flex items-center gap-1">
+			<kbd class="kbd">{ keys }</kbd>
+		</div>
+	</div>
+}
+
+// modelConfigurationSection renders a unified panel for per-agent model configuration.
+// It combines provider/model selection (AgentModelOverride) and generation parameters
+// (AgentModelConfig) into one cohesive section, matching the unified agent config pipeline.
+templ modelConfigurationSection() {
+	<div class="rounded-xl border border-border bg-card overflow-hidden">
+		<button
+			type="button"
+			@click="showModelConfig = !showModelConfig"
+			class="flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent/30 transition-colors"
+			:class="showModelConfig ? 'bg-gradient-to-r from-primary/5 to-transparent border-b border-border/50' : ''"
+		>
+			<span class="flex items-center gap-2">
+				<div class="size-6 rounded-md bg-primary/10 flex items-center justify-center">
+					@icon.Cpu(icon.Props{Class: "size-3.5 text-primary"})
+				</div>
+				{ i18n.T(ctx, "Model Configuration") }
+				<span
+					class="text-[10px] text-muted-foreground"
+					x-show="(form.modelOverride.provider && form.modelOverride.modelName) || form.modelConfig.temperature !== null || form.modelConfig.topP !== null || form.modelConfig.topK !== null || form.modelConfig.maxOutputTokens !== null || form.modelConfig.stopSequences.length > 0"
+				>
+					<template x-if="form.modelOverride.provider && form.modelOverride.modelName">
+						<span class="font-mono" x-text="' ' + form.modelOverride.provider + '/' + form.modelOverride.modelName"></span>
+					</template>
+					<template x-if="!form.modelOverride.provider || !form.modelOverride.modelName">
+						<span>{ i18n.T(ctx, "overrides set") }</span>
+					</template>
+				</span>
+			</span>
+			<span class="transition-transform duration-200" :class="showModelConfig ? 'rotate-180' : ''">
+				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+			</span>
+		</button>
+		<div x-show="showModelConfig" x-collapse>
+			<div class="p-4 space-y-6 border-t border-border/50">
+				<p class="text-xs text-muted-foreground leading-relaxed">
+					@icon.Info(icon.Props{Class: "size-3.5 inline me-1 text-primary"})
+					{ i18n.T(ctx, "Choose a specific AI model and fine-tune generation parameters for this agent. Leave blank to use your global defaults.") }
+				</p>
+
+				<!-- ═══ Model Selection ═══ -->
+				<div class="space-y-3">
+					<h4 class="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold flex items-center gap-1.5">
+						@icon.Layers(icon.Props{Class: "size-3"})
+						{ i18n.T(ctx, "Model") }
+					</h4>
+					<!-- Provider -->
+					<div class="space-y-1.5">
+						<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Provider") }</span>
+						<select
+							class="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+							x-model="form.modelOverride.provider"
+							@change="form.modelOverride.modelName = ''; fetchModelsForProvider($event.target.value)"
+						>
+							<option value="">{ i18n.T(ctx, "— use global default —") }</option>
+							<option value="gemini">Gemini (Google)</option>
+							<option value="openai">OpenAI</option>
+							<option value="anthropic">Anthropic</option>
+						</select>
+					</div>
+					<!-- Model -->
+					<div class="space-y-1.5" x-show="form.modelOverride.provider">
+						<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Model") }</span>
+						<div x-show="providerModelsLoading" class="text-xs text-muted-foreground py-2">{ i18n.T(ctx, "Loading models…") }</div>
+						<div x-show="providerModelsError && !providerModelsLoading" class="text-xs text-destructive py-1" x-text="providerModelsError"></div>
+						<select
+							x-show="!providerModelsLoading"
+							class="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+							x-model="form.modelOverride.modelName"
+						>
+							<option value="">{ i18n.T(ctx, "— select a model —") }</option>
+							<template x-for="m in providerModelOptions" :key="m.id">
+								<option :value="m.id" x-text="m.displayName"></option>
+							</template>
+						</select>
+					</div>
+					<!-- Clear -->
+					<button
+						type="button"
+						x-show="form.modelOverride.provider || form.modelOverride.modelName"
+						@click="form.modelOverride = { provider: '', modelName: '' }; providerModelOptions = []; providerModelsError = ''"
+						class="text-xs text-muted-foreground hover:text-destructive transition-colors inline-flex items-center gap-1"
+					>
+						@icon.X(icon.Props{Class: "size-3"})
+						{ i18n.T(ctx, "Clear override") }
+					</button>
+				</div>
+
+				<!-- ═══ Generation Parameters ═══ -->
+				<div class="space-y-4 pt-4 border-t border-border/50">
+					<h4 class="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold flex items-center gap-1.5">
+						@icon.SlidersHorizontal(icon.Props{Class: "size-3"})
+						{ i18n.T(ctx, "Generation Parameters") }
+					</h4>
+					<!-- Temperature -->
+					<div class="space-y-1.5">
+						<div class="flex items-center justify-between">
+							<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Temperature") }</span>
+							<span class="text-[11px] text-muted-foreground font-mono" x-text="form.modelConfig.temperature !== null && form.modelConfig.temperature !== '' ? form.modelConfig.temperature : '—'"></span>
+						</div>
+						<input
+							type="range"
+							min="0"
+							max="2"
+							step="0.05"
+							class="w-full accent-primary"
+							x-model.number="form.modelConfig.temperature"
+						/>
+						<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Lower = focused, higher = creative.") }</p>
+					</div>
+					<!-- Max Output Tokens -->
+					<div class="space-y-1.5">
+						<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Max Output Tokens") }</span>
+						@input.Input(input.Props{
+							Type:        "number",
+							Placeholder: i18n.T(ctx, "e.g. 4096 (blank = global default)"),
+							Attributes: templ.Attributes{
+								"x-model.number": "form.modelConfig.maxOutputTokens",
+								"min":            "1",
+								"max":            "65536",
+							},
+						})
+						<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Maximum response length (1–65,536 tokens).") }</p>
+					</div>
+					<!-- Advanced: TopP / TopK -->
+					<details class="group">
+						<summary class="text-[11px] text-muted-foreground cursor-pointer select-none list-none flex items-center gap-1 hover:text-foreground transition-colors">
+							<span class="transition-transform group-open:rotate-90">▶</span>
+							{ i18n.T(ctx, "Advanced sampling (TopP / TopK)") }
+						</summary>
+						<div class="mt-3 space-y-3">
+							<!-- TopP -->
+							<div class="space-y-1.5">
+								<div class="flex items-center justify-between">
+									<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Top-P (nucleus sampling)") }</span>
+									<span class="text-[11px] text-muted-foreground font-mono" x-text="form.modelConfig.topP !== null && form.modelConfig.topP !== '' ? form.modelConfig.topP : '—'"></span>
+								</div>
+								<input
+									type="range"
+									min="0"
+									max="1"
+									step="0.01"
+									class="w-full accent-primary"
+									x-model.number="form.modelConfig.topP"
+								/>
+								<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Controls diversity. 0.9 = top 90% most likely words.") }</p>
+							</div>
+							<!-- TopK -->
+							<div class="space-y-1.5">
+								<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Top-K") }</span>
+								@input.Input(input.Props{
+									Type:        "number",
+									Placeholder: i18n.T(ctx, "e.g. 40 (blank = model default)"),
+									Attributes: templ.Attributes{
+										"x-model.number": "form.modelConfig.topK",
+										"min":            "1",
+									},
+								})
+								<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Limits the model to the top K most likely words.") }</p>
+							</div>
+						</div>
+					</details>
+					<!-- Stop Sequences -->
+					<div class="space-y-1.5">
+						<span class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Stop Sequences") }</span>
+						<div class="flex flex-wrap gap-1 min-h-7 p-1.5 rounded-md border border-input bg-background">
+							<template x-for="(seq, idx) in form.modelConfig.stopSequences" :key="idx">
+								<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-[11px] font-mono">
+									<span x-text="seq"></span>
+									<button type="button" @click="form.modelConfig.stopSequences.splice(idx, 1)" class="text-muted-foreground hover:text-foreground leading-none">&times;</button>
+								</span>
+							</template>
+							<input
+								type="text"
+								class="flex-1 min-w-[120px] bg-transparent text-[11px] font-mono outline-none placeholder:text-muted-foreground"
+								placeholder={ i18n.T(ctx, "Type and press Enter…") }
+								@keydown.enter.prevent="
+									const v = $event.target.value.trim();
+									if (v && !form.modelConfig.stopSequences.includes(v)) {
+										form.modelConfig.stopSequences.push(v);
+									}
+									$event.target.value = '';
+								"
+							/>
+						</div>
+						<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Stops generation on any of these strings. Enter to add.") }</p>
+					</div>
+					<!-- Reset button -->
+					<button
+						type="button"
+						@click="form.modelConfig = { temperature: null, topP: null, topK: null, maxOutputTokens: null, stopSequences: [] }"
+						class="text-xs text-muted-foreground hover:text-destructive transition-colors inline-flex items-center gap-1"
+					>
+						@icon.RotateCcw(icon.Props{Class: "size-3"})
+						{ i18n.T(ctx, "Reset all to global defaults") }
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// toolsSection renders the collapsible tools section for an agent in edit mode.
+//
+// Each plugin and tool row has two independent controls:
+//   1. Enable toggle (right side) — allow ↔ block. Binary. Saves immediately.
+//   2. "Confirm" mini-toggle — shown only when enabled. Sets require_confirmation.
+//      Orthogonal to the enable state: a tool can be enabled with or without confirmation.
+//
+// A gear (⚙) icon appears next to the confirm toggle when confirmation is on,
+// opening a small settings panel for the hint text and per-turn invocation limit.
+// Additional future requirements (rate limits, cost budgets, etc.) can be added
+// as further independent mini-toggles in the same row without restructuring.
+templ toolsSection() {
+	<div class="border border-border rounded-lg">
+		<button
+			type="button"
+			@click="showTools = !showTools"
+			class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
+		>
+			<span class="flex items-center gap-2">
+				@icon.Blocks(icon.Props{Class: "size-4 text-muted-foreground"})
+				{ i18n.T(ctx, "Tools") }
+				<span class="text-[10px] text-muted-foreground tabular-nums" x-text="toolsSummary"></span>
+			</span>
+			<span class="transition-transform duration-200" :class="showTools ? 'rotate-180' : ''">
+				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+			</span>
+		</button>
+		<div x-show="showTools" x-collapse class="px-3 pb-3 border-t border-border pt-3">
+			<template x-if="loadingTools">
+				<div class="space-y-2">
+					<template x-for="i in 3" :key="i">
+						<div class="flex items-center gap-3 p-2 animate-pulse rounded-md">
+							<div class="size-7 rounded bg-muted"></div>
+							<div class="flex-1 space-y-1">
+								<div class="h-3 bg-muted rounded w-1/3"></div>
+								<div class="h-2 bg-muted rounded w-2/3"></div>
+							</div>
+						</div>
+					</template>
+				</div>
+			</template>
+			<template x-if="!loadingTools">
+				<div>
+					<template x-if="agentPlugins.length === 0">
+						<div class="py-4 text-center text-xs text-muted-foreground">
+							{ i18n.T(ctx, "No plugins available. Add plugins from the Tools sidebar.") }
+						</div>
+					</template>
+					<div class="space-y-1.5">
+						<template x-for="plugin in agentPlugins" :key="plugin.id">
+							<div class="rounded-md border border-border overflow-hidden">
+								<!-- Plugin header row -->
+								<div
+									class="flex items-center gap-2 p-2 transition-colors"
+									:class="plugin.requirement_config?.action === 'block' ? 'bg-muted/30' : ''"
+								>
+									<!-- Icon -->
+									<div
+										class="size-7 rounded-md flex items-center justify-center shrink-0 transition-colors"
+										:class="plugin.requirement_config?.action === 'block' ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'"
+									>
+										@icon.Blocks(icon.Props{Class: "size-3.5"})
+									</div>
+									<!-- Name + tool count -->
+									<div class="flex-1 min-w-0">
+										<div
+											class="text-xs font-medium truncate transition-colors"
+											:class="plugin.requirement_config?.action === 'block' ? 'line-through text-muted-foreground' : 'text-foreground'"
+											x-text="plugin.name"
+										></div>
+										<div class="text-[10px] text-muted-foreground tabular-nums" x-text="plugin.tools.length + ' tools'"></div>
+									</div>
+									<!-- Confirm mini-toggle — only visible when plugin is enabled.
+									     Orthogonal to the enable toggle: pauses before each run and asks user. -->
+									<template x-if="isPluginEnabled(plugin)">
+										<div class="flex items-center gap-1.5 shrink-0">
+											<label
+												class="flex items-center gap-1 cursor-pointer select-none"
+												:title="plugin.requirement_config?.action === 'require_confirmation' ? 'Confirmation required before each run — click to turn off' : 'Click to require user confirmation before each run'"
+											>
+												<span
+													class="text-[10px] transition-colors"
+													:class="plugin.requirement_config?.action === 'require_confirmation' ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-muted-foreground'"
+												>{ i18n.T(ctx, "Confirm") }</span>
+												<!-- Mini toggle switch -->
+												<button
+													type="button"
+													@click.stop="setToolSetAction(plugin, plugin.requirement_config?.action === 'require_confirmation' ? 'allow' : 'require_confirmation')"
+													role="switch"
+													:aria-checked="plugin.requirement_config?.action === 'require_confirmation'"
+													class="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+													:class="plugin.requirement_config?.action === 'require_confirmation' ? 'bg-amber-500' : 'bg-input'"
+												>
+													<span
+														class="pointer-events-none inline-block size-3 rounded-full bg-background shadow ring-0 transition-transform duration-200"
+														:class="plugin.requirement_config?.action === 'require_confirmation' ? 'translate-x-3' : 'translate-x-0'"
+													></span>
+												</button>
+											</label>
+											<!-- Gear icon for confirmation hint + invocation limit -->
+											<template x-if="plugin.requirement_config?.action === 'require_confirmation'">
+												<button
+													type="button"
+													@click.stop="openToolSetRequirements(plugin)"
+													title="Set confirmation prompt and invocation limits"
+													class="p-1 rounded text-amber-500/70 hover:text-amber-600 hover:bg-amber-500/10 transition-colors"
+												>
+													@icon.SlidersHorizontal(icon.Props{Class: "size-3"})
+												</button>
+											</template>
+										</div>
+									</template>
+									<!-- Enable/disable toggle — allow ↔ block -->
+									<!-- Absence of requirement_config means disabled (no tools enabled by default) -->
+									<button
+										type="button"
+										@click.stop="setToolSetAction(plugin, isPluginEnabled(plugin) ? 'block' : 'allow')"
+										role="switch"
+										:aria-checked="isPluginEnabled(plugin)"
+										:title="isPluginEnabled(plugin) ? 'Disable plugin' : 'Enable plugin'"
+										class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+										:class="isPluginEnabled(plugin) ? 'bg-primary' : 'bg-input'"
+									>
+										<span
+											class="pointer-events-none inline-block size-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200"
+											:class="isPluginEnabled(plugin) ? 'translate-x-4' : 'translate-x-0'"
+										></span>
+									</button>
+								</div>
+								<!-- Individual tools — shown when plugin is enabled and has multiple tools -->
+								<template x-if="isPluginEnabled(plugin) && plugin.tools.length > 1">
+									<div class="border-t border-border/50 divide-y divide-border/30 bg-background/40">
+										<template x-for="tool in plugin.tools" :key="tool.id">
+											<div
+												class="flex items-center gap-2 px-2 py-1.5 transition-colors"
+												:class="!isToolEnabled(tool) ? 'bg-muted/20' : ''"
+											>
+												<!-- Indent marker + name -->
+												<span class="w-3 shrink-0"></span>
+												<span
+													class="text-[11px] flex-1 min-w-0 truncate transition-colors"
+													:class="!isToolEnabled(tool) ? 'line-through text-muted-foreground/50' : 'text-muted-foreground'"
+													x-text="tool.name"
+												></span>
+												<!-- Confirm mini-toggle (only when tool is enabled) -->
+												<template x-if="isToolEnabled(tool)">
+													<div class="flex items-center gap-1 shrink-0">
+														<label
+															class="flex items-center gap-1 cursor-pointer select-none"
+															:title="tool.requirement_config?.action === 'require_confirmation' ? 'Confirmation required — click to turn off' : 'Require confirmation before this tool runs'"
+														>
+															<span
+																class="text-[9px] transition-colors"
+																:class="tool.requirement_config?.action === 'require_confirmation' ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-muted-foreground'"
+															>{ i18n.T(ctx, "Confirm") }</span>
+															<button
+																type="button"
+																@click.stop="setToolAction(plugin, tool, tool.requirement_config?.action === 'require_confirmation' ? 'allow' : 'require_confirmation')"
+																role="switch"
+																:aria-checked="tool.requirement_config?.action === 'require_confirmation'"
+																class="relative inline-flex h-3.5 w-6 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+																:class="tool.requirement_config?.action === 'require_confirmation' ? 'bg-amber-500' : 'bg-input'"
+															>
+																<span
+																	class="pointer-events-none inline-block size-2.5 rounded-full bg-background shadow ring-0 transition-transform duration-200"
+																	:class="tool.requirement_config?.action === 'require_confirmation' ? 'translate-x-2.5' : 'translate-x-0'"
+																></span>
+															</button>
+														</label>
+														<!-- Gear for tool-level confirmation hint/limits -->
+														<template x-if="tool.requirement_config?.action === 'require_confirmation'">
+															<button
+																type="button"
+																@click.stop="openToolRequirements(plugin, tool)"
+																title="Set confirmation prompt and invocation limits"
+																class="p-0.5 rounded text-amber-500/70 hover:text-amber-600 hover:bg-amber-500/10 transition-colors"
+															>
+																@icon.SlidersHorizontal(icon.Props{Class: "size-2.5"})
+															</button>
+														</template>
+													</div>
+												</template>
+												<!-- Enable/disable toggle for individual tool -->
+												<button
+													type="button"
+													@click.stop="setToolAction(plugin, tool, tool.requirement_config?.action === 'block' ? 'allow' : 'block')"
+													role="switch"
+													:aria-checked="tool.requirement_config?.action !== 'block'"
+													:title="tool.requirement_config?.action === 'block' ? 'Enable tool' : 'Disable tool'"
+													class="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+													:class="tool.requirement_config?.action !== 'block' ? 'bg-primary' : 'bg-input'"
+												>
+													<span
+														class="pointer-events-none inline-block size-3 rounded-full bg-background shadow ring-0 transition-transform duration-200"
+														:class="tool.requirement_config?.action !== 'block' ? 'translate-x-3' : 'translate-x-0'"
+													></span>
+												</button>
+											</div>
+										</template>
+									</div>
+								</template>
+							</div>
+						</template>
+					</div>
+				</div>
+			</template>
+		</div>
+	</div>
+	<!-- Confirmation settings panel — opens via the gear icon when confirm is on.
+	     Contains only the hint text and invocation limit; the enable/confirm toggles
+	     are inline in the row and do not appear here. -->
+	@toolRequirementsDialog()
+}
+
+// toolRequirementsDialog renders the confirmation settings panel for a tool or tool set.
+// Reached only via the gear (⚙) icon that appears next to the Confirm toggle.
+// Contains only the hint text and per-turn invocation limit.
+// The enable/disable toggle and the confirm toggle live inline in the tool list rows.
+templ toolRequirementsDialog() {
+	<!-- Backdrop overlay -->
+	<div
+		x-show="showRequirementsPanel"
+		x-transition:enter="transition ease-out duration-200"
+		x-transition:enter-start="opacity-0"
+		x-transition:enter-end="opacity-100"
+		x-transition:leave="transition ease-in duration-150"
+		x-transition:leave-start="opacity-100"
+		x-transition:leave-end="opacity-0"
+		@click.self="closeRequirementsPanel()"
+		class="fixed inset-0 z-60 bg-black/40 backdrop-blur-[3px]"
+	></div>
+	<!-- Dialog content -->
+	<div
+		x-show="showRequirementsPanel"
+		x-transition:enter="transition ease-out duration-200"
+		x-transition:enter-start="opacity-0 scale-[0.97]"
+		x-transition:enter-end="opacity-100 scale-100"
+		x-transition:leave="transition ease-in duration-150"
+		x-transition:leave-start="opacity-100 scale-100"
+		x-transition:leave-end="opacity-0 scale-[0.97]"
+		@keydown.escape.window="closeRequirementsPanel()"
+		class="fixed z-60 left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] bg-background rounded-2xl border border-border/60 shadow-modern-xl w-full max-w-[calc(100%-2rem)] sm:max-w-md"
+	>
+		<!-- Header -->
+		<div class="flex items-center justify-between px-5 pt-5 pb-0">
+			<div class="flex items-center gap-2.5">
+				<div class="size-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400">
+					@icon.SlidersHorizontal(icon.Props{Class: "size-4"})
+				</div>
+				<div>
+					<h3 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Confirmation Settings") }</h3>
+					<p class="text-xs text-muted-foreground" x-text="reqConfigTarget?.name || ''"></p>
+				</div>
+			</div>
+			<button
+				type="button"
+				@click="closeRequirementsPanel()"
+				class="size-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+			>
+				@icon.X(icon.Props{Class: "size-4"})
+			</button>
+		</div>
+		<!-- Body -->
+		<div class="px-5 py-4 space-y-4">
+			<!-- Confirmation hint -->
+			<div class="space-y-2">
+				<label class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Confirmation Prompt") }</label>
+				@textarea.Textarea(textarea.Props{
+					Placeholder: i18n.T(ctx, "e.g., This tool will modify files. Are you sure?"),
+					Class:       "min-h-[56px] resize-y text-xs",
+					Rows:        2,
+					Attributes: templ.Attributes{
+						"x-model": "reqConfig.confirmation_hint",
+					},
+				})
+				<p class="text-[11px] text-muted-foreground leading-relaxed">
+					{ i18n.T(ctx, "Shown to the user before the tool runs. Leave blank to use a default prompt.") }
+				</p>
+			</div>
+			<!-- Max invocations -->
+			<div class="space-y-2">
+				<label class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Max Invocations per Turn") }</label>
+				<input
+					type="number"
+					min="0"
+					x-model.number="reqConfig.max_invocations"
+					placeholder="0"
+					class="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+				/>
+				<p class="text-[11px] text-muted-foreground leading-relaxed">
+					{ i18n.T(ctx, "Maximum times this tool can run in a single agent turn. 0 means unlimited.") }
+				</p>
+			</div>
+		</div>
+		<!-- Footer -->
+		<div class="flex items-center justify-end gap-2 px-5 pb-5 pt-0">
+			@button.Button(button.Props{
+				Variant: button.VariantOutline,
+				Class:   "h-8 px-3 text-xs",
+				Attributes: templ.Attributes{
+					"@click": "closeRequirementsPanel()",
+				},
+			}) {
+				{ i18n.T(ctx, "Cancel") }
+			}
+			@button.Button(button.Props{
+				Variant: button.VariantDefault,
+				Class:   "h-8 px-4 text-xs gap-1.5",
+				Attributes: templ.Attributes{
+					"@click":    "saveRequirementConfig()",
+					":disabled": "savingReqConfig",
+				},
+			}) {
+				<span x-show="!savingReqConfig" class="flex items-center gap-1.5">
+					@icon.Check(icon.Props{Class: "size-3.5"})
+					{ i18n.T(ctx, "Save") }
+				</span>
+				<span x-show="savingReqConfig" class="flex items-center gap-1.5">
+					<span class="animate-spin size-3.5 border-2 border-current border-t-transparent rounded-full"></span>
+					{ i18n.T(ctx, "Saving...") }
+				</span>
+			}
+		</div>
+	</div>
+}
+
+// knowledgeBasesSection renders the collapsible KB section for an agent in edit mode.
+templ knowledgeBasesSection() {
+	<div class="border border-border rounded-lg">
+		<button
+			type="button"
+			@click="showKnowledgeBases = !showKnowledgeBases"
+			class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
+		>
+			<span class="flex items-center gap-2">
+				@icon.Library(icon.Props{Class: "size-4 text-muted-foreground"})
+				{ i18n.T(ctx, "Knowledge Bases") }
+				<span class="text-[10px] text-muted-foreground tabular-nums" x-text="kbSummary"></span>
+			</span>
+			<span class="transition-transform duration-200" :class="showKnowledgeBases ? 'rotate-180' : ''">
+				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+			</span>
+		</button>
+		<div x-show="showKnowledgeBases" x-collapse class="px-3 pb-3 border-t border-border pt-3">
+			<template x-if="loadingKBs">
+				<div class="space-y-2">
+					<template x-for="i in 3" :key="i">
+						<div class="flex items-center gap-3 p-2 animate-pulse rounded-md">
+							<div class="size-7 rounded bg-muted"></div>
+							<div class="flex-1 space-y-1">
+								<div class="h-3 bg-muted rounded w-1/3"></div>
+								<div class="h-2 bg-muted rounded w-2/3"></div>
+							</div>
+						</div>
+					</template>
+				</div>
+			</template>
+			<template x-if="!loadingKBs">
+				<div>
+					<template x-if="agentWorkspaces.length === 0">
+						<div class="py-4 text-center text-xs text-muted-foreground">
+							{ i18n.T(ctx, "No knowledge bases available. Create one from the Resources sidebar.") }
+						</div>
+					</template>
+					<div class="space-y-1.5">
+						<template x-for="ws in agentWorkspaces" :key="ws.id">
+							<div class="flex items-center justify-between p-2 rounded-md border border-border hover:bg-accent/20 transition-colors">
+								<div class="flex items-center gap-2 flex-1 min-w-0">
+									<div class="size-7 rounded-md bg-primary/10 flex items-center justify-center text-primary shrink-0">
+										@icon.Library(icon.Props{Class: "size-3.5"})
+									</div>
+									<div class="flex-1 min-w-0">
+										<div class="text-xs font-medium text-foreground truncate" x-text="ws.name"></div>
+										<div class="text-[10px] text-muted-foreground truncate" x-text="ws.description || ws.slug"></div>
+									</div>
+								</div>
+								<button
+									@click="toggleAgentWorkspace(ws)"
+									class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+									:class="ws.enabled ? 'bg-primary' : 'bg-input'"
+									role="switch"
+									:aria-checked="ws.enabled"
+								>
+									<span class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200" :class="ws.enabled ? 'translate-x-4' : 'translate-x-0'"></span>
+								</button>
+							</div>
+						</template>
+					</div>
+				</div>
+			</template>
+		</div>
+	</div>
+}
+
+// filesystemsSection renders the collapsible filesystem section for an agent in edit mode.
+templ filesystemsSection() {
+	<div class="border border-border rounded-lg">
+		<button
+			type="button"
+			@click="showFilesystems = !showFilesystems"
+			class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
+		>
+			<span class="flex items-center gap-2">
+				@icon.Folder(icon.Props{Class: "size-4 text-muted-foreground"})
+				{ i18n.T(ctx, "Filesystems") }
+				<span class="text-[10px] text-muted-foreground tabular-nums" x-text="fsSummary"></span>
+			</span>
+			<span class="transition-transform duration-200" :class="showFilesystems ? 'rotate-180' : ''">
+				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+			</span>
+		</button>
+		<div x-show="showFilesystems" x-collapse class="px-3 pb-3 border-t border-border pt-3">
+			<template x-if="loadingFilesystems">
+				<div class="space-y-2">
+					<template x-for="i in 3" :key="i">
+						<div class="flex items-center gap-3 p-2 animate-pulse rounded-md">
+							<div class="size-7 rounded bg-muted"></div>
+							<div class="flex-1 space-y-1">
+								<div class="h-3 bg-muted rounded w-1/3"></div>
+								<div class="h-2 bg-muted rounded w-2/3"></div>
+							</div>
+						</div>
+					</template>
+				</div>
+			</template>
+			<template x-if="!loadingFilesystems">
+				<div>
+					<template x-if="agentFilesystems.length === 0">
+						<div class="py-4 text-center text-xs text-muted-foreground">
+							{ i18n.T(ctx, "No filesystems available. Create one from the Files sidebar.") }
+						</div>
+					</template>
+					<div class="space-y-1.5">
+						<template x-for="fs in agentFilesystems" :key="fs.id">
+							<div class="flex items-center justify-between p-2 rounded-md border border-border hover:bg-accent/20 transition-colors">
+								<div class="flex items-center gap-2 flex-1 min-w-0">
+									<div class="size-7 rounded-md bg-primary/10 flex items-center justify-center text-primary shrink-0">
+										@icon.Folder(icon.Props{Class: "size-3.5"})
+									</div>
+									<div class="flex-1 min-w-0">
+										<div class="text-xs font-medium text-foreground truncate" x-text="fs.name"></div>
+										<div class="text-[10px] text-muted-foreground truncate" x-text="fs.description || fs.type"></div>
+									</div>
+								</div>
+								<button
+									@click="toggleAgentFilesystem(fs)"
+									class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+									:class="fs.enabled ? 'bg-primary' : 'bg-input'"
+									role="switch"
+									:aria-checked="fs.enabled"
+								>
+									<span class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200" :class="fs.enabled ? 'translate-x-4' : 'translate-x-0'"></span>
+								</button>
+							</div>
+						</template>
+					</div>
+				</div>
+			</template>
+		</div>
+	</div>
+}
+
+// deleteConfirmation renders a reusable delete confirmation view.
+templ deleteConfirmation(cancelAction string, deleteAction string) {
+	<div class="flex flex-col h-full">
+		<div class="p-4 pb-3 border-b border-border">
+			<h2 class="text-lg font-semibold">{ i18n.T(ctx, "Delete Agent") }</h2>
+			<p class="text-sm text-muted-foreground">{ i18n.T(ctx, "This action cannot be undone.") }</p>
+		</div>
+		<div class="p-6 flex flex-col items-center gap-4">
+			<div class="size-12 rounded-full bg-destructive/10 flex items-center justify-center">
+				@icon.Trash2(icon.Props{Class: "size-6 text-destructive"})
+			</div>
+			<p class="text-sm text-center text-foreground">
+				{ i18n.T(ctx, "Are you sure you want to delete") }
+				<span class="font-semibold" x-text="deletingAgent?.name"></span>?
+			</p>
+		</div>
+		<div class="px-4 py-3 border-t mt-auto bg-muted/50 flex items-center justify-end gap-2">
+			@button.Button(button.Props{
+				Variant: button.VariantGhost,
+				Class:   "h-8 px-3 text-xs",
+				Attributes: templ.Attributes{
+					"@click": cancelAction,
+				},
+			}) {
+				{ i18n.T(ctx, "Cancel") }
+			}
+			@button.Button(button.Props{
+				Variant: button.VariantDestructive,
+				Class:   "h-8 px-4 text-xs gap-1.5",
+				Attributes: templ.Attributes{
+					"@click":    deleteAction,
+					":disabled": "saving || pipelineSaving",
+				},
+			}) {
+				<span x-show="!saving && !pipelineSaving">{ i18n.T(ctx, "Delete") }</span>
+				<span x-show="saving || pipelineSaving" class="flex items-center gap-1.5">
+					<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
+					{ i18n.T(ctx, "Deleting...") }
+				</span>
+			}
+		</div>
+	</div>
+}
+
+// deleteAllConfirmation renders a delete-all-agents confirmation view.
+templ deleteAllConfirmation() {
+	<div class="flex flex-col h-full">
+		<div class="p-4 pb-3 border-b border-border">
+			<h2 class="text-lg font-semibold">{ i18n.T(ctx, "Delete All Agents") }</h2>
+			<p class="text-sm text-muted-foreground">{ i18n.T(ctx, "This action cannot be undone.") }</p>
+		</div>
+		<div class="p-6 flex flex-col items-center gap-4">
+			<div class="size-12 rounded-full bg-destructive/10 flex items-center justify-center">
+				@icon.Trash2(icon.Props{Class: "size-6 text-destructive"})
+			</div>
+			<p class="text-sm text-center text-foreground">
+				{ i18n.T(ctx, "Are you sure you want to delete all") }
+				<span class="font-semibold" x-text="agents.length"></span>
+				{ i18n.T(ctx, " agents?") }
+			</p>
+		</div>
+		<div class="px-4 py-3 border-t mt-auto bg-muted/50 flex items-center justify-end gap-2">
+			@button.Button(button.Props{
+				Variant: button.VariantGhost,
+				Class:   "h-8 px-3 text-xs",
+				Attributes: templ.Attributes{
+					"@click": "view = 'list'",
+				},
+			}) {
+				{ i18n.T(ctx, "Cancel") }
+			}
+			@button.Button(button.Props{
+				Variant: button.VariantDestructive,
+				Class:   "h-8 px-4 text-xs gap-1.5",
+				Attributes: templ.Attributes{
+					"@click":    "deleteAllAgents()",
+					":disabled": "saving",
+				},
+			}) {
+				<span x-show="!saving">{ i18n.T(ctx, "Delete All") }</span>
+				<span x-show="saving" class="flex items-center gap-1.5">
+					<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
+					{ i18n.T(ctx, "Deleting...") }
+				</span>
+			}
+		</div>
+	</div>
+}
+
+// AgentDesignerNavButtonTrigger renders a workflow icon button for the navbar.
+templ AgentDesignerNavButtonTrigger() {
+	@dialog.Trigger(dialog.TriggerProps{
+		For: "agent-designer-dialog",
+	}) {
+		@button.Button(button.Props{
+			Size:    button.SizeIcon,
+			Variant: button.VariantGhost,
+			Class:   "size-9",
+			Attributes: templ.Attributes{
+				"@click": "$dispatch('open-agent-designer')",
+				"title":  i18n.T(ctx, "Agent Designer"),
+			},
+		}) {
+			@icon.Workflow(icon.Props{Class: "size-5"})
+			<span class="sr-only">{ i18n.T(ctx, "Agent Designer") }</span>
+		}
+	}
+}
+
+// AgentDesignerHeaderButton renders an icon button for the top header bar.
+templ AgentDesignerHeaderButton() {
+	@dialog.Trigger(dialog.TriggerProps{
+		For: "agent-designer-dialog",
+	}) {
+		@button.Button(button.Props{
+			Size:    button.SizeIcon,
+			Variant: button.VariantGhost,
+			Class:   "size-9 text-muted-foreground hover:text-foreground hover:bg-accent/60 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+			Attributes: templ.Attributes{
+				"@click": "$dispatch('open-agent-designer')",
+				"title":  i18n.T(ctx, "Agent Designer"),
+			},
+		}) {
+			@icon.Workflow(icon.Props{Class: "size-5"})
+			<span class="sr-only">{ i18n.T(ctx, "Agent Designer") }</span>
+		}
+	}
+}

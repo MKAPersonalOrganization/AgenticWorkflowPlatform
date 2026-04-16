@@ -1,0 +1,134 @@
+package artifacts
+
+import (
+	"aicompass/components/button"
+	"aicompass/ui/i18n"
+	"aicompass/components/icon"
+	"aicompass/components/sidebar"
+)
+
+templ Artifacts() {
+	@sidebar.Sidebar(sidebar.Props{
+		ID:          "artifacts-sidebar",
+		Side:        sidebar.SideRight,
+		Variant:     sidebar.VariantSidebar,
+		Collapsible: sidebar.CollapsibleOffcanvas,
+		Collapsed:   true, // Default to closed
+		Class:       "z-30 !end-0 !border-s-0 border-s border-border bg-background",
+		Attributes: templ.Attributes{
+			"style": "--sidebar-width: 400px",
+		},
+	}) {
+		@sidebar.Header(sidebar.HeaderProps{
+			Class: "flex flex-row items-center justify-between px-4 py-3 border-b border-border/50",
+		}) {
+			<div class="flex items-center gap-2">
+				@icon.LayoutDashboard(icon.Props{Class: "size-4 text-muted-foreground"})
+				<span class="text-sm font-medium">{ i18n.T(ctx, "Artifacts") }</span>
+			</div>
+			<!-- Close Button -->
+			@button.Button(button.Props{
+				Size:    button.SizeIcon,
+				Variant: button.VariantGhost,
+				Class:   "size-8 hover:bg-sidebar-accent/50 rounded-lg",
+				Attributes: templ.Attributes{
+					"data-tui-sidebar-trigger": "true",
+					"data-tui-sidebar-target":  "artifacts-sidebar",
+				},
+			}) {
+				@icon.X(icon.Props{Class: "size-4 text-muted-foreground"})
+				<span class="sr-only">{ i18n.T(ctx, "Close Artifacts") }</span>
+			}
+		}
+		@sidebar.Content(sidebar.ContentProps{Class: "p-4"}) {
+			@ArtifactsContent()
+		}
+	}
+}
+
+templ ArtifactsContent() {
+	<div 
+		class="flex flex-col h-full"
+		x-data="{
+			artifacts: [],
+			loading: false,
+			async loadArtifacts(id) {
+				const idToLoad = id || (this.$data && this.$data.threadId) || threadId;
+				console.log('[Artifacts] Loading for thread:', idToLoad);
+				if (!idToLoad) {
+					this.artifacts = [];
+					return;
+				}
+				if (this.loading) return;
+				this.loading = true;
+				try {
+					const res = await fetch('/v1/threads/' + idToLoad + '/artifacts');
+					if (res.ok) {
+						const data = await res.json();
+						this.artifacts = data.artifacts || [];
+						console.log('[Artifacts] Loaded:', this.artifacts.length, 'items');
+					} else {
+						console.error('[Artifacts] Failed to fetch:', res.status);
+					}
+				} catch(e) { 
+					console.error('[Artifacts] Error:', e); 
+				} finally { 
+					this.loading = false; 
+				}
+			}
+		}"
+		x-init="loadArtifacts(threadId); $watch('threadId', val => loadArtifacts(val))"
+		@artifacts-updated.window="loadArtifacts()"
+	>
+		<!-- Header / Title -->
+		<div class="flex items-center justify-between p-4 border-b border-border/40">
+			<h3 class="font-medium text-sm text-foreground">{ i18n.T(ctx, "Generated Artifacts") }</h3>
+			<button 
+				@click="loadArtifacts()" 
+				class="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-md hover:bg-muted"
+				:class="{'animate-spin': loading}"
+				title={ i18n.T(ctx, "Refresh") }
+			>
+				@icon.RefreshCw(icon.Props{Class: "size-3.5"})
+			</button>
+		</div>
+
+		<!-- List -->
+		<div class="flex-1 overflow-y-auto p-4 space-y-2">
+			<template x-if="loading">
+				<div class="flex flex-col gap-2">
+					<div class="h-12 w-full bg-muted/20 animate-pulse rounded-lg"></div>
+					<div class="h-12 w-full bg-muted/20 animate-pulse rounded-lg"></div>
+					<div class="h-12 w-full bg-muted/20 animate-pulse rounded-lg"></div>
+				</div>
+			</template>
+			
+			<template x-if="!loading && artifacts.length === 0">
+				 <div class="flex flex-col items-center justify-center h-40 text-center text-muted-foreground gap-2">
+					<div class="size-10 rounded-full bg-muted/50 flex items-center justify-center">
+						@icon.FileText(icon.Props{Class: "size-5"})
+					</div>
+					<p class="text-xs">{ i18n.T(ctx, "No artifacts generated yet") }</p>
+				</div>
+			</template>
+
+			<template x-for="artifact in artifacts" :key="artifact">
+				<a 
+					:href="`/v1/threads/${threadId}/artifacts/${artifact}`"
+					class="flex items-center gap-3 p-3 rounded-lg border border-border/40 bg-card hover:bg-accent/50 transition-colors group"
+					download
+				>
+					<div class="size-8 rounded bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+						@icon.FileText(icon.Props{Class: "size-4"})
+					</div>
+					<div class="flex-1 min-w-0">
+						<p class="text-sm font-medium truncate" x-text="artifact"></p>
+					</div>
+					<div class="text-muted-foreground group-hover:text-foreground">
+						@icon.Download(icon.Props{Class: "size-4"})
+					</div>
+				</a>
+			</template>
+		</div>
+	</div>
+}

@@ -1,0 +1,221 @@
+package knowledge
+
+/**
+ * DocumentDetailDialog - Modal dialog showing full document metadata and actions.
+ * Matches EdgeQuake edgequake_webui/src/components/documents/document-detail-dialog.tsx
+ *
+ * Shows: Overview (metadata grid), Content (raw text in ScrollArea), Entities info.
+ */
+
+import (
+	"aicompass/components/button"
+	"aicompass/components/dialog"
+	"aicompass/ui/i18n"
+	"aicompass/components/icon"
+	"aicompass/components/tabs"
+)
+
+templ DocumentDetailDialog() {
+	@dialog.Dialog(dialog.Props{ID: "document-detail-dialog"}) {
+		@dialog.Content(dialog.ContentProps{
+			Class: "max-h-[90vh] overflow-y-auto",
+			Attributes: templ.Attributes{
+				":class": "(detailDoc?.pdf_id || detailDoc?.file_name?.toLowerCase().endsWith('.pdf')) ? 'sm:max-w-4xl' : 'sm:max-w-2xl'",
+			},
+		}) {
+			@dialog.Header(dialog.HeaderProps{}) {
+				@dialog.Title(dialog.TitleProps{Class: "flex items-center gap-2"}) {
+					@icon.FileText(icon.Props{Class: "size-5"})
+					<span x-text="detailDoc?.title || detailDoc?.file_name || window.i18n.t('Untitled Document')"></span>
+				}
+				@dialog.Description(dialog.DescriptionProps{Class: "flex items-center gap-2"}) {
+					<span
+						class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium cursor-default"
+						:class="statusBadgeClass(detailDoc?.current_stage || detailDoc?.status)"
+						x-text="statusLabel(detailDoc?.current_stage || detailDoc?.status)"
+					></span>
+					<span class="text-muted-foreground">·</span>
+					<span x-text="timeAgo(detailDoc?.created_at)"></span>
+				}
+			}
+			@tabs.Tabs(tabs.Props{ID: "doc-detail-tabs", Class: "mt-4"}) {
+				@tabs.List(tabs.ListProps{
+					Class: "grid w-full",
+					Attributes: templ.Attributes{
+						":class": "(detailDoc?.pdf_id || detailDoc?.file_name?.toLowerCase().endsWith('.pdf')) ? 'grid-cols-4' : 'grid-cols-3'",
+					},
+				}) {
+					@tabs.Trigger(tabs.TriggerProps{Value: "overview", IsActive: true}) {
+						{ i18n.T(ctx, "Overview") }
+					}
+					<template x-if="detailDoc?.pdf_id || detailDoc?.file_name?.toLowerCase().endsWith('.pdf')">
+						@tabs.Trigger(tabs.TriggerProps{Value: "source"}) {
+							{ i18n.T(ctx, "Source") }
+						}
+					</template>
+					@tabs.Trigger(tabs.TriggerProps{Value: "content"}) {
+						{ i18n.T(ctx, "Content") }
+					}
+					@tabs.Trigger(tabs.TriggerProps{Value: "entities"}) {
+						{ i18n.T(ctx, "Entities") }
+					}
+				}
+				@tabs.Content(tabs.ContentProps{Value: "overview"}) {
+					<div class="mt-4 space-y-4">
+						<!-- Metadata Grid -->
+						<div class="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+							<!-- Document ID -->
+							<div class="flex items-start gap-3 py-2">
+								@icon.Hash(icon.Props{Class: "size-4 text-muted-foreground mt-0.5"})
+								<div class="flex-1 min-w-0">
+									<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Document ID") }</p>
+									<div class="flex items-center gap-1">
+										<code class="text-xs" x-text="(detailDoc?.id || '').slice(0, 12) + '...'"></code>
+										@button.Button(button.Props{
+											Variant: button.VariantGhost,
+											Size:    button.SizeIcon,
+											Class:   "h-6 w-6",
+											Attributes: templ.Attributes{
+												"@click": "navigator.clipboard.writeText(detailDoc?.id || ''); showToast && showToast('Copied!')",
+											},
+										}) {
+											@icon.Copy(icon.Props{Class: "size-3"})
+										}
+									</div>
+								</div>
+							</div>
+							<!-- Status -->
+							<div class="flex items-start gap-3 py-2">
+								@icon.Tag(icon.Props{Class: "size-4 text-muted-foreground mt-0.5"})
+								<div class="flex-1 min-w-0">
+									<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Status") }</p>
+									<span
+										class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium mt-0.5"
+										:class="statusBadgeClass(detailDoc?.current_stage || detailDoc?.status)"
+										x-text="statusLabel(detailDoc?.current_stage || detailDoc?.status)"
+									></span>
+								</div>
+							</div>
+							<!-- Created -->
+							<div class="flex items-start gap-3 py-2">
+								@icon.Calendar(icon.Props{Class: "size-4 text-muted-foreground mt-0.5"})
+								<div class="flex-1 min-w-0">
+									<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Created") }</p>
+									<p class="text-sm font-medium" x-text="timeAgo(detailDoc?.created_at)"></p>
+								</div>
+							</div>
+							<!-- Updated -->
+							<div class="flex items-start gap-3 py-2">
+								@icon.Clock(icon.Props{Class: "size-4 text-muted-foreground mt-0.5"})
+								<div class="flex-1 min-w-0">
+									<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Last Updated") }</p>
+									<p class="text-sm font-medium" x-text="timeAgo(detailDoc?.updated_at)"></p>
+								</div>
+							</div>
+							<!-- Entities -->
+							<div class="flex items-start gap-3 py-2">
+								@icon.Link(icon.Props{Class: "size-4 text-muted-foreground mt-0.5"})
+								<div class="flex-1 min-w-0">
+									<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Entities Extracted") }</p>
+									<p class="text-sm font-medium" x-text="detailDoc?.entity_count ?? 0"></p>
+								</div>
+							</div>
+							<!-- Chunks -->
+							<div class="flex items-start gap-3 py-2">
+								@icon.FileText(icon.Props{Class: "size-4 text-muted-foreground mt-0.5"})
+								<div class="flex-1 min-w-0">
+									<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Chunks") }</p>
+									<p class="text-sm font-medium" x-text="detailDoc?.chunk_count ?? 0"></p>
+								</div>
+							</div>
+						</div>
+						<!-- Error Panel -->
+						<div x-show="detailDoc?.status === 'failed' && detailDoc?.error_message" x-cloak class="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+							<h4 class="text-sm font-medium text-destructive mb-1">{ i18n.T(ctx, "Error") }</h4>
+							<p class="text-xs text-destructive/80" x-text="detailDoc?.error_message"></p>
+						</div>
+						<!-- Actions -->
+						<div class="flex gap-2 pt-2">
+							<template x-if="detailDoc?.status === 'failed'">
+								@button.Button(button.Props{
+									Variant: button.VariantOutline,
+									Size:    button.SizeSm,
+									Attributes: templ.Attributes{
+										"@click": "reprocessDocument(detailDoc.id)",
+									},
+								}) {
+									@icon.RotateCcw(icon.Props{Class: "size-4 me-2"})
+									{ i18n.T(ctx, "Reprocess") }
+								}
+							</template>
+						</div>
+					</div>
+				}
+				@tabs.Content(tabs.ContentProps{Value: "source"}) {
+					<div class="mt-4">
+						<template x-if="detailDoc?.pdf_id || detailDoc?.file_name?.toLowerCase().endsWith('.pdf')">
+							@PDFMarkdownSplitView(PDFMarkdownSplitViewProps{
+								PDFURL:   "'/api/knowledge/pdfs/' + detailDoc.pdf_id + '/download?workspace_id=' + workspaceId",
+								Markdown: "detailDoc?.content || previewContent",
+								Height:   450,
+							})
+						</template>
+					</div>
+				}
+				@tabs.Content(tabs.ContentProps{Value: "content"}) {
+					<div class="mt-4">
+						<template x-if="detailDoc?.content || previewContent">
+							@MarkdownViewer(MarkdownViewerProps{
+								Content:     "detailDoc?.content || previewContent",
+								Height:      "300px",
+								ShowToolbar: true,
+								Title:       i18n.T(ctx, "Extracted Markdown"),
+							})
+						</template>
+						<template x-if="!detailDoc?.content && !previewContent">
+							<div class="h-[300px] rounded-lg border p-4 flex items-center justify-center text-muted-foreground italic">
+								<p class="text-sm">{ i18n.T(ctx, "No content available") }</p>
+							</div>
+						</template>
+					</div>
+				}
+				@tabs.Content(tabs.ContentProps{Value: "entities"}) {
+					<div class="mt-4 h-[300px] rounded-lg border p-4 overflow-y-auto custom-scrollbar">
+						<template x-if="detailDoc?.entity_count && detailDoc.entity_count > 0">
+							<div class="text-center py-8">
+								<p class="text-sm text-muted-foreground mb-2">
+									<span x-text="detailDoc.entity_count"></span> { i18n.T(ctx, "entities extracted") }
+								</p>
+								<p class="text-xs text-muted-foreground mb-4">
+									{ i18n.T(ctx, "Switch to the Graph tab for detailed entity information") }
+								</p>
+								@button.Button(button.Props{
+									Variant: button.VariantOutline,
+									Size:    button.SizeSm,
+									Attributes: templ.Attributes{
+										"@click": "viewInGraph(detailDoc)",
+									},
+								}) {
+									@icon.Network(icon.Props{Class: "size-4 me-2"})
+									{ i18n.T(ctx, "View in Graph") }
+								}
+							</div>
+						</template>
+						<template x-if="!detailDoc?.entity_count || detailDoc.entity_count === 0">
+							<p class="text-muted-foreground text-sm text-center py-8">
+								{ i18n.T(ctx, "No entities extracted yet") }
+							</p>
+						</template>
+					</div>
+				}
+			}
+			@dialog.Footer(dialog.FooterProps{}) {
+				@dialog.Close(dialog.CloseProps{}) {
+					@button.Button(button.Props{Variant: button.VariantOutline}) {
+						{ i18n.T(ctx, "Close") }
+					}
+				}
+			}
+		}
+	}
+}

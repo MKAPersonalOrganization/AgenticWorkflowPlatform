@@ -1,0 +1,123 @@
+package message
+
+import "aicompass/ui/i18n"
+
+templ UserMessage() {
+	<div
+		x-show="message.role === 'user'"
+		class={
+			"flex items-start gap-4 group/message w-full relative",
+			templ.KV("justify-end", i18n.Dir(ctx) == "ltr"),
+			templ.KV("justify-start", i18n.Dir(ctx) == "rtl"),
+			templ.KV("pis-10", i18n.Dir(ctx) == "ltr"),
+			templ.KV("pie-10", i18n.Dir(ctx) == "rtl"),
+		}
+	>
+		<div
+			class={
+				"flex flex-col gap-1 max-w-full",
+				templ.KV("items-end", i18n.Dir(ctx) == "ltr"),
+				templ.KV("items-start", i18n.Dir(ctx) == "rtl"),
+			}
+		>
+			<!-- User Message Bubble -->
+			<div
+				class="bg-secondary/70 px-4 py-3 rounded-[1.25rem] text-start prose prose-sm max-w-none text-foreground leading-relaxed shadow-modern-xs"
+				dir="auto"
+			>
+				<!-- Inline attachments from user message (images, audio, files) -->
+				<template x-if="message.attachments && message.attachments.length > 0">
+					<div class="flex flex-wrap gap-2 mb-2 not-prose">
+						<template x-for="(att, idx) in message.attachments" :key="idx">
+							<div>
+								<!-- Image attachments -->
+								<template x-if="att.type && att.type.startsWith('image/')">
+									<img :src="att.data" :alt="att.name || 'Attached image'" class="max-h-48 max-w-xs rounded-lg border border-border object-contain cursor-pointer hover:opacity-90 transition-opacity" @click="window.open(att.data, '_blank')"/>
+								</template>
+								<!-- Audio attachments -->
+								<template x-if="att.type && att.type.startsWith('audio/')">
+									<div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted border border-border">
+										<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+										<audio
+											controls
+											preload="metadata"
+											class="h-8 max-w-[200px]"
+											x-init="$el.src = att.data; $el.load()"
+										></audio>
+										<span class="text-xs text-muted-foreground" x-text="att.name || 'Audio'"></span>
+									</div>
+								</template>
+								<!-- Other file attachments (PDF, text, etc.) -->
+								<template x-if="att.type && !att.type.startsWith('image/') && !att.type.startsWith('audio/')">
+									<a :href="att.data" :download="att.name || 'file'" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted border border-border hover:bg-muted/80 transition-colors no-underline">
+										<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+										<span class="text-xs text-muted-foreground" x-text="att.name || 'File'"></span>
+									</a>
+								</template>
+							</div>
+						</template>
+					</div>
+				</template>
+				<div x-show="message.content" x-html="renderMarkdown(message.content)"></div>
+			</div>
+			<!-- Actions (Bottom Right fallback or integrated? LibreChat puts them on the side or bottom) -->
+		</div>
+	</div>
+}
+
+templ AssistantMessage() {
+	<div
+		x-show="message.role === 'assistant'"
+		class={
+			"flex items-start gap-4 group/message w-full",
+			templ.KV("justify-start", i18n.Dir(ctx) == "ltr"),
+			templ.KV("justify-end", i18n.Dir(ctx) == "rtl"),
+			templ.KV("pie-10", i18n.Dir(ctx) == "ltr"),
+			templ.KV("pis-10", i18n.Dir(ctx) == "rtl"),
+		}
+	>
+		<div
+			class="flex flex-col gap-1 min-w-0 flex-1 relative"
+			:class="message.workflowType === 'parallel' ? 'border-s-2 ps-3 ' + ['border-amber-400/60','border-cyan-400/60','border-violet-400/60','border-emerald-400/60'][Math.min(message.stepIndex||0, 3)] : ''"
+		>
+			<!-- Workflow-aware agent scope indicator -->
+			<template x-if="message.agentName">
+				<div class="flex items-center gap-1.5 mb-1 flex-wrap">
+					<!-- Sequential step badge -->
+					<template x-if="message.workflowType === 'sequential'">
+						<span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+							<svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+							<span x-text="`Step ${(message.stepIndex||0) + 1}/${message.stepCount||'?'}`"></span>
+						</span>
+					</template>
+					<!-- Parallel branch badge -->
+					<template x-if="message.workflowType === 'parallel'">
+						<span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+							<svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v12"></path><path d="M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path><path d="M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path><path d="M18 9a9 9 0 0 1-9 9"></path></svg>
+							<span x-text="`Branch ${(message.stepIndex||0) + 1}/${message.stepCount||'?'}`"></span>
+						</span>
+					</template>
+					<!-- Loop iteration badge -->
+					<template x-if="message.workflowType === 'loop'">
+						<span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20">
+							<svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+							<span x-text="`Iter ${message.iteration||1}/${message.maxIterations||'?'}`"></span>
+						</span>
+					</template>
+					<!-- Agent name badge (always shown) -->
+					<span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20">
+						<svg xmlns="http://www.w3.org/2000/svg" class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+						<span x-text="message.agentName"></span>
+					</span>
+				</div>
+			</template>
+			<!-- Message Content -->
+			<div
+				class="prose prose-sm max-w-none text-[0.9375rem] leading-[1.75] text-foreground dark:**:text-white mb-1"
+				:class="message.streaming ? 'result-streaming' : ''"
+				x-html="renderMarkdown(message.content)"
+				dir="auto"
+			></div>
+		</div>
+	</div>
+}

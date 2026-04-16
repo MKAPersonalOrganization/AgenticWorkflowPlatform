@@ -1,0 +1,130 @@
+package sampleprompts
+
+import (
+	"aicompass/components/button"
+	"aicompass/ui/i18n"
+	"aicompass/components/icon"
+	"strings"
+)
+
+// ConversationStarters - LibreChat style quick prompt cards
+templ StarterCard(text string) {
+	<button
+		@click={ "currentMessage = '" + strings.ReplaceAll(text, "'", "\\'") + "'; sendMessage()" }
+		class="relative flex w-40 cursor-pointer flex-col gap-2 rounded-2xl border border-border/40 px-3.5 pb-4.5 pt-3.5 text-start align-top text-[15px] shadow-modern-xs transition-all duration-250 ease-out hover:bg-accent/40 hover:border-border hover:shadow-modern-sm hover:-translate-y-0.5 active:scale-[0.98] fade-in"
+	>
+		<p class="wrap-break-word line-clamp-3 overflow-hidden text-balance break-all text-muted-foreground text-sm leading-relaxed">
+			{ text }
+		</p>
+	</button>
+}
+
+templ SamplePrompts() {
+	<!-- Welcome Screen / Sample Prompts -->
+	<div class="w-full flex flex-col items-center justify-center min-h-[60vh] space-y-10 animate-in fade-in duration-500" x-data="{ selectedCategory: null }">
+		<!-- Category Grid -->
+		<div class="w-full max-w-full">
+			<div class="grid gap-4 grid-cols-2 md:grid-cols-4 lg:grid-cols-4">
+				<!-- Math -->
+				@CategoryButton("math", i18n.T(ctx, "Mathematics"), icon.Calculator)
+				<!-- Physics -->
+				@CategoryButton("physics", i18n.T(ctx, "Physics"), icon.Atom)
+				<!-- Chemistry -->
+				@CategoryButton("chemistry", i18n.T(ctx, "Chemistry"), icon.FlaskConical)
+				<!-- Biology -->
+				@CategoryButton("biology", i18n.T(ctx, "Biology"), icon.Dna)
+				<!-- History -->
+				@CategoryButton("history", i18n.T(ctx, "History"), icon.Landmark)
+				<!-- Literature -->
+				@CategoryButton("literature", i18n.T(ctx, "Literature"), icon.BookOpen)
+				<!-- Comp Sci -->
+				@CategoryButton("cs", i18n.T(ctx, "Computer Science"), icon.Cpu)
+				<!-- Economics -->
+				@CategoryButton("economics", i18n.T(ctx, "Economics"), icon.TrendingUp)
+			</div>
+		</div>
+		<!-- Expanded Examples (Centered & Clean) -->
+		<div class="w-full max-w-full transition-all duration-300 ease-in-out">
+			<!-- Math Examples -->
+			<div x-show="selectedCategory === 'math'" x-collapse class="space-y-2">
+				@PromptButton(i18n.T(ctx, "Solve the quadratic equation: x² + 5x + 6 = 0"))
+				@PromptButton(i18n.T(ctx, "What is the derivative of sin(x) · cos(x)?"))
+				@PromptButton(i18n.T(ctx, "Calculate the area of a circle with radius 5"))
+				@PromptButton(i18n.T(ctx, "Calculate mean and standard deviation of: 4, 8, 6, 5, 3, 7"))
+			</div>
+			<!-- Physics Examples -->
+			<div x-show="selectedCategory === 'physics'" x-collapse class="space-y-2">
+				@PromptButton(i18n.T(ctx, "Calculate the force needed to accelerate a 50kg object at 3m/s²"))
+				@PromptButton(i18n.T(ctx, "What is the kinetic energy of a 2kg object moving at 10m/s?"))
+				@PromptButton(i18n.T(ctx, "Explain Newton's third law of motion with an example"))
+			</div>
+			<!-- Chemistry Examples -->
+			<div x-show="selectedCategory === 'chemistry'" x-collapse class="space-y-2">
+				@PromptButton(i18n.T(ctx, "Balance the equation: H₂ + O₂ → H₂O"))
+				@PromptButton(i18n.T(ctx, "What is the molar mass of glucose (C₆H₁₂O₆)?"))
+				@PromptButton(i18n.T(ctx, "Explain the difference between ionic and covalent bonds"))
+			</div>
+			<!-- Biology Examples -->
+			<div x-show="selectedCategory === 'biology'" x-collapse class="space-y-2">
+				@PromptButton(i18n.T(ctx, "Explain the process of photosynthesis"))
+				@PromptButton(i18n.T(ctx, "What are the main differences between plant and animal cells?"))
+				@PromptButton(i18n.T(ctx, "Describe the structure of DNA"))
+			</div>
+			<!-- History Examples -->
+			<div x-show="selectedCategory === 'history'" x-collapse class="space-y-2">
+				@PromptButton(i18n.T(ctx, "Explain the causes of World War I"))
+				@PromptButton(i18n.T(ctx, "What were the key events of the French Revolution?"))
+				@PromptButton(i18n.T(ctx, "Describe the impact of the Industrial Revolution on society"))
+			</div>
+			<!-- Literature Examples -->
+			<div x-show="selectedCategory === 'literature'" x-collapse class="space-y-2">
+				@PromptButton(i18n.T(ctx, "Analyze the theme of revenge in Hamlet"))
+				@PromptButton(i18n.T(ctx, "What are the main literary devices in To Kill a Mockingbird?"))
+				@PromptButton(i18n.T(ctx, "Compare and contrast a sonnet and a haiku"))
+			</div>
+			<!-- Computer Science Examples -->
+			<div x-show="selectedCategory === 'cs'" x-collapse class="space-y-2">
+				@PromptButton(i18n.T(ctx, "Explain what an algorithm is with examples"))
+				@PromptButton(i18n.T(ctx, "What is the difference between a stack and a queue?"))
+				@PromptButton(i18n.T(ctx, "Write a simple Python program to find prime numbers"))
+			</div>
+			<!-- Economics Examples -->
+			<div x-show="selectedCategory === 'economics'" x-collapse class="space-y-2">
+				@PromptButton(i18n.T(ctx, "Explain the law of supply and demand"))
+				@PromptButton(i18n.T(ctx, "What is the difference between GDP and GNP?"))
+				@PromptButton(i18n.T(ctx, "How does inflation affect the economy?"))
+			</div>
+		</div>
+	</div>
+}
+
+templ CategoryButton(id string, label string, iconFunc func(...icon.Props) templ.Component) {
+	@button.Button(button.Props{
+		Type:    button.TypeButton,
+		Variant: button.VariantGhost,
+		Class:   "group flex flex-col items-center justify-center p-5 gap-3 rounded-2xl border border-border/30 bg-card/80 hover:bg-accent/50 hover:border-border transition-all duration-250 hover:shadow-modern-sm hover:-translate-y-0.5 h-auto focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+		Attributes: templ.Attributes{
+			"@click": "selectedCategory = selectedCategory === '" + id + "' ? null : '" + id + "'",
+			":class": "selectedCategory === '" + id + "' ? 'border-primary/40 bg-primary/5 ring-1 ring-primary/15 shadow-modern-sm' : ''",
+		},
+	}) {
+		<div class="p-3 rounded-xl bg-background/80 group-hover:bg-background transition-all duration-200 shadow-modern-xs ring-1 ring-border/30">
+			@iconFunc(icon.Props{Class: "size-5 text-foreground/60 group-hover:text-primary transition-colors duration-200"})
+		</div>
+		<span class="text-sm font-medium text-foreground/70 group-hover:text-foreground transition-colors duration-200">{ label }</span>
+	}
+}
+
+templ PromptButton(text string) {
+	@button.Button(button.Props{
+		Type:    button.TypeButton,
+		Variant: button.VariantGhost,
+		Class:   "w-full text-start p-4 rounded-xl border border-border/30 bg-card/60 hover:bg-accent/50 hover:border-border transition-all duration-250 text-sm group flex items-center justify-between h-auto focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none hover:shadow-modern-xs",
+		Attributes: templ.Attributes{
+			"@click": "currentMessage = '" + strings.ReplaceAll(text, "'", "\\'") + "'; sendMessage()",
+		},
+	}) {
+		<span>{ text }</span>
+		<span class="opacity-0 group-hover:opacity-100 transition-all duration-200 text-muted-foreground translate-x-0 group-hover:translate-x-0.5">→</span>
+	}
+}

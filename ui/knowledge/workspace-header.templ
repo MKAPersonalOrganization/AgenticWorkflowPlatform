@@ -1,0 +1,55 @@
+package knowledge
+
+/**
+ * WorkspaceHeader - Top section of workspace details page.
+ * Matches EdgeQuake workspace detail header pattern.
+ *
+ * Contains: Back link, workspace title, description, refresh button, upload button.
+ */
+
+import (
+	"aicompass/components/button"
+	"aicompass/components/dialog"
+	"aicompass/ui/i18n"
+	"aicompass/components/icon"
+)
+
+type WorkspaceHeaderProps struct {
+	Workspace *WorkspaceViewModel
+}
+
+templ WorkspaceHeader(props WorkspaceHeaderProps) {
+	<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+		<div>
+			<div class="flex items-center gap-2 mb-1">
+				<a href="/knowledge" class="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+					@icon.ArrowLeft(icon.Props{Class: "size-4"})
+					{ i18n.T(ctx, "Workspaces") }
+				</a>
+			</div>
+			<h1 class="text-3xl font-bold tracking-tight">{ props.Workspace.Name }</h1>
+			if props.Workspace.Description != nil {
+				<p class="text-muted-foreground mt-2 text-lg">{ *props.Workspace.Description }</p>
+			}
+		</div>
+		<div class="flex items-center gap-3">
+			<button
+				@click="refreshAll()"
+				class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-10 w-10 border shadow-sm"
+				:class="{ 'animate-spin': isRefreshing }"
+				title="Refresh All"
+			>
+				@icon.RefreshCw(icon.Props{Class: "size-5"})
+			</button>
+			@dialog.Trigger(dialog.TriggerProps{For: "upload-document-dialog"}) {
+				@button.Button(button.Props{
+					Size:  button.SizeLg,
+					Class: "shadow-sm",
+				}) {
+					@icon.Upload(icon.Props{Class: "size-5 me-2"})
+					{ i18n.T(ctx, "Upload Document") }
+				}
+			}
+		</div>
+	</div>
+}

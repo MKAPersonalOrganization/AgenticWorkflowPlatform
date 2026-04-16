@@ -1,0 +1,88 @@
+package knowledge
+
+/**
+ * PaginationControls - Page navigation for document table.
+ * Matches EdgeQuake edgequake_webui/src/components/documents/pagination-controls.tsx
+ *
+ * Shows: Page size selector, page info, First/Prev/Next/Last buttons.
+ */
+
+import (
+	"aicompass/components/button"
+	"aicompass/ui/i18n"
+	"aicompass/components/icon"
+)
+
+templ PaginationControls() {
+	<div class="flex items-center justify-between px-2 py-4" x-show="filteredDocuments.length > 0">
+		<!-- Left: Page size selector -->
+		<div class="flex items-center gap-2">
+			<span class="text-sm text-muted-foreground">{ i18n.T(ctx, "Rows per page") }</span>
+			<select
+				x-model.number="docPageSize"
+				@change="docPage = 1"
+				class="h-8 w-20 rounded-md border bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+			>
+				<option value="10">10</option>
+				<option value="20">20</option>
+				<option value="50">50</option>
+				<option value="100">100</option>
+			</select>
+			<span class="text-sm text-muted-foreground ms-2" x-text="'(' + filteredDocuments.length + ' total)'"></span>
+		</div>
+		<!-- Right: Page info + Navigation buttons -->
+		<div class="flex items-center gap-2">
+			<span class="text-sm text-muted-foreground" x-text="'Page ' + docPage + ' of ' + (docTotalPages || 1)"></span>
+			<div class="flex items-center gap-1">
+				@button.Button(button.Props{
+					Variant: button.VariantOutline,
+					Size:    button.SizeIcon,
+					Class:   "h-8 w-8",
+					Attributes: templ.Attributes{
+						"@click":     "docPage = 1",
+						":disabled":  "docPage <= 1",
+						"aria-label": "First page",
+					},
+				}) {
+					@icon.ChevronsLeft(icon.Props{Class: "size-4"})
+				}
+				@button.Button(button.Props{
+					Variant: button.VariantOutline,
+					Size:    button.SizeIcon,
+					Class:   "h-8 w-8",
+					Attributes: templ.Attributes{
+						"@click":     "docPage = Math.max(1, docPage - 1)",
+						":disabled":  "docPage <= 1",
+						"aria-label": "Previous page",
+					},
+				}) {
+					@icon.ChevronLeft(icon.Props{Class: "size-4"})
+				}
+				@button.Button(button.Props{
+					Variant: button.VariantOutline,
+					Size:    button.SizeIcon,
+					Class:   "h-8 w-8",
+					Attributes: templ.Attributes{
+						"@click":     "docPage = Math.min(docTotalPages, docPage + 1)",
+						":disabled":  "docPage >= docTotalPages",
+						"aria-label": "Next page",
+					},
+				}) {
+					@icon.ChevronRight(icon.Props{Class: "size-4"})
+				}
+				@button.Button(button.Props{
+					Variant: button.VariantOutline,
+					Size:    button.SizeIcon,
+					Class:   "h-8 w-8",
+					Attributes: templ.Attributes{
+						"@click":     "docPage = docTotalPages",
+						":disabled":  "docPage >= docTotalPages",
+						"aria-label": "Last page",
+					},
+				}) {
+					@icon.ChevronsRight(icon.Props{Class: "size-4"})
+				}
+			</div>
+		</div>
+	</div>
+}

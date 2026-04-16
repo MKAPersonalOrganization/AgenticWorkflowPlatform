@@ -4,11 +4,11 @@ import (
 	"aicompass/adapters/adkgo"
 	"aicompass/adapters/filesystembridge"
 	"aicompass/adapters/gemini"
-	"aicompass/components"
-	authcomp "aicompass/components/auth"
-	"aicompass/components/docs"
-	"aicompass/components/landing"
-	"aicompass/components/pricing"
+	"aicompass/ui"
+	authcomp "aicompass/ui/auth"
+	"aicompass/ui/docs"
+	"aicompass/ui/landing"
+	"aicompass/ui/pricing"
 	"aicompass/foundation/artifact"
 	"aicompass/foundation/artifact/adkartifact"
 	"aicompass/foundation/auth"
@@ -921,7 +921,7 @@ func HandleViewChatInputScreen(log *logger.Logger, edgequakeService *edgequake.S
 			}
 		}
 
-		component := components.ChatInputScreen(user)
+		component := ui.ChatInputScreen(user)
 		if err := component.Render(r.Context(), w); err != nil {
 			log.Error(r.Context(), "failed to render chat input screen", "error", err)
 		}

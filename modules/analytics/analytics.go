@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	component "aicompass/components/analytics"
+	component "aicompass/ui/analytics"
 )
 
 // Module is the analytics bounded context. It wraps the statistics projection

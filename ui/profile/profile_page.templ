@@ -1,0 +1,194 @@
+package profile
+
+import (
+	"aicompass/ui"
+	"aicompass/ui/agenteditor"
+	"aicompass/components/button"
+	"aicompass/components/card"
+	"aicompass/components/icon"
+	"aicompass/components/input"
+	"aicompass/components/label"
+	"aicompass/components/textarea"
+	"aicompass/shared"
+	"strings"
+)
+
+// UserProfileDTO is a view-layer data transfer object for the profile page.
+// Components accept DTOs, not domain types — the module handler maps domain → DTO.
+type UserProfileDTO struct {
+	LearningStyle string
+	Struggles     []string
+	Strengths     []string
+	Goals         string
+}
+
+type ProfilePageProps struct {
+	User    *shared.User
+	Profile UserProfileDTO
+}
+
+templ ProfilePage(props ProfilePageProps) {
+	@ui.BaseLayout(ui.LayoutProps{
+		Title: "Personalized Profile",
+		User:  props.User,
+	}) {
+		<div class="container mx-auto max-w-3xl p-6 space-y-6">
+			<!-- Header -->
+			<div class="flex items-center gap-4">
+				<a href="/">
+					@button.Button(button.Props{
+						Variant: button.VariantGhost,
+						Size:    button.SizeIcon,
+					}) {
+						@icon.ArrowLeft(icon.Props{Class: "size-5"})
+						<span class="sr-only">Back to Chat</span>
+					}
+				</a>
+				<div class="flex-1">
+					<h1 class="text-3xl font-bold tracking-tight">Personalized Profile</h1>
+					<p class="text-muted-foreground mt-1">Personalize your AI companion experience</p>
+				</div>
+				<!-- Agent Designer -->
+				<div class="hidden md:flex shrink-0">
+					@agenteditor.AgentDesignerHeaderButton()
+				</div>
+			</div>
+			<!-- Profile Form -->
+			@card.Card(card.Props{}) {
+				@card.Header(card.HeaderProps{}) {
+					@card.Title(card.TitleProps{}) {
+						<div class="flex items-center gap-2">
+							@icon.User(icon.Props{Class: "size-5"})
+							<span>Work Preferences</span>
+						</div>
+					}
+					@card.Description(card.DescriptionProps{}) {
+						These details help our AI agents tailor their communication style to you.
+					}
+				}
+				@card.Content(card.ContentProps{}) {
+					<form id="profile-form" class="space-y-6">
+						<!-- Identity (Read-only) -->
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div class="space-y-2">
+								@label.Label(label.Props{For: "email"}) {
+									Email 
+								}
+								@input.Input(input.Props{
+									ID:       "email",
+									Value:    props.User.Email,
+									Disabled: true,
+								})
+							</div>
+							<div class="space-y-2">
+								@label.Label(label.Props{For: "name"}) {
+									Full Name 
+								}
+								@input.Input(input.Props{
+									ID:       "name",
+									Value:    props.User.GetFullName(),
+									Disabled: true,
+								})
+							</div>
+						</div>
+						<div class="text-[0.8rem] text-muted-foreground flex items-center gap-1">
+							<span>Managed by your Google account.</span>
+							<button type="button" @click="$dispatch('open-settings-dialog', { tab: 'account' })" class="text-primary hover:underline cursor-pointer">Account Settings</button>
+						</div>
+						<div class="border-t border-border"></div>
+						<!-- Work Style -->
+						<div class="space-y-2">
+							@label.Label(label.Props{For: "learning_style"}) {
+								Work Style 
+							}
+							@input.Input(input.Props{
+								ID:          "learning_style",
+								Name:        "learning_style",
+								Type:        "text",
+								Value:       props.Profile.LearningStyle,
+								Placeholder: "e.g., Visual thinker, Detail-oriented",
+							})
+							<p class="text-[0.8rem] text-muted-foreground">How do you work best?</p>
+						</div>
+						<!-- Preferences -->
+						<div class="space-y-2">
+							@label.Label(label.Props{For: "struggles"}) {
+								Current Struggles 
+							}
+							@textarea.Textarea(textarea.Props{
+								ID:          "struggles",
+								Name:        "struggles",
+								Value:       strings.Join(props.Profile.Struggles, ", "),
+								Placeholder: "e.g., Calculus limits, Writing thesis statements",
+								Rows:        3,
+							})
+							<p class="text-[0.8rem] text-muted-foreground">Separate multiple items with commas.</p>
+						</div>
+						<!-- Strengths -->
+						<div class="space-y-2">
+							@label.Label(label.Props{For: "strengths"}) {
+								Capabilities & Strengths 
+							}
+							@textarea.Textarea(textarea.Props{
+								ID:          "strengths",
+								Name:        "strengths",
+								Value:       strings.Join(props.Profile.Strengths, ", "),
+								Placeholder: "e.g., System design, Data analysis",
+								Rows:        3,
+							})
+							<p class="text-[0.8rem] text-muted-foreground">Separate multiple items with commas.</p>
+						</div>
+						<!-- Goals -->
+						<div class="space-y-2">
+							@label.Label(label.Props{For: "goals"}) {
+								Professional/Personal Goals 
+							}
+							@textarea.Textarea(textarea.Props{
+								ID:          "goals",
+								Name:        "goals",
+								Value:       props.Profile.Goals,
+								Placeholder: "e.g., Ship the MVP, Learn Rust",
+								Rows:        3,
+							})
+						</div>
+						<!-- Actions -->
+						<div class="flex justify-end gap-4 pt-4">
+							@button.Button(button.Props{
+								Type: "submit",
+							}) {
+								Save Profile
+							}
+						</div>
+					</form>
+				}
+			}
+		</div>
+		<script>
+			document.getElementById('profile-form').addEventListener('submit', async (e) => {
+				e.preventDefault();
+				const formData = new FormData(e.target);
+				const data = Object.fromEntries(formData.entries());
+
+				try {
+					const response = await fetch('/api/profile', {
+						method: 'PUT',
+						headers: {
+							'Content-Type': 'application/json',
+						},
+						body: JSON.stringify(data),
+					});
+
+					if (response.ok) {
+						alert('Profile saved successfully!');
+						window.location.reload();
+					} else {
+						alert('Failed to save profile.');
+					}
+				} catch (error) {
+					console.error('Error:', error);
+					alert('An error occurred.');
+				}
+			});
+		</script>
+	}
+}

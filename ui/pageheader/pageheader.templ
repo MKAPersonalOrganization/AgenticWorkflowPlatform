@@ -1,0 +1,48 @@
+package pageheader
+
+import "aicompass/ui/agenteditor"
+import "aicompass/components/button"
+import "aicompass/components/icon"
+
+type Props struct {
+	Title       string
+	Description string
+	BackURL     string // Optional, if empty no back button
+	BackLabel   string // Optional, defaults to "Back"
+}
+
+// PageHeader provides a consistent header layout for pages
+templ PageHeader(props ...Props) {
+	{{ var p Props }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	if p.BackLabel == "" {
+		{{ p.BackLabel = "Back" }}
+	}
+	<div class="flex items-center gap-6">
+		if p.BackURL != "" {
+			<a href={ templ.SafeURL(p.BackURL) }>
+				@button.Button(button.Props{
+					Variant: button.VariantGhost,
+					Size:    button.SizeIcon,
+				}) {
+					@icon.ArrowLeft(icon.Props{Class: "size-5"})
+					<span class="sr-only">{ p.BackLabel }</span>
+				}
+			</a>
+		}
+		<div class="flex-1 text-center lg:text-start">
+			<h1 class="text-4xl lg:text-5xl font-bold tracking-tight">{ p.Title }</h1>
+			if p.Description != "" {
+				<p class="text-base lg:text-lg text-muted-foreground mt-3 max-w-2xl mx-auto lg:mx-0">
+					{ p.Description }
+				</p>
+			}
+		</div>
+		<!-- Agent Designer -->
+		<div class="hidden md:flex shrink-0">
+			@agenteditor.AgentDesignerHeaderButton()
+		</div>
+	</div>
+}

@@ -1,7 +1,7 @@
 package agui
 
 import (
-	"aicompass/components/i18n"
+	"aicompass/ui/i18n"
 	"aicompass/foundation/agent"
 	"aicompass/foundation/event"
 	"aicompass/foundation/logger"

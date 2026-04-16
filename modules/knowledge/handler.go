@@ -1,7 +1,7 @@
 package knowledge
 
 import (
-	"aicompass/components/knowledge"
+	"aicompass/ui/knowledge"
 	"aicompass/foundation/logger"
 	"aicompass/modules/knowledge/edgequake"
 	"aicompass/modules/knowledge/rag/documents"

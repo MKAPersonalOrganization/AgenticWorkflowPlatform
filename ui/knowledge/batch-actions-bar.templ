@@ -1,0 +1,76 @@
+package knowledge
+
+/**
+ * BatchActionsBar - Contextual actions for selected documents.
+ * Matches EdgeQuake edgequake_webui/src/components/documents/batch-actions-bar.tsx
+ *
+ * Shows: Selected count, Reprocess Selected, Delete Selected, Clear Selection.
+ * Appears only when one or more documents are selected.
+ */
+
+import (
+	"aicompass/components/button"
+	"aicompass/ui/i18n"
+	"aicompass/components/icon"
+)
+
+templ BatchActionsBar() {
+	<div
+		x-show="selectedDocs.length > 0"
+		x-cloak
+		x-transition:enter="transition ease-out duration-200"
+		x-transition:enter-start="opacity-0 -translate-y-2"
+		x-transition:enter-end="opacity-100 translate-y-0"
+		x-transition:leave="transition ease-in duration-150"
+		x-transition:leave-start="opacity-100 translate-y-0"
+		x-transition:leave-end="opacity-0 -translate-y-2"
+		class="shrink-0 px-4 py-2 bg-muted/50 border-b flex items-center justify-between"
+	>
+		<div class="flex items-center gap-3">
+			<!-- Selection count -->
+			<span class="text-sm font-medium" x-text="selectedDocs.length + ' document(s) selected'"></span>
+			<!-- Keyboard hint (OODA-19) -->
+			<span class="text-xs text-muted-foreground hidden sm:inline">
+				{ i18n.T(ctx, "Press") } <kbd class="px-1 py-0.5 bg-muted rounded text-[10px]">Esc</kbd> { i18n.T(ctx, "to clear") }
+			</span>
+		</div>
+		<div class="flex items-center gap-2">
+			<!-- Reprocess Selected -->
+			@button.Button(button.Props{
+				Variant: button.VariantOutline,
+				Size:    button.SizeSm,
+				Attributes: templ.Attributes{
+					"@click":    "bulkReprocessDocs()",
+					":disabled": "selectedDocs.length === 0",
+				},
+			}) {
+				@icon.RefreshCw(icon.Props{Class: "size-4 me-2"})
+				{ i18n.T(ctx, "Reprocess") }
+			}
+			<!-- Delete Selected -->
+			@button.Button(button.Props{
+				Variant: button.VariantOutline,
+				Size:    button.SizeSm,
+				Class:   "text-destructive",
+				Attributes: templ.Attributes{
+					"@click":    "bulkDeleteDocs()",
+					":disabled": "selectedDocs.length === 0",
+				},
+			}) {
+				@icon.Trash2(icon.Props{Class: "size-4 me-2"})
+				{ i18n.T(ctx, "Delete") }
+			}
+			<!-- Clear Selection -->
+			@button.Button(button.Props{
+				Variant: button.VariantGhost,
+				Size:    button.SizeSm,
+				Attributes: templ.Attributes{
+					"@click": "selectedDocs = []",
+				},
+			}) {
+				@icon.X(icon.Props{Class: "size-4 me-2"})
+				{ i18n.T(ctx, "Clear") }
+			}
+		</div>
+	</div>
+}

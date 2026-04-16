@@ -1,0 +1,147 @@
+package chatinput
+
+import "aicompass/components/button"
+import "aicompass/components/textarea"
+import "aicompass/components/icon"
+import "aicompass/components/tooltip"
+import "aicompass/ui/i18n"
+import "aicompass/ui/agents"
+
+templ ChatInput() {
+	<div
+		class="relative flex w-full flex-grow flex-col overflow-visible rounded-t-[1.75rem] border border-border/60 bg-background/95 backdrop-blur-sm shadow-modern transition-all duration-300 focus-within:shadow-modern-lg focus-within:border-border sm:rounded-[1.75rem]"
+		:class="isTextAreaFocused ? 'shadow-modern-lg border-border ring-1 ring-ring/10' : 'shadow-modern'"
+		x-data="{ isTextAreaFocused: false }"
+		@click="$refs.messageInput.focus()"
+		role="region"
+		aria-label="Message input area"
+	>
+		<form @submit.prevent="sendMessage" class="mx-auto flex flex-col w-full p-1.5 overflow-hidden rounded-[inherit]">
+			<!-- File Previews -->
+			@FileRow()
+			<!-- Textarea Area -->
+			<div class="relative w-full">
+				@textarea.Textarea(textarea.Props{
+					AutoResize: true,
+					Attributes: templ.Attributes{
+						"x-model": "currentMessage",
+
+						"@keydown":     "handleSlashKeydown($event) || handleKeydown($event)",
+						"@input":       "handleInput($event)",
+						"@paste":       "handlePaste($event)",
+						"@drop":        "handleDrop($event)",
+						"@dragover":    "handleDragOver($event)",
+						"@focus":       "isTextAreaFocused = true",
+						"@blur":        "isTextAreaFocused = false",
+						"placeholder":  i18n.T(ctx, "Message compass.AI..."),
+						":placeholder": "currentAgentData?.name ? '" + i18n.T(ctx, "Message") + " ' + currentAgentData.name + '...' : '" + i18n.T(ctx, "Message compass.AI...") + "'",
+						"rows":         "1",
+						"style":        "max-height: 45vh;",
+						"aria-label":   "Type your message",
+
+						":aria-describedby": "errorMessage ? 'error-message' : null",
+						"x-ref":             "messageInput",
+						"dir":               "auto",
+					},
+					Class: "md:py-3.5 m-0 w-full resize-none py-[13px] placeholder-muted-foreground/50 bg-transparent border-none shadow-none text-base min-h-[44px] px-5 focus:ring-0 focus:outline-none",
+				})
+				<!-- Slash Command Menu -->
+				@SlashMenu()
+			</div>
+			<!-- Hidden file input for attach button -->
+			<input
+				type="file"
+				multiple
+				x-ref="fileInput"
+				@change="handleFileSelect($event)"
+				accept="image/jpeg,image/png,image/gif,image/webp,audio/wav,audio/x-wav,audio/mpeg,audio/mp3,audio/ogg,audio/webm,application/pdf,text/plain,text/csv,text/markdown"
+				class="hidden"
+				tabindex="-1"
+				aria-hidden="true"
+			/>
+			<!-- Footer Area -->
+			<div class="flex items-center gap-2 pb-2">
+				<!-- Left: Agents & Attachments -->
+				<div class="ms-2 flex items-center gap-1">
+					<!-- Agents Selector -->
+					@agents.AgentsButtonTrigger()
+					<!-- Attach Files Button -->
+					@tooltip.Tooltip() {
+						@tooltip.Trigger(tooltip.TriggerProps{}) {
+							@button.Button(button.Props{
+								Type:    button.TypeButton,
+								Variant: button.VariantGhost,
+								Size:    button.SizeIcon,
+								Class:   "text-muted-foreground hover:text-foreground transition-colors p-2 rounded-xl hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+								Attributes: templ.Attributes{
+									"@click.stop": "$refs.fileInput.click()",
+									"aria-label":  i18n.T(ctx, "Attach files"),
+								},
+							}) {
+								@icon.Paperclip(icon.Props{Class: "size-5"})
+							}
+						}
+						@tooltip.Content(tooltip.ContentProps{Class: "text-xs"}) {
+							{ i18n.T(ctx, "Attach files") }
+						}
+					}
+				</div>
+				<!-- Spacer -->
+				<div class="flex-1"></div>
+				<!-- Right: Send Button -->
+				<div class="me-2 flex items-center gap-1">
+					<!-- Help/Shortcuts -->
+					@tooltip.Tooltip() {
+						@tooltip.Trigger(tooltip.TriggerProps{}) {
+							@button.Button(button.Props{
+								Type:    button.TypeButton,
+								Variant: button.VariantGhost,
+								Size:    button.SizeIcon,
+								Class:   "text-muted-foreground hover:text-foreground transition-colors p-2 rounded-xl hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+								Attributes: templ.Attributes{
+									"@click":     "toggleKeyboardShortcuts()",
+									"aria-label": i18n.T(ctx, "Show keyboard shortcuts"),
+								},
+							}) {
+								<!-- Use a small keyboard icon or question mark -->
+								<div class="size-5 flex items-center justify-center border border-current rounded text-[10px] font-medium opacity-70">?</div>
+							}
+						}
+						@tooltip.Content(tooltip.ContentProps{Class: "text-xs"}) {
+							{ i18n.T(ctx, "Keyboard shortcuts") }
+						}
+					}
+					@tooltip.Tooltip() {
+						@tooltip.Trigger(tooltip.TriggerProps{}) {
+							@button.Button(button.Props{
+								Variant: button.VariantDefault,
+								Size:    button.SizeIcon,
+								Class:   "rounded-full bg-foreground p-1.5 text-background transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-10 hover:bg-foreground/85 hover:scale-105 active:scale-95",
+								Attributes: templ.Attributes{
+									"@click.prevent": "isStreaming ? cancelJob() : sendMessage()",
+									"type":           "button",
+									":disabled":      "!canSendMessage && !isStreaming",
+									":class":         "(canSendMessage || isStreaming) ? '' : 'opacity-20 cursor-not-allowed'",
+									":aria-busy":     "isStreaming",
+									":aria-label":    "isStreaming ? 'Cancel message' : '" + i18n.T(ctx, "Send message") + "'",
+								},
+							}) {
+								<!-- Send Icon -->
+								<div x-show="!isStreaming" x-cloak>
+									@icon.ArrowUp(icon.Props{Class: "size-5"})
+								</div>
+								<!-- Cancel/Stop Icon -->
+								<div x-show="isStreaming" x-cloak>
+									<div class="size-3 bg-current rounded-[2px]"></div>
+								</div>
+							}
+						}
+						@tooltip.Content(tooltip.ContentProps{Class: "text-xs"}) {
+							<span x-text={ "isStreaming ? '" + i18n.T(ctx, "Stop generating") + "' : '" + i18n.T(ctx, "Send message") + "'" }></span>
+						}
+					}
+				</div>
+			</div>
+		</form>
+	</div>
+}

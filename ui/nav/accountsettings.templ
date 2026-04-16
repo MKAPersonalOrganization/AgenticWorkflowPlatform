@@ -1,0 +1,469 @@
+package nav
+
+import (
+	"strings"
+
+	"aicompass/components/button"
+	"aicompass/ui/i18n"
+	"aicompass/components/icon"
+	"aicompass/components/popover"
+	"aicompass/components/sidebar"
+	"aicompass/shared"
+)
+
+type AccountSettingsProps struct {
+	User    *shared.User
+	ID      string // Unique popover ID (required when multiple instances exist)
+	Compact bool   // True: icon-only trigger (navbar). False: avatar+name trigger (sidebar footer).
+}
+
+// AccountSettings renders a unified user profile/settings menu
+// (matches LibreChat's AccountSettings.tsx).
+templ AccountSettings(props ...AccountSettingsProps) {
+	{{ var p AccountSettingsProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	if p.ID == "" {
+		{{ p.ID = "account-settings-popover" }}
+	}
+	if p.Compact {
+		<div class="mt-auto">
+			@popover.Root(popover.RootProps{ID: p.ID}) {
+				@popover.Trigger(popover.TriggerProps{}) {
+					@button.Button(button.Props{
+						Size:    button.SizeIcon,
+						Variant: button.VariantGhost,
+						Class:   "size-9",
+					}) {
+						if p.User != nil {
+							<div class="size-7 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden shrink-0">
+								<span class="text-xs font-bold text-primary">{ strings.ToUpper(p.User.Email[:1]) }</span>
+							</div>
+						} else {
+							@icon.User(icon.Props{Class: "size-5"})
+						}
+					}
+				}
+				@accountMenuPopover(p)
+			}
+		</div>
+	} else {
+		@sidebar.Menu() {
+			@sidebar.MenuItem() {
+				@popover.Root(popover.RootProps{ID: p.ID}) {
+					@popover.Trigger(popover.TriggerProps{}) {
+						@sidebar.MenuButton(sidebar.MenuButtonProps{
+							Size:  "lg",
+							Class: "hover:bg-sidebar-accent/50 transition-colors py-2 px-2 rounded-xl",
+						}) {
+							if p.User != nil {
+								<div class="flex items-center gap-2 w-full">
+									<div class="size-8 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden shrink-0 border border-border/50">
+										<span class="text-xs font-bold text-primary">{ strings.ToUpper(p.User.Email[:1]) }</span>
+									</div>
+									<div class="grid flex-1 text-start text-sm leading-tight">
+										<span class="truncate font-medium text-sidebar-foreground">{ p.User.GetDisplayName() }</span>
+									</div>
+									@icon.ChevronsUpDown(icon.Props{Class: "size-4 text-muted-foreground/70"})
+								</div>
+							} else {
+								<div class="flex items-center gap-2 w-full">
+									<div class="size-8 rounded-full bg-muted flex items-center justify-center overflow-hidden shrink-0 border border-border/50">
+										@icon.User(icon.Props{Class: "size-4 text-muted-foreground"})
+									</div>
+									<div class="grid flex-1 text-start text-sm leading-tight">
+										<span class="truncate font-medium text-sidebar-foreground">{ i18n.T(ctx, "Guest") }</span>
+									</div>
+									@icon.ChevronsUpDown(icon.Props{Class: "size-4 text-muted-foreground/70"})
+								</div>
+							}
+						}
+					}
+					@accountMenuPopover(p)
+				}
+			}
+		}
+	}
+}
+
+templ accountMenuPopover(p AccountSettingsProps) {
+	{{ placement := popover.PlacementTopStart }}
+	{{ popoverClass := "w-64 overflow-hidden p-1 border border-border bg-popover text-popover-foreground shadow-lg rounded-xl mb-2" }}
+	if p.Compact {
+		{{ placement = popover.PlacementRight }}
+		{{ popoverClass = "w-64 overflow-hidden p-1 border border-border bg-popover text-popover-foreground shadow-lg rounded-xl" }}
+	}
+	@popover.Content(popover.ContentProps{
+		Placement: placement,
+		Class:     popoverClass,
+	}) {
+		<div class="flex flex-col">
+			if p.User != nil {
+				@authenticatedMenu(p.User)
+			} else {
+				@unauthenticatedMenu()
+			}
+		</div>
+	}
+}
+
+templ accountMenuItem(iconComp templ.Component, label string, attrs templ.Attributes) {
+	<button
+		type="button"
+		class="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg hover:bg-accent transition-colors text-start"
+		{ attrs... }
+	>
+		<div class="flex items-center justify-center size-5">
+			@iconComp
+		</div>
+		<span class="flex-1 text-start">{ label }</span>
+	</button>
+}
+
+templ accountMenuLink(iconComp templ.Component, label string, href string, extraClass string) {
+	<a
+		href={ templ.SafeURL(href) }
+		class={ "flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg hover:bg-accent transition-colors", extraClass }
+	>
+		<div class="flex items-center justify-center size-5">
+			@iconComp
+		</div>
+		<span class="flex-1 text-start">{ label }</span>
+	</a>
+}
+
+templ accountMenuSeparator() {
+	<div class="my-1 h-px bg-border/50"></div>
+}
+
+templ authenticatedMenu(user *shared.User) {
+	<!-- User Info -->
+	<div class="px-3 py-2">
+		<div class="text-sm font-semibold truncate">{ user.GetDisplayName() }</div>
+		<div class="text-xs text-muted-foreground truncate">{ user.Email }</div>
+	</div>
+	@accountMenuSeparator()
+	<!-- Settings -->
+	@accountMenuItem(
+		icon.Settings(icon.Props{Class: "size-4"}),
+		i18n.T(ctx, "Settings"),
+		templ.Attributes{"@click": "$dispatch('open-settings-dialog', {})"},
+	)
+	<!-- Billing Status — conditionally show Activate or Active badge -->
+	<div
+		x-data="{
+			billingStatus: 'loading',
+			billingData: null,
+			cancelling: false,
+			reactivating: false,
+			billingError: '',
+			async fetchStatus() {
+				try {
+					const r = await fetch('/api/billing/status', { credentials: 'same-origin' });
+					if (r.ok) {
+						const d = await r.json();
+						this.billingStatus = d.status;
+						this.billingData = d;
+					} else {
+						this.billingStatus = 'none';
+					}
+				} catch(e) {
+					this.billingStatus = 'none';
+				}
+			},
+			async cancelSubscription() {
+				if (this.cancelling) return;
+				if (!confirm('Are you sure you want to cancel your subscription? You will retain access until the end of your billing period.')) return;
+				this.cancelling = true;
+				this.billingError = '';
+				try {
+					const r = await fetch('/api/billing/cancel', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						credentials: 'same-origin',
+						body: JSON.stringify({})
+					});
+					if (r.ok) {
+						const d = await r.json();
+						this.billingStatus = 'cancelled';
+						this.billingData = { ...this.billingData, status: 'cancelled', cancelsOn: d.cancelsOn };
+					} else {
+						const body = await r.json().catch(() => ({}));
+						this.billingError = body.error || 'Could not cancel subscription. Please try again.';
+					}
+				} catch(e) {
+					this.billingError = 'Network error. Please check your connection.';
+				}
+				this.cancelling = false;
+			},
+			async reactivateSubscription() {
+				if (this.reactivating) return;
+				this.reactivating = true;
+				this.billingError = '';
+				try {
+					const r = await fetch('/api/billing/reactivate', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						credentials: 'same-origin'
+					});
+					if (r.ok) {
+						this.billingStatus = 'active';
+						this.billingData = { ...this.billingData, status: 'active', cancelledAt: null, cancelsOn: null };
+					} else {
+						const body = await r.json().catch(() => ({}));
+						if (body.code === 'billing_period_ended') {
+							this.billingError = 'Billing period ended. Please subscribe again.';
+							this.billingStatus = 'none';
+						} else {
+							this.billingError = body.error || 'Could not reactivate. Please try again.';
+						}
+					}
+				} catch(e) {
+					this.billingError = 'Network error. Please check your connection.';
+				}
+				this.reactivating = false;
+			},
+			formatDate(iso) {
+				if (!iso) return '';
+				try { return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
+				catch(e) { return iso; }
+			}
+		}"
+		x-init="fetchStatus()"
+	>
+		<!-- Loading state -->
+		<template x-if="billingStatus === 'loading'">
+			<div class="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg text-start">
+				<div class="flex items-center justify-center size-5">
+					<span class="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-muted-foreground"></span>
+				</div>
+				<span class="flex-1 text-start text-muted-foreground">{ i18n.T(ctx, "Loading…") }</span>
+			</div>
+		</template>
+		<!-- Error banner for billing operations -->
+		<template x-if="billingError">
+			<div class="px-3 py-1.5">
+				<div class="text-xs text-destructive bg-destructive/10 rounded px-2 py-1.5" x-text="billingError" @click="billingError = ''"></div>
+			</div>
+		</template>
+		<!-- Activate Account — shown when not active and not cancelled -->
+		<template x-if="billingStatus !== 'active' && billingStatus !== 'cancelled' && billingStatus !== 'loading'">
+			<button
+				type="button"
+				class="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg hover:bg-accent transition-colors text-start"
+				@click="$dispatch('open-pricing-dialog')"
+			>
+				<div class="flex items-center justify-center size-5">
+					@icon.Crown(icon.Props{Class: "size-4"})
+				</div>
+				<span class="flex-1 text-start">{ i18n.T(ctx, "Activate Account") }</span>
+			</button>
+		</template>
+		<!-- Active state — with subscription management -->
+		<template x-if="billingStatus === 'active'">
+			<div class="space-y-1">
+				<div class="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg text-start">
+					<div class="flex items-center justify-center size-5">
+						@icon.BadgeCheck(icon.Props{Class: "size-4 text-green-600 dark:text-green-400"})
+					</div>
+					<div class="flex-1 text-start">
+						<span class="text-green-600 dark:text-green-400 font-medium block" x-text="(billingData && billingData.planName) || 'Full Access'"></span>
+						<template x-if="billingData && billingData.nextBillingAt">
+							<span class="text-[10px] text-muted-foreground" x-text="'Next billing ' + formatDate(billingData.nextBillingAt)"></span>
+						</template>
+					</div>
+				</div>
+				<!-- Card info if available -->
+				<template x-if="billingData && billingData.cardLast4">
+					<div class="flex items-center gap-3 w-full px-3 py-1 text-xs text-muted-foreground">
+						<div class="flex items-center justify-center size-5">
+							@icon.CreditCard(icon.Props{Class: "size-3 text-muted-foreground/70"})
+						</div>
+						<span x-text="(billingData.cardBrand ? billingData.cardBrand.charAt(0).toUpperCase() + billingData.cardBrand.slice(1) : 'Card') + ' ••••' + billingData.cardLast4"></span>
+					</div>
+				</template>
+				<!-- Cancel subscription button -->
+				<button
+					type="button"
+					class="flex items-center gap-3 w-full px-3 py-1.5 text-xs rounded-lg hover:bg-destructive/10 transition-colors text-start text-muted-foreground hover:text-destructive"
+					@click="cancelSubscription()"
+					:disabled="cancelling"
+				>
+					<div class="flex items-center justify-center size-5">
+						<template x-if="!cancelling">
+							@icon.X(icon.Props{Class: "size-3"})
+						</template>
+						<template x-if="cancelling">
+							<span class="animate-spin rounded-full h-3 w-3 border-b-2 border-current"></span>
+						</template>
+					</div>
+					<span class="flex-1 text-start" x-text="cancelling ? 'Cancelling…' : 'Cancel Subscription'"></span>
+				</button>
+			</div>
+		</template>
+		<!-- Cancelled state — with reactivation option -->
+		<template x-if="billingStatus === 'cancelled'">
+			<div class="space-y-1">
+				<div class="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg text-start">
+					<div class="flex items-center justify-center size-5">
+						@icon.Clock(icon.Props{Class: "size-4 text-yellow-600 dark:text-yellow-400"})
+					</div>
+					<div class="flex-1 text-start">
+						<span class="text-yellow-600 dark:text-yellow-400 font-medium block">{ i18n.T(ctx, "Cancelled") }</span>
+						<template x-if="billingData && billingData.daysRemaining > 0">
+							<span class="text-[10px] text-muted-foreground" x-text="billingData.daysRemaining + ' days remaining'"></span>
+						</template>
+						<template x-if="billingData && (!billingData.daysRemaining || billingData.daysRemaining <= 0) && billingData.cancelsOn">
+							<span class="text-[10px] text-muted-foreground" x-text="'Until ' + formatDate(billingData.cancelsOn)"></span>
+						</template>
+					</div>
+				</div>
+				<!-- Reactivate button -->
+				<button
+					type="button"
+					class="flex items-center gap-3 w-full px-3 py-1.5 text-xs rounded-lg hover:bg-primary/10 transition-colors text-start text-primary"
+					@click="reactivateSubscription()"
+					:disabled="reactivating"
+				>
+					<div class="flex items-center justify-center size-5">
+						<template x-if="!reactivating">
+							@icon.RefreshCw(icon.Props{Class: "size-3"})
+						</template>
+						<template x-if="reactivating">
+							<span class="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></span>
+						</template>
+					</div>
+					<span class="flex-1 text-start" x-text="reactivating ? 'Reactivating…' : 'Reactivate Subscription'"></span>
+				</button>
+			</div>
+		</template>
+	</div>
+	@accountMenuSeparator()
+	<!-- Theme Toggle -->
+	@button.Button(button.Props{
+		Type:    button.TypeButton,
+		Variant: button.VariantGhost,
+		Class:   "justify-start flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg hover:bg-accent transition-colors font-normal h-auto",
+		Attributes: templ.Attributes{
+			"@click": "toggleTheme()",
+		},
+	}) {
+		<div class="flex items-center justify-center size-5">
+			<!-- Sun icon (light mode) -->
+			<svg x-show="($data.preferences?.theme || theme) === 'light'" x-cloak class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+			</svg>
+			<!-- Moon icon (dark mode) -->
+			<svg x-show="($data.preferences?.theme || theme) === 'dark'" x-cloak class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+			</svg>
+			<!-- System icon (auto mode) -->
+			<svg x-show="($data.preferences?.theme || theme) === 'system'" x-cloak class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+			</svg>
+		</div>
+		<span class="flex-1 text-start">{ i18n.T(ctx, "Theme:") } <span x-text="window.i18n.t(($data.preferences?.theme || theme).charAt(0).toUpperCase() + ($data.preferences?.theme || theme).slice(1))"></span></span>
+	}
+	<!-- Language Switcher -->
+	<div class="relative" x-data="{ langOpen: false }">
+		<button
+			@click="langOpen = !langOpen"
+			class="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg hover:bg-accent transition-colors"
+			type="button"
+		>
+			<div class="flex items-center justify-center size-5">
+				@icon.Languages(icon.Props{Class: "size-4"})
+			</div>
+			<span class="flex-1 text-start" x-text="window.i18n.getNativeName(window.i18n.getCurrentLanguage())"></span>
+			<svg class="size-4 text-muted-foreground transition-transform" :class="langOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+		</button>
+		<div x-show="langOpen" x-cloak @click.outside="langOpen = false" class="mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg z-50">
+			<template x-for="lang in Object.values(window.i18n.LANGUAGES).sort((a, b) => a.nativeName.localeCompare(b.nativeName))" :key="lang.code">
+				<button
+					@click="window.i18n.setLanguage(lang.code)"
+					class="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent transition-colors"
+					:class="lang.code === window.i18n.getCurrentLanguage() ? 'bg-accent/50 font-medium' : ''"
+					type="button"
+				>
+					<span x-text="lang.nativeName"></span>
+					<span class="text-muted-foreground text-xs ms-auto" x-text="lang.code.toUpperCase()"></span>
+				</button>
+			</template>
+		</div>
+	</div>
+	@accountMenuSeparator()
+	<!-- Logout -->
+	@accountMenuLink(
+		icon.LogOut(icon.Props{Class: "size-4"}),
+		i18n.T(ctx, "Log out"),
+		"/auth/logout",
+		"text-destructive hover:text-destructive",
+	)
+}
+
+templ unauthenticatedMenu() {
+	<div class="px-3 py-2 text-sm font-semibold">{ i18n.T(ctx, "Welcome") }</div>
+	@accountMenuSeparator()
+	<!-- Login -->
+	@accountMenuLink(
+		icon.LogIn(icon.Props{Class: "size-4"}),
+		i18n.T(ctx, "Login"),
+		"/auth/login",
+		"",
+	)
+	<!-- Register (uses same Google OAuth login flow) -->
+	@accountMenuLink(
+		icon.UserPlus(icon.Props{Class: "size-4"}),
+		i18n.T(ctx, "Register"),
+		"/auth/login",
+		"",
+	)
+	@accountMenuSeparator()
+	<!-- Language Switcher -->
+	<div class="relative" x-data="{ langOpen: false }">
+		<button
+			@click="langOpen = !langOpen"
+			class="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg hover:bg-accent transition-colors"
+			type="button"
+		>
+			<div class="flex items-center justify-center size-5">
+				@icon.Languages(icon.Props{Class: "size-4"})
+			</div>
+			<span class="flex-1 text-start" x-text="window.i18n.getNativeName(window.i18n.getCurrentLanguage())"></span>
+			<svg class="size-4 text-muted-foreground transition-transform" :class="langOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+		</button>
+		<div x-show="langOpen" x-cloak @click.outside="langOpen = false" class="mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg z-50">
+			<template x-for="lang in Object.values(window.i18n.LANGUAGES).sort((a, b) => a.nativeName.localeCompare(b.nativeName))" :key="lang.code">
+				<button
+					@click="window.i18n.setLanguage(lang.code)"
+					class="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent transition-colors"
+					:class="lang.code === window.i18n.getCurrentLanguage() ? 'bg-accent/50 font-medium' : ''"
+					type="button"
+				>
+					<span x-text="lang.nativeName"></span>
+					<span class="text-muted-foreground text-xs ms-auto" x-text="lang.code.toUpperCase()"></span>
+				</button>
+			</template>
+		</div>
+	</div>
+	<!-- Theme Toggle -->
+	<button
+		@click="toggleTheme()"
+		class="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg hover:bg-accent transition-colors"
+		type="button"
+	>
+		<div class="flex items-center justify-center size-5">
+			<svg x-show="($data.preferences?.theme || theme) === 'light'" x-cloak class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+			</svg>
+			<svg x-show="($data.preferences?.theme || theme) === 'dark'" x-cloak class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+			</svg>
+			<svg x-show="($data.preferences?.theme || theme) === 'system'" x-cloak class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+			</svg>
+		</div>
+		<span class="flex-1 text-start">{ i18n.T(ctx, "Theme:") } <span x-text="window.i18n.t(($data.preferences?.theme || theme).charAt(0).toUpperCase() + ($data.preferences?.theme || theme).slice(1))"></span></span>
+	</button>
+}

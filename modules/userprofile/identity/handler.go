@@ -1,7 +1,7 @@
 package identity
 
 import (
-	"aicompass/components/profile"
+	"aicompass/ui/profile"
 	"aicompass/foundation/i18n"
 	"aicompass/foundation/logger"
 	"aicompass/shared"
