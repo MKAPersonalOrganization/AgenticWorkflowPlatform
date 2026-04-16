@@ -2,6 +2,7 @@ package main
 
 import (
 	"aicompass/adapters/adkgo"
+	"aicompass/adapters/filesystembridge"
 	"aicompass/adapters/gemini"
 	"aicompass/components"
 	authcomp "aicompass/components/auth"
@@ -484,7 +485,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// All agents (including the default assistant) live in the database.
 	// In the unified model, both simple and composed agents are AgentDefinitions.
-	agentProvider := newUserAwareAgentProvider(
+	agentProvider := agentdefmod.NewUserAwareProvider(
 		agentDefModule.Repo(),
 	)
 
@@ -563,7 +564,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		f.SetGroundedSearchClientFactory(func(apiKey, model string) any {
 			return gemini.NewSearchClient(apiKey, model)
 		})
-		f.SetAgentFilesystem(&agentFSAdapter{source: filesystemModule.AgentFS()})
+		f.SetAgentFilesystem(filesystembridge.NewFSPluginAdapter(filesystemModule.AgentFS()))
 		return f
 	})
 
@@ -587,7 +588,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		return extra
 	})
 
-	kbPromptInjector := &knowledgeBasePromptInjector{workspaceSvc: workspacePermissionsService}
+	kbPromptInjector := adkgo.NewKnowledgeBasePromptInjector(workspacePermissionsService)
 
 	adkRunner, err := adkgo.NewRunnerAdapter(adkgo.RunnerAdapterConfig{
 		Log:                    log,

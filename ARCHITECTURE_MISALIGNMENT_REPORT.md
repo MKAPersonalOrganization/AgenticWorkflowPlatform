@@ -184,33 +184,36 @@ Resolved in current session. Decoupled `foundation/toolregistry` unit tests from
 
 ### What is wrong
 
-`adapters.go` (550 lines) defines 8 adapter types, some of which contain non-trivial domain logic that belongs in proper packages:
+This misalignment has been addressed.
+
+The domain-heavy adapters were relocated out of the composition root:
 
 | Type | Lines | Concern |
 |------|-------|---------|
-| `userAwareAgentProvider` | ~140 lines (272-409) | Loads agents from DB, resolves compositions, builds sub-agent trees, handles workflow graphs |
-| `knowledgeBasePromptInjector` | ~20 lines (116-137) | Resolves workspace permissions and injects KB instructions into system prompts |
-| `agentFSAdapter` | ~90 lines (167-258) | Maps filesystem module types to plugin types with full file-operation bridging |
+| `modules/agentdefinition.UserAwareProvider` | ~190 lines | Loads agents from DB, resolves coordinator sub-agents, builds workflow agents |
+| `adapters/adkgo.KnowledgeBasePromptInjector` | ~35 lines | Resolves workspace permissions and injects KB instructions into ADK prompts |
+| `adapters/filesystembridge.FSPluginAdapter` | ~100 lines | Maps filesystem module types to plugin-facing filesystem DTOs |
 
 ### Why this matters
 
-The composition root should contain only wiring — constructing dependencies and passing them to constructors. When it contains domain logic (agent resolution, permission checking, prompt engineering), it becomes:
+The composition root should contain only wiring — constructing dependencies and passing them to constructors. That is now the case:
 
-- **Untestable:** These adapter types have no unit tests because they live in `package main`
-- **Opaque:** A developer looking for "how agents are loaded" would check `modules/agentdefinition` or `adapters/adkgo`, not the root `adapters.go`
-- **Growing:** At 550 lines, this file is approaching the threshold where further additions will make it a maintenance burden
+- `adapters.go` now contains only thin composition glue
+- the moved adapters are in packages where their responsibilities are discoverable
+- unit tests now exist for the moved agent provider and prompt injector
 
 ### How to fix
 
-**Relocate domain-heavy adapters to proper packages.**
+Implemented by relocating the domain-heavy adapters to proper packages:
 
-1. Move `userAwareAgentProvider` to `modules/agentdefinition/provider.go` — it depends on `agentdefinition.AgentDefinitionRepository` and orchestrates agent loading, which is the agent-definition module's responsibility
-2. Move `knowledgeBasePromptInjector` to `adapters/adkgo/prompt_injector.go` — it's ADK-specific prompt engineering
-3. Keep the thin adapters (type-mapping one-liners) in `adapters.go` — those are legitimate composition glue
+1. Moved `userAwareAgentProvider` to `modules/agentdefinition/provider.go` as `UserAwareProvider`
+2. Moved `knowledgeBasePromptInjector` to `adapters/adkgo/prompt_injector.go` as `KnowledgeBasePromptInjector`
+3. Moved the filesystem bridge to `adapters/filesystembridge/fsplugin_adapter.go` as `FSPluginAdapter`
+4. Kept only the thin Edgequake, profile, and A2A adapters in `adapters.go`
 
-After the moves, `adapters.go` should shrink to ~300 lines of pure wiring code.
+`main.go` now wires these adapters via exported constructors instead of owning their implementations.
 
-**Estimated effort:** 3-4 hours
+**Status:** Fixed
 
 ---
 
