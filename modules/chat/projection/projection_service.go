@@ -1,4 +1,4 @@
-package projections
+package projection
 
 import (
 	"aicompass/modules/chat/projection/agui"

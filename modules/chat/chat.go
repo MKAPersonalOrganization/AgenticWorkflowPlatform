@@ -30,7 +30,7 @@ import (
 	"aicompass/modules/chat/chatcontracts"
 	"aicompass/modules/chat/projection/agui"
 	"aicompass/modules/chat/projection/llmcontext"
-	"aicompass/modules/chat/projections"
+	"aicompass/modules/chat/projection"
 	"aicompass/modules/chat/thread"
 	"aicompass/modules/chat/threadmgmt"
 	"aicompass/platform/artifact"
@@ -106,7 +106,7 @@ func New(deps Dependencies) *Module {
 	threadMgmtSvc := threadmgmt.New(log, threadRepo)
 
 	// Thread query service (wraps AGUI projection for UI queries)
-	threadQuerySvc := projections.NewUIProjectionService(aguiProjection)
+	threadQuerySvc := projection.NewUIProjectionService(aguiProjection)
 
 	// Agent orchestrator — runner is set later via SetRunner()
 	orchestrator := agentorchestrator.New(log, deps.EventStore,

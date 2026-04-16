@@ -3,7 +3,6 @@ package taskmgmt
 import (
 	"aicompass/foundation/agent"
 	"aicompass/modules/chat/agentorchestrator"
-	"aicompass/modules/chat/taskmanagement"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -221,7 +220,7 @@ func (h *TaskManagementHandler) streamRun(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		aguiEvents := taskmanagement.ToAguiEvents(event)
+		aguiEvents := ToAguiEvents(event)
 		for _, ae := range aguiEvents {
 			if err := WriteSSEEvent(w, ae, ""); err != nil {
 				h.log.Info(r.Context(), "[API] Write failed, client disconnected")

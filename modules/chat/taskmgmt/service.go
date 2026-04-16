@@ -1,4 +1,4 @@
-package taskmanagement
+package taskmgmt
 
 import (
 	"aicompass/foundation/logger"

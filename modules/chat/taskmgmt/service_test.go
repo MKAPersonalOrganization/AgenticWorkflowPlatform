@@ -1,4 +1,4 @@
-package taskmanagement
+package taskmgmt
 
 import (
 	"aicompass/modules/chat/agentorchestrator"

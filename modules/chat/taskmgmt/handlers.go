@@ -18,7 +18,6 @@ import (
 	"aicompass/foundation/logger"
 	"aicompass/modules/chat/chatcontracts"
 	"aicompass/modules/chat/projection/agui"
-	"aicompass/modules/chat/taskmanagement"
 	"aicompass/modules/chat/threadmgmt"
 	"aicompass/platform/artifact"
 	"aicompass/platform/toolregistry"
@@ -45,7 +44,7 @@ func DefaultSSEConfig() SSEConfig {
 // TaskManagementHandler encapsulates dependencies for HTTP handlers for task management.
 type TaskManagementHandler struct {
 	log                      *logger.Logger
-	orchestrator             taskmanagement.Orchestrator
+	orchestrator             Orchestrator
 	agentProvider            agent.AgentProvider
 	authService              shared.AuthService
 	threadQueryService       chatcontracts.ThreadQueryService
@@ -63,7 +62,7 @@ type TaskManagementHandler struct {
 // NewTaskManagementHandler creates a new HTTP handler for task management.
 func NewTaskManagementHandler(
 	log *logger.Logger,
-	orchestrator taskmanagement.Orchestrator,
+	orchestrator Orchestrator,
 	agentProvider agent.AgentProvider,
 	authService shared.AuthService,
 	threadQueryService chatcontracts.ThreadQueryService,
