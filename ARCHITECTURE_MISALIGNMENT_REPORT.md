@@ -16,7 +16,7 @@
 5. [Misalignment 4 — Presentation layer imports business logic](#misalignment-4--presentation-layer-imports-business-logic)
 6. [Misalignment 5 — Dead `AuthService` interface creates phantom abstraction](#misalignment-5--dead-authservice-interface-creates-phantom-abstraction)
 7. [~~Misalignment 6 — God Handler in `chat/taskmgmt`~~](#misalignment-6--god-handler-in-chattaskmgmt) **RESOLVED**
-8. [Misalignment 7 — Foundation test files import from plugins and infra](#misalignment-7--foundation-test-files-import-from-plugins-and-infra)
+8. [~~Misalignment 7 — Foundation test files import from plugins and infra~~](#misalignment-7--foundation-test-files-import-from-plugins-and-infra) **RESOLVED**
 9. [Misalignment 8 — `adapters.go` composition root accumulating domain logic](#misalignment-8--adaptergo-composition-root-accumulating-domain-logic)
 10. [Misalignment 9 — Plugin initialization pattern inconsistency](#misalignment-9--plugin-initialization-pattern-inconsistency)
 11. [Priority Matrix](#priority-matrix)
