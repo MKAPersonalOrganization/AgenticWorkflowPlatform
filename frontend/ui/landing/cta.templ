@@ -1,0 +1,54 @@
+package landing
+
+import (
+	"aicompass/frontend/components/button"
+	"aicompass/frontend/components/icon"
+	"aicompass/shared"
+)
+
+// ─── CTA Section ─────────────────────────────────────────────────────────────
+templ ctaSection(user *shared.User) {
+	<section class="py-32 bg-background border-t border-border/50 relative overflow-hidden">
+		<!-- Subtle radial gradient in background -->
+		<div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/[0.02] via-transparent to-transparent pointer-events-none"></div>
+		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center relative">
+			<div class="mx-auto max-w-3xl">
+				<h2 class="text-4xl font-semibold tracking-[-0.02em] sm:text-5xl text-foreground pb-2">
+					Ready to transform your workflow?
+				</h2>
+				<p class="mx-auto mt-6 text-xl text-muted-foreground">
+					Join thousands of professionals who use Compass.AI to work smarter, move faster, and achieve more with AI.
+				</p>
+				<div class="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+					if user != nil {
+						@button.Button(button.Props{
+							Href:  "/chat",
+							Size:  button.SizeLg,
+							Class: "px-8 rounded-full",
+						}) {
+							<span>Open Compass.AI</span>
+							@icon.ArrowRight(icon.Props{Class: "size-4 ms-2"})
+						}
+					} else {
+						@button.Button(button.Props{
+							Href:  "/auth/login",
+							Size:  button.SizeLg,
+							Class: "px-8 rounded-full",
+						}) {
+							<span>Start for Free</span>
+							@icon.ArrowRight(icon.Props{Class: "size-4 ms-2"})
+						}
+					}
+					@button.Button(button.Props{
+						Href:    "/docs",
+						Variant: button.VariantOutline,
+						Size:    button.SizeLg,
+						Class:   "px-8 rounded-full",
+					}) {
+						<span>Explore Documentation</span>
+					}
+				</div>
+			</div>
+		</div>
+	</section>
+}

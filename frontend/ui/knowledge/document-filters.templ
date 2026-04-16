@@ -1,0 +1,66 @@
+package knowledge
+
+/**
+ * DocumentFilters - Filter/sort controls for document listing.
+ * Matches EdgeQuake edgequake_webui/src/components/documents/document-filters.tsx
+ *
+ * Status dropdown (with counts) and sort toggle buttons with direction arrows.
+ */
+
+import (
+	"aicompass/frontend/ui/i18n"
+	"aicompass/frontend/components/icon"
+)
+
+templ DocumentFilters() {
+	<div class="flex flex-wrap items-center gap-3">
+		<!-- Status Filter Select -->
+		<select
+			class="h-10 w-40 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+			x-model="docStatusFilter"
+			@change="filterByStatus(docStatusFilter)"
+		>
+			<option value="" x-text="'All' + (docStatusCounts ? ' (' + (docStatusCounts.all || documents.length) + ')' : '')"></option>
+			<option value="pending" x-text="'Pending' + (docStatusCounts?.pending ? ' (' + docStatusCounts.pending + ')' : '')"></option>
+			<option value="processing" x-text="'Processing' + (docStatusCounts?.processing ? ' (' + docStatusCounts.processing + ')' : '')"></option>
+			<option value="completed" x-text="'Completed' + (docStatusCounts?.completed ? ' (' + docStatusCounts.completed + ')' : '')"></option>
+			<option value="failed" x-text="'Failed' + (docStatusCounts?.failed ? ' (' + docStatusCounts.failed + ')' : '')"></option>
+			<option value="partial_failure" x-text="'Partial Failure' + (docStatusCounts?.partial_failure ? ' (' + docStatusCounts.partial_failure + ')' : '')"></option>
+			<option value="cancelled" x-text="'Cancelled' + (docStatusCounts?.cancelled ? ' (' + docStatusCounts.cancelled + ')' : '')"></option>
+		</select>
+		<!-- Separator -->
+		<div class="h-6 w-px bg-border hidden sm:block"></div>
+		<!-- Sort Controls -->
+		<div class="flex items-center gap-1.5">
+			<span class="text-sm text-muted-foreground whitespace-nowrap">
+				{ i18n.T(ctx, "Sort by") }
+			</span>
+			<button
+				@click="toggleSort('created_at')"
+				class="inline-flex items-center gap-1 rounded-md px-3 h-9 text-sm font-medium transition-colors"
+				:class="sortField === 'created_at' ? 'bg-secondary text-secondary-foreground' : 'hover:bg-muted text-muted-foreground'"
+			>
+				{ i18n.T(ctx, "Created") }
+				<template x-if="sortField === 'created_at' && sortDirection === 'asc'">
+					@icon.ArrowUp(icon.Props{Class: "size-3"})
+				</template>
+				<template x-if="sortField === 'created_at' && sortDirection === 'desc'">
+					@icon.ArrowDown(icon.Props{Class: "size-3"})
+				</template>
+			</button>
+			<button
+				@click="toggleSort('updated_at')"
+				class="inline-flex items-center gap-1 rounded-md px-3 h-9 text-sm font-medium transition-colors"
+				:class="sortField === 'updated_at' ? 'bg-secondary text-secondary-foreground' : 'hover:bg-muted text-muted-foreground'"
+			>
+				{ i18n.T(ctx, "Updated") }
+				<template x-if="sortField === 'updated_at' && sortDirection === 'asc'">
+					@icon.ArrowUp(icon.Props{Class: "size-3"})
+				</template>
+				<template x-if="sortField === 'updated_at' && sortDirection === 'desc'">
+					@icon.ArrowDown(icon.Props{Class: "size-3"})
+				</template>
+			</button>
+		</div>
+	</div>
+}

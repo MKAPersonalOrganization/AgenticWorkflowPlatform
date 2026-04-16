@@ -1,0 +1,76 @@
+package landing
+
+import "aicompass/frontend/components/icon"
+
+// ─── Knowledge Base ──────────────────────────────────────────────────────────
+templ knowledgeBaseSection() {
+	<section class="py-24">
+		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+			<div class="grid gap-12 lg:grid-cols-2 lg:items-center">
+				<!-- Text -->
+				<div>
+					<div class="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-4 py-1.5 text-sm text-muted-foreground">
+						@icon.Database(icon.Props{Class: "size-4 text-pink-500"})
+						<span>Knowledge Base</span>
+					</div>
+					<h2 class="text-3xl font-bold tracking-tight sm:text-4xl">
+						Your documents, your
+						<span class="text-primary">knowledge graph</span>
+					</h2>
+					<p class="mt-4 text-lg text-muted-foreground">
+						Upload PDFs, documents, and text files. Compass.AI builds a searchable knowledge graph with vector embeddings, so your AI agents can give answers grounded in your own data.
+					</p>
+					<ul class="mt-8 space-y-4">
+						@checkListItem("Multi-workspace document management")
+						@checkListItem("Automatic PDF processing and indexing")
+						@checkListItem("Interactive knowledge graph visualization")
+						@checkListItem("Per-agent workspace access controls")
+						@checkListItem("Pipeline monitoring and queue management")
+					</ul>
+				</div>
+				<!-- Visual -->
+				<div class="rounded-xl border border-border bg-card p-6">
+					<div class="mb-4 flex items-center justify-between">
+						<h4 class="text-sm font-semibold">Knowledge Workspaces</h4>
+						<span class="text-xs text-muted-foreground">Active workspaces</span>
+					</div>
+					<div class="space-y-3">
+						@workspaceRow("Physics Notes", "42 documents", "2.1 GB", "bg-blue-500")
+						@workspaceRow("History Research", "128 documents", "5.4 GB", "bg-amber-500")
+						@workspaceRow("Programming Guides", "67 documents", "1.8 GB", "bg-green-500")
+					</div>
+					<div class="mt-4 rounded-lg border border-border bg-muted/30 p-4">
+						<div class="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+							@icon.Network(icon.Props{Class: "size-3"})
+							<span>Knowledge Graph Preview</span>
+						</div>
+						<div class="h-32 rounded-md bg-linear-to-br from-primary/5 to-primary/10 flex items-center justify-center">
+							<div class="flex items-center gap-6 text-muted-foreground/50">
+								<div class="h-4 w-4 rounded-full bg-primary/40"></div>
+								<div class="h-1 w-12 bg-primary/20 rounded"></div>
+								<div class="h-3 w-3 rounded-full bg-primary/30"></div>
+								<div class="h-1 w-8 bg-primary/20 rounded"></div>
+								<div class="h-5 w-5 rounded-full bg-primary/50"></div>
+								<div class="h-1 w-10 bg-primary/20 rounded"></div>
+								<div class="h-3 w-3 rounded-full bg-primary/20"></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+templ workspaceRow(name, docs, size, dotColor string) {
+	<div class="flex items-center justify-between rounded-lg border border-border bg-background px-4 py-3">
+		<div class="flex items-center gap-3">
+			<div class={ "h-2.5 w-2.5 rounded-full", dotColor }></div>
+			<div>
+				<div class="text-sm font-medium">{ name }</div>
+				<div class="text-xs text-muted-foreground">{ docs }</div>
+			</div>
+		</div>
+		<span class="text-xs text-muted-foreground">{ size }</span>
+	</div>
+}

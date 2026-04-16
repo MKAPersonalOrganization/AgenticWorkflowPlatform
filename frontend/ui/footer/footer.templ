@@ -1,0 +1,14 @@
+package footer
+
+import "aicompass/frontend/ui/i18n"
+
+// Footer - Empty footer after removal of disclaimer and links
+templ Footer() {
+}
+
+// CompactFooter - Smaller footer for conversation state
+templ CompactFooter() {
+	<div class="text-center text-[11px] text-muted-foreground/70 py-2 tracking-wide">
+		{ i18n.T(ctx, "AI responses may be inaccurate. Verify important information.") }
+	</div>
+}

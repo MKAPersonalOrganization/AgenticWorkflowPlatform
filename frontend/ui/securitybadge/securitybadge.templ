@@ -1,0 +1,23 @@
+package securitybadge
+
+import "aicompass/frontend/components/icon"
+
+type Props struct {
+	Message string // Optional, defaults to standard security message
+	Class   string // Optional additional classes
+}
+
+// SecurityBadge displays a security assurance message
+templ SecurityBadge(props ...Props) {
+	{{ var p Props }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	if p.Message == "" {
+		{{ p.Message = "Secure checkout powered by 256-bit SSL encryption" }}
+	}
+	<div class={ "flex items-center justify-center gap-3 py-4 px-6 rounded-xl border border-border bg-muted text-sm text-foreground", p.Class }>
+		@icon.Lock(icon.Props{Class: "size-5 text-primary"})
+		<span class="font-medium">{ p.Message }</span>
+	</div>
+}

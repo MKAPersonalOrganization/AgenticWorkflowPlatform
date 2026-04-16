@@ -1,0 +1,203 @@
+package knowledge
+
+import (
+	"aicompass/frontend/ui/i18n"
+	"aicompass/frontend/components/icon"
+	"aicompass/frontend/components/popover"
+	"aicompass/frontend/components/slider"
+	switchcomp "aicompass/frontend/components/switch"
+)
+
+templ GraphSettingsPanel() {
+	@popover.Root(popover.RootProps{ID: "graph-settings-popover"}) {
+		@popover.Trigger(popover.TriggerProps{
+			Class: "flex items-center justify-center h-8 w-8 rounded-md border bg-background hover:bg-accent hover:text-accent-foreground transition-all duration-200",
+			Attributes: templ.Attributes{
+				"title": i18n.T(ctx, "Graph Settings"),
+			},
+		}) {
+			@icon.Settings2(icon.Props{Class: "size-4"})
+		}
+		@popover.Content(popover.ContentProps{
+			Placement: popover.PlacementBottomEnd,
+			Class:     "w-80 p-4 border shadow-2xl bg-background/95 backdrop-blur-md animate-in fade-in zoom-in duration-200",
+			ShowArrow: true,
+		}) {
+		<div class="space-y-5">
+			<!-- Header -->
+			<div class="flex items-center justify-between pb-2 border-b">
+				<div class="flex items-center gap-2">
+					<div class="p-1.5 bg-primary/10 rounded-md text-primary">
+						@icon.Settings2(icon.Props{Class: "size-4"})
+					</div>
+					<h4 class="font-semibold text-sm tracking-tight">{ i18n.T(ctx, "Query Settings") }</h4>
+				</div>
+			</div>
+			<!-- Focus Entity Search -->
+			<div class="space-y-2.5">
+				<label class="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80 flex items-center gap-1.5 px-0.5">
+					@icon.Search(icon.Props{Class: "size-3"})
+					{ i18n.T(ctx, "Focus Entity") }
+				</label>
+				<div class="relative group">
+					<div class="absolute start-2.5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+						@icon.Search(icon.Props{Class: "size-3.5"})
+					</div>
+					<input
+						type="text"
+						x-model="graphStartNodeInput"
+						@input.debounce.300ms="searchGraphLabels()"
+						placeholder={ i18n.T(ctx, "Search entity to focus...") }
+						class="w-full h-9 ps-8.5 pe-8 text-xs bg-muted/30 border border-border/50 rounded-md ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+					/>
+					<template x-if="graphStartNodeInput">
+						<button
+							@click="clearGraphFocus()"
+							class="absolute end-1 top-1/2 -translate-y-1/2 h-7 w-7 flex items-center justify-center rounded-sm hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+						>
+							@icon.X(icon.Props{Class: "size-3"})
+						</button>
+					</template>
+				</div>
+				<!-- Search results list -->
+				<template x-if="graphLabelMatches.length > 0">
+					<div class="mt-1 border rounded-md bg-card shadow-lg divide-y max-h-40 overflow-y-auto custom-scrollbar border-border/60">
+						<template x-for="match in graphLabelMatches" :key="match">
+							<button
+								@click="selectGraphFocus(match)"
+								class="w-full px-3 py-2 text-start text-xs hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2"
+							>
+								@icon.Tag(icon.Props{Class: "size-3 opacity-40"})
+								<span x-text="match" class="truncate font-medium"></span>
+							</button>
+						</template>
+					</div>
+				</template>
+				<p class="text-[10px] text-muted-foreground leading-relaxed px-1">
+					<template x-if="!graphStartNode">
+						<span>{ i18n.T(ctx, "Leave empty to show most connected nodes.") }</span>
+					</template>
+					<template x-if="graphStartNode">
+						<span class="flex items-center gap-1.5 text-primary font-medium">
+							@icon.Check(icon.Props{Class: "size-2.5"})
+							<span x-text="'Focused on: ' + graphStartNode"></span>
+						</span>
+					</template>
+				</p>
+			</div>
+			<!-- Performance Tuning Section -->
+			<div class="space-y-4 pt-1">
+				<!-- Max Nodes -->
+				<div class="space-y-3">
+					<div class="flex items-center justify-between px-0.5">
+						<label class="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80 flex items-center gap-1.5">
+							@icon.Network(icon.Props{Class: "size-3"})
+							{ i18n.T(ctx, "Max Nodes") }
+						</label>
+						<span class="text-[11px] font-mono font-bold text-primary bg-primary/5 px-2 py-0.5 rounded border border-primary/10" x-text="graphMaxNodes"></span>
+					</div>
+					@slider.Slider(slider.Props{
+						Class: "px-0.5",
+						Attributes: templ.Attributes{
+							"@input":  "graphMaxNodes = $event.target.value",
+							"@change": "loadGraph()",
+						},
+					}) {
+						@slider.Input(slider.InputProps{
+							Min:   50,
+							Max:   1000,
+							Step:  50,
+							Value: 100, // Tied via x-model/init
+							Attributes: templ.Attributes{
+								"x-model": "graphMaxNodes",
+							},
+						})
+					}
+					<p class="text-[10px] text-muted-foreground px-0.5 italic">
+						{ i18n.T(ctx, "Limit the number of nodes fetched from the server.") }
+					</p>
+				</div>
+				<!-- Traversal Depth -->
+				<div class="space-y-3">
+					<div class="flex items-center justify-between px-0.5">
+						<label class="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80 flex items-center gap-1.5">
+							@icon.GitBranch(icon.Props{Class: "size-3"})
+							{ i18n.T(ctx, "Traversal Depth") }
+						</label>
+						<span class="text-[11px] font-mono font-bold text-primary bg-primary/5 px-2 py-0.5 rounded border border-primary/10" x-text="graphDepth"></span>
+					</div>
+					@slider.Slider(slider.Props{
+						Class: "px-0.5",
+						Attributes: templ.Attributes{
+							"@input":  "graphDepth = $event.target.value",
+							"@change": "loadGraph()",
+						},
+					}) {
+						@slider.Input(slider.InputProps{
+							Min:   1,
+							Max:   5,
+							Step:  1,
+							Value: 2,
+							Attributes: templ.Attributes{
+								"x-model": "graphDepth",
+							},
+						})
+					}
+					<p class="text-[10px] text-muted-foreground px-0.5 italic">
+						{ i18n.T(ctx, "Depth of relationship traversal from the focus node.") }
+					</p>
+				</div>
+			</div>
+			<!-- Options -->
+			<div class="space-y-3 pt-2">
+				<div class="flex items-center justify-between p-2.5 rounded-lg bg-muted/40 border border-border/40 hover:border-border transition-colors">
+					<div class="space-y-0.5">
+						<label class="text-xs font-semibold flex items-center gap-2">
+							@icon.UserMinus(icon.Props{Class: "size-3.5"})
+							{ i18n.T(ctx, "Include Orphans") }
+						</label>
+						<p class="text-[10px] text-muted-foreground">
+							{ i18n.T(ctx, "Show nodes with no connections.") }
+						</p>
+					</div>
+					@switchcomp.Switch(switchcomp.Props{
+						Class: "scale-90",
+						Attributes: templ.Attributes{
+							"x-model": "graphIncludeOrphans",
+							"@change": "loadGraph()",
+						},
+					})
+				</div>
+			</div>
+			<!-- Presets -->
+			<div class="pt-2">
+				<div class="flex items-center gap-2 mb-2.5 px-0.5">
+					<div class="h-px bg-border flex-1"></div>
+					<span class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">{ i18n.T(ctx, "Quick Presets") }</span>
+					<div class="h-px bg-border flex-1"></div>
+				</div>
+				<div class="flex gap-2">
+					<button
+						@click="applyGraphPreset(200, 2)"
+						class="flex-1 h-8 text-[11px] font-medium border rounded-md hover:bg-accent transition-all hover:shadow-sm"
+					>
+						{ i18n.T(ctx, "Default") }
+					</button>
+					<button
+						@click="applyGraphPreset(500, 3)"
+						class="flex-1 h-8 text-[11px] font-medium border rounded-md hover:bg-accent transition-all hover:shadow-sm"
+					>
+						{ i18n.T(ctx, "Large") }
+					</button>
+					<button
+						@click="applyGraphPreset(1000, 4)"
+						class="flex-1 h-8 text-[11px] font-medium border rounded-md hover:bg-accent transition-all hover:shadow-sm"
+					>
+						{ i18n.T(ctx, "Max") }
+					</button>
+				</div>
+			</div>
+		</div>
+		}
+	}
+}

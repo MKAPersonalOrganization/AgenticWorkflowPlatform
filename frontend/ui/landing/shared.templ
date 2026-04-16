@@ -1,0 +1,13 @@
+package landing
+
+import "aicompass/frontend/components/icon"
+
+// checkListItem renders a single checklist item with a check icon.
+templ checkListItem(text string) {
+	<li class="flex items-start gap-3">
+		<div class="mt-1">
+			@icon.Check(icon.Props{Class: "size-5 text-primary shrink-0"})
+		</div>
+		<span class="text-sm leading-relaxed text-muted-foreground">{ text }</span>
+	</li>
+}

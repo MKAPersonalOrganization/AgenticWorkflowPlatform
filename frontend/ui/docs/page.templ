@@ -1,0 +1,71 @@
+package docs
+
+import (
+	"aicompass/frontend/ui"
+	"aicompass/frontend/ui/landing"
+	"aicompass/shared"
+)
+
+type DocsPageProps struct {
+	User *shared.User
+}
+
+templ DocsPage(props DocsPageProps) {
+	@ui.BaseLayout(ui.LayoutProps{
+		Title:      "Documentation",
+		User:       props.User,
+		HideNavbar: true,
+	}) {
+		<div class="h-full overflow-y-auto scroll-smooth relative" id="docs-root">
+			<!-- Subtle background grid -->
+			<div class="fixed inset-0 pointer-events-none z-[-1]">
+				<div class="absolute inset-0 bg-grid-pattern [mask-image:radial-gradient(ellipse_at_top,black,transparent_80%)] opacity-20"></div>
+				<div class="absolute inset-0 bg-gradient-to-b from-background/50 to-background"></div>
+			</div>
+			<!-- Navbar (reuse landing nav) -->
+			@landing.Nav(props.User)
+			<!-- Docs Layout -->
+			<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 relative z-10">
+				<div class="lg:grid lg:grid-cols-[240px_1fr] lg:gap-12">
+					<!-- Sidebar Navigation -->
+					@docsSidebar()
+					<!-- Main Content -->
+					<main class="min-w-0">
+						@docsHero()
+						@docsOverview()
+						@docsGettingStarted()
+						@docsAIModels()
+						@docsAISettings()
+						@docsAgentStore()
+						@docsCustomAgents()
+						@docsMultiAgentOrchestration()
+						@docsUserProfile()
+						@docsWorkflowExamples()
+						@docsSequentialExamples()
+						@docsParallelExamples()
+						@docsLoopExamples()
+						@docsConditionalExamples()
+						@docsAdvancedExamples()
+						@docsDesignYourOwn()
+						@docsPlugins()
+						@docsVoiceTTS()
+						@docsMCP()
+						@docsA2A()
+						@docsKnowledgeBase()
+						@docsMemoryArtifacts()
+						@docsFileAttachments()
+						@docsResourceLibrary()
+						@docsConversationSearch()
+						@docsTokenUsage()
+						@docsArchitecture()
+						@docsSecurity()
+						@docsI18n()
+						@docsBilling()
+					</main>
+				</div>
+			</div>
+			<!-- Footer -->
+			@landing.Footer()
+		</div>
+	}
+}

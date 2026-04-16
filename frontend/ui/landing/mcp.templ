@@ -1,0 +1,76 @@
+package landing
+
+import "aicompass/frontend/components/icon"
+
+// ─── MCP Integration ─────────────────────────────────────────────────────────
+templ mcpSection() {
+	<section id="integrations" class="py-24">
+		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+			<div class="grid gap-12 lg:grid-cols-2 lg:items-center">
+				<!-- Visual -->
+				<div class="order-2 lg:order-1">
+					<div class="rounded-xl border border-border bg-card p-6">
+						<div class="space-y-4">
+							@mcpConnectorRow("GitHub Copilot MCP", "connected", "github.com")
+							@mcpConnectorRow("Notion Workspace", "connected", "notion.so")
+							@mcpConnectorRow("Slack Integration", "auth_required", "slack.com")
+							@mcpConnectorRow("Custom API Server", "connecting", "api.example.com")
+						</div>
+						<div class="mt-6 rounded-lg border border-dashed border-border bg-muted/30 p-4 text-center">
+							<div class="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+								@icon.MCPLogo("size-4")
+								<span>Add MCP Connector...</span>
+							</div>
+						</div>
+					</div>
+				</div>
+				<!-- Text content -->
+				<div class="order-1 lg:order-2">
+					<div class="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-4 py-1.5 text-sm text-muted-foreground">
+						@icon.MCPLogo("size-4 text-orange-500")
+						<span>Model Context Protocol</span>
+					</div>
+					<h2 class="text-3xl font-bold tracking-tight sm:text-4xl">
+						Connect to any
+						<span class="text-primary">MCP server</span>
+					</h2>
+					<p class="mt-4 text-lg text-muted-foreground">
+						The Model Context Protocol lets you extend Compass.AI with external tools and data sources. Connect to GitHub, Notion, Slack, or your own custom servers.
+					</p>
+					<ul class="mt-8 space-y-4">
+						@checkListItem("Full OAuth 2.1 Authorization Code + PKCE flow")
+						@checkListItem("Automatic tool discovery from remote servers")
+						@checkListItem("Authenticated reverse proxy for secure communication")
+						@checkListItem("Preset catalog of popular MCP connectors")
+						@checkListItem("SSRF protection and encrypted tokens at rest")
+					</ul>
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+templ mcpConnectorRow(name, status, url string) {
+	<div class="flex items-center justify-between rounded-lg border border-border bg-background px-4 py-3">
+		<div class="flex items-center gap-3">
+			@icon.Server(icon.Props{Class: "size-4 text-muted-foreground"})
+			<div>
+				<div class="text-sm font-medium">{ name }</div>
+				<div class="text-xs text-muted-foreground">{ url }</div>
+			</div>
+		</div>
+		<div class="flex items-center gap-2">
+			switch status {
+				case "connected":
+					<div class="h-2 w-2 rounded-full bg-green-500"></div>
+					<span class="text-xs text-green-600 dark:text-green-400">Connected</span>
+				case "auth_required":
+					<div class="h-2 w-2 rounded-full bg-yellow-500"></div>
+					<span class="text-xs text-yellow-600 dark:text-yellow-400">Auth Required</span>
+				case "connecting":
+					<div class="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></div>
+					<span class="text-xs text-blue-600 dark:text-blue-400">Connecting</span>
+			}
+		</div>
+	</div>
+}

@@ -1,0 +1,594 @@
+package analytics
+
+import (
+	"encoding/json"
+	"fmt"
+	"aicompass/frontend/components/chart"
+	"aicompass/shared"
+)
+
+type DashboardProps struct {
+	Stats        []StatRow
+	Agents       []string
+	CurrentAgent string
+	User         *shared.User
+	TimeSeries   []TimeSeriesPoint
+	ToolList     []ToolSummary
+}
+
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+templ Dashboard(props DashboardProps) {
+	@Layout(LayoutProps{
+		Title:      "Analytics",
+		User:       props.User,
+		HideNavbar: true,
+	}) {
+		<div class="p-6 lg:p-8 space-y-8 max-w-[1600px] mx-auto">
+			<!-- Header -->
+			<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+				<div>
+					<h1 class="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Analytics Dashboard</h1>
+					<p class="text-muted-foreground mt-1 text-lg">Production-ready insights into agent system performance.</p>
+				</div>
+				<div class="flex items-center gap-3">
+					<form action="/analytics" method="GET" class="flex items-center gap-3 bg-card p-2 rounded-xl border shadow-sm">
+						<label for="agent-filter" class="text-sm font-medium text-muted-foreground ms-2">Filter by Agent:</label>
+						<select
+							id="agent-filter"
+							name="agent"
+							class="bg-background border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
+							onchange="this.form.submit()"
+						>
+							<option value="">All Agents</option>
+							for _, agent := range props.Agents {
+								<option value={ agent } selected?={ props.CurrentAgent == agent }>{ agent }</option>
+							}
+						</select>
+					</form>
+					<a
+						href={ templ.URL(fmt.Sprintf("/analytics?agent=%s", props.CurrentAgent)) }
+						class="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors gap-2 h-[42px]"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>
+						Refresh
+					</a>
+				</div>
+			</div>
+			<!-- KPI Cards -->
+			{{
+				totalCalls := 0
+				totalErrors := 0
+				totalSuccesses := 0
+				activeTools := len(props.ToolList)
+				mostUsedTool := "—"
+				mostUsedCount := 0
+				for _, t := range props.ToolList {
+					totalCalls += t.TotalCalls
+					totalErrors += t.Errors
+					totalSuccesses += t.Successes
+					if t.TotalCalls > mostUsedCount {
+						mostUsedCount = t.TotalCalls
+						mostUsedTool = t.ToolName
+					}
+				}
+				successRate := 0.0
+				if totalCalls > 0 {
+					successRate = float64(totalSuccesses) / float64(totalCalls) * 100
+				}
+			}}
+			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+				<!-- Total Tool Calls -->
+				<div class="bg-card rounded-2xl border shadow-sm p-6 flex flex-col gap-2">
+					<div class="flex items-center gap-2 text-muted-foreground text-sm font-medium">
+						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+						Total Tool Calls
+					</div>
+					<div class="text-3xl font-bold tracking-tight">{ fmt.Sprintf("%d", totalCalls) }</div>
+					<div class="text-xs text-muted-foreground">Last 7 days of events</div>
+				</div>
+				<!-- Success Rate -->
+				<div class="bg-card rounded-2xl border shadow-sm p-6 flex flex-col gap-2">
+					<div class="flex items-center gap-2 text-muted-foreground text-sm font-medium">
+						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+						Success Rate
+					</div>
+					<div class="text-3xl font-bold tracking-tight">
+						if totalCalls > 0 {
+							<span class={ templ.KV("text-green-600 dark:text-green-400", successRate >= 95), templ.KV("text-yellow-600 dark:text-yellow-400", successRate >= 80 && successRate < 95), templ.KV("text-red-600 dark:text-red-400", successRate < 80) }>{ fmt.Sprintf("%.1f%%", successRate) }</span>
+						} else {
+							<span class="text-muted-foreground">—</span>
+						}
+					</div>
+					<div class="text-xs text-muted-foreground">{ fmt.Sprintf("%d successes / %d failures", totalSuccesses, totalErrors) }</div>
+				</div>
+				<!-- Active Tools -->
+				<div class="bg-card rounded-2xl border shadow-sm p-6 flex flex-col gap-2">
+					<div class="flex items-center gap-2 text-muted-foreground text-sm font-medium">
+						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+						Active Tools
+					</div>
+					<div class="text-3xl font-bold tracking-tight">{ fmt.Sprintf("%d", activeTools) }</div>
+					<div class="text-xs text-muted-foreground">Distinct tools invoked</div>
+				</div>
+				<!-- Most Used Tool -->
+				<div class="bg-card rounded-2xl border shadow-sm p-6 flex flex-col gap-2">
+					<div class="flex items-center gap-2 text-muted-foreground text-sm font-medium">
+						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+						Most Used Tool
+					</div>
+					<div class="text-xl font-bold tracking-tight truncate" title={ mostUsedTool }>{ mostUsedTool }</div>
+					<div class="text-xs text-muted-foreground">{ fmt.Sprintf("%d calls", mostUsedCount) }</div>
+				</div>
+			</div>
+			<!-- Time-Series Charts Row -->
+			if len(props.TimeSeries) > 0 {
+				{{
+					tsLabels := []string{}
+					tsCalls := []float64{}
+					tsErrors := []float64{}
+					tsSuccesses := []float64{}
+					tsErrorRates := []float64{}
+					for _, p := range props.TimeSeries {
+						tsLabels = append(tsLabels, p.Bucket.Format("Jan 02 15:04"))
+						tsCalls = append(tsCalls, float64(p.TotalCalls))
+						tsErrors = append(tsErrors, float64(p.Errors))
+						tsSuccesses = append(tsSuccesses, float64(p.Successes))
+						tsErrorRates = append(tsErrorRates, p.ErrorRate)
+					}
+				}}
+				<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+					<!-- Tool Calls Over Time -->
+					<div class="bg-card rounded-2xl border shadow-sm p-6">
+						<h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+							<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><path d="M3 3v18h18"></path><path d="m19 9-5 5-4-4-3 3"></path></svg>
+							Tool Calls Over Time
+						</h3>
+						@chart.Chart(chart.Props{
+							ID:          "tool-calls-timeline",
+							Variant:     chart.VariantLine,
+							ShowLegend:  true,
+							ShowXAxis:   true,
+							ShowYAxis:   true,
+							ShowXLabels: true,
+							ShowYLabels: true,
+							ShowYGrid:   true,
+							BeginAtZero: boolPtr(true),
+							Class:       "h-[300px]",
+							Data: chart.Data{
+								Labels: tsLabels,
+								Datasets: []chart.Dataset{
+									{
+										Label:           "Successes",
+										Data:            tsSuccesses,
+										BorderColor:     "rgb(34, 197, 94)",
+										BackgroundColor: "rgba(34, 197, 94, 0.1)",
+										BorderWidth:     2,
+										Tension:         0.3,
+										Fill:            true,
+									},
+									{
+										Label:           "Errors",
+										Data:            tsErrors,
+										BorderColor:     "rgb(239, 68, 68)",
+										BackgroundColor: "rgba(239, 68, 68, 0.1)",
+										BorderWidth:     2,
+										Tension:         0.3,
+										Fill:            true,
+									},
+								},
+							},
+						})
+					</div>
+					<!-- Error Rate Over Time -->
+					<div class="bg-card rounded-2xl border shadow-sm p-6">
+						<h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+							<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-destructive"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+							Error Rate Over Time (%)
+						</h3>
+						@chart.Chart(chart.Props{
+							ID:          "error-rate-timeline",
+							Variant:     chart.VariantLine,
+							ShowLegend:  false,
+							ShowXAxis:   true,
+							ShowYAxis:   true,
+							ShowXLabels: true,
+							ShowYLabels: true,
+							ShowYGrid:   true,
+							BeginAtZero: boolPtr(true),
+							Class:       "h-[300px]",
+							Data: chart.Data{
+								Labels: tsLabels,
+								Datasets: []chart.Dataset{
+									{
+										Label:           "Error Rate %",
+										Data:            tsErrorRates,
+										BorderColor:     "rgb(239, 68, 68)",
+										BackgroundColor: "rgba(239, 68, 68, 0.15)",
+										BorderWidth:     2,
+										Tension:         0.3,
+										Fill:            true,
+									},
+								},
+							},
+						})
+					</div>
+				</div>
+			}
+			<!-- Tool Popularity & Per-Tool Detail Row -->
+			if len(props.ToolList) > 0 {
+				<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+					<!-- Tool Popularity Bar Chart -->
+					<div class="bg-card rounded-2xl border shadow-sm p-6">
+						<h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+							<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-500"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M7 16V8"></path><path d="M12 16v-5"></path><path d="M17 16v-7"></path></svg>
+							Tool Popularity
+						</h3>
+						{{
+							toolNames := []string{}
+							toolCallCounts := []float64{}
+							toolSuccessCounts := []float64{}
+							toolErrorCounts := []float64{}
+							for _, t := range props.ToolList {
+								toolNames = append(toolNames, t.ToolName)
+								toolCallCounts = append(toolCallCounts, float64(t.TotalCalls))
+								toolSuccessCounts = append(toolSuccessCounts, float64(t.Successes))
+								toolErrorCounts = append(toolErrorCounts, float64(t.Errors))
+							}
+						}}
+						@chart.Chart(chart.Props{
+							ID:          "tool-popularity",
+							Variant:     chart.VariantBar,
+							Horizontal:  true,
+							Stacked:     true,
+							ShowLegend:  true,
+							ShowXAxis:   true,
+							ShowYAxis:   true,
+							ShowXLabels: true,
+							ShowYLabels: true,
+							BeginAtZero: boolPtr(true),
+							Class:       "h-[300px]",
+							Data: chart.Data{
+								Labels: toolNames,
+								Datasets: []chart.Dataset{
+									{
+										Label:           "Successes",
+										Data:            toolSuccessCounts,
+										BackgroundColor: "rgba(34, 197, 94, 0.8)",
+										BorderWidth:     0,
+									},
+									{
+										Label:           "Errors",
+										Data:            toolErrorCounts,
+										BackgroundColor: "rgba(239, 68, 68, 0.8)",
+										BorderWidth:     0,
+									},
+								},
+							},
+						})
+					</div>
+					<!-- Tool Detail Table -->
+					<div class="bg-card rounded-2xl border shadow-sm p-6">
+						<h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+							<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-violet-500"><path d="M12 20V10"></path><path d="M18 20V4"></path><path d="M6 20v-4"></path></svg>
+							Tool Performance Summary
+						</h3>
+						<div class="overflow-x-auto">
+							<table class="w-full text-sm">
+								<thead>
+									<tr class="border-b bg-muted/30">
+										<th class="h-10 px-3 text-start font-semibold text-muted-foreground uppercase tracking-wider text-xs">Tool</th>
+										<th class="h-10 px-3 text-end font-semibold text-muted-foreground uppercase tracking-wider text-xs">Calls</th>
+										<th class="h-10 px-3 text-end font-semibold text-muted-foreground uppercase tracking-wider text-xs">Success</th>
+										<th class="h-10 px-3 text-end font-semibold text-muted-foreground uppercase tracking-wider text-xs">Rate</th>
+									</tr>
+								</thead>
+								<tbody class="divide-y divide-border">
+									for _, t := range props.ToolList {
+										<tr class="hover:bg-muted/20 transition-colors">
+											<td class="px-3 py-2.5 font-medium truncate max-w-[200px]" title={ t.ToolName }>{ t.ToolName }</td>
+											<td class="px-3 py-2.5 text-end font-semibold tabular-nums">{ fmt.Sprintf("%d", t.TotalCalls) }</td>
+											<td class="px-3 py-2.5 text-end text-green-600 dark:text-green-400 tabular-nums">{ fmt.Sprintf("%d", t.Successes) }</td>
+											<td class="px-3 py-2.5 text-end">
+												<div class="flex items-center justify-end gap-2">
+													<div class="w-12 bg-muted rounded-full h-1.5 hidden sm:block">
+														<div
+															class={ templ.KV("bg-green-500", t.SuccessRate >= 95), templ.KV("bg-yellow-500", t.SuccessRate >= 80 && t.SuccessRate < 95), templ.KV("bg-red-500", t.SuccessRate < 80), "h-1.5 rounded-full" }
+															style={ fmt.Sprintf("width: %.0f%%", t.SuccessRate) }
+														></div>
+													</div>
+													<span class="font-mono text-xs tabular-nums">{ fmt.Sprintf("%.1f%%", t.SuccessRate) }</span>
+												</div>
+											</td>
+										</tr>
+									}
+								</tbody>
+							</table>
+						</div>
+					</div>
+				</div>
+			}
+			<!-- Per-Tool Detail Section (Dynamic via Alpine.js) -->
+			if len(props.ToolList) > 0 {
+				{{ toolListJSON, _ := json.Marshal(props.ToolList) }}
+				<div
+					class="bg-card rounded-2xl border shadow-sm p-6"
+					x-data={ fmt.Sprintf(`{
+						selectedTool: '',
+						toolList: %s,
+						loading: false,
+						chartInstance: null,
+						async loadToolDetail() {
+							if (!this.selectedTool) return;
+							this.loading = true;
+							try {
+								const res = await fetch('/analytics/api/tools/' + encodeURIComponent(this.selectedTool) + '?agent=%s');
+								const data = await res.json();
+								this.renderDetailChart(data);
+							} catch(e) {
+								console.error('Failed to load tool detail', e);
+							} finally {
+								this.loading = false;
+							}
+						},
+						renderDetailChart(data) {
+							const canvas = document.getElementById('tool-detail-canvas');
+							if (!canvas) return;
+							if (this.chartInstance) { this.chartInstance.destroy(); }
+							const labels = data.map(d => {
+								const dt = new Date(d.bucket);
+								return dt.toLocaleDateString('en', {month:'short',day:'numeric'}) + ' ' + dt.toLocaleTimeString('en', {hour:'2-digit',minute:'2-digit'});
+							});
+							this.chartInstance = new Chart(canvas.getContext('2d'), {
+								type: 'bar',
+								data: {
+									labels: labels,
+									datasets: [
+										{
+											label: 'Successes',
+											data: data.map(d => d.successes),
+											backgroundColor: 'rgba(34, 197, 94, 0.8)',
+											borderWidth: 0,
+											borderRadius: 4,
+										},
+										{
+											label: 'Errors',
+											data: data.map(d => d.errors),
+											backgroundColor: 'rgba(239, 68, 68, 0.8)',
+											borderWidth: 0,
+											borderRadius: 4,
+										}
+									]
+								},
+								options: {
+									responsive: true,
+									maintainAspectRatio: false,
+									plugins: {
+										legend: { display: true, position: 'top' },
+										tooltip: {
+											callbacks: {
+												afterBody: function(items) {
+													const idx = items[0].dataIndex;
+													const errRate = data[idx].errorRate;
+													return 'Error Rate: ' + errRate.toFixed(1) + '%%';
+												}
+											}
+										}
+									},
+									scales: {
+										x: { stacked: true, grid: { display: false } },
+										y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(128,128,128,0.1)' } }
+									}
+								}
+							});
+						}
+					}`, string(toolListJSON), props.CurrentAgent) }
+				>
+					<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+						<h3 class="text-lg font-semibold flex items-center gap-2">
+							<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-amber-500"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+							Per-Tool Deep Dive
+						</h3>
+						<select
+							x-model="selectedTool"
+							x-on:change="loadToolDetail()"
+							class="bg-background border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary outline-none transition-all max-w-xs"
+						>
+							<option value="">Select a tool...</option>
+							for _, t := range props.ToolList {
+								<option value={ t.ToolName }>{ t.ToolName } ({ fmt.Sprintf("%d calls", t.TotalCalls) })</option>
+							}
+						</select>
+					</div>
+					<div x-show="!selectedTool" class="text-center py-12 text-muted-foreground">
+						<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-3 opacity-30"><path d="M3 3v18h18"></path><path d="m19 9-5 5-4-4-3 3"></path></svg>
+						<p class="text-sm">Select a tool above to view detailed performance metrics</p>
+					</div>
+					<div x-show="loading" class="text-center py-12">
+						<div class="inline-block h-6 w-6 animate-spin rounded-full border-2 border-primary border-r-transparent"></div>
+						<p class="text-sm text-muted-foreground mt-2">Loading tool data...</p>
+					</div>
+					<div x-show="selectedTool && !loading" class="relative h-[350px]">
+						<canvas id="tool-detail-canvas"></canvas>
+					</div>
+				</div>
+			}
+			<!-- Agent Doughnut Charts -->
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+				{{
+					// Group stats by agent for visualization
+					agentTools := make(map[string][]StatRow)
+					for _, s := range props.Stats {
+						if s.Category == "tool" {
+							agentTools[s.AgentName] = append(agentTools[s.AgentName], s)
+						}
+					}
+				}}
+				for agent, stats := range agentTools {
+					<div class="bg-card p-6 rounded-2xl border shadow-sm flex flex-col items-center">
+						<h3 class="text-lg font-semibold mb-4 text-center">{ agent } - Tool Success Ratio</h3>
+						<div class="w-full aspect-square relative max-w-[250px]">
+							<canvas id={ fmt.Sprintf("chart-%s", agent) }></canvas>
+						</div>
+						<div class="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+							{{
+								totalAgentSuccess := 0
+								totalAgentFailures := 0
+								for _, s := range stats {
+									totalAgentSuccess += s.Successes
+									totalAgentFailures += s.Failures
+								}
+							}}
+							<div class="flex items-center gap-1.5">
+								<span class="w-3 h-3 rounded-full bg-green-500"></span>
+								<span>Success: { fmt.Sprintf("%d", totalAgentSuccess) }</span>
+							</div>
+							<div class="flex items-center gap-1.5">
+								<span class="w-3 h-3 rounded-full bg-red-500"></span>
+								<span>Failures: { fmt.Sprintf("%d", totalAgentFailures) }</span>
+							</div>
+						</div>
+						{{
+							labels := []string{}
+							data := []int{}
+							backgrounds := []string{}
+
+							for i, s := range stats {
+								if s.Successes > 0 {
+									labels = append(labels, fmt.Sprintf("%s (Success)", s.Name))
+									data = append(data, s.Successes)
+									opacity := 0.8 - (float64(i%5) * 0.1)
+									backgrounds = append(backgrounds, fmt.Sprintf("rgba(34, 197, 94, %v)", opacity))
+								}
+							}
+							for i, s := range stats {
+								if s.Failures > 0 {
+									labels = append(labels, fmt.Sprintf("%s (Failure)", s.Name))
+									data = append(data, s.Failures)
+									opacity := 0.8 - (float64(i%5) * 0.1)
+									backgrounds = append(backgrounds, fmt.Sprintf("rgba(239, 68, 68, %v)", opacity))
+								}
+							}
+
+							labelsJSON, _ := json.Marshal(labels)
+							dataJSON, _ := json.Marshal(data)
+							bgJSON, _ := json.Marshal(backgrounds)
+						}}
+						@renderChart(agent, string(labelsJSON), string(dataJSON), string(bgJSON))
+					</div>
+				}
+			</div>
+			<!-- Metrics Table -->
+			<div class="bg-card rounded-2xl border shadow-sm overflow-hidden">
+				<div class="px-6 py-4 border-b bg-muted/30">
+					<h3 class="text-lg font-semibold flex items-center gap-2">
+						<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+						Detailed Metrics
+					</h3>
+				</div>
+				<div id="stats-table-container">
+					<table class="w-full text-sm">
+						<thead>
+							<tr class="border-b bg-muted/30">
+								<th class="h-12 px-6 text-start align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Category</th>
+								<th class="h-12 px-6 text-start align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Name</th>
+								if props.CurrentAgent == "" {
+									<th class="h-12 px-6 text-start align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Agent</th>
+								}
+								<th class="h-12 px-6 text-end align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Total</th>
+								<th class="h-12 px-6 text-end align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Success</th>
+								<th class="h-12 px-6 text-end align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Failures</th>
+								<th class="h-12 px-6 text-end align-middle font-semibold text-muted-foreground uppercase tracking-wider text-xs">Failure Rate</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-border">
+							if len(props.Stats) == 0 {
+								<tr>
+									<td colspan="7" class="p-12 text-center text-muted-foreground italic">No metrics recorded yet</td>
+								</tr>
+							} else {
+								for _, s := range props.Stats {
+									<tr class="hover:bg-muted/20 transition-colors">
+										<td class="px-6 py-4 align-middle">
+											<span
+												class={
+													"inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+													templ.KV("bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300", s.Category == "tool"),
+													templ.KV("bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300", s.Category == "message"),
+													templ.KV("bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300", s.Category == "error"),
+												}
+											>
+												{ s.Category }
+											</span>
+										</td>
+										<td class="px-6 py-4 align-middle font-medium">{ s.Name }</td>
+										if props.CurrentAgent == "" {
+											<td class="px-6 py-4 align-middle text-muted-foreground">{ s.AgentName }</td>
+										}
+										<td class="px-6 py-4 align-middle text-end font-semibold tabular-nums">{ fmt.Sprintf("%d", s.TotalCount) }</td>
+										<td class="px-6 py-4 align-middle text-end text-green-600 dark:text-green-400 tabular-nums">{ fmt.Sprintf("%d", s.Successes) }</td>
+										<td class="px-6 py-4 align-middle text-end text-destructive tabular-nums">{ fmt.Sprintf("%d", s.Failures) }</td>
+										<td class="px-6 py-4 align-middle text-end">
+											if s.TotalCount > 0 {
+												<div class="flex items-center justify-end gap-2">
+													<div class="w-16 bg-muted rounded-full h-1.5 hidden sm:block">
+														<div class="bg-destructive h-1.5 rounded-full" style={ fmt.Sprintf("width: %.1f%%", float64(s.Failures)/float64(s.TotalCount)*100) }></div>
+													</div>
+													<span class="font-mono text-xs tabular-nums">{ fmt.Sprintf("%.1f%%", float64(s.Failures)/float64(s.TotalCount)*100) }</span>
+												</div>
+											} else {
+												<span class="text-muted-foreground">-</span>
+											}
+										</td>
+									</tr>
+								}
+							}
+						</tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+script renderChart(agent, labelsJSON, dataJSON, backgroundsJSON string) {
+	const chartId = `chart-${agent}`;
+	const ctx = document.getElementById(chartId).getContext('2d');
+	const labels = JSON.parse(labelsJSON);
+	const data = JSON.parse(dataJSON);
+	const backgrounds = JSON.parse(backgroundsJSON);
+
+	new Chart(ctx, {
+		type: 'doughnut',
+		data: {
+			labels: labels,
+			datasets: [{
+				data: data,
+				backgroundColor: backgrounds,
+				borderWidth: 1,
+				hoverOffset: 4
+			}]
+		},
+		options: {
+			cutout: '65%',
+			plugins: {
+				legend: {
+					display: false
+				},
+				tooltip: {
+					callbacks: {
+						label: function(context) {
+							const label = context.label || '';
+							const value = context.raw || 0;
+							const total = context.dataset.data.reduce((a, b) => a + b, 0);
+							const percentage = Math.round((value / total) * 100);
+							return `${label}: ${value} (${percentage}%)`;
+						}
+					}
+				}
+			}
+		}
+	});
+}

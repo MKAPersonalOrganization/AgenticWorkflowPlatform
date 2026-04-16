@@ -1,0 +1,289 @@
+package knowledge
+
+/**
+ * DocumentPreviewPanel - Slide-over panel for document preview.
+ * Matches EdgeQuake's document preview / detail panel pattern.
+ *
+ * Shows: Document metadata, content preview, and actions in a right-side panel.
+ * Uses Alpine.js transition for slide-in/slide-out.
+ */
+
+import (
+	"aicompass/frontend/components/button"
+	"aicompass/frontend/ui/i18n"
+	"aicompass/frontend/components/icon"
+	"aicompass/frontend/components/separator"
+	"aicompass/frontend/components/tooltip"
+)
+
+templ DocumentPreviewPanel() {
+	<!-- Overlay backdrop -->
+	<div
+		x-show="previewDoc"
+		x-cloak
+		@click="closePreview()"
+		class="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm"
+		x-transition:enter="transition ease-out duration-200"
+		x-transition:enter-start="opacity-0"
+		x-transition:enter-end="opacity-100"
+		x-transition:leave="transition ease-in duration-150"
+		x-transition:leave-start="opacity-100"
+		x-transition:leave-end="opacity-0"
+	></div>
+	<!-- Panel -->
+	<div
+		x-show="previewDoc"
+		x-cloak
+		x-transition:enter="transition ease-out duration-300 transform"
+		x-transition:enter-start="translate-x-full"
+		x-transition:enter-end="translate-x-0"
+		x-transition:leave="transition ease-in duration-200 transform"
+		x-transition:leave-start="translate-x-0"
+		x-transition:leave-end="translate-x-full"
+		class="fixed inset-y-0 end-0 z-50 w-full max-w-lg border-s bg-background shadow-xl flex flex-col"
+	>
+		<!-- Header -->
+		<div class="flex items-center justify-between border-b px-4 py-3">
+			<div class="flex items-center gap-2 min-w-0 flex-1">
+				@icon.FileText(icon.Props{Class: "size-4 text-muted-foreground flex-shrink-0"})
+				<h3 class="text-sm font-semibold truncate" x-text="previewDoc?.title || previewDoc?.file_name || 'Document Preview'"></h3>
+			</div>
+			<div class="flex items-center gap-1 flex-shrink-0">
+				<!-- Open detail dialog -->
+				@button.Button(button.Props{
+					Variant: button.VariantGhost,
+					Size:    button.SizeIcon,
+					Class:   "h-8 w-8",
+					Attributes: templ.Attributes{
+						"@click": "detailDoc = previewDoc; window.tui.dialog.open('document-detail-dialog')",
+					},
+				}) {
+					@icon.Maximize2(icon.Props{Class: "size-4"})
+				}
+				<!-- Close -->
+				@button.Button(button.Props{
+					Variant: button.VariantGhost,
+					Size:    button.SizeIcon,
+					Class:   "h-8 w-8",
+					Attributes: templ.Attributes{
+						"@click": "closePreview()",
+					},
+				}) {
+					@icon.X(icon.Props{Class: "size-4"})
+				}
+			</div>
+		</div>
+		<!-- Metadata section -->
+		<div class="border-b px-4 py-3 space-y-3">
+			<h4 class="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+				{ i18n.T(ctx, "Details") }
+			</h4>
+			<div class="space-y-2 text-xs">
+				<!-- ID -->
+				<div class="flex items-center justify-between">
+					<span class="text-muted-foreground flex items-center gap-1.5">
+						@icon.FileText(icon.Props{Class: "size-3.5"})
+						ID
+					</span>
+					<div class="flex items-center gap-1">
+						<code class="bg-muted px-1.5 py-0.5 rounded font-mono text-xs" x-text="(previewDoc?.id || '').slice(0, 12) + '...'"></code>
+						@tooltip.Tooltip() {
+							@tooltip.Trigger(tooltip.TriggerProps{}) {
+								@button.Button(button.Props{
+									Variant: button.VariantGhost,
+									Size:    button.SizeIcon,
+									Class:   "h-6 w-6",
+									Attributes: templ.Attributes{
+										"@click": "navigator.clipboard.writeText(previewDoc?.id || ''); showToast && showToast('Document ID copied')",
+									},
+								}) {
+									@icon.Copy(icon.Props{Class: "size-3"})
+								}
+							}
+							@tooltip.Content(tooltip.ContentProps{}) {
+								{ i18n.T(ctx, "Copy") }
+							}
+						}
+					</div>
+				</div>
+				<!-- Status -->
+				<div class="flex items-center justify-between">
+					<span class="text-muted-foreground">{ i18n.T(ctx, "Status") }</span>
+					<span
+						class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium"
+						:class="statusBadgeClass(previewDoc?.current_stage || previewDoc?.status)"
+						x-text="statusLabel(previewDoc?.current_stage || previewDoc?.status)"
+					></span>
+				</div>
+				<!-- Entities -->
+				<div class="flex items-center justify-between">
+					<span class="text-muted-foreground flex items-center gap-1.5">
+						@icon.Network(icon.Props{Class: "size-3.5"})
+						{ i18n.T(ctx, "Entities") }
+					</span>
+					<span class="font-medium" x-text="previewDoc?.entity_count ?? 0"></span>
+				</div>
+				<!-- Created -->
+				<div class="flex items-center justify-between">
+					<span class="text-muted-foreground flex items-center gap-1.5">
+						@icon.Calendar(icon.Props{Class: "size-3.5"})
+						{ i18n.T(ctx, "Created") }
+					</span>
+					@tooltip.Tooltip() {
+						@tooltip.Trigger(tooltip.TriggerProps{}) {
+							<span class="font-medium cursor-help" x-text="timeAgo(previewDoc?.created_at)"></span>
+						}
+						@tooltip.Content(tooltip.ContentProps{}) {
+							<span x-text="previewDoc?.created_at ? new Date(previewDoc.created_at).toLocaleString() : ''"></span>
+						}
+					}
+				</div>
+				<!-- Updated -->
+				<div x-show="previewDoc?.updated_at && previewDoc?.updated_at !== previewDoc?.created_at" class="flex items-center justify-between">
+					<span class="text-muted-foreground flex items-center gap-1.5">
+						@icon.Clock(icon.Props{Class: "size-3.5"})
+						{ i18n.T(ctx, "Updated") }
+					</span>
+					@tooltip.Tooltip() {
+						@tooltip.Trigger(tooltip.TriggerProps{}) {
+							<span class="font-medium cursor-help" x-text="timeAgo(previewDoc?.updated_at)"></span>
+						}
+						@tooltip.Content(tooltip.ContentProps{}) {
+							<span x-text="previewDoc?.updated_at ? new Date(previewDoc.updated_at).toLocaleString() : ''"></span>
+						}
+					}
+				</div>
+				<!-- Cost -->
+				<div x-show="previewDoc?.cost_usd" class="flex items-center justify-between">
+					<span class="text-muted-foreground flex items-center gap-1.5">
+						@icon.DollarSign(icon.Props{Class: "size-3.5"})
+						{ i18n.T(ctx, "Cost") }
+					</span>
+					<span class="font-medium font-mono" x-text="previewDoc?.cost_usd ? ('$' + previewDoc.cost_usd.toFixed(4)) : '-'"></span>
+				</div>
+			</div>
+		</div>
+		<!-- Error info for failed docs -->
+		<template x-if="(previewDoc?.status === 'failed' || previewDoc?.status === 'partial_failure') && previewDoc?.error_message">
+			<div class="border-b px-4 py-3 space-y-2">
+				<h4 class="text-sm font-medium text-destructive flex items-center gap-1.5">
+					@icon.CircleAlert(icon.Props{Class: "size-4"})
+					{ i18n.T(ctx, "Error") }
+				</h4>
+				<div class="p-3 bg-destructive/10 border border-destructive/20 rounded-lg space-y-2">
+					<p class="text-xs text-destructive/80" x-text="previewDoc.error_message"></p>
+					<template x-if="previewDoc?.status === 'failed'">
+						@button.Button(button.Props{
+							Variant: button.VariantOutline,
+							Size:    button.SizeSm,
+							Class:   "w-full",
+							Attributes: templ.Attributes{
+								"@click": "reprocessDocument(previewDoc.id)",
+							},
+						}) {
+							@icon.RefreshCw(icon.Props{Class: "size-3.5 me-1.5"})
+							{ i18n.T(ctx, "Retry Now") }
+						}
+					</template>
+				</div>
+			</div>
+		</template>
+		@separator.Separator(separator.Props{})
+		<!-- Content preview -->
+		<div class="flex-1 overflow-y-auto custom-scrollbar">
+			<div class="px-4 py-3 space-y-3">
+				<div class="flex items-center justify-between">
+					<h4 class="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+						{ i18n.T(ctx, "Content Preview") }
+					</h4>
+					<div x-show="previewContent" x-cloak>
+						@button.Button(button.Props{
+							Variant: button.VariantGhost,
+							Size:    button.SizeSm,
+							Class:   "h-7 text-xs",
+							Attributes: templ.Attributes{
+								"@click": "navigator.clipboard.writeText(previewContent || ''); showToast && showToast('Content copied')",
+							},
+						}) {
+							@icon.Copy(icon.Props{Class: "size-3 me-1"})
+							{ i18n.T(ctx, "Copy") }
+						}
+					</div>
+				</div>
+				<template x-if="previewLoading">
+					<div class="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground">
+						@icon.LoaderCircle(icon.Props{Class: "size-5 animate-spin"})
+						<span class="text-sm">{ i18n.T(ctx, "Loading content...") }</span>
+					</div>
+				</template>
+				<template x-if="!previewLoading && previewContent">
+					@MarkdownViewer(MarkdownViewerProps{
+						Content:     "previewContent",
+						ShowToolbar: false,
+						Title:       "Document Preview",
+					})
+				</template>
+				<template x-if="!previewLoading && !previewContent">
+					<div class="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground">
+						@icon.FileExclamationPoint(icon.Props{Class: "size-8"})
+						<p class="text-sm">{ i18n.T(ctx, "No content available for preview") }</p>
+					</div>
+				</template>
+			</div>
+		</div>
+		<!-- Footer actions -->
+		<div class="border-t px-4 py-3 space-y-2">
+			<h4 class="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+				{ i18n.T(ctx, "Actions") }
+			</h4>
+			<div class="grid grid-cols-2 gap-2">
+				@button.Button(button.Props{
+					Variant: button.VariantOutline,
+					Size:    button.SizeSm,
+					Class:   "h-9",
+					Attributes: templ.Attributes{
+						"@click": "detailDoc = previewDoc; window.tui.dialog.open('document-detail-dialog')",
+					},
+				}) {
+					@icon.Eye(icon.Props{Class: "size-3.5 me-1.5"})
+					{ i18n.T(ctx, "View") }
+				}
+				@button.Button(button.Props{
+					Variant: button.VariantOutline,
+					Size:    button.SizeSm,
+					Class:   "h-9",
+					Attributes: templ.Attributes{
+						"@click":  "viewInGraph(previewDoc)",
+						"x-show":  "previewDoc?.entity_count > 0",
+						"x-cloak": "",
+					},
+				}) {
+					@icon.Network(icon.Props{Class: "size-3.5 me-1.5"})
+					{ i18n.T(ctx, "Graph") }
+				}
+				@button.Button(button.Props{
+					Variant: button.VariantOutline,
+					Size:    button.SizeSm,
+					Class:   "h-9",
+					Attributes: templ.Attributes{
+						"@click": "reprocessDocument(previewDoc?.id)",
+					},
+				}) {
+					@icon.RefreshCw(icon.Props{Class: "size-3.5 me-1.5"})
+					{ i18n.T(ctx, "Reprocess") }
+				}
+				@button.Button(button.Props{
+					Variant: button.VariantOutline,
+					Size:    button.SizeSm,
+					Class:   "h-9 text-destructive hover:text-destructive hover:bg-destructive/10",
+					Attributes: templ.Attributes{
+						"@click": "deleteDocument(previewDoc?.id); closePreview()",
+					},
+				}) {
+					@icon.Trash2(icon.Props{Class: "size-3.5 me-1.5"})
+					{ i18n.T(ctx, "Delete") }
+				}
+			</div>
+		</div>
+	</div>
+}

@@ -1,6 +1,6 @@
 {
-  "componentsDir": "components",
-  "utilsDir": "components/utils",
+  "componentsDir": "frontend/components",
+  "utilsDir": "frontend/components/utils",
   "moduleName": "aicompass",
   "jsDir": "assets/js",
   "jsPublicPath": "/assets/js"

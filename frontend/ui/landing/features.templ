@@ -1,0 +1,74 @@
+package landing
+
+import "aicompass/frontend/components/icon"
+
+// ─── Features Section ────────────────────────────────────────────────────────
+templ featuresSection() {
+	<section id="features" class="py-24">
+		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+			<div class="mx-auto max-w-2xl text-center">
+				<div class="mb-4 inline-flex items-center gap-2 rounded-full border border-border/40 bg-muted/30 px-4 py-1.5 text-sm text-muted-foreground shadow-modern-xs">
+					@icon.Zap(icon.Props{Class: "size-4 text-primary"})
+					<span>Core Capabilities</span>
+				</div>
+				<h2 class="text-3xl font-bold tracking-[-0.02em] sm:text-4xl">
+					Everything you need, in one platform
+				</h2>
+				<p class="mt-4 text-lg text-muted-foreground">
+					From AI-powered conversations to knowledge management, Compass.AI delivers a complete workspace ecosystem.
+				</p>
+			</div>
+			<div class="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+				@featureCard(
+					"Multi-Model AI Chat",
+					"Stream GPT-4o, Claude 3.5 Sonnet, or Gemini 2.0. Switch models instantly based on your task requirements.",
+					"text-blue-500",
+					iconMessageSq,
+				)
+			@featureCard(
+				"Workflow Orchestration",
+				"Compose teams of specialized agents with sequential, parallel, loop, and conditional routing workflows. Coordinator agents delegate to sub-agents dynamically, while transfer policies, output keys, and context controls let you build enterprise-grade AI pipelines.",
+				"text-purple-500",
+				iconGitBranch,
+			)
+				@featureCard(
+					"Knowledge Integration",
+					"Connect your own data. Build interactive RAG knowledge bases that ground your AI agents in reality.",
+					"text-pink-500",
+					iconDatabase,
+				)
+				@featureCard(
+					"MCP, A2A & Plugin Ecosystem",
+					"Connect to MCP servers for tools, A2A agents for cross-team AI collaboration, and built-in plugins — all managed per-agent.",
+					"text-violet-500",
+					iconA2ALogo,
+				)
+				@featureCard(
+					"Memory & Artifacts",
+					"Agents auto-recall relevant context from past conversations and can search memory on demand. Versioned artifacts let agents create, update, and load persistent files across sessions.",
+					"text-violet-500",
+					iconBrain,
+				)
+				@featureCard(
+					"Secure Architecture",
+					"Enterprise-grade security built-in. Features time-travel debugging, immutable event logs, and robust rate-limiting.",
+					"text-slate-500",
+					iconShieldCheck,
+				)
+			</div>
+		</div>
+	</section>
+}
+
+templ featureCard(title, description, colorClass string, iconComp templ.Component) {
+	<div class="group relative rounded-2xl border border-border/30 p-6 transition-all duration-300 hover:bg-muted/30 hover:border-border/50 hover:shadow-modern-sm">
+		<div class="relative z-10">
+			<!-- Subtle monochrome icon container -->
+			<div class="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-muted/80 text-foreground transition-colors duration-200 group-hover:bg-muted">
+				@iconComp
+			</div>
+			<h3 class="text-lg font-semibold tracking-tight text-foreground">{ title }</h3>
+			<p class="mt-2 text-sm leading-relaxed text-muted-foreground">{ description }</p>
+		</div>
+	</div>
+}

@@ -1,0 +1,45 @@
+package landing
+
+import "aicompass/frontend/components/icon"
+
+// ─── Plugin System ───────────────────────────────────────────────────────────
+templ pluginSection() {
+	<section class="border-t border-border bg-muted/20 py-24">
+		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+			<div class="mx-auto max-w-2xl text-center">
+				<div class="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-1.5 text-sm text-muted-foreground">
+					@icon.Puzzle(icon.Props{Class: "size-4 text-green-500"})
+					<span>Plugin Ecosystem</span>
+				</div>
+				<h2 class="text-3xl font-bold tracking-tight sm:text-4xl">
+					Built-in plugins for every <span class="text-primary">agentic scenario</span>
+				</h2>
+				<p class="mt-4 text-lg text-muted-foreground">
+					A rich set of built-in plugins — from calculation and code analysis to cross-session memory and versioned artifacts — useful for many agentic scenarios. Toggle them per-agent for fine-grained control.
+				</p>
+			</div>
+			<div class="mt-16 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+				@pluginPill("🧮", "Calculator", "Math & computation")
+				@pluginPill("💻", "Codebase", "Code analysis")
+				@pluginPill("🧠", "Cognitive", "Reasoning tools")
+				@pluginPill("📄", "Document", "File processing")
+				@pluginPill("❓", "Elicitation", "Smart follow-ups")
+				@pluginPill("📚", "Knowledge Base", "RAG queries")
+				@pluginPill("📖", "Library", "Reference materials")
+				@pluginPill("🧠", "Agent Memory", "Auto + on-demand recall")
+				@pluginPill("📁", "Artifacts", "Versioned file management")
+				@pluginPill("🔊", "Text-to-Speech", "Voice output")
+			</div>
+		</div>
+	</section>
+}
+
+templ pluginPill(emoji, name, desc string) {
+	<div class="flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/30 hover:shadow-md">
+		<div class="text-xl shrink-0">{ emoji }</div>
+		<div class="min-w-0">
+			<div class="text-sm font-semibold truncate">{ name }</div>
+			<div class="text-xs text-muted-foreground truncate">{ desc }</div>
+		</div>
+	</div>
+}

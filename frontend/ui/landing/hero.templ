@@ -1,0 +1,121 @@
+package landing
+
+import (
+	"aicompass/frontend/components/button"
+	"aicompass/frontend/components/icon"
+	"aicompass/shared"
+)
+
+// ─── Hero Section ────────────────────────────────────────────────────────────
+templ heroSection(user *shared.User) {
+	<section class="relative overflow-hidden bg-background">
+		<!-- Subtle gradient background orb -->
+		<div class="absolute top-0 start-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] bg-linear-to-b from-primary/3 via-primary/2 to-transparent rounded-full blur-3xl pointer-events-none"></div>
+		<div class="mx-auto max-w-7xl px-4 pb-20 pt-24 sm:px-6 sm:pt-32 lg:px-8 lg:pt-40 relative">
+			<div class="mx-auto max-w-4xl text-center">
+				<!-- Badge -->
+				<div class="mb-8 inline-flex items-center gap-2 rounded-full border border-border/40 bg-muted/20 px-4 py-1.5 text-sm font-medium text-muted-foreground transition-all duration-300 hover:bg-muted/40 hover:border-border/60 shadow-modern-xs">
+					@icon.Sparkles(icon.Props{Class: "size-4 text-primary"})
+					<span>Powered by cutting-edge AI models</span>
+				</div>
+				<!-- Heading -->
+				<h1 class="text-5xl font-semibold tracking-[-0.02em] sm:text-6xl lg:text-7xl text-foreground">
+					Intelligence,
+					<br/>
+					Orchestrated.
+				</h1>
+				<!-- Subheading -->
+				<p class="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground/80 sm:text-xl leading-relaxed">
+					A complete workspace integrating leading models, specialized agents, and dynamic tools. Built for professionals.
+				</p>
+				<!-- CTA Buttons -->
+				<div class="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+					if user != nil {
+						@button.Button(button.Props{
+							Href: "/chat",
+							Size: button.SizeLg,
+						}) {
+							<span>Open Compass.AI</span>
+							@icon.ArrowRight(icon.Props{Class: "size-5"})
+						}
+					} else {
+						@button.Button(button.Props{
+							Href: "/auth/login",
+							Size: button.SizeLg,
+						}) {
+							<span>Start for Free</span>
+							@icon.ArrowRight(icon.Props{Class: "size-5"})
+						}
+					}
+					@button.Button(button.Props{
+						Href:    "/docs",
+						Variant: button.VariantOutline,
+						Size:    button.SizeLg,
+					}) {
+						@icon.BookOpen(icon.Props{Class: "size-5"})
+						<span>Read the Docs</span>
+					}
+				</div>
+			</div>
+			<!-- Hero visual — Compass illustration -->
+			<div class="mx-auto mt-20 max-w-4xl">
+				<div class="rounded-2xl border border-border/40 bg-card shadow-modern-xl overflow-hidden ring-1 ring-border/20">
+					<div class="bg-background">
+						<!-- Mock app screenshot -->
+						<div class="flex h-[400px] flex-col sm:h-[500px]">
+							<!-- Mock top bar -->
+							<div class="flex items-center gap-2 border-b border-border px-4 py-3">
+								<div class="flex gap-1.5">
+									<div class="h-3 w-3 rounded-full bg-red-400/60"></div>
+									<div class="h-3 w-3 rounded-full bg-yellow-400/60"></div>
+									<div class="h-3 w-3 rounded-full bg-green-400/60"></div>
+								</div>
+								<div class="ms-4 flex-1">
+									<div class="mx-auto h-6 w-60 rounded-md bg-muted/50"></div>
+								</div>
+							</div>
+							<!-- Mock sidebar + chat -->
+							<div class="flex flex-1">
+								<!-- Sidebar -->
+								<div class="hidden w-12 flex-col items-center gap-4 border-e border-border py-4 sm:flex">
+									<div class="h-6 w-6 rounded bg-primary/20"></div>
+									<div class="h-6 w-6 rounded bg-muted"></div>
+									<div class="h-6 w-6 rounded bg-muted"></div>
+									<div class="h-6 w-6 rounded bg-muted"></div>
+								</div>
+								<!-- Chat area -->
+								<div class="flex flex-1 flex-col justify-between p-6">
+									<div class="space-y-4">
+										<!-- User message -->
+										<div class="flex justify-end">
+											<div class="max-w-xs rounded-xl bg-primary px-4 py-2.5 text-sm text-primary-foreground">
+												Explain quantum entanglement simply
+											</div>
+										</div>
+										<!-- AI response -->
+										<div class="flex justify-start">
+											<div class="max-w-sm rounded-xl bg-muted/70 px-4 py-2.5 text-sm">
+												<div class="flex items-center gap-2 mb-2">
+													@icon.Bot(icon.Props{Class: "size-4 text-primary"})
+													<span class="font-medium text-xs text-muted-foreground">Research Assistant</span>
+												</div>
+												Imagine two connected systems that are perfectly synchronized — no matter how far apart they are, when you observe one, you instantly know the state of the other...
+											</div>
+										</div>
+									</div>
+									<!-- Input bar mock -->
+									<div class="mt-4 flex items-center gap-2 rounded-xl border border-border/60 bg-background/80 px-4 py-3 shadow-modern-xs">
+										<div class="flex-1 text-sm text-muted-foreground/40">Ask anything...</div>
+										<div class="h-8 w-8 rounded-full bg-primary flex items-center justify-center transition-all duration-200 hover:opacity-90 hover:scale-105 active:scale-95">
+											@icon.ArrowRight(icon.Props{Class: "size-4 text-primary-foreground"})
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+}

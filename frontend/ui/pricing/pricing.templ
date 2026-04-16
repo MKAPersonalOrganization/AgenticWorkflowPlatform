@@ -1,0 +1,91 @@
+package pricing
+
+import "aicompass/frontend/components/card"
+import "aicompass/frontend/components/button"
+import "aicompass/frontend/components/icon"
+import "aicompass/frontend/ui/pageheader"
+import "aicompass/frontend/ui"
+import "aicompass/shared"
+import "aicompass/frontend/ui/i18n"
+
+type PricingPageProps struct {
+	User *shared.User
+}
+
+templ PricingPage(props PricingPageProps) {
+	@ui.BaseLayout(ui.LayoutProps{
+		Title: i18n.T(ctx, "Activate Your Account"),
+		User:  props.User,
+	}) {
+		<div class="min-h-screen bg-background">
+			<div class="container mx-auto max-w-3xl px-6 py-8 lg:py-12 space-y-10">
+				@pageheader.PageHeader(pageheader.Props{
+					Title:       i18n.T(ctx, "Activate Your Account"),
+					Description: i18n.T(ctx, "$5/month subscription — unlimited access to all features"),
+					BackURL:     "/",
+					BackLabel:   i18n.T(ctx, "Back to Home"),
+				})
+				@ActivationCard()
+			</div>
+		</div>
+	}
+}
+
+templ ActivationCard() {
+	<div class="max-w-xl mx-auto">
+		@card.Card(card.Props{
+			Class: "border-2 border-primary shadow-xl",
+		}) {
+			@card.Header(card.HeaderProps{Class: "text-center pb-8 pt-8"}) {
+				@card.Title(card.TitleProps{Class: "text-2xl font-bold"}) {
+					{ i18n.T(ctx, "Full Access") }
+				}
+				@card.Description(card.DescriptionProps{Class: "mt-3 leading-relaxed"}) {
+					{ i18n.T(ctx, "Subscribe and get unlimited access to every feature") }
+				}
+				<div class="mt-6">
+					<div class="flex items-baseline justify-center gap-2">
+						<span class="text-5xl font-bold tracking-tight">{ i18n.T(ctx, "$5") }</span>
+						<span class="text-base text-muted-foreground font-medium">{ i18n.T(ctx, "/month") }</span>
+					</div>
+				</div>
+			}
+			@card.Content(card.ContentProps{Class: "space-y-5 pb-8"}) {
+				<ul class="space-y-4">
+					@featureItem(i18n.T(ctx, "Unlimited conversations"))
+					@featureItem(i18n.T(ctx, "All AI models"))
+					@featureItem(i18n.T(ctx, "Priority support"))
+					@featureItem(i18n.T(ctx, "Export conversation history"))
+					@featureItem(i18n.T(ctx, "Advanced analytics"))
+					@featureItem(i18n.T(ctx, "Custom instructions"))
+					@featureItem(i18n.T(ctx, "Cancel anytime"))
+				</ul>
+			}
+			@card.Footer(card.FooterProps{Class: "flex-col pt-6"}) {
+				@button.Button(button.Props{
+					Variant:   button.VariantDefault,
+					FullWidth: true,
+					Size:      button.SizeLg,
+					Attributes: templ.Attributes{
+						"@click": "$dispatch('open-checkout-dialog')",
+					},
+				}) {
+					@icon.Lock(icon.Props{Class: "size-4"})
+					<span>{ i18n.T(ctx, "Activate Now") }</span>
+				}
+				<p class="text-xs text-muted-foreground mt-4 text-center">
+					{ i18n.T(ctx, "Secure payment powered by Stripe. Your card details never touch our servers.") }
+				</p>
+			}
+		}
+	</div>
+}
+
+templ featureItem(text string) {
+	<li class="flex items-start gap-3">
+		<div class="mt-1">
+			@icon.Check(icon.Props{Class: "size-5 text-primary flex-shrink-0"})
+		</div>
+		<span class="text-sm leading-relaxed">{ text }</span>
+	</li>
+}

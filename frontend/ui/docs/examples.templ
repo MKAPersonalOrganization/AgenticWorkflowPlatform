@@ -1,0 +1,457 @@
+package docs
+
+import "aicompass/frontend/components/icon"
+
+// ─── Workflow Examples ───────────────────────────────────────────────────────
+templ docsWorkflowExamples() {
+	@docsSection("workflow-examples", "Workflow Examples", iconBlocks, "text-violet-500") {
+		<p>
+			Compass.AI ships with a library of <strong>pre-built workflow templates</strong> in the Agent Templates that
+			demonstrate different multi-agent composition patterns. Each template can be <strong>forked and customized</strong>.
+			This section walks through every pattern with architecture diagrams to help you design your own workflows.
+		</p>
+		<h3>Pattern Quick Reference</h3>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Pattern</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">When to Use</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Catalog Template</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("Sequential", "Each step depends on the previous step's output", "sequential-workflow")
+				@docsTableRow("Implicit State", "Agents read prior output from conversation history", "implicit-state")
+				@docsTableRow("Parallel Fan-Out/In", "Independent work streams that merge for a final step", "parallel-workflow")
+				@docsTableRow("Loop", "Iterative refinement with fixed or early-exit termination", "loop-workflow, loop-with-exit")
+				@docsTableRow("Conditional Routing", "Classify input then route to the best specialist branch", "conditional-routing")
+				@docsTableRow("Nested Workflows", "Compose sequential, parallel, and loop inside each other", "sequential-inside-parallel, parallel-inside-sequential")
+				@docsTableRow("Context Control", "Isolate agents from conversation history", "context-control")
+				@docsTableRow("Output Schema", "Force structured JSON output from an agent", "output-schema")
+				@docsTableRow("Agent Isolation", "Constrain agents from delegating to others", "agent-isolation")
+				@docsTableRow("Transfer Patterns", "Escalate to parent or route between peers", "transfer-to-parent, transfer-to-peers")
+			</tbody>
+		}
+		@docsInfoBox("State Passing") {
+			<p>
+				All workflows use <strong>OutputKey → &#123;variable&#125; templates</strong> to pass data between agents.
+				Each agent saves its output under a named key; downstream agents reference it with
+				<code>&#123;key_name&#125;</code> in their system prompts. Keys can be optional with
+				<code>&#123;key?&#125;</code> (substitutes empty string if absent).
+			</p>
+		}
+	}
+}
+
+// ─── Sequential Pipelines ────────────────────────────────────────────────────
+templ docsSequentialExamples() {
+	@docsSection("sequential-examples", "Sequential Pipelines", iconPipelineDoc, "text-blue-500") {
+		<p>
+			In a <strong>sequential pipeline</strong>, agents execute one after another. Each agent receives the
+			previous agent's output via state keys. This is the simplest and most common composition pattern.
+		</p>
+		<!-- Sequential Workflow (City → Time) -->
+		<h3>Sequential Workflow: City Generator → Time Report</h3>
+		<p>
+			Two-agent pipeline: a city generator picks a random city and stores it as
+			<code>city</code>, then a report agent writes a friendly sentence about the local time there.
+			This is the reference implementation for the <code>OutputKey → &#123;variable&#125;</code> pattern.
+		</p>
+		@wfSequential([]wfAgent{
+			{Name: "CityGenerator", Subtitle: "output: city"},
+			{Name: "CityReport", Subtitle: "reads {city}"},
+		})
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Agent</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Reads</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Writes</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("CityGeneratorAgent", "User request", "city")
+				@docsTableRow("CityReportAgent", "{city}", "final report")
+			</tbody>
+		}
+		@wfConceptBadges([]string{"output_key", "{variable} templates", "2-agent chain"})
+		<!-- Implicit State -->
+		<h3>Implicit State: Critic → Reviser</h3>
+		<p>
+			Two-agent pipeline where the second agent reads the first agent's output purely from
+			<strong>conversation history</strong> — no explicit <code>output_key</code>. The critic's response
+			— including all verdicts — is automatically part of the context the reviser receives.
+		</p>
+		@wfSequential([]wfAgent{
+			{Name: "Critic", Subtitle: "identifies claims, assigns verdicts"},
+			{Name: "Reviser", Subtitle: "reads full conversation → corrected answer"},
+		})
+		@wfConceptBadges([]string{"implicit state", "conversation history", "no output_key needed"})
+	}
+}
+
+// ─── Parallel Fan-In Examples ────────────────────────────────────────────────
+templ docsParallelExamples() {
+	@docsSection("parallel-examples", "Parallel Fan-Out/In Workflows", iconNetworkDoc, "text-emerald-500") {
+		<p>
+			In a <strong>parallel fan-out</strong> workflow, multiple agents work <strong>simultaneously on independent tasks</strong>,
+			then a downstream agent merges all results. This pattern reduces latency when work streams
+			don't depend on each other.
+		</p>
+		<!-- Parallel Workflow -->
+		<h3>Parallel Workflow: Enhancer → Email / Slack / Calendar</h3>
+		<p>
+			A message enhancer enriches a brief topic, then three agents run <strong>in parallel</strong> —
+			drafting an email, a Slack message, and a calendar event — and a summary agent collects the results.
+			This is the purest fan-out/fan-in pattern.
+		</p>
+		@wfParallelSequential([]wfAgent{
+			{Name: "EmailDrafter", Subtitle: "output: drafted_email"},
+			{Name: "SlackDrafter", Subtitle: "output: drafted_slack_message"},
+			{Name: "EventExtractor", Subtitle: "output: event_details"},
+		}, []wfAgent{
+			{Name: "SummaryAgent", Subtitle: "reads all three → broadcast"},
+		})
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Agent</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Reads</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Writes</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("MessageEnhancer", "User topic", "enhanced_message")
+				@docsTableRow("EmailDrafter ∥ SlackDrafter ∥ EventExtractor", "{enhanced_message}", "drafted_email, drafted_slack_message, event_details")
+				@docsTableRow("SummaryAgent", "{drafted_email?} + {drafted_slack_message?} + {event_details?}", "final summary")
+			</tbody>
+		}
+		@wfConceptBadges([]string{"parallel node", "fan-out/fan-in", "optional {key?} injection"})
+		<!-- Sequential Inside Parallel -->
+		<h3>Sequential Inside Parallel</h3>
+		<p>
+			Three parallel branches where <strong>each branch is itself a sequential pipeline</strong>
+			(drafter → publisher). All three branches run concurrently. This demonstrates nested composition.
+		</p>
+		@wfNested(wfNestedGroup{
+			Label: "Parallel (3 branches)",
+			RootType: "parallel",
+			Nodes: []wfNestedNode{
+				{Node: wfAgent{Name: "EmailDrafter"}, Children: []wfNestedNode{{Node: wfNode{Name: "EmailPublisher"}}}},
+				{Node: wfAgent{Name: "SlackDrafter"}, Children: []wfNestedNode{{Node: wfNode{Name: "SlackPublisher"}}}},
+				{Node: wfAgent{Name: "EventExtractor"}, Children: []wfNestedNode{{Node: wfNode{Name: "CalendarPublisher"}}}},
+			},
+		})
+		@wfConceptBadges([]string{"sequential inside parallel", "state isolation per branch", "nested composition"})
+		<!-- Parallel Inside Sequential -->
+		<h3>Parallel Inside Sequential</h3>
+		<p>
+			A sequential root where <strong>one step is a parallel node</strong>. An intake analyst processes
+			input first, then three specialist analysts evaluate the topic concurrently, then a synthesiser
+			combines all findings into a final report.
+		</p>
+		@wfNested(wfNestedGroup{
+			Label: "Sequential → Parallel → Sequential",
+			Nodes: []wfNestedNode{
+				{Node: wfNode{Name: "IntakeAnalyst", Subtitle: "output: topic_brief"}},
+				{Type: "parallel", Node: wfAgent{Name: "Analysis Group"}, Children: []wfNestedNode{
+					{Node: wfNode{Name: "TechnicalAnalyst", Subtitle: "output: tech_assessment"}},
+					{Node: wfNode{Name: "BusinessAnalyst", Subtitle: "output: biz_assessment"}},
+					{Node: wfNode{Name: "RiskAnalyst", Subtitle: "output: risk_assessment"}},
+				}},
+				{Node: wfNode{Name: "Synthesiser", Subtitle: "reads all 3 → final_report"}},
+			},
+		})
+		@wfConceptBadges([]string{"parallel as one step in sequence", "multiple output_keys", "context fan-in"})
+	}
+}
+
+// ─── Loop Examples ───────────────────────────────────────────────────────────
+templ docsLoopExamples() {
+	@docsSection("loop-examples", "Loop Workflows", iconRepeatDoc, "text-rose-500") {
+		<p>
+			<strong>Loop workflows</strong> repeat a set of agents until a quality condition is met or a maximum
+			iteration count is reached. The most common pattern is <strong>generate → evaluate → refine</strong>:
+			a generator produces content, an evaluator checks quality, and if unsatisfied it provides
+			feedback for the next pass.
+		</p>
+		<!-- Fixed-Iteration Loop -->
+		<h3>Fixed-Iteration Loop: Refinement Agent</h3>
+		<p>
+			A single agent runs exactly 3 times with no early exit. Each iteration reads the previous output
+			via <code>&#123;refined_concept?&#125;</code> and improves it. Shows the simplest loop pattern.
+		</p>
+		@wfLoop(wfLoopGroup{
+			Agents:   []wfAgent{{Name: "RefinementAgent", Subtitle: "reads {refined_concept?} → improves"}},
+			MaxIter: "3",
+		})
+		@wfConceptBadges([]string{"loop node", "max_iterations: 3", "allow_early_exit: false", "state overwrite"})
+		<!-- Loop with Early Exit -->
+		<h3>Loop with Early Exit: Draft → Check</h3>
+		<p>
+			A loop with <code>allow_early_exit: true</code> where a writer agent produces a draft and a
+			checker agent validates quality. The checker calls the <code>exit_loop</code> tool when the draft
+			meets standards, skipping remaining iterations. Shows the "retry-until-good" pattern.
+		</p>
+		@wfLoop(wfLoopGroup{
+			Agents: []wfAgent{
+				{Name: "DraftWriter", Subtitle: "produces draft"},
+				{Name: "QualityChecker", Subtitle: "calls exit_loop if passes"},
+			},
+			EarlyExit: true,
+		})
+		@wfConceptBadges([]string{"allow_early_exit: true", "exit_loop tool", "validation pattern"})
+		<!-- Sequential Inside Loop -->
+		<h3>Sequential Inside Loop</h3>
+		<p>
+			An outer sequential pipeline wraps a loop: a planner produces requirements, then a loop runs
+			a sequential generate-score-check pipeline that iterates until quality is met, and finally an
+			editor polishes the approved output.
+		</p>
+		@wfNested(wfNestedGroup{
+			Label: "Sequential → Loop → Sequential",
+			Nodes: []wfNestedNode{
+				{Node: wfNode{Name: "PlannerAgent", Subtitle: "output: requirements"}},
+				{Type: "loop", Node: wfAgent{Name: "Generate → Score → Check"}, Children: []wfNestedNode{
+					{Node: wfNode{Name: "Generator", Subtitle: "output: draft"}},
+					{Node: wfNode{Name: "Scorer", Subtitle: "score ≥ 8 → exit_loop"}},
+					{Node: wfNode{Name: "Checker", Subtitle: "early exit decision"}},
+				}},
+				{Node: wfNode{Name: "EditorAgent", Subtitle: "reads {generated_output} → final"}},
+			},
+		})
+		@wfConceptBadges([]string{"sequential → loop → sequential", "feedback loop", "nested composition"})
+		<!-- Parallel Inside Loop Inside Sequential -->
+		<h3>Parallel Inside Loop Inside Sequential</h3>
+		<p>
+			The most deeply nested pattern in the catalog. A sequential root contains a loop whose body is
+			itself a sequential containing a parallel. Two drafters run concurrently, a critic selects the
+			best, and the loop repeats exactly 3 times.
+		</p>
+		@wfNested(wfNestedGroup{
+			Label: "Sequential → Loop (3 iter) → Sequential → Parallel",
+			Nodes: []wfNestedNode{
+				{Node: wfNode{Name: "BriefEnhancer", Subtitle: "output: topic_brief"}},
+				{Type: "loop", Node: wfAgent{Name: "Draft → Critic Loop"}, Children: []wfNestedNode{
+					{Type: "parallel", Node: wfAgent{Name: "Draft Agents"}, Children: []wfNestedNode{
+						{Node: wfNode{Name: "DraftA"}},
+						{Node: wfNode{Name: "DraftB"}},
+					}},
+					{Node: wfNode{Name: "Critic", Subtitle: "selects best_draft"}},
+				}},
+			},
+		})
+		@wfConceptBadges([]string{"sequential → loop → sequential → parallel", "state fan-out", "deepest nesting"})
+		@docsInfoBox("Loop vs. Sequential Retry") {
+			<p>
+				Loops are different from re-running a sequential pipeline. Inside a loop, <strong>conversation history persists</strong>
+				across iterations — each pass sees what came before. The evaluator's feedback becomes part of the
+				generator's context on the next iteration, enabling genuine iterative improvement.
+			</p>
+		}
+	}
+}
+
+// ─── Conditional Routing Examples ─────────────────────────────────────────────
+templ docsConditionalExamples() {
+	@docsSection("conditional-examples", "Conditional Routing Workflows", iconGitForkDoc, "text-red-500") {
+		<p>
+			<strong>Conditional routing</strong> evaluates input through a classifier agent, then routes to
+			<strong>exactly one matching branch</strong>. This is ideal for triage, content classification,
+			and role-based delegation — where different types of requests need different specialists.
+		</p>
+		<p>
+			A conditional node has an <strong>evaluator</strong> (first child) that outputs a classification
+			value to session state via <code>output_key</code>. The remaining children are <strong>branches</strong>,
+			each with a <code>condition</code> field. Only the branch whose condition matches the evaluator's
+			output executes. A branch with <code>condition: "*"</code> acts as a fallback.
+		</p>
+		@wfConditional(wfConditionalGroup{
+			Evaluator: wfNode{Name: "Classifier", Subtitle: "output: category"},
+			OutputKey: "category",
+			Branches: []wfBranch{
+				{Label: "Branch A", Condition: "value_a", Color: "emerald"},
+				{Label: "Branch B", Condition: "value_b", Color: "amber"},
+				{Label: "Fallback", Condition: "*", Color: "slate"},
+			},
+		})
+		@wfConceptBadges([]string{"conditional node", "evaluator + branches", "output_key matching", "fallback (*)"})
+		@docsInfoBox("How Matching Works") {
+			<p>
+				The evaluator's output is read from session state using the <code>output_key</code> field.
+				Each branch's <code>condition</code> is matched against this value using <strong>case-insensitive exact string matching</strong>.
+				A branch with <code>condition: "*"</code> matches anything — use it as a default/fallback.
+				If no branch matches and there's no fallback, the workflow errors.
+			</p>
+		}
+		<!-- Conditional Routing: Coordinator → Triage → Specialist -->
+		<h3>Conditional Routing: Coordinator → Triage → Specialist</h3>
+		<p>
+			A coordinator receives a user request, a triage agent decides which domain is needed,
+			then a conditional router sends it to the right specialist. If the specialist can't help,
+			they escalate back to the coordinator for re-routing.
+		</p>
+		@wfConditional(wfConditionalGroup{
+			Evaluator: wfNode{Name: "TriageAgent", Subtitle: "output: specialist_selection"},
+			OutputKey: "specialist_selection",
+			Branches: []wfBranch{
+				{Label: "TechSpecialist", Condition: "technical", Color: "emerald"},
+				{Label: "BillingSpecialist", Condition: "billing", Color: "amber"},
+				{Label: "GeneralSpecialist", Condition: "*", Color: "slate"},
+			},
+		})
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Agent</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Role</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Condition</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("CoordinatorAgent", "Receives request, classifies domain", "N/A — pre-evaluator")
+				@docsTableRow("TriageAgent", "Reviews classification, selects specialist", "N/A — evaluator")
+				@docsTableRow("TechSpecialist", "Handles technical requests", "technical")
+				@docsTableRow("BillingSpecialist", "Handles billing requests", "billing")
+				@docsTableRow("GeneralSpecialist", "Handles everything else", "* (fallback)")
+			</tbody>
+		}
+		@wfConceptBadges([]string{"triage pattern", "3 branches + fallback", "escalation to parent"})
+	}
+}
+
+// ─── Context Control & Output Schema ─────────────────────────────────────────
+templ docsAdvancedExamples() {
+	@docsSection("advanced-examples", "Context Control & Output Schemas", iconSized(icon.Shield), "text-amber-500") {
+		<!-- Context Control -->
+		<h3>Context Control: Isolated Composer</h3>
+		<p>
+			An agent with <code>include_contents="none"</code> receives no conversation history — it operates
+			only on explicitly injected state via <code>&#123;variable&#125;</code> placeholders. This isolates the agent
+			from irrelevant prior context, reduces token cost, and prevents hallucination from stale history.
+		</p>
+		@wfSequential([]wfAgent{
+			{Name: "PlannerAgent", Subtitle: "output: research_plan"},
+			{Name: "ResearcherAgent", Subtitle: "output: findings"},
+			{Name: "Composer", Subtitle: "include_contents=none, reads {research_plan}+{findings}"},
+		})
+		@wfConceptBadges([]string{"include_contents: none", "explicit state only", "cost efficiency"})
+		<!-- Output Schema -->
+		<h3>Output Schema: Structured Data Extraction</h3>
+		<p>
+			An agent with <code>output_schema</code> set to a JSON Schema forces the LLM to return strictly
+			typed structured data instead of free-form text. When set, the agent can only reply with matching
+			JSON — no tool use, no RAG, no agent transfer.
+		</p>
+		@wfSequential([]wfAgent{
+			{Name: "DataExtractor", Subtitle: "output_schema: object → structured_data"},
+			{Name: "ReportFormatter", Subtitle: "reads {structured_data}"},
+		})
+		@wfConceptBadges([]string{"output_schema", "forced JSON", "no tools/RAG/transfer when schema set"})
+		<!-- Agent Isolation -->
+		<h3>Agent Isolation: Researcher → Evaluator → Executor</h3>
+		<p>
+			An evaluator agent with <code>disallow_transfer_to_parent</code> and
+			<code>disallow_transfer_to_peers</code> set to <code>true</code> is constrained from making
+			routing decisions. It can only produce its output — it cannot delegate back to the parent or
+			transfer to siblings. Critical for quality assurance and compliance agents.
+		</p>
+		@wfSequential([]wfAgent{
+			{Name: "Researcher", Subtitle: "output: findings"},
+			{Name: "Evaluator", Subtitle: "isolated → evaluation"},
+			{Name: "Executor", Subtitle: "reads {evaluation}+{findings}"},
+		})
+		@wfConceptBadges([]string{"disallow_transfer_to_parent", "disallow_transfer_to_peers", "role boundaries"})
+		<!-- Transfer to Parent -->
+		<h3>Transfer to Parent: Escalation Pattern</h3>
+		<p>
+			A sequential workflow where a specialist agent can escalate back to the parent coordinator
+			when it cannot resolve the request. The parent re-routes to a different specialist.
+		</p>
+		@wfSequential([]wfAgent{
+			{Name: "Coordinator", Subtitle: "output: routing_decision"},
+			{Name: "TriageAgent", Subtitle: "output: specialist_selection"},
+			{Name: "Specialist", Subtitle: "can transfer to parent → resolution or escalation"},
+		})
+		@wfConceptBadges([]string{"transfer_to_parent", "escalation", "re-routing"})
+		<!-- Transfer to Peers -->
+		<h3>Transfer to Peers: Coordinator Pattern</h3>
+		<p>
+			A single LLM root agent with child agents, using the <code>transfer_to_agent</code> tool to
+			route between peers. No workflow graph — the LLM decides which agent handles the request.
+		</p>
+		@wfSequential([]wfAgent{
+			{Name: "RootAgent", Subtitle: "transfer_to_agent tool → routes to peer"},
+			{Name: "PeerAgent A ∥ PeerAgent B ∥ PeerAgent C", Subtitle: "specialists"},
+		})
+		@wfConceptBadges([]string{"coordinator pattern", "LLM-driven routing", "no workflow graph"})
+	}
+}
+
+// ─── Design Your Own ─────────────────────────────────────────────────────────
+templ docsDesignYourOwn() {
+	@docsSection("design-your-own", "Design Your Own Workflow", iconWandDoc, "text-pink-500") {
+		<p>
+			Every example above is a template you can <strong>fork from the Agent Templates</strong> and adapt.
+			Here's a step-by-step guide to designing your own workflow orchestration from scratch.
+		</p>
+		<h3>Step 1 — Identify the Stages</h3>
+		<p>
+			Break your task into <strong>distinct stages</strong>. Each stage should have a clear input, a clear output,
+			and a well-defined responsibility. If a stage can be described in one sentence, it's probably the right granularity.
+		</p>
+		<h3>Step 2 — Choose the Composition Pattern</h3>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">If your stages…</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Use this pattern</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow2("Must run in order, each reading the prior output", "Sequential")
+				@docsTableRow2("Can run independently at the same time", "Parallel")
+				@docsTableRow2("Have independent work then a merge step", "Parallel → Sequential (fan-in)")
+				@docsTableRow2("Need a plan step, then N workers, then a join step", "Map-Reduce (seq → par → seq)")
+				@docsTableRow2("Need iterative refinement with feedback", "Loop with exit_loop")
+				@docsTableRow2("Need to route input to the right specialist", "Conditional routing")
+			</tbody>
+		}
+		<h3>Step 3 — Define State Keys</h3>
+		<p>
+			For each agent, decide:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>• <strong>What it reads</strong> — which <code>&#123;variable&#125;</code> references appear in its system prompt?</li>
+			<li>• <strong>What it writes</strong> — what <code>output_key</code> should it save its output under?</li>
+			<li>• <strong>Is it temporary?</strong> — use the <code>temp:</code> prefix for intermediate results that don't need to persist.</li>
+		</ul>
+		<h3>Step 4 — Write System Prompts</h3>
+		<p>
+			Each agent's system prompt should:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>• Define its <strong>role</strong> and <strong>expertise</strong> in the first sentence.</li>
+			<li>• Reference upstream state keys with <code>&#123;key_name&#125;</code> syntax to receive prior outputs.</li>
+			<li>• Clearly specify the <strong>expected output format</strong> (Markdown, JSON, code block, etc.).</li>
+			<li>• For evaluator agents in a loop, include <strong>evaluation criteria</strong> and exit conditions.</li>
+		</ul>
+		<h3>Step 5 — Build and Test</h3>
+		<ol class="list-decimal list-inside space-y-2 my-4">
+			<li>Open the <strong>Agent Templates</strong> and browse the catalog templates for a starting point.</li>
+			<li>Click <strong>Add to My Agents</strong> on the one closest to your needs, or create a new agent.</li>
+			<li>In the workflow editor, add your composition nodes (sequential, parallel, loop).</li>
+			<li>Add agent states inside each composition node and assign your agents.</li>
+			<li>Set <code>output_key</code> on each agent node.</li>
+			<li>Test with a simple prompt first, then iterate on the system prompts.</li>
+		</ol>
+		@docsInfoBox("Nesting Compositions") {
+			<p>
+				Composition nodes can be nested up to <strong>5 levels deep</strong>. You can place a parallel group inside a
+				sequential pipeline, or a loop inside a parallel group — any combination works. The visual tree
+				builder shows the full hierarchy in real time.
+			</p>
+		}
+	}
+}
+

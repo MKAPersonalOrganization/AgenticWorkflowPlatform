@@ -1,0 +1,78 @@
+package auth
+
+import "aicompass/frontend/ui"
+import "aicompass/frontend/components/card"
+import "aicompass/frontend/components/icon"
+import "aicompass/shared"
+import "aicompass/frontend/ui/i18n"
+
+type LayoutProps struct {
+	Title       string
+	Description string
+	LogoURL     string
+	User        *shared.User // Optional: if provided, navbar will show user info
+}
+
+// AuthLayout provides a centered card layout for authentication pages
+templ AuthLayout(props LayoutProps) {
+	@ui.BaseLayout(ui.LayoutProps{
+		Title:      props.Title,
+		User:       props.User,
+		HideNavbar: true,
+	}) {
+		@icon.CompassLogoCSS()
+		<main class="flex min-h-screen items-center justify-center p-4">
+			<div class="w-full max-w-md space-y-8">
+				<!-- Logo -->
+				<div class="flex justify-center">
+					if props.LogoURL != "" {
+						<img src={ props.LogoURL } alt="Compass.AI Logo" class="h-12 w-auto"/>
+					} else {
+						<div class="h-12 w-12 mx-auto flex items-center justify-center bg-primary text-primary-foreground rounded-full">
+							@icon.CompassLogoAnimated("size-6")
+						</div>
+					}
+				</div>
+				<!-- Main Content Card -->
+				@card.Card(card.Props{
+					Class: "w-full",
+				}) {
+					@card.Header(card.HeaderProps{}) {
+						@card.Title(card.TitleProps{
+							Class: "text-center text-2xl font-bold",
+						}) {
+							{ props.Title }
+						}
+						if props.Description != "" {
+							@card.Description(card.DescriptionProps{
+								Class: "text-center",
+							}) {
+								{ props.Description }
+							}
+						}
+					}
+					@card.Content(card.ContentProps{}) {
+						{ children... }
+					}
+				}
+				<!-- Footer Links -->
+				<div class="text-center text-sm text-muted-foreground">
+					<div class="flex items-center justify-center gap-4">
+						<a href="/privacy" class="hover:text-foreground">{ i18n.T(ctx, "Privacy") }</a>
+						<span>•</span>
+						<a href="/terms" class="hover:text-foreground">{ i18n.T(ctx, "Terms") }</a>
+						<span>•</span>
+						<a href="/support" class="hover:text-foreground">{ i18n.T(ctx, "Support") }</a>
+					</div>
+					<div class="mt-2 text-xs">
+						© { templ.EscapeString(getCurrentYear()) } Compass.AI. { i18n.T(ctx, "All rights reserved.") }
+					</div>
+				</div>
+			</div>
+		</main>
+	}
+}
+
+func getCurrentYear() string {
+	return "2026"
+}
