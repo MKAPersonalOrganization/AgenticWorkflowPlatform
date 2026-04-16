@@ -102,8 +102,12 @@ func (h *handler) WorkspaceDetailsPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	component := knowledge.WorkspaceDetailsPage(knowledge.WorkspaceDetailsPageProps{
-		User:      user,
-		Workspace: workspace,
+		User: user,
+		Workspace: &knowledge.WorkspaceViewModel{
+			ID:          workspace.ID,
+			Name:        workspace.Name,
+			Description: workspace.Description,
+		},
 	})
 	if err := component.Render(r.Context(), w); err != nil {
 		h.log.Error(r.Context(), "failed to render workspace details page", "error", err)

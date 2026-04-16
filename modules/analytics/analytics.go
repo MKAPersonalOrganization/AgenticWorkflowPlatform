@@ -102,13 +102,37 @@ func (h *handler) serveDashboard(w http.ResponseWriter, r *http.Request) {
 
 	user := shared.GetUserFromContext(ctx)
 
+	// Map domain types to component view models to keep the presentation
+	// layer decoupled from the analytics module's internal types.
+	viewStats := make([]component.StatRow, len(stats))
+	for i, s := range stats {
+		viewStats[i] = component.StatRow{
+			AgentName: s.AgentName, Category: s.Category, Name: s.Name,
+			TotalCount: s.TotalCount, Successes: s.Successes, Failures: s.Failures,
+		}
+	}
+	viewTS := make([]component.TimeSeriesPoint, len(timeSeries))
+	for i, p := range timeSeries {
+		viewTS[i] = component.TimeSeriesPoint{
+			Bucket: p.Bucket, TotalCalls: p.TotalCalls, Errors: p.Errors,
+			Successes: p.Successes, ErrorRate: p.ErrorRate,
+		}
+	}
+	viewTools := make([]component.ToolSummary, len(toolList))
+	for i, t := range toolList {
+		viewTools[i] = component.ToolSummary{
+			ToolName: t.ToolName, TotalCalls: t.TotalCalls, Errors: t.Errors,
+			Successes: t.Successes, SuccessRate: t.SuccessRate,
+		}
+	}
+
 	props := component.DashboardProps{
-		Stats:        stats,
+		Stats:        viewStats,
 		Agents:       agents,
 		CurrentAgent: agentFilter,
 		User:         user,
-		TimeSeries:   timeSeries,
-		ToolList:     toolList,
+		TimeSeries:   viewTS,
+		ToolList:     viewTools,
 	}
 
 	if err := component.Dashboard(props).Render(ctx, w); err != nil {

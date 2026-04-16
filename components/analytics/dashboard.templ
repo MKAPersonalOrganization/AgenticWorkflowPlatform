@@ -4,17 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"aicompass/components/chart"
-	"aicompass/modules/analytics/statistics"
 	"aicompass/shared"
 )
 
 type DashboardProps struct {
-	Stats        []statistics.StatRow
+	Stats        []StatRow
 	Agents       []string
 	CurrentAgent string
 	User         *shared.User
-	TimeSeries   []statistics.TimeSeriesPoint
-	ToolList     []statistics.ToolSummary
+	TimeSeries   []TimeSeriesPoint
+	ToolList     []ToolSummary
 }
 
 func boolPtr(b bool) *bool {
@@ -420,7 +419,7 @@ templ Dashboard(props DashboardProps) {
 			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 				{{
 					// Group stats by agent for visualization
-					agentTools := make(map[string][]statistics.StatRow)
+					agentTools := make(map[string][]StatRow)
 					for _, s := range props.Stats {
 						if s.Category == "tool" {
 							agentTools[s.AgentName] = append(agentTools[s.AgentName], s)

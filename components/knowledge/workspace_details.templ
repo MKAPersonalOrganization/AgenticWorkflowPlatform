@@ -8,12 +8,11 @@ import (
 	"aicompass/components/separator"
 	"aicompass/components/tabs"
 	"aicompass/shared"
-	"aicompass/modules/knowledge/rag/workspaces"
 )
 
 type WorkspaceDetailsPageProps struct {
 	User      *shared.User
-	Workspace *workspaces.WorkspaceResponse
+	Workspace *WorkspaceViewModel
 }
 
 templ WorkspaceDetailsPage(props WorkspaceDetailsPageProps) {
