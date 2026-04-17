@@ -9,6 +9,7 @@ import (
 
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
+	"github.com/openai/openai-go/v3/shared"
 	"google.golang.org/genai"
 
 	adkmodel "google.golang.org/adk/model"
@@ -117,6 +118,14 @@ func (m *openAIModel) GenerateContent(ctx context.Context, req *adkmodel.LLMRequ
 					}
 					params.Tools = append(params.Tools, openai.ChatCompletionFunctionTool(funcDef))
 				}
+			}
+
+			// Translate genai.ResponseSchema → OpenAI response_format.json_schema.
+			// ADK's basic_processor populates ResponseSchema for every non-Gemini
+			// provider when the agent has an OutputSchema — without this translation
+			// OpenAI silently ignores it and the model replies in free-form text.
+			if req.Config.ResponseSchema != nil {
+				params.ResponseFormat = buildOpenAIResponseFormat(req.Config.ResponseSchema)
 			}
 		}
 
@@ -440,6 +449,111 @@ func ensureObjectProperties(m map[string]any) {
 	// Recurse into items (array element schema).
 	if items, ok := m["items"].(map[string]any); ok {
 		ensureObjectProperties(items)
+	}
+}
+
+// buildOpenAIResponseFormat converts a genai.Schema into an OpenAI
+// response_format union targeting json_schema with strict mode on.
+//
+// Strict mode guarantees schema-conformant output on modern models
+// (gpt-4o, gpt-4.1, gpt-5, o-series). It imposes two structural
+// requirements on the schema itself that we enforce in applyOpenAIStrictMode:
+//
+//   - every "object" node must set additionalProperties:false, and
+//   - every property listed under an object must appear in that object's
+//     required array.
+//
+// Our UI exposes a "required" toggle per field — when the user marks a
+// field optional we honour that by nullifying the type (e.g. "string" →
+// ["string","null"]) rather than dropping it from required, because
+// OpenAI strict mode does not allow properties to be absent from required.
+// This preserves the user's intent ("this field may be missing/empty")
+// while satisfying strict-mode's structural constraint.
+func buildOpenAIResponseFormat(schema *genai.Schema) openai.ChatCompletionNewParamsResponseFormatUnion {
+	m := genaiSchemaToMap(schema)
+	applyOpenAIStrictMode(m)
+	return openai.ChatCompletionNewParamsResponseFormatUnion{
+		OfJSONSchema: &shared.ResponseFormatJSONSchemaParam{
+			JSONSchema: shared.ResponseFormatJSONSchemaJSONSchemaParam{
+				Name:   "agent_output",
+				Strict: openai.Bool(true),
+				Schema: m,
+			},
+		},
+	}
+}
+
+// applyOpenAIStrictMode walks the schema tree and enforces the two
+// structural invariants OpenAI strict mode demands: additionalProperties:false
+// on every object, and every property listed in required. Originally
+// "optional" properties get a union-with-null type so they can be omitted
+// semantically without violating strict-mode's required list.
+func applyOpenAIStrictMode(m map[string]any) {
+	if m == nil {
+		return
+	}
+	t, _ := m["type"].(string)
+	if t == "object" {
+		m["additionalProperties"] = false
+		props, _ := m["properties"].(map[string]any)
+		if props == nil {
+			m["properties"] = map[string]any{}
+			props = m["properties"].(map[string]any)
+		}
+		existingRequired := map[string]bool{}
+		if req, ok := m["required"].([]string); ok {
+			for _, k := range req {
+				existingRequired[k] = true
+			}
+		} else if req, ok := m["required"].([]any); ok {
+			for _, k := range req {
+				if s, ok := k.(string); ok {
+					existingRequired[s] = true
+				}
+			}
+		}
+		allRequired := make([]string, 0, len(props))
+		for name, raw := range props {
+			sub, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			// Recurse before mutating this node — nested objects get their own
+			// additionalProperties + required pass.
+			applyOpenAIStrictMode(sub)
+			// If the user did not mark this property as required, expand its
+			// type to a union with "null" so the model can still produce a
+			// missing value semantically.
+			if !existingRequired[name] {
+				makeNullableOpenAI(sub)
+			}
+			allRequired = append(allRequired, name)
+		}
+		m["required"] = allRequired
+	}
+	// Recurse into array items.
+	if items, ok := m["items"].(map[string]any); ok {
+		applyOpenAIStrictMode(items)
+	}
+}
+
+// makeNullableOpenAI widens a schema's type to include "null" so OpenAI
+// strict mode can accept an empty value for a logically-optional field.
+func makeNullableOpenAI(m map[string]any) {
+	if m == nil {
+		return
+	}
+	if ts, ok := m["type"].(string); ok && ts != "" && ts != "null" {
+		m["type"] = []any{ts, "null"}
+		return
+	}
+	if arr, ok := m["type"].([]any); ok {
+		for _, v := range arr {
+			if s, ok := v.(string); ok && s == "null" {
+				return
+			}
+		}
+		m["type"] = append(arr, "null")
 	}
 }
 

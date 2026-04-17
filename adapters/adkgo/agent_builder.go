@@ -10,14 +10,43 @@ import (
 	fagent "aicompass/foundation/agent"
 )
 
+// foundationTypeToGenAI maps our JSON-Schema-style lowercase type tokens to the
+// OpenAPI-style uppercase tokens genai.Type uses (see vendor/google.golang.org/genai/types.go).
+// An empty/unknown value becomes TypeUnspecified so it is surfaced as a schema
+// validation error by genai rather than silently accepted as a literal.
+func foundationTypeToGenAI(t fagent.SchemaType) genai.Type {
+	switch t {
+	case fagent.TypeString:
+		return genai.TypeString
+	case fagent.TypeNumber:
+		return genai.TypeNumber
+	case fagent.TypeInteger:
+		return genai.TypeInteger
+	case fagent.TypeBoolean:
+		return genai.TypeBoolean
+	case fagent.TypeArray:
+		return genai.TypeArray
+	case fagent.TypeObject:
+		return genai.TypeObject
+	default:
+		return genai.TypeUnspecified
+	}
+}
+
 // foundationSchemaToGenAI converts a foundation agent.Schema to a genai.Schema.
 // Used to populate llmagent.Config.InputSchema and OutputSchema.
+//
+// Note on case: our foundation.SchemaType uses JSON-Schema lowercase tokens
+// (`"object"`, `"string"`, …) while genai.Type uses OpenAPI uppercase tokens
+// (`"OBJECT"`, `"STRING"`, …). A plain string cast silently produced invalid
+// genai schemas that the model would reject or ignore — causing agents with an
+// OutputSchema set to not follow it. Always route through foundationTypeToGenAI.
 func foundationSchemaToGenAI(s *fagent.Schema) *genai.Schema {
 	if s == nil {
 		return nil
 	}
 	gs := &genai.Schema{
-		Type:        genai.Type(string(s.Type)),
+		Type:        foundationTypeToGenAI(s.Type),
 		Description: s.Description,
 	}
 	if s.Nullable {
