@@ -152,6 +152,290 @@ tasks:
       - go run ./cmd/repo-statistics
       - xdg-open .github/images/repo_statistics.png 2>/dev/null || open .github/images/repo_statistics.png 2>/dev/null || echo "Graph saved at .github/images/repo_statistics.png"
 
+  # ─── Code Maat Analysis Suite ─────────────────────────────────────────
+  # All analyses save results to .maat/ directory.
+  # Set MAAT_JAR env var to point to your code-maat standalone jar.
+  # Set MAAT_AFTER to a YYYY-MM-DD date to limit the analysis window.
+  # Download: https://github.com/adamtornhill/code-maat/releases
+
+  maat:gen-log:
+    desc: "[internal] Generate git log for code-maat analyses"
+    internal: true
+    vars:
+      MAAT_AFTER: '{{.MAAT_AFTER | default ""}}'
+    cmds:
+      - mkdir -p .maat
+      - |
+        AFTER_FLAG=""
+        if [ -n "{{.MAAT_AFTER}}" ]; then
+          AFTER_FLAG="--after={{.MAAT_AFTER}}"
+        fi
+        git log --all --numstat --date=short \
+          --pretty=format:'--%h--%ad--%aN' \
+          --no-renames $AFTER_FLAG \
+          -- . ":(exclude)vendor/" ":(exclude).READ/" ":(exclude)go.sum" ":(exclude)go.mod" ":(exclude)*_test.go" ":(exclude)*_templ.go" ":(exclude)*_mock.go" ":(exclude)mock_*.go" ":(exclude)frontend/" ":(exclude)assets/" \
+          > .maat/git.log
+        echo "Git log generated (.maat/git.log)"
+
+  maat:check:
+    desc: "[internal] Verify code-maat JAR exists"
+    internal: true
+    vars:
+      MAAT_JAR: '{{.MAAT_JAR | default "code-maat.jar"}}'
+    preconditions:
+      - sh: test -f "{{.MAAT_JAR}}"
+        msg: |
+          code-maat JAR not found at '{{.MAAT_JAR}}'.
+          Download from: https://github.com/adamtornhill/code-maat/releases
+          Then either place it in the project root or set MAAT_JAR=/path/to/jar
+
+  maat:run:
+    desc: "[internal] Run a code-maat analysis"
+    internal: true
+    vars:
+      MAAT_JAR: '{{.MAAT_JAR | default "code-maat.jar"}}'
+    cmds:
+      - |
+        java -Djava.awt.headless=true -Xmx4g \
+          -jar "{{.MAAT_JAR}}" \
+          -l .maat/git.log -c git2 \
+          -a {{.ANALYSIS}} \
+          {{.EXTRA_ARGS | default ""}} \
+          > ".maat/{{.OUTPUT}}"
+
+  hotspots:
+    desc: "Hotspots — files that change most frequently"
+    vars:
+      MAAT_JAR: '{{.MAAT_JAR | default "code-maat.jar"}}'
+    cmds:
+      - task: maat:gen-log
+      - |
+        if [ ! -f "{{.MAAT_JAR}}" ]; then
+          echo "═══ Code Hotspot Analysis (fallback — no code-maat) ═══"
+          echo ""
+          echo "Top 30 most frequently changed files:"
+          echo "───────────────────────────────────────"
+          git log --name-only --pretty=format: \
+            | grep -v '^\s*$' \
+            | grep -v '^vendor/' \
+            | sort | uniq -c | sort -rn | head -30
+        else
+          java -Djava.awt.headless=true -Xmx4g \
+            -jar "{{.MAAT_JAR}}" \
+            -l .maat/git.log -c git2 \
+            -a revisions \
+            > .maat/hotspots.csv
+
+          echo "═══ Code Hotspot Analysis ═══"
+          echo ""
+          echo "Top 30 hotspots (by change frequency):"
+          echo "───────────────────────────────────────"
+          sort -t, -k2 -rn .maat/hotspots.csv | head -30 | column -t -s,
+          echo ""
+          echo "Full report: .maat/hotspots.csv"
+        fi
+
+  coupling:
+    desc: "Logical coupling — files that always change together (hidden dependencies)"
+    deps: [maat:gen-log, maat:check]
+    vars:
+      MAAT_JAR: '{{.MAAT_JAR | default "code-maat.jar"}}'
+      MIN_REVS: '{{.MIN_REVS | default "10"}}'
+      MIN_COUPLING: '{{.MIN_COUPLING | default "30"}}'
+    cmds:
+      - task: maat:run
+        vars:
+          ANALYSIS: coupling
+          OUTPUT: coupling.csv
+          EXTRA_ARGS: "-n {{.MIN_REVS}} -i {{.MIN_COUPLING}}"
+      - |
+        echo "═══ Logical Coupling Analysis ═══"
+        echo ""
+        echo "Files that change together (≥{{.MIN_COUPLING}}% coupling, ≥{{.MIN_REVS}} shared revisions):"
+        echo "──────────────────────────────────────────────────────────────────────────"
+        sort -t, -k3 -rn .maat/coupling.csv | head -30 | column -t -s,
+        echo ""
+        echo "⚠  High coupling between unrelated modules suggests hidden dependencies."
+        echo "Full report: .maat/coupling.csv"
+
+  code-age:
+    desc: "Code age — how long since each file was last changed (stability indicator)"
+    deps: [maat:gen-log, maat:check]
+    cmds:
+      - task: maat:run
+        vars:
+          ANALYSIS: age
+          OUTPUT: code-age.csv
+      - |
+        echo "═══ Code Age Analysis ═══"
+        echo ""
+        echo "Most recently changed files (least stable):"
+        echo "─────────────────────────────────────────────"
+        sort -t, -k2 -n .maat/code-age.csv | head -20 | column -t -s,
+        echo ""
+        echo "Oldest unchanged files (most stable):"
+        echo "──────────────────────────────────────"
+        sort -t, -k2 -rn .maat/code-age.csv | head -20 | column -t -s,
+        echo ""
+        echo "Full report: .maat/code-age.csv"
+
+  churn:
+    desc: "Code churn — lines added/deleted per file (defect predictor)"
+    deps: [maat:gen-log, maat:check]
+    cmds:
+      - task: maat:run
+        vars:
+          ANALYSIS: entity-churn
+          OUTPUT: churn.csv
+      - |
+        echo "═══ Code Churn Analysis ═══"
+        echo ""
+        echo "Top 30 files by total churn (added + deleted lines):"
+        echo "─────────────────────────────────────────────────────"
+        tail -n +2 .maat/churn.csv \
+          | awk -F, '{print $0","$2+$3}' \
+          | sort -t, -k4 -rn \
+          | head -30 \
+          | column -t -s,
+        echo ""
+        echo "⚠  High churn correlates with post-release defects."
+        echo "Full report: .maat/churn.csv"
+
+  authors:
+    desc: "Author analysis — number of contributors per file (communication complexity)"
+    deps: [maat:gen-log, maat:check]
+    cmds:
+      - task: maat:run
+        vars:
+          ANALYSIS: authors
+          OUTPUT: authors.csv
+      - |
+        echo "═══ Authors Analysis ═══"
+        echo ""
+        echo "Files with most contributors (highest coordination cost):"
+        echo "──────────────────────────────────────────────────────────"
+        sort -t, -k2 -rn .maat/authors.csv | head -20 | column -t -s,
+        echo ""
+        echo "Full report: .maat/authors.csv"
+
+  main-dev:
+    desc: "Main developer — who owns which files (knowledge risk if they leave)"
+    deps: [maat:gen-log, maat:check]
+    cmds:
+      - task: maat:run
+        vars:
+          ANALYSIS: main-dev-by-revs
+          OUTPUT: main-dev.csv
+      - |
+        echo "═══ Main Developer Analysis ═══"
+        echo ""
+        echo "Primary owner of each file (by revision count):"
+        echo "────────────────────────────────────────────────"
+        head -30 .maat/main-dev.csv | column -t -s,
+        echo ""
+        echo "⚠  Files owned >80% by one dev are a knowledge bus-factor risk."
+        echo "Full report: .maat/main-dev.csv"
+
+  fragmentation:
+    desc: "Code fragmentation — how scattered are contributions across authors"
+    deps: [maat:gen-log, maat:check]
+    cmds:
+      - task: maat:run
+        vars:
+          ANALYSIS: fragmentation
+          OUTPUT: fragmentation.csv
+      - |
+        echo "═══ Fragmentation Analysis ═══"
+        echo ""
+        echo "Most fragmented files (many authors, no clear owner):"
+        echo "──────────────────────────────────────────────────────"
+        sort -t, -k2 -rn .maat/fragmentation.csv | head -20 | column -t -s,
+        echo ""
+        echo "⚠  High fragmentation = diffused responsibility = more defects."
+        echo "Full report: .maat/fragmentation.csv"
+
+  soc:
+    desc: "Sum of coupling — which files are coupled to the most other files"
+    deps: [maat:gen-log, maat:check]
+    cmds:
+      - task: maat:run
+        vars:
+          ANALYSIS: soc
+          OUTPUT: soc.csv
+      - |
+        echo "═══ Sum of Coupling Analysis ═══"
+        echo ""
+        echo "Files with highest total coupling (architectural bottlenecks):"
+        echo "───────────────────────────────────────────────────────────────"
+        sort -t, -k2 -rn .maat/soc.csv | head -20 | column -t -s,
+        echo ""
+        echo "⚠  High SoC files are architectural chokepoints — changes ripple everywhere."
+        echo "Full report: .maat/soc.csv"
+
+  maat:summary:
+    desc: "Repository summary — high-level stats about the codebase"
+    deps: [maat:gen-log, maat:check]
+    cmds:
+      - task: maat:run
+        vars:
+          ANALYSIS: summary
+          OUTPUT: summary.csv
+      - |
+        echo "═══ Repository Summary ═══"
+        echo ""
+        column -t -s, .maat/summary.csv
+        echo ""
+
+  analyze:
+    desc: "Run ALL code-maat analyses (File + Architecture), generate dashboards"
+    cmds:
+      - task: maat:gen-log
+      - task: maat:check
+      - task: maat:summary
+      - task: hotspots
+      - task: coupling
+      - task: code-age
+      - task: churn
+      - task: authors
+      - task: main-dev
+      - task: fragmentation
+      - task: soc
+      - task: analyze:architecture
+      - task: visualize
+      - |
+        echo ""
+        echo "═══════════════════════════════════════"
+        echo "  All reports saved to .maat/"
+        echo "═══════════════════════════════════════"
+        echo ""
+        ls -la .maat/*.csv .maat/*.png .maat/arch/*.csv 2>/dev/null || true
+
+  analyze:architecture:
+    desc: "Run code-maat architectural (domain-level) analyses"
+    vars:
+      MAAT_JAR: '{{.MAAT_JAR | default "code-maat.jar"}}'
+    cmds:
+      - mkdir -p .maat/arch
+      - |
+        set -x
+        if [ ! -f "{{.MAAT_JAR}}" ]; then echo "Skipping architecture analysis, no JAR"; exit 0; fi
+        
+        echo "Generating Architectural (Domain) Output..."
+        java -Djava.awt.headless=true -Xmx4g -jar "{{.MAAT_JAR}}" -l .maat/git.log -c git2 -a revisions -g scripts/go_grouping.txt > .maat/arch/hotspots.csv
+        java -Djava.awt.headless=true -Xmx4g -jar "{{.MAAT_JAR}}" -l .maat/git.log -c git2 -a coupling -g scripts/go_grouping.txt > .maat/arch/coupling.csv
+        java -Djava.awt.headless=true -Xmx4g -jar "{{.MAAT_JAR}}" -l .maat/git.log -c git2 -a age -g scripts/go_grouping.txt > .maat/arch/code-age.csv
+        java -Djava.awt.headless=true -Xmx4g -jar "{{.MAAT_JAR}}" -l .maat/git.log -c git2 -a entity-churn -g scripts/go_grouping.txt > .maat/arch/churn.csv
+        java -Djava.awt.headless=true -Xmx4g -jar "{{.MAAT_JAR}}" -l .maat/git.log -c git2 -a fragmentation -g scripts/go_grouping.txt > .maat/arch/fragmentation.csv
+        java -Djava.awt.headless=true -Xmx4g -jar "{{.MAAT_JAR}}" -l .maat/git.log -c git2 -a soc -g scripts/go_grouping.txt > .maat/arch/soc.csv
+        java -Djava.awt.headless=true -Xmx4g -jar "{{.MAAT_JAR}}" -l .maat/git.log -c git2 -a summary > .maat/arch/summary.csv
+
+  visualize:
+    desc: "Generate visual dashboards from code-maat CSV reports"
+    cmds:
+      - python3 scripts/maat-visualize.py --maat-dir .maat --output .maat/dashboard_files.png --filter-missing
+      - python3 scripts/maat-visualize.py --maat-dir .maat/arch --output .maat/dashboard_architecture.png
+      - echo "Dashboards saved in .maat directory"
+
   ci:
     desc: Run CI checks (format, lint, test, arch tests, build)
     cmds:
