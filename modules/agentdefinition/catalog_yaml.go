@@ -39,6 +39,7 @@ type yamlSubAgent struct {
 	Description  string `yaml:"description"`
 	Icon         string `yaml:"icon"` // named icon or raw SVG
 	SystemPrompt string `yaml:"system_prompt"`
+	OutputKey    string `yaml:"output_key,omitempty"` // session-state key ADK writes the agent's output to; referenced by sibling prompts as {key}
 }
 
 // ParseCatalogEntryYAML parses one catalog-style YAML document: a single LLM agent
@@ -86,6 +87,7 @@ func (s *yamlCatalogSpec) toEntry() (AgentCatalogEntry, error) {
 				Description:  sa.Description,
 				SystemPrompt: sa.SystemPrompt,
 				Icon:         sa.Icon,
+				OutputKey:    sa.OutputKey,
 			}
 		}
 		subsJSON, err := json.Marshal(subs)

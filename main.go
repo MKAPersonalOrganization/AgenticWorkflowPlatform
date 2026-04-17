@@ -73,6 +73,7 @@ import (
 	billingmod "aicompass/modules/billing"
 	chatmod "aicompass/modules/chat"
 	"aicompass/modules/chat/handlers/common"
+	"aicompass/modules/chat/handlers/debughandler"
 	evalmod "aicompass/modules/evaluation"
 	evalhallucinationmod "aicompass/modules/evaluation/hallucination"
 	evalresponsemod "aicompass/modules/evaluation/response"
@@ -616,6 +617,16 @@ func run(ctx context.Context, log *logger.Logger) error {
 	chatModule.SetRunner(adkRunner)
 
 	log.Info(ctx, "startup", "status", "chat module initialized")
+
+	// Internal debug endpoint: self-contained agent run for developer
+	// integration testing. Mounted on the debug mux (see below) so it is
+	// only reachable on cfg.Web.DebugHost — same posture as pprof/expvar.
+	debugAgentHandler := debughandler.New(
+		log,
+		chatModule.Orchestrator().GetThreadManagement(),
+		baseEventStore,
+	)
+	debugMux.HandleFunc("/debug/agent:run", debugAgentHandler.HandleRun)
 
 	// -------------------------------------------------------------------------
 	// Start Debug Service

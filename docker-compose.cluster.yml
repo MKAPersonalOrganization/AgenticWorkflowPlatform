@@ -48,10 +48,16 @@ services:
       replicas: 1
     expose:
       - "8090"
+    # Publish the debug mux to the host on loopback only. This is the single
+    # pod that carries it — keeps /debug/agent:run and pprof reachable from
+    # `curl http://127.0.0.1:4015/...` without exposing them on the LAN.
+    ports:
+      - "127.0.0.1:4015:4015"
     networks:
       - intranet
     environment:
       - APP_WEB_API_HOST=0.0.0.0:8090
+      - APP_WEB_DEBUG_HOST=0.0.0.0:4015
       - APP_WEB_TLS_CERT=/app/tls/cert.pem
       - APP_WEB_TLS_KEY=/app/tls/key.pem
       - APP_REDIS_ADDR=redis-master:6379
