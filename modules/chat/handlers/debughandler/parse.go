@@ -44,15 +44,91 @@ func parseYAMLAgent(data []byte) (string, []*agentdefinition.AgentDefinition, er
 		return "", nil, fmt.Errorf("parsing agent YAML: %w", err)
 	}
 
+	// Parse agent_tools from entry
+	var agentToolRefs []agentdefinition.AgentToolRef
+	if entry.AgentToolsJSON != "" {
+		if err := json.Unmarshal([]byte(entry.AgentToolsJSON), &agentToolRefs); err != nil {
+			return "", nil, fmt.Errorf("parsing agent_tools: %w", err)
+		}
+	}
+
 	if !entry.IsWorkflow() {
+		// Handle single-agent with llm_agents (for agent-as-tool pattern)
+		// Parse llm_agents to create sub-agents
+		var subs []agentdefinition.CatalogSubAgent
+		if entry.LLMAgentsJSON != "" {
+			if err := json.Unmarshal([]byte(entry.LLMAgentsJSON), &subs); err != nil {
+				return "", nil, fmt.Errorf("parsing llm_agents: %w", err)
+			}
+		}
+
+		// Parse agent_tools to expose sub-agents as tools
+		var agentToolRefs []agentdefinition.AgentToolRef
+		if entry.AgentToolsJSON != "" {
+			if err := json.Unmarshal([]byte(entry.AgentToolsJSON), &agentToolRefs); err != nil {
+				return "", nil, fmt.Errorf("parsing agent_tools: %w", err)
+			}
+		}
+
+		// Create sub-agents from llm_agents (first entry can be root if it matches entry name)
+		idMap := make(map[string]string)
+		var defs []*agentdefinition.AgentDefinition
+
+		// Create first entry as root
+		rootID := fagent.GenerateID()
 		root := &agentdefinition.AgentDefinition{
-			ID:           fagent.GenerateID(),
+			ID:           rootID,
 			Name:         entry.Name,
 			Description:  entry.Description,
 			SystemPrompt: entry.SystemPrompt,
 			Icon:         entry.Icon,
 		}
-		return root.ID, []*agentdefinition.AgentDefinition{root}, nil
+
+		// If there are sub-agents in llm_agents, create them
+		if len(subs) > 0 {
+			for _, sa := range subs {
+				subID := fagent.GenerateID()
+				sub := &agentdefinition.AgentDefinition{
+					ID:           subID,
+					Name:         sa.Name,
+					Description:  sa.Description,
+					SystemPrompt: sa.SystemPrompt,
+					Icon:         sa.Icon,
+					OutputKey:    sa.OutputKey,
+				}
+				idMap[sa.ID] = subID
+				defs = append(defs, sub)
+			}
+
+			// Remap agent_tools references and apply input_schema
+			for i := range agentToolRefs {
+				if newID, ok := idMap[agentToolRefs[i].AgentID]; ok {
+					agentToolRefs[i].AgentID = newID
+					// Set input_schema on the sub-agent from agent_tools ref
+					if agentToolRefs[i].InputSchema != "" {
+						if subAgent, ok := idMap[agentToolRefs[i].AgentID]; ok {
+							// Find the sub-agent and set its input_schema
+							for _, d := range defs {
+								if d.ID == subAgent {
+									d.InputSchemaJSON = agentToolRefs[i].InputSchema
+									break
+								}
+							}
+						}
+					}
+				}
+			}
+
+			// Set agent_tools on root
+			tools := make([]*agentdefinition.AgentToolRef, len(agentToolRefs))
+			for i := range agentToolRefs {
+				tools[i] = &agentToolRefs[i]
+			}
+			root.AgentTools = tools
+		}
+
+		defs = append([]*agentdefinition.AgentDefinition{root}, defs...)
+		return root.ID, defs, nil
 	}
 
 	// Workflow catalog entry → expand llm_agents + composition graph into a
@@ -87,6 +163,19 @@ func parseYAMLAgent(data []byte) (string, []*agentdefinition.AgentDefinition, er
 
 	remapGraphAgentIDs(&graph, idMap)
 
+	// Remap agent_tools references to the generated sub-agent IDs.
+	for i := range agentToolRefs {
+		if newID, ok := idMap[agentToolRefs[i].AgentID]; ok {
+			agentToolRefs[i].AgentID = newID
+		}
+	}
+
+	// Convert to pointer slice
+	tools := make([]*agentdefinition.AgentToolRef, len(agentToolRefs))
+	for i := range agentToolRefs {
+		tools[i] = &agentToolRefs[i]
+	}
+
 	root := &agentdefinition.AgentDefinition{
 		ID:           fagent.GenerateID(),
 		Name:         entry.Name,
@@ -94,6 +183,7 @@ func parseYAMLAgent(data []byte) (string, []*agentdefinition.AgentDefinition, er
 		SystemPrompt: entry.SystemPrompt,
 		Icon:         entry.Icon,
 		Graph:        &graph,
+		AgentTools:   tools,
 	}
 	defs = append([]*agentdefinition.AgentDefinition{root}, defs...)
 	return root.ID, defs, nil

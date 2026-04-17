@@ -140,13 +140,6 @@ func (h *Handler) HandleRun(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	for _, d := range defs {
-		if len(d.AgentTools) > 0 {
-			writeErr(w, http.StatusBadRequest, "agent-as-tool is not supported by /debug/agent:run yet")
-			return
-		}
-	}
-
 	userID := req.UserID
 	if userID == "" {
 		userID = "debug-user"

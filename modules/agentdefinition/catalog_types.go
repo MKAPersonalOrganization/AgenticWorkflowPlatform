@@ -31,6 +31,9 @@ type AgentCatalogEntry struct {
 	// Note: the DB column is shared with the coordinator pattern (sub_agents).
 	LLMAgentsJSON string `json:"-" db:"sub_agents"`
 
+	// AgentToolsJSON is a JSON-encoded array of AgentToolRef for exposing sub-agents as tools.
+	AgentToolsJSON string `json:"-" db:"agent_tools"`
+
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -43,10 +46,10 @@ func (e *AgentCatalogEntry) IsWorkflow() bool {
 // CatalogSubAgent defines a sub-agent template embedded in a workflow catalog entry.
 // When the catalog entry is forked, each sub-agent becomes a real AgentDefinition.
 type CatalogSubAgent struct {
-	ID           string `json:"id"`            // Placeholder ID (e.g. "sub-1")
-	Name         string `json:"name"`          // Display name
-	Description  string `json:"description"`   // Short description
-	SystemPrompt string `json:"system_prompt"` // System prompt for the agent
-	Icon         string `json:"icon"`          // SVG icon markup
+	ID           string `json:"id"`                   // Placeholder ID (e.g. "sub-1")
+	Name         string `json:"name"`                 // Display name
+	Description  string `json:"description"`          // Short description
+	SystemPrompt string `json:"system_prompt"`        // System prompt for the agent
+	Icon         string `json:"icon"`                 // SVG icon markup
 	OutputKey    string `json:"output_key,omitempty"` // Session state key to store this agent's output
 }

@@ -274,6 +274,10 @@ type AgentToolRef struct {
 	// SkipSummarization skips the parent's LLM summarisation of the child's
 	// output — the parent hands the raw output back verbatim.
 	SkipSummarization bool `json:"skip_summarization,omitempty"`
+
+	// InputSchema is the JSON schema for the callable signature when this agent
+	// is used as a tool. If empty, defaults to "request" string parameter.
+	InputSchema string `json:"input_schema,omitempty"`
 }
 
 // MarshalAgentTools serializes AgentTools to AgentToolsJSON for storage.

@@ -9,17 +9,18 @@ import (
 
 // yamlCatalogSpec mirrors the YAML schema for a single catalog entry file.
 type yamlCatalogSpec struct {
-	Name         string            `yaml:"name"`
-	Slug         string            `yaml:"slug"` // deterministic ID seed; defaults to Name
-	Description  string            `yaml:"description"`
-	SystemPrompt string            `yaml:"system_prompt"` // non-empty for single-agent entries
-	Category     string            `yaml:"category"`
-	Tags         []string          `yaml:"tags"`
-	AuthorName   string            `yaml:"author_name"`
-	Icon         string            `yaml:"icon"` // named icon (e.g. "bot") or raw SVG
-	Featured     bool              `yaml:"featured"`
-	Workflow     *yamlWorkflowNode `yaml:"workflow"`   // nil for single-agent entries
-	LLMAgents    []yamlSubAgent    `yaml:"llm_agents"` // nil for single-agent entries
+	Name         string             `yaml:"name"`
+	Slug         string             `yaml:"slug"` // deterministic ID seed; defaults to Name
+	Description  string             `yaml:"description"`
+	SystemPrompt string             `yaml:"system_prompt"` // non-empty for single-agent entries
+	Category     string             `yaml:"category"`
+	Tags         []string           `yaml:"tags"`
+	AuthorName   string             `yaml:"author_name"`
+	Icon         string             `yaml:"icon"` // named icon (e.g. "bot") or raw SVG
+	Featured     bool               `yaml:"featured"`
+	Workflow     *yamlWorkflowNode  `yaml:"workflow"`              // nil for single-agent entries
+	LLMAgents    []yamlSubAgent     `yaml:"llm_agents"`            // nil for single-agent entries
+	AgentTools   []yamlAgentToolRef `yaml:"agent_tools,omitempty"` // expose sub-agents as callable tools
 }
 
 type yamlWorkflowNode struct {
@@ -40,6 +41,12 @@ type yamlSubAgent struct {
 	Icon         string `yaml:"icon"` // named icon or raw SVG
 	SystemPrompt string `yaml:"system_prompt"`
 	OutputKey    string `yaml:"output_key,omitempty"` // session-state key ADK writes the agent's output to; referenced by sibling prompts as {key}
+}
+
+type yamlAgentToolRef struct {
+	AgentID           string `yaml:"agent_id"`
+	SkipSummarization bool   `yaml:"skip_summarization,omitempty"`
+	InputSchema       string `yaml:"input_schema,omitempty"` // JSON schema for callable signature when used as tool
 }
 
 // ParseCatalogEntryYAML parses one catalog-style YAML document: a single LLM agent
@@ -95,6 +102,21 @@ func (s *yamlCatalogSpec) toEntry() (AgentCatalogEntry, error) {
 			return e, fmt.Errorf("marshaling llm_agents: %w", err)
 		}
 		e.LLMAgentsJSON = string(subsJSON)
+	}
+
+	if len(s.AgentTools) > 0 {
+		tools := make([]AgentToolRef, len(s.AgentTools))
+		for i, t := range s.AgentTools {
+			tools[i] = AgentToolRef{
+				AgentID:           t.AgentID,
+				SkipSummarization: t.SkipSummarization,
+			}
+		}
+		toolsJSON, err := json.Marshal(tools)
+		if err != nil {
+			return e, fmt.Errorf("marshaling agent_tools: %w", err)
+		}
+		e.AgentToolsJSON = string(toolsJSON)
 	}
 
 	return e, nil

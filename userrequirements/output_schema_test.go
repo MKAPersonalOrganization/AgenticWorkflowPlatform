@@ -5,11 +5,11 @@
 //
 // Specs exercised:
 //
-//	An agent with output_schema returns JSON that conforms to the schema
-//	  → ReturnsSchemaConformantJSONInDirectChat
+//	An agent can return structured data matching a schema
+//	  → AnAgentCanReturnStructuredDataMatchingASchema
 //
-//	An agent with output_schema writes JSON to state via output_key
-//	  → OutputsJSONToStateAndPassesToDownstreamAgent
+//	A downstream agent can receive the output of an upstream agent
+//	  → ADownstreamAgentCanReceiveOutputFromAnUpstreamAgent
 package userrequirements
 
 import (
@@ -34,7 +34,7 @@ const outputSchemaCityFacts = `{
 }`
 
 // An agent with output_schema returns JSON that conforms to the schema in direct chat.
-func TestReturnsSchemaConformantJSONInDirectChat(t *testing.T) {
+func TestAnAgentCanReturnStructuredDataMatchingASchema(t *testing.T) {
 	apiKey := requireOpenAIKey(t)
 	temperature := 0.0
 
@@ -123,7 +123,7 @@ llm_agents:
       Output the sentence and nothing else.
 `
 
-func TestOutputsJSONToStateAndPassesToDownstreamAgent(t *testing.T) {
+func TestADownstreamAgentCanReceiveOutputFromAnUpstreamAgent(t *testing.T) {
 	apiKey := requireOpenAIKey(t)
 	temperature := 0.0
 
