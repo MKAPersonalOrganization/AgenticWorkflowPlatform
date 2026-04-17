@@ -3,12 +3,42 @@ package adkgo
 import (
 	"context"
 	"fmt"
+	"strings"
+	"unicode"
 
 	adktool "google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/agenttool"
 
 	fagent "aicompass/foundation/agent"
 )
+
+// sanitizeToolName produces a function-name-safe identifier from the
+// user-typed agent display name. Providers like OpenAI require tool
+// names to match ^[a-zA-Z0-9_-]+$, so spaces, emoji and punctuation
+// must be stripped. The ID is used as a deterministic fallback when
+// sanitisation leaves nothing usable (e.g. an all-emoji name).
+func sanitizeToolName(display, fallbackID string) string {
+	var b strings.Builder
+	b.Grow(len(display))
+	for _, r := range display {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '_', r == '-':
+			b.WriteRune(r)
+		case unicode.IsSpace(r) || r == '.' || r == '/' || r == '\\' || r == ':':
+			b.WriteByte('_')
+		}
+	}
+	out := strings.Trim(b.String(), "_-")
+	// Collapse runs of underscores that arise from consecutive invalid chars.
+	for strings.Contains(out, "__") {
+		out = strings.ReplaceAll(out, "__", "_")
+	}
+	if out == "" {
+		// Last-resort fallback: use the UUID (already matches the pattern).
+		return "agent_" + strings.ReplaceAll(fallbackID, "-", "")
+	}
+	return out
+}
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Agent-as-Tool wrapping
@@ -144,8 +174,13 @@ func (r *RunnerAdapter) buildAgentToolFromRef(
 	// runs inside agenttool's isolated runner where our parent-level
 	// logging / confirmation pipeline does not apply. Tool errors inside
 	// the child still bubble up as an error from agenttool.Run.
+	//
+	// The name must be a legal function-declaration identifier because
+	// agenttool.Name() forwards it to the LLM as the tool name. OpenAI
+	// enforces ^[a-zA-Z0-9_-]+$, which rejects the spaces/emoji users
+	// put in display names — so slugify it here.
 	childAgent, err := buildLLMAgent(llmAgentParams{
-		name:       foundAgent.Name(),
+		name:       sanitizeToolName(foundAgent.Name(), ref.AgentID),
 		foundAgent: foundAgent,
 		agentCfg:   childCfgCopy,
 		llm:        childLLM,
