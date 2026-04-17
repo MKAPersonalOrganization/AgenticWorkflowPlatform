@@ -167,3 +167,8 @@ tasks:
       - find . -name "*.gp" -path "*/assets/*" -delete 2>/dev/null || true
       - find . -name "*.png" -path "*/assets/charts/*" -delete 2>/dev/null || true
       - find . -name "*.gif" -path "*/assets/animations/*" -delete 2>/dev/null || true
+
+  integration:
+    desc: Run integration tests
+    cmds:
+      - go test -tags integration -v ./userrequirements/...
