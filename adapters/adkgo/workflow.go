@@ -482,6 +482,10 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 		adkTools = append(adkTools, loadartifactstool.New())
 	}
 
+	// Wrap each AgentToolRef via ADK-Go's tool/agenttool so leaf agents
+	// inside workflows can also expose peer agents as callable tools.
+	adkTools = append(adkTools, wbc.adapter.resolveAgentTools(wbc.ctx, wbc.userID, wbc.modelCfg, wbc.threadID, agentCfg, wbc.req)...)
+
 	// For the last child in a loop, add the exit_loop tool.
 	if isLastInLoop {
 		exitTool, etErr := exitlooptool.New()

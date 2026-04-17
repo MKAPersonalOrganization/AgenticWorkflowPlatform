@@ -28,6 +28,7 @@ const agentSelectColumns = `id, user_id, name, description, system_prompt, icon,
     COALESCE(output_schema::text, '') as output_schema,
     COALESCE(graph::text, '') as graph,
     COALESCE(sub_agents::text, '') as sub_agents,
+    COALESCE(agent_tools::text, '') as agent_tools,
     COALESCE(model_config::text, '') as model_config,
     COALESCE(model_override::text, '') as model_override,
     share_token, visibility,
@@ -42,10 +43,11 @@ func newPostgresAgentDefinitionRepository(db *sqlx.DB) *postgresAgentDefinitionR
 	return &postgresAgentDefinitionRepository{db: db}
 }
 
-// hydrateAgent populates Graph, SubAgents, ModelConfig, and ModelOverride from their JSON columns after scanning.
+// hydrateAgent populates Graph, SubAgents, AgentTools, ModelConfig, and ModelOverride from their JSON columns after scanning.
 func hydrateAgent(a *AgentDefinition) {
 	_ = a.UnmarshalGraph()
 	_ = a.UnmarshalSubAgents()
+	_ = a.UnmarshalAgentTools()
 	_ = a.UnmarshalModelConfig()
 	_ = a.UnmarshalModelOverride()
 }
@@ -59,11 +61,14 @@ func (r *postgresAgentDefinitionRepository) Create(ctx context.Context, agent *A
 	agent.CreatedAt = now
 	agent.UpdatedAt = now
 
-	// Marshal composition graph, sub_agents, model config, and model override to JSON for storage.
+	// Marshal composition graph, sub_agents, agent_tools, model config, and model override to JSON for storage.
 	if err := agent.MarshalGraph(); err != nil {
 		return err
 	}
 	if err := agent.MarshalSubAgents(); err != nil {
+		return err
+	}
+	if err := agent.MarshalAgentTools(); err != nil {
 		return err
 	}
 	if err := agent.MarshalModelConfig(); err != nil {
@@ -77,9 +82,9 @@ func (r *postgresAgentDefinitionRepository) Create(ctx context.Context, agent *A
 INSERT INTO user_agents (id, user_id, name, description, system_prompt, icon, source_catalog_id,
     parent_id,
     disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
-    global_instruction, input_schema, output_schema, graph, sub_agents, model_config, model_override,
+    global_instruction, input_schema, output_schema, graph, sub_agents, agent_tools, model_config, model_override,
     share_token, visibility, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)`
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)`
 
 	_, err := r.db.ExecContext(ctx, query,
 		agent.ID,
@@ -99,6 +104,7 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $
 		nullIfEmpty(agent.OutputSchemaJSON),
 		nullIfEmpty(agent.GraphJSON),
 		nullIfEmpty(agent.SubAgentsJSON),
+		nullIfEmpty(agent.AgentToolsJSON),
 		nullIfEmpty(agent.ModelConfigJSON),
 		nullIfEmpty(agent.ModelOverrideJSON),
 		agent.ShareToken,
@@ -116,11 +122,14 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $
 func (r *postgresAgentDefinitionRepository) Update(ctx context.Context, agent *AgentDefinition) error {
 	agent.UpdatedAt = time.Now().UTC()
 
-	// Marshal composition graph, sub_agents, model config, and model override to JSON for storage.
+	// Marshal composition graph, sub_agents, agent_tools, model config, and model override to JSON for storage.
 	if err := agent.MarshalGraph(); err != nil {
 		return err
 	}
 	if err := agent.MarshalSubAgents(); err != nil {
+		return err
+	}
+	if err := agent.MarshalAgentTools(); err != nil {
 		return err
 	}
 	if err := agent.MarshalModelConfig(); err != nil {
@@ -137,8 +146,8 @@ SET name = $1, description = $2, system_prompt = $3,
     disallow_transfer_to_parent = $7, disallow_transfer_to_peers = $8,
     output_key = $9, include_contents = $10, global_instruction = $11,
     input_schema = $12, output_schema = $13, graph = $14, sub_agents = $15,
-    model_config = $16, model_override = $17
-WHERE id = $18 AND user_id = $19`
+    agent_tools = $16, model_config = $17, model_override = $18
+WHERE id = $19 AND user_id = $20`
 
 	result, err := r.db.ExecContext(ctx, query,
 		agent.Name,
@@ -156,6 +165,7 @@ WHERE id = $18 AND user_id = $19`
 		nullIfEmpty(agent.OutputSchemaJSON),
 		nullIfEmpty(agent.GraphJSON),
 		nullIfEmpty(agent.SubAgentsJSON),
+		nullIfEmpty(agent.AgentToolsJSON),
 		nullIfEmpty(agent.ModelConfigJSON),
 		nullIfEmpty(agent.ModelOverrideJSON),
 		agent.ID,

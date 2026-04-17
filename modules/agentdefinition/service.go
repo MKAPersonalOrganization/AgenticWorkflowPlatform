@@ -64,6 +64,12 @@ func (s *Service) create(ctx context.Context, agent *AgentDefinition) error {
 		}
 	}
 
+	// Validate agent tools if present. AgentTools are orthogonal to SubAgents
+	// and Graph — any agent may expose other agents as callable tools.
+	if err := s.validateAgentTools(ctx, agent); err != nil {
+		return err
+	}
+
 	s.log.Info(ctx, "creating agent definition",
 		"userID", agent.UserID,
 		"name", agent.Name,
@@ -222,6 +228,11 @@ func (s *Service) update(ctx context.Context, agent *AgentDefinition) error {
 				return fmt.Errorf("sub_agents[%d]: agent_id is required", i)
 			}
 		}
+	}
+
+	// Validate agent tools if present.
+	if err := s.validateAgentTools(ctx, agent); err != nil {
+		return err
 	}
 
 	s.log.Info(ctx, "updating agent definition",
@@ -456,6 +467,33 @@ func (s *Service) forkShared(ctx context.Context, token, targetUserID string) (*
 		"forkID", fork.ID,
 	)
 	return fork, nil
+}
+
+// ── Agent-Tool Validation ──
+
+// validateAgentTools ensures each AgentToolRef names a real, user-owned agent
+// and rejects self-reference. Cycles between two agents (A → B, B → A) are
+// allowed at persist time — they can't produce runtime loops because the
+// adapter builds the child as a plain leaf LLM agent without propagating
+// its own AgentTools (see adapters/adkgo resolveAgentTools).
+func (s *Service) validateAgentTools(ctx context.Context, agent *AgentDefinition) error {
+	seen := make(map[string]bool, len(agent.AgentTools))
+	for i, ref := range agent.AgentTools {
+		if ref == nil || ref.AgentID == "" {
+			return fmt.Errorf("agent_tools[%d]: agent_id is required", i)
+		}
+		if agent.ID != "" && ref.AgentID == agent.ID {
+			return fmt.Errorf("agent_tools[%d]: an agent cannot reference itself", i)
+		}
+		if seen[ref.AgentID] {
+			return fmt.Errorf("agent_tools[%d]: duplicate agent_id %q", i, ref.AgentID)
+		}
+		seen[ref.AgentID] = true
+		if _, err := s.repo.GetByID(ctx, ref.AgentID, agent.UserID); err != nil {
+			return fmt.Errorf("agent_tools[%d]: agent %q not found: %w", i, ref.AgentID, err)
+		}
+	}
+	return nil
 }
 
 // ── Composition Graph Validation ──

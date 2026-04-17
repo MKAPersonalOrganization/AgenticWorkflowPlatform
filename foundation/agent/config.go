@@ -60,11 +60,26 @@ type AgentModelConfig struct {
 // Layering:
 //   - Identity:     Name, Description
 //   - Behaviour:    SystemPrompt, InstructionFunc, Requirements
-//   - Capabilities: Tools, SubAgents
+//   - Capabilities: Tools, SubAgents, AgentTools
 //   - Transfer:     TransferPolicy (parent/peer delegation control)
 //   - I/O Schema:   InputSchema, OutputSchema
 //   - Execution:    MaxIterations, OutputKey, IncludeContents
 //   - Global:       GlobalInstruction (shared across agent tree)
+//
+// Two ways to combine agents — pick the one that matches the intent:
+//   - SubAgents  (transfer):    control shifts to the child; the child
+//                               drives the conversation and produces the
+//                               final user-visible response. Use for
+//                               coordinator/specialist patterns where the
+//                               parent hands off ("I don't know — ask
+//                               Agent B to take over").
+//   - AgentTools (function call): the parent stays in charge; it calls
+//                               the child like a function, receives its
+//                               output, and keeps reasoning. Use when the
+//                               parent needs a capability but must remain
+//                               responsible for the final answer
+//                               ("summarise this via Agent B, then
+//                               combine it with my other findings").
 type Config struct {
 	// Name is the unique identifier for the agent.
 	// Must be unique within the agent tree. Cannot be "user" (reserved).
@@ -89,7 +104,14 @@ type Config struct {
 	// Tools are the available capabilities for this agent.
 	Tools []Tool
 
-	// SubAgents are child agents that this agent can delegate tasks to.
+	// SubAgents are child agents that this agent can delegate tasks to
+	// via ADK-Go's transfer_to_agent mechanism. When the parent transfers,
+	// control shifts to the sub-agent for the rest of the turn and the
+	// sub-agent's output becomes the user-visible response.
+	//
+	// For function-call-style delegation where the parent stays in charge
+	// and receives the child's output as a tool result, use AgentTools
+	// instead. The two are orthogonal and may be combined on one agent.
 	SubAgents []Agent
 
 	// Requirements are declarative constraints evaluated before each LLM turn.
@@ -140,6 +162,50 @@ type Config struct {
 	// ModelOverride selects a specific provider and model for this agent,
 	// replacing the user's global default. nil means use the global default.
 	ModelOverride *AgentModelOverride
+
+	// AgentTools exposes other user-owned agents as callable tools on this
+	// agent. Each ref is resolved at runtime and wrapped via ADK-Go's
+	// tool/agenttool package, so the child appears to the parent LLM as a
+	// regular function: the parent calls it, reads the output, and keeps
+	// reasoning.
+	//
+	// Orthogonal to SubAgents (control-transfer delegation) and to the
+	// workflow Graph (fixed sequential/parallel/loop orchestration) — any
+	// leaf agent can have AgentTools regardless of its role elsewhere.
+	AgentTools []AgentToolRef
+}
+
+// AgentToolRef exposes another agent as a callable tool for this agent.
+// Maps to ADK-Go's tool/agenttool package (see
+// vendor/google.golang.org/adk/tool/agenttool).
+//
+// AgentTool vs SubAgent — pick the right shape up front:
+//
+//	                    AgentTool (this type)          SubAgent
+//	Control flow        parent calls, child returns    parent transfers to child
+//	Who answers user    parent (after using output)    child (directly)
+//	Child isolation     fresh in-memory session        shares thread's session
+//	Typical use         "run Agent B on this snippet"  "hand off to specialist B"
+//	Summarization       parent summarises by default   no summarisation (child
+//	                    (toggle via SkipSummarization) owns the response)
+//
+// Both lists may coexist on the same agent: a coordinator can transfer to
+// peers and also call utility agents as tools. The adapter flattens the
+// child: when wrapped as an AgentTool, the child's own AgentTools and
+// SubAgents are NOT propagated — you get a plain callable, which keeps
+// semantics simple and prevents accidental cycles.
+//
+// Only the AgentID is persisted; the target agent's definition is resolved
+// at runtime so edits to the target propagate automatically.
+type AgentToolRef struct {
+	// AgentID is the ID of the target agent definition.
+	AgentID string
+
+	// SkipSummarization, when true, skips the parent LLM's summarisation
+	// step after the child returns. Use it when the parent should hand
+	// the child's output back verbatim (e.g. the child produced the
+	// final structured response).
+	SkipSummarization bool
 }
 
 // AgentModelOverride selects a specific LLM provider and model for one agent,

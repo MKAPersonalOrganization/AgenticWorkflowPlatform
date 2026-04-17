@@ -315,6 +315,10 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 				adkTools = append(adkTools, loadartifactstool.New())
 			}
 
+			// 6c. Wrap each AgentToolRef via ADK-Go's tool/agenttool so the
+			// parent can call another user-owned agent as a plain function.
+			adkTools = append(adkTools, r.resolveAgentTools(ctx, req.UserID, modelCfg, req.SessionID, agentCfg, req)...)
+
 			// 7. Build system prompt (agent config + requirements + workspace KB + skills + profile).
 			systemPrompt := r.buildSystemPrompt(ctx, foundAgent, req.UserID, agentName, req.SessionID, agentCfg, inv)
 

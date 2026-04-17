@@ -701,6 +701,7 @@ google.golang.org/adk/plugin/retryandreflect
 google.golang.org/adk/runner
 google.golang.org/adk/session
 google.golang.org/adk/tool
+google.golang.org/adk/tool/agenttool
 google.golang.org/adk/tool/exitlooptool
 google.golang.org/adk/tool/functiontool
 google.golang.org/adk/tool/loadartifactstool

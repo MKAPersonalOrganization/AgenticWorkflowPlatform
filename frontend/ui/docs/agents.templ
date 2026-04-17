@@ -223,6 +223,34 @@ templ docsMultiAgentOrchestration() {
 				@docsTableRow("Coordinator", "An LM agent delegates to sub-agents dynamically based on conversation context.", "Open-ended triage: user query routed to the best specialist")
 			</tbody>
 		}
+		<h3>Sub-Agents vs Agent-as-Tool</h3>
+		<p>
+			There are two ways to wire one agent to call another, and the right choice depends on
+			<strong>who owns the final answer</strong>:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>• <strong>Sub-Agent (transfer)</strong> — The parent hands off; the sub-agent takes over the turn and its reply becomes the user-visible response. Use when a specialist is better qualified to answer end-to-end ("hand off to the billing agent").</li>
+			<li>• <strong>Agent-as-Tool (function call)</strong> — The parent stays in charge; it calls the other agent like any tool, reads its output, and keeps reasoning. Use when the parent needs a capability but must remain responsible for the final answer ("run Agent B on this snippet, then combine with my other findings").</li>
+		</ul>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Aspect</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Sub-Agent (transfer)</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Agent-as-Tool (function call)</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow("Control flow", "Parent transfers to child; child drives the turn", "Parent calls child, child returns, parent keeps going")
+				@docsTableRow("Who answers the user", "The child (directly)", "The parent (after using the child's output)")
+				@docsTableRow("Child session", "Shares the thread's session and history", "Fresh in-memory session per call — isolated")
+				@docsTableRow("Summarization", "No extra step — the child's reply is the reply", "Parent summarises by default (toggle off to return raw output)")
+				@docsTableRow("Typical use", `"Escalate to specialist"`, `"Use another agent as a utility"`)
+			</tbody>
+		}
+		@docsInfoBox("Combine them freely") {
+			<p>Sub-Agents and Agent-as-Tool attachments are orthogonal — a single agent can transfer to peers <em>and</em> call utility agents as tools. When an agent is wrapped as a tool, its own Sub-Agents and Agent Tools are <strong>not</strong> propagated into the call — you get a plain callable. This keeps semantics simple and prevents accidental cycles.</p>
+		}
 		<h3>Transfer Policies</h3>
 		<p>
 			Transfer policies control how agents can delegate work to each other in an LLM-routed
