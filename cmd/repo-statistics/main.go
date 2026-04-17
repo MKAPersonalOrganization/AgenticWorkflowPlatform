@@ -176,8 +176,9 @@ func main() {
 }
 
 func getGitStats() ([]Commit, error) {
+	// Exclude vendor directory from analysis
 	cmd := exec.Command("git", "log", "--numstat", "--pretty=format:%H|%ad|%s",
-		"--date=short", "--reverse")
+		"--date=short", "--reverse", "--", ".", ":(exclude)vendor/**")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("git log failed: %w", err)
