@@ -534,6 +534,7 @@ export const agentDesigner = () => ({
         this.showFilesystems = false;
         this.showSubAgents = false;
         this.showAgentTools = false;
+        this.showCalledAsTool = false;
         this.showModelConfig = false;
         this.showRequirementsPanel = false;
         this.agentPlugins = [];
@@ -541,6 +542,7 @@ export const agentDesigner = () => ({
         this.agentFilesystems = [];
         this.providerModelOptions = [];
         this.providerModelsError = '';
+        this.hydrateInputSchemaRows();
         this.view = 'agentForm';
     },
 
@@ -579,10 +581,12 @@ export const agentDesigner = () => ({
         this.showFilesystems = false;
         this.showSubAgents = false;
         this.showAgentTools = false;
+        this.showCalledAsTool = false;
         this.showModelConfig = false;
         this.showRequirementsPanel = false;
         this.providerModelOptions = [];
         this.providerModelsError = '';
+        this.hydrateInputSchemaRows();
         this.view = 'agentForm';
 
         // Load tool/KB/FS data
@@ -630,7 +634,7 @@ export const agentDesigner = () => ({
                 outputKey: this.form.outputKey.trim(),
                 includeContents: this.form.includeContents || '',
                 globalInstruction: this.form.globalInstruction.trim(),
-                inputSchema: this.form.inputSchema.trim(),
+                inputSchema: this.serializeInputSchema(),
                 outputSchema: this.form.outputSchema.trim(),
                 modelConfig: Object.keys(modelConfig).length > 0 ? modelConfig : null,
                 modelOverride,
@@ -783,6 +787,117 @@ export const agentDesigner = () => ({
     getAgentName(agentId) {
         const agent = this.allAgents.find(a => a.id === agentId);
         return agent ? agent.name : 'Unknown Agent';
+    },
+
+    // Input-Schema Row Builder (M4)
+    // Renders form.inputSchema as a list of {name, type, required, description}
+    // rows the user edits without writing JSON. Serialized back to a JSON Schema
+    // object at save time. Falls back to a raw JSON view when the persisted schema
+    // is too complex to round-trip (nested objects, arrays of objects, $ref, etc.).
+    showCalledAsTool: false,
+    inputSchemaMode: 'visual', // 'visual' | 'json'
+    inputSchemaRows: [],
+    inputSchemaJSONError: '',
+
+    /** Supported simple types in the visual builder. */
+    get inputSchemaTypeOptions() {
+        return ['string', 'number', 'integer', 'boolean'];
+    },
+
+    /**
+     * Parse form.inputSchema (raw JSON) into editable rows. If the schema is
+     * missing, empty, malformed, or uses features beyond flat scalar properties
+     * (nested objects, arrays, enums with objects, $ref), we switch to JSON
+     * mode so the user can edit the raw schema instead of silently losing data.
+     */
+    hydrateInputSchemaRows() {
+        this.inputSchemaJSONError = '';
+        const raw = (this.form.inputSchema || '').trim();
+        if (!raw) {
+            this.inputSchemaRows = [];
+            this.inputSchemaMode = 'visual';
+            return;
+        }
+        let parsed;
+        try {
+            parsed = JSON.parse(raw);
+        } catch (e) {
+            this.inputSchemaMode = 'json';
+            this.inputSchemaJSONError = e.message;
+            return;
+        }
+        const simple = this.schemaToRows(parsed);
+        if (simple === null) {
+            this.inputSchemaMode = 'json';
+            return;
+        }
+        this.inputSchemaRows = simple;
+        this.inputSchemaMode = 'visual';
+    },
+
+    /**
+     * Convert a JSON Schema object to flat rows.
+     * Returns null if the schema can't be represented as flat scalar rows.
+     */
+    schemaToRows(schema) {
+        if (!schema || typeof schema !== 'object') return null;
+        if (schema.type !== 'object' || !schema.properties || typeof schema.properties !== 'object') return null;
+        const required = Array.isArray(schema.required) ? schema.required : [];
+        const rows = [];
+        for (const [name, propRaw] of Object.entries(schema.properties)) {
+            if (!propRaw || typeof propRaw !== 'object') return null;
+            const t = propRaw.type;
+            if (!this.inputSchemaTypeOptions.includes(t)) return null;
+            rows.push({
+                name,
+                type: t,
+                required: required.includes(name),
+                description: typeof propRaw.description === 'string' ? propRaw.description : '',
+            });
+        }
+        return rows;
+    },
+
+    addInputSchemaRow() {
+        this.inputSchemaRows.push({ name: '', type: 'string', required: false, description: '' });
+    },
+
+    removeInputSchemaRow(idx) {
+        this.inputSchemaRows.splice(idx, 1);
+    },
+
+    switchInputSchemaToJSON() {
+        // Serialize current rows into the JSON textarea, then let the user edit freely.
+        this.form.inputSchema = this.serializeInputSchema();
+        this.inputSchemaMode = 'json';
+    },
+
+    switchInputSchemaToVisual() {
+        // Try to re-parse whatever is in the textarea. If it's too complex, stay in JSON mode.
+        this.hydrateInputSchemaRows();
+    },
+
+    /**
+     * Build a JSON Schema string from either the visual rows or the raw JSON,
+     * depending on the current mode. Empty result → "" (persisted as NULL).
+     */
+    serializeInputSchema() {
+        if (this.inputSchemaMode === 'json') {
+            return (this.form.inputSchema || '').trim();
+        }
+        const rows = (this.inputSchemaRows || []).filter(r => r.name && r.name.trim());
+        if (rows.length === 0) return '';
+        const properties = {};
+        const required = [];
+        for (const r of rows) {
+            const prop = { type: r.type };
+            if (r.description && r.description.trim()) prop.description = r.description.trim();
+            properties[r.name.trim()] = prop;
+            if (r.required) required.push(r.name.trim());
+        }
+        const schema = { type: 'object', properties };
+        if (required.length > 0) schema.required = required;
+        return JSON.stringify(schema);
     },
 
     // Agent-as-Tool Management

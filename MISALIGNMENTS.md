@@ -14,7 +14,7 @@
    - [M1. Agent-as-Tool node type](#m1-agent-as-tool-node-type) ✅ **done**
    - [M2. Planner preset (ReAct / Plan-then-Act / None)](#m2-planner-preset)
    - [M3. Model parameter controls (the rest of `GenerateContentConfig`)](#m3-model-parameter-controls)
-   - [M4. Input-schema visual builder (remove dead code or ship it)](#m4-input-schema-visual-builder)
+   - [M4. Input-schema visual builder (remove dead code or ship it)](#m4-input-schema-visual-builder) ✅ **done**
    - [M5. Output-schema visual builder (replace raw JSON textarea)](#m5-output-schema-visual-builder)
    - [M6. Instruction template variable picker](#m6-instruction-template-variable-picker)
    - [M7. Global-instruction UX (root-only surfacing)](#m7-global-instruction-ux)
@@ -242,6 +242,8 @@ Designer slider → payload → AgentModelConfig (+ new fields) → adapters/adk
 ---
 
 ### M4. Input-schema visual builder
+
+> **Status: ✅ Done.** Reframed after reading ADK source (`agent/llmagent/llmagent.go:253` — "The input schema when agent is used as a tool"): InputSchema is an **inbound** signature that only matters when the agent is wrapped via `agenttool.New` (M1). Moved it out of the mixed "Data Contracts" block into its own **"Called as a Tool"** section peer to "Agents as Tools" (outbound). Replaced the raw JSON textarea with a row-based builder (name / type / required / description) plus a JSON-fallback view for complex schemas. OutputSchema is now a separate standalone section since it applies universally. See `frontend/ui/agenteditor/agenteditor.templ` (Called-as-a-Tool section) + `assets/js/components/agent-designer-dialog.js` (`hydrateInputSchemaRows` / `serializeInputSchema`). Backend untouched — round-trips through the existing `InputSchemaJSON` string.
 
 **ADK.** `llmagent.Config.InputSchema (*genai.Schema)` — defines the function-call signature when an agent is invoked as a tool (see M1).
 

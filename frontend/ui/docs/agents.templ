@@ -251,6 +251,57 @@ templ docsMultiAgentOrchestration() {
 		@docsInfoBox("Combine them freely") {
 			<p>Sub-Agents and Agent-as-Tool attachments are orthogonal — a single agent can transfer to peers <em>and</em> call utility agents as tools. When an agent is wrapped as a tool, its own Sub-Agents and Agent Tools are <strong>not</strong> propagated into the call — you get a plain callable. This keeps semantics simple and prevents accidental cycles.</p>
 		}
+		<h3>Agent as Tool (Function-Call Pattern)</h3>
+		<p>
+			The <strong>Agent as Tool</strong> pattern lets one agent call another like any
+			function tool. The parent's LLM sees the child in its tool list, decides to invoke
+			it, reads the child's output, and keeps reasoning. Control never transfers — the
+			parent always produces the final user-visible response.
+		</p>
+		<p>
+			Under the hood this maps to ADK-Go's <code>tool/agenttool</code> package: the
+			target agent is built, wrapped as a <code>tool.Tool</code>, and appended to the
+			parent's tools. The child runs inside an <strong>isolated in-memory session</strong>
+			per call, so it cannot read or write the parent's session state, memory, or
+			artifacts — safe by default.
+		</p>
+		<h4>Wiring it in the designer</h4>
+		<p>
+			In the agent editor, open the <strong>Agents as Tools</strong> section (distinct
+			from <strong>Sub-Agents</strong>):
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>• <strong>Add Agent Tool</strong> — Pick any of your other agents. The child's name and description become the function declaration the parent's LLM sees.</li>
+			<li>• <strong>Return raw output (skip summarization)</strong> — Off by default: the parent summarises the child's output in its own reply. Turn on when the child produces the final authoritative response and you want the parent to pass it through verbatim.</li>
+		</ul>
+		<h4>What the caller sees</h4>
+		<p>
+			The parent's LLM receives a function declaration built from the child's fields:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>• <strong>Function name</strong> — derived from the child's display name (slugified to match provider rules, e.g. OpenAI's <code>^[a-zA-Z0-9_-]+$</code>).</li>
+			<li>• <strong>Description</strong> — the child's description, verbatim. Make it actionable — the LLM picks the tool based on this text.</li>
+			<li>• <strong>Parameters</strong> — the child's <strong>Input Schema</strong> (see below). With no schema, the caller passes a single <code>request</code> string.</li>
+		</ul>
+		@docsInfoBox("Publish a proper signature") {
+			<p>If you want the calling LLM to produce typed arguments instead of a blob of prose, set the child's <strong>Input Schema</strong> in its "Called as a Tool" section. Without it, the callable signature falls back to a single free-text <code>request</code>.</p>
+		}
+		<h4>Runtime semantics</h4>
+		<ul class="space-y-2 my-4">
+			<li>• <strong>Isolated session</strong> — each invocation gets a fresh in-memory session. No leakage of parent state, memory, or artifacts into the child.</li>
+			<li>• <strong>Flattened child</strong> — when wrapped as a tool, the child's own Sub-Agents and Agent Tools are <em>not</em> propagated. You always get a plain leaf callable, which keeps semantics simple and prevents cycles.</li>
+			<li>• <strong>Workflow agents are rejected</strong> — only simple LLM agents can be wrapped. A composed workflow (sequential/parallel/loop) must be invoked via its own orchestration, not as a tool.</li>
+			<li>• <strong>Errors propagate</strong> — a failure inside the child surfaces as a tool error to the parent's LLM, which can retry or report naturally.</li>
+		</ul>
+		<h4>When to reach for it</h4>
+		<ul class="space-y-2 my-4">
+			<li>• <strong>Utility sub-tasks</strong> — "summarise this passage", "extract entities", "translate to French" — the parent needs the result but owns the final answer.</li>
+			<li>• <strong>Structured extraction</strong> — a child with an Output Schema produces validated JSON that the parent merges into its broader response.</li>
+			<li>• <strong>Capability wrapping</strong> — expose a specialist agent (with its own tools/KB) as a clean callable without giving the parent those tools directly.</li>
+		</ul>
+		@docsInfoBox("Not for handoffs") {
+			<p>If the child should <em>own</em> the reply end-to-end (e.g. "escalate to the billing specialist"), use a <strong>Sub-Agent</strong> and let the parent transfer instead. Agent-as-Tool always keeps the parent in charge.</p>
+		}
 		<h3>Transfer Policies</h3>
 		<p>
 			Transfer policies control how agents can delegate work to each other in an LLM-routed
@@ -293,14 +344,44 @@ templ docsMultiAgentOrchestration() {
 			Set it on the root agent, and all sub-agents inherit it automatically. Use this for
 			cross-cutting concerns like tone, compliance rules, or output format requirements.
 		</p>
-		<h3>Output Schemas</h3>
+		<h3>Input Schema (Inbound Signature)</h3>
 		<p>
-			Constrain an agent's output to a <strong>JSON schema</strong>. When an output schema is set,
-			the agent's response is guaranteed to conform to the specified structure — essential when downstream agents or systems expect structured input.
+			The <strong>input schema</strong> defines the callable signature an agent publishes
+			to its callers. It's an <strong>inbound</strong> contract — "here is how I want to be invoked"
+			— and it lives on the <em>callee</em>, not the caller.
 		</p>
 		<p>
-			<strong>Note:</strong> When an output schema is active, tool use is automatically disabled as the model focuses exclusively on producing the structured response.
+			<strong>When it matters.</strong> The input schema is consulted only when the agent is
+			invoked programmatically as a callable — specifically when it is wrapped via the
+			<em>Agents as Tools</em> pattern, or exposed over A2A. On direct chat, inside workflow
+			leaves, and at transfer targets the input schema is <strong>ignored</strong> — those paths
+			always receive free-text user content.
 		</p>
+		<p>
+			<strong>Default behaviour.</strong> An agent with no input schema is called with a single
+			free-text argument named <code>request</code>. Set a schema to require named, typed
+			arguments — e.g. <code>topic</code> as a string and <code>depth</code> as an integer —
+			and the calling LLM will produce a properly structured function call instead of a
+			blob of prose.
+		</p>
+		@docsInfoBox("Rule of thumb") {
+			<p>If nothing ever wraps this agent as a tool and you don't publish it over A2A, the input schema has no effect — leave it empty. If another agent calls this one through <strong>Agents as Tools</strong>, define the input schema here to tell that caller what arguments to provide.</p>
+		}
+		<h3>Output Schema (Structured Replies)</h3>
+		<p>
+			The <strong>output schema</strong> constrains an agent's reply to a JSON Schema.
+			Unlike the input schema, the output schema is <strong>universal</strong>: it applies
+			on every reply regardless of how the agent was invoked (direct chat, workflow leaf,
+			transfer target, or wrapped as a tool).
+		</p>
+		<p>
+			<strong>Note:</strong> When an output schema is active, tool use, sub-agent transfers,
+			and agent-tool calls are automatically disabled — the model focuses exclusively on
+			producing the structured response.
+		</p>
+		@docsInfoBox("Input vs Output Schema") {
+			<p><strong>Input schema</strong> = inbound, situational — only consulted when someone calls this agent as a tool or over A2A. <strong>Output schema</strong> = outbound, universal — constrains every reply the agent produces.</p>
+		}
 		<h3>Visual Workflow Builder</h3>
 		<p>
 			The workflow tree builder provides a <strong>visual, interactive editor</strong> to compose multi-agent workflows.
