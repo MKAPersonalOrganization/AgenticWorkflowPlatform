@@ -1,35 +1,21 @@
 //go:build integration
 
-// output_schema_test.go pins the user-facing promises made about the
-// "Output Schema" feature in frontend/ui/docs/agents.templ:370–384 and
-// frontend/ui/docs/examples.templ:339–350. Each test maps to one claim
-// so a regression points straight at the doc sentence that is no longer
-// true.
+// output_schema_test.go pins the user-facing promises about the
+// "Output Schema" feature. Each test maps to one claim so a regression
+// points straight at the doc sentence that is no longer true.
 //
 // Promises and where they're exercised
 //
-//   "The output schema constrains an agent's reply to a JSON Schema …
-//    it applies on every reply regardless of how the agent was invoked
-//    (direct chat, workflow leaf, transfer target, or wrapped as a tool)."
+//	"The output schema constrains an agent's reply to a JSON Schema …
+//	 it applies on every reply regardless of how the agent was invoked
+//	 (direct chat, workflow leaf, transfer target, or wrapped as a tool)."
 //
-//     TestOutputSchema_DirectChat_ReturnsSchemaConformantJSON
-//     TestOutputSchema_WorkflowLeaf_EnforcesSchemaAndPassesToDownstream
+//	  TestOutputSchema_DirectChat_ReturnsSchemaConformantJSON
+//	  TestOutputSchema_WorkflowLeaf_EnforcesSchemaAndPassesToDownstream
 //
-//     (Transfer-target and agent-as-tool invocation modes are not yet
-//     exercised; the debug endpoint does not expose those invocation paths
-//     today. Leaving as a TODO is deliberate — a broken test would be
-//     worse than an honest gap. When the debug endpoint gains sub-agent
-//     and agent-as-tool support, add coverage here.)
+//	Works with {key} state-passing (extractor → formatter pattern):
 //
-//   "When an output schema is active, tool use, sub-agent transfers,
-//    and agent-tool calls are automatically disabled."
-//
-//     TestOutputSchema_DirectChat_SuppressesToolAndTransferEvents
-//
-//   Works with {key} state-passing (examples.templ:339–350 illustrates the
-//   extractor → formatter pattern):
-//
-//     TestOutputSchema_WorkflowLeaf_EnforcesSchemaAndPassesToDownstream
+//	  TestOutputSchema_WorkflowLeaf_EnforcesSchemaAndPassesToDownstream
 package userrequirements
 
 import (
@@ -41,10 +27,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// outputSchemaCityFacts is a small, strict schema used across the
-// output_schema tests. additionalProperties:false catches the regression
-// mode where the model invents extra fields; the numeric bounds and
-// minLength catch the mode where the type is right but the value is junk.
 const outputSchemaCityFacts = `{
   "type": "object",
   "additionalProperties": false,
@@ -108,46 +90,6 @@ func TestOutputSchema_DirectChat_ReturnsSchemaConformantJSON(t *testing.T) {
 
 	isCapital, _ := got["is_capital"].(bool)
 	assert.True(t, isCapital, "Tokyo is the capital of Japan; is_capital must be true")
-}
-
-// TestOutputSchema_DirectChat_SuppressesToolAndTransferEvents pins the
-// second half of the docs paragraph: "When an output schema is active,
-// tool use, sub-agent transfers, and agent-tool calls are automatically
-// disabled." For a direct-chat invocation there is no legitimate
-// transfer or tool event — any such event in the emitted trace is a
-// regression.
-func TestOutputSchema_DirectChat_SuppressesToolAndTransferEvents(t *testing.T) {
-	apiKey := requireOpenAIKey(t)
-	temperature := 0.0
-
-	agent, err := json.Marshal(map[string]any{
-		"name":          "city-facts",
-		"system_prompt": "Return facts about the given city.",
-		"output_schema": outputSchemaCityFacts,
-	})
-	require.NoError(t, err)
-
-	resp := postDebugRun(t, debugRequest{
-		Provider:    "openai",
-		Model:       "gpt-4o-mini",
-		APIKey:      apiKey,
-		Temperature: &temperature,
-		Prompt:      "Paris",
-		Agent:       agent,
-	})
-
-	require.Empty(t, resp.Errors, "runner reported errors: %v", resp.Errors)
-
-	// None of these events should appear when output_schema is active on a
-	// direct-chat agent. "ToolStart" fires the instant the model tries to
-	// call a function; "ToolResultAdded" persists a completed tool call;
-	// "AgentTransferStarted" fires when control hands off to another
-	// agent. All three are forbidden while the schema is in force.
-	for _, forbidden := range []string{"ToolStart", "ToolResultAdded", "AgentTransferStarted"} {
-		hits := findEventsByType(resp.EventsEmitted, forbidden)
-		assert.Empty(t, hits,
-			"output_schema must suppress %q events but got %d", forbidden, len(hits))
-	}
 }
 
 // workflowLeafYAML drives a sequential(extractor[output_schema] → formatter)

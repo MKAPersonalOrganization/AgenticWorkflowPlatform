@@ -68,18 +68,18 @@ type AgentModelConfig struct {
 //
 // Two ways to combine agents — pick the one that matches the intent:
 //   - SubAgents  (transfer):    control shifts to the child; the child
-//                               drives the conversation and produces the
-//                               final user-visible response. Use for
-//                               coordinator/specialist patterns where the
-//                               parent hands off ("I don't know — ask
-//                               Agent B to take over").
+//     drives the conversation and produces the
+//     final user-visible response. Use for
+//     coordinator/specialist patterns where the
+//     parent hands off ("I don't know — ask
+//     Agent B to take over").
 //   - AgentTools (function call): the parent stays in charge; it calls
-//                               the child like a function, receives its
-//                               output, and keeps reasoning. Use when the
-//                               parent needs a capability but must remain
-//                               responsible for the final answer
-//                               ("summarise this via Agent B, then
-//                               combine it with my other findings").
+//     the child like a function, receives its
+//     output, and keeps reasoning. Use when the
+//     parent needs a capability but must remain
+//     responsible for the final answer
+//     ("summarise this via Agent B, then
+//     combine it with my other findings").
 type Config struct {
 	// Name is the unique identifier for the agent.
 	// Must be unique within the agent tree. Cannot be "user" (reserved).
@@ -152,7 +152,7 @@ type Config struct {
 	InputSchema *Schema
 
 	// OutputSchema forces the agent to produce structured JSON output
-	// conforming to this schema. When set, tool use is disabled.
+	// conforming to this schema.
 	OutputSchema *Schema
 
 	// ModelConfig holds per-agent LLM generation parameter overrides.

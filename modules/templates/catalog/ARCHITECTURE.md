@@ -399,7 +399,7 @@ flowchart LR
 
 **Source:** `deep-search` (research_evaluator with Feedback schema), `travel-concierge` (planning with Itinerary/HotelsSelection schemas)
 
-**What it demonstrates:** An agent with `output_schema` set to a JSON Schema forces the LLM to return strictly typed structured data instead of free-form text. When set, the agent can only reply with matching JSON — no tool use, no RAG, no agent transfer. This enables reliable downstream processing of agent output.
+**What it demonstrates:** An agent with `output_schema` set to a JSON Schema forces the LLM to return strictly typed structured data instead of free-form text. The schema is enforced on every reply regardless of how the agent was invoked (direct chat, workflow leaf, transfer target, or wrapped as a tool). This enables reliable downstream processing of agent output.
 
 ```mermaid
 flowchart LR
@@ -418,7 +418,7 @@ flowchart LR
 
 **Workflow features used**
 - `output_schema` — forces the LLM to return JSON matching the schema
-- When `output_schema` is set, the agent **cannot** use tools, RAG, or transfer to other agents
+- `output_key` — writes the JSON to session state for downstream agents to read via `{key}`
 - Enables reliable downstream processing — the formatter knows the exact structure
 - Reduces parsing errors — the model is constrained by the schema
 - Common schema types: `object` with required properties, `array` of typed items, `enum` fields

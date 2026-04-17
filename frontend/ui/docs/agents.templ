@@ -374,11 +374,6 @@ templ docsMultiAgentOrchestration() {
 			on every reply regardless of how the agent was invoked (direct chat, workflow leaf,
 			transfer target, or wrapped as a tool).
 		</p>
-		<p>
-			<strong>Note:</strong> When an output schema is active, tool use, sub-agent transfers,
-			and agent-tool calls are automatically disabled — the model focuses exclusively on
-			producing the structured response.
-		</p>
 		@docsInfoBox("Input vs Output Schema") {
 			<p><strong>Input schema</strong> = inbound, situational — only consulted when someone calls this agent as a tool or over A2A. <strong>Output schema</strong> = outbound, universal — constrains every reply the agent produces.</p>
 		}

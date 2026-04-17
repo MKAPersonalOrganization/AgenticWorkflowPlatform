@@ -340,14 +340,14 @@ templ docsAdvancedExamples() {
 		<h3>Output Schema: Structured Data Extraction</h3>
 		<p>
 			An agent with <code>output_schema</code> set to a JSON Schema forces the LLM to return strictly
-			typed structured data instead of free-form text. When set, the agent can only reply with matching
-			JSON — no tool use, no RAG, no agent transfer.
+			typed structured data instead of free-form text. The schema is enforced on every reply regardless of
+			how the agent was invoked (direct chat, workflow leaf, transfer target, or wrapped as a tool).
 		</p>
 		@wfSequential([]wfAgent{
 			{Name: "DataExtractor", Subtitle: "output_schema: object → structured_data"},
 			{Name: "ReportFormatter", Subtitle: "reads {structured_data}"},
 		})
-		@wfConceptBadges([]string{"output_schema", "forced JSON", "no tools/RAG/transfer when schema set"})
+		@wfConceptBadges([]string{"output_schema", "forced JSON", "schema enforced on every reply"})
 		<!-- Agent Isolation -->
 		<h3>Agent Isolation: Researcher → Evaluator → Executor</h3>
 		<p>
