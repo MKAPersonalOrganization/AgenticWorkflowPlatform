@@ -76,6 +76,7 @@ func (p *UserAwareProvider) agentFromDefinition(def *AgentDefinition) agent.Agen
 		OutputSchema:      parseAgentSchema(def.OutputSchemaJSON),
 		ModelConfig:       toAgentModelConfig(def.ModelConfig),
 		ModelOverride:     toAgentModelOverride(def.ModelOverride),
+		AgentTools:        toFoundationAgentToolRefs(def.AgentTools),
 	}
 
 	if len(def.SubAgents) > 0 {
@@ -169,6 +170,25 @@ func toAgentModelOverride(src *AgentModelOverride) *agent.AgentModelOverride {
 		Provider:  src.Provider,
 		ModelName: src.ModelName,
 	}
+}
+
+// toFoundationAgentToolRefs converts persisted AgentToolRefs to the
+// foundation type consumed by the adapter.
+func toFoundationAgentToolRefs(src []*AgentToolRef) []agent.AgentToolRef {
+	if len(src) == 0 {
+		return nil
+	}
+	out := make([]agent.AgentToolRef, 0, len(src))
+	for _, ref := range src {
+		if ref == nil || ref.AgentID == "" {
+			continue
+		}
+		out = append(out, agent.AgentToolRef{
+			AgentID:           ref.AgentID,
+			SkipSummarization: ref.SkipSummarization,
+		})
+	}
+	return out
 }
 
 func convertCompositionNode(n *CompositionNode) agent.WorkflowNodeInfo {

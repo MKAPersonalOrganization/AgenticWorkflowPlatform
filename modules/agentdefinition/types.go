@@ -105,6 +105,15 @@ type AgentDefinition struct {
 	SubAgents     []*SubAgentRef `json:"sub_agents,omitempty" db:"-"`
 	SubAgentsJSON string         `json:"-" db:"sub_agents"`
 
+	// ── Agent-as-Tool References ──
+	// AgentTools exposes other agents as callable tools on this agent. Unlike
+	// SubAgents (transfer-based), the parent keeps control: it calls the child,
+	// receives a result, and continues. Maps to ADK-Go's tool/agenttool package.
+	// Orthogonal to SubAgents (coordinator transfer) and Graph (workflow),
+	// and may be combined with either.
+	AgentTools     []*AgentToolRef `json:"agent_tools,omitempty" db:"-"`
+	AgentToolsJSON string          `json:"-" db:"agent_tools"`
+
 	// ── Multi-Agent Orchestration (used when this agent participates as a sub-agent) ──
 
 	DisallowTransferToParent bool   `json:"disallow_transfer_to_parent" db:"disallow_transfer_to_parent"`
@@ -246,6 +255,53 @@ func (a *AgentDefinition) UnmarshalSubAgents() error {
 // IsCoordinator returns true if this agent has inline sub-agent definitions.
 func (a *AgentDefinition) IsCoordinator() bool {
 	return len(a.SubAgents) > 0
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// AgentToolRef — expose another agent as a callable tool
+//
+// Stored as JSONB in user_agents.agent_tools. Each ref names another agent
+// by ID; the target is resolved at runtime and wrapped via ADK-Go's
+// tool/agenttool package. The parent agent calls the child and receives
+// the child's output as the tool result — control does not transfer.
+// ──────────────────────────────────────────────────────────────────────────────
+
+// AgentToolRef references an existing agent to be exposed as a callable tool.
+type AgentToolRef struct {
+	// AgentID is the UUID of the referenced AgentDefinition.
+	AgentID string `json:"agent_id"`
+
+	// SkipSummarization skips the parent's LLM summarisation of the child's
+	// output — the parent hands the raw output back verbatim.
+	SkipSummarization bool `json:"skip_summarization,omitempty"`
+}
+
+// MarshalAgentTools serializes AgentTools to AgentToolsJSON for storage.
+func (a *AgentDefinition) MarshalAgentTools() error {
+	if len(a.AgentTools) == 0 {
+		a.AgentToolsJSON = ""
+		return nil
+	}
+	b, err := json.Marshal(a.AgentTools)
+	if err != nil {
+		return fmt.Errorf("marshalling agent_tools: %w", err)
+	}
+	a.AgentToolsJSON = string(b)
+	return nil
+}
+
+// UnmarshalAgentTools deserializes AgentToolsJSON into AgentTools.
+func (a *AgentDefinition) UnmarshalAgentTools() error {
+	if a.AgentToolsJSON == "" || a.AgentToolsJSON == "null" {
+		a.AgentTools = nil
+		return nil
+	}
+	var refs []*AgentToolRef
+	if err := json.Unmarshal([]byte(a.AgentToolsJSON), &refs); err != nil {
+		return fmt.Errorf("unmarshalling agent_tools: %w", err)
+	}
+	a.AgentTools = refs
+	return nil
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

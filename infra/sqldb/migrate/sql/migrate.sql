@@ -1185,3 +1185,8 @@ CREATE TABLE IF NOT EXISTS rubrics (
 );
 
 CREATE INDEX IF NOT EXISTS idx_rubrics_user_id ON rubrics(user_id);
+
+-- Version: 1.80
+-- Description: Add agent_tools JSONB column for the agent-as-tool pattern
+-- (wrap another agent via ADK-Go's tool/agenttool so the parent can call it).
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS agent_tools JSONB;

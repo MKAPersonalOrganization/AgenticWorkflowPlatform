@@ -81,6 +81,7 @@ export const agentDesigner = () => ({
         systemPrompt: '',
         graph: null,
         subAgents: [],
+        agentTools: [],
         disallowTransferToParent: false,
         disallowTransferToPeers: false,
         outputKey: '',
@@ -511,6 +512,7 @@ export const agentDesigner = () => ({
             systemPrompt: '',
             graph: null,
             subAgents: [],
+            agentTools: [],
             disallowTransferToParent: false,
             disallowTransferToPeers: false,
             outputKey: '',
@@ -531,6 +533,7 @@ export const agentDesigner = () => ({
         this.showKnowledgeBases = false;
         this.showFilesystems = false;
         this.showSubAgents = false;
+        this.showAgentTools = false;
         this.showModelConfig = false;
         this.showRequirementsPanel = false;
         this.agentPlugins = [];
@@ -551,6 +554,7 @@ export const agentDesigner = () => ({
             systemPrompt: agent.systemPrompt || '',
             graph: null, // Node mode = simple LLM agent, no composition graph
             subAgents: agent.subAgents ? agent.subAgents.map(sa => ({...sa})) : [],
+            agentTools: agent.agentTools ? agent.agentTools.map(at => ({...at})) : [],
             disallowTransferToParent: agent.disallowTransferToParent || false,
             disallowTransferToPeers: agent.disallowTransferToPeers || false,
             outputKey: agent.outputKey || '',
@@ -574,6 +578,7 @@ export const agentDesigner = () => ({
         this.showKnowledgeBases = false;
         this.showFilesystems = false;
         this.showSubAgents = false;
+        this.showAgentTools = false;
         this.showModelConfig = false;
         this.showRequirementsPanel = false;
         this.providerModelOptions = [];
@@ -614,6 +619,12 @@ export const agentDesigner = () => ({
                 systemPrompt: this.form.systemPrompt.trim(),
                 // Node mode → no graph (simple LLM agent → llmagent.New)
                 subAgents: this.form.subAgents.filter(sa => sa.agent_id && sa.agent_id.trim()),
+                agentTools: (this.form.agentTools || [])
+                    .filter(at => at.agent_id && at.agent_id.trim())
+                    .map(at => ({
+                        agent_id: at.agent_id,
+                        skip_summarization: !!at.skip_summarization,
+                    })),
                 disallowTransferToParent: this.form.disallowTransferToParent || false,
                 disallowTransferToPeers: this.form.disallowTransferToPeers || false,
                 outputKey: this.form.outputKey.trim(),
@@ -772,6 +783,40 @@ export const agentDesigner = () => ({
     getAgentName(agentId) {
         const agent = this.allAgents.find(a => a.id === agentId);
         return agent ? agent.name : 'Unknown Agent';
+    },
+
+    // Agent-as-Tool Management
+    // Orthogonal to SubAgents: agent-tools are callable children whose
+    // output is returned to the parent LLM, not delegated-to peers.
+    showAgentTools: false,
+    agentToolsDialogOpen: false,
+
+    get availableAgentsForAgentTool() {
+        const currentId = this.editingAgent?.id;
+        const selectedIds = new Set((this.form.agentTools || []).map(at => at.agent_id));
+        return this.allAgents.filter(a => a.id !== currentId && !selectedIds.has(a.id));
+    },
+    openAgentToolsDialog() {
+        this.agentToolsDialogOpen = true;
+    },
+    isAgentToolSelected(agentId) {
+        return (this.form.agentTools || []).some(at => at.agent_id === agentId);
+    },
+    toggleAgentToolFromDialog(agentId) {
+        if (!this.form.agentTools) this.form.agentTools = [];
+        const idx = this.form.agentTools.findIndex(at => at.agent_id === agentId);
+        if (idx > -1) {
+            this.form.agentTools.splice(idx, 1);
+        } else {
+            this.form.agentTools.push({ agent_id: agentId, skip_summarization: false });
+        }
+    },
+    removeAgentTool(index) {
+        if (this.form.agentTools) this.form.agentTools.splice(index, 1);
+    },
+    toggleAgentToolSkipSummarization(index) {
+        if (!this.form.agentTools || !this.form.agentTools[index]) return;
+        this.form.agentTools[index].skip_summarization = !this.form.agentTools[index].skip_summarization;
     },
 
     async fetchModelsForProvider(provider) {

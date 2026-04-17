@@ -45,7 +45,8 @@ type createRequest struct {
 	SystemPrompt             string                     `json:"systemPrompt"`
 	Icon                     string                     `json:"icon"`
 	Graph                    *CompositionNode           `json:"graph,omitempty"`
-	SubAgents                []*SubAgentRef           `json:"subAgents,omitempty"`
+	SubAgents                []*SubAgentRef             `json:"subAgents,omitempty"`
+	AgentTools               []*AgentToolRef            `json:"agentTools,omitempty"`
 	DisallowTransferToParent bool                       `json:"disallowTransferToParent"`
 	DisallowTransferToPeers  bool                       `json:"disallowTransferToPeers"`
 	OutputKey                string                     `json:"outputKey"`
@@ -63,7 +64,8 @@ type updateRequest struct {
 	SystemPrompt             string                     `json:"systemPrompt"`
 	Icon                     string                     `json:"icon"`
 	Graph                    *CompositionNode           `json:"graph"`
-	SubAgents                []*SubAgentRef           `json:"subAgents,omitempty"`
+	SubAgents                []*SubAgentRef             `json:"subAgents,omitempty"`
+	AgentTools               []*AgentToolRef            `json:"agentTools,omitempty"`
 	DisallowTransferToParent bool                       `json:"disallowTransferToParent"`
 	DisallowTransferToPeers  bool                       `json:"disallowTransferToPeers"`
 	OutputKey                string                     `json:"outputKey"`
@@ -86,6 +88,7 @@ type agentResponse struct {
 	IsComposed               bool                     `json:"isComposed"`
 	IsCoordinator            bool                     `json:"isCoordinator"`
 	SubAgents                []*SubAgentRef           `json:"subAgents,omitempty"`
+	AgentTools               []*AgentToolRef          `json:"agentTools,omitempty"`
 	DisallowTransferToParent bool                     `json:"disallowTransferToParent"`
 	DisallowTransferToPeers  bool                     `json:"disallowTransferToPeers"`
 	OutputKey                string                   `json:"outputKey,omitempty"`
@@ -154,6 +157,7 @@ func toAgentResponse(a *AgentDefinition) agentResponse {
 		IsComposed:               a.IsComposed(),
 		IsCoordinator:            a.IsCoordinator(),
 		SubAgents:                a.SubAgents,
+		AgentTools:               a.AgentTools,
 		DisallowTransferToParent: a.DisallowTransferToParent,
 		DisallowTransferToPeers:  a.DisallowTransferToPeers,
 		OutputKey:                a.OutputKey,
@@ -199,6 +203,7 @@ func (h *storeHandler) create(w http.ResponseWriter, r *http.Request) {
 		Icon:                     agentIconOrDefault(req.Icon),
 		Graph:                    req.Graph,
 		SubAgents:                req.SubAgents,
+		AgentTools:               req.AgentTools,
 		DisallowTransferToParent: req.DisallowTransferToParent,
 		DisallowTransferToPeers:  req.DisallowTransferToPeers,
 		OutputKey:                req.OutputKey,
@@ -324,6 +329,7 @@ func (h *storeHandler) update(w http.ResponseWriter, r *http.Request) {
 		Icon:                     iconValue,
 		Graph:                    req.Graph,
 		SubAgents:                req.SubAgents,
+		AgentTools:               req.AgentTools,
 		DisallowTransferToParent: req.DisallowTransferToParent,
 		DisallowTransferToPeers:  req.DisallowTransferToPeers,
 		OutputKey:                req.OutputKey,
