@@ -535,6 +535,7 @@ export const agentDesigner = () => ({
         this.showSubAgents = false;
         this.showAgentTools = false;
         this.showCalledAsTool = false;
+        this.showOutputSchema = false;
         this.showModelConfig = false;
         this.showRequirementsPanel = false;
         this.agentPlugins = [];
@@ -542,7 +543,8 @@ export const agentDesigner = () => ({
         this.agentFilesystems = [];
         this.providerModelOptions = [];
         this.providerModelsError = '';
-        this.hydrateInputSchemaRows();
+        this.hydrateSchemaRows('inputSchema');
+        this.hydrateSchemaRows('outputSchema');
         this.view = 'agentForm';
     },
 
@@ -582,11 +584,13 @@ export const agentDesigner = () => ({
         this.showSubAgents = false;
         this.showAgentTools = false;
         this.showCalledAsTool = false;
+        this.showOutputSchema = false;
         this.showModelConfig = false;
         this.showRequirementsPanel = false;
         this.providerModelOptions = [];
         this.providerModelsError = '';
-        this.hydrateInputSchemaRows();
+        this.hydrateSchemaRows('inputSchema');
+        this.hydrateSchemaRows('outputSchema');
         this.view = 'agentForm';
 
         // Load tool/KB/FS data
@@ -634,8 +638,8 @@ export const agentDesigner = () => ({
                 outputKey: this.form.outputKey.trim(),
                 includeContents: this.form.includeContents || '',
                 globalInstruction: this.form.globalInstruction.trim(),
-                inputSchema: this.serializeInputSchema(),
-                outputSchema: this.form.outputSchema.trim(),
+                inputSchema: this.serializeSchema('inputSchema'),
+                outputSchema: this.serializeSchema('outputSchema'),
                 modelConfig: Object.keys(modelConfig).length > 0 ? modelConfig : null,
                 modelOverride,
             };
@@ -789,50 +793,63 @@ export const agentDesigner = () => ({
         return agent ? agent.name : 'Unknown Agent';
     },
 
-    // Input-Schema Row Builder (M4)
-    // Renders form.inputSchema as a list of {name, type, required, description}
-    // rows the user edits without writing JSON. Serialized back to a JSON Schema
-    // object at save time. Falls back to a raw JSON view when the persisted schema
-    // is too complex to round-trip (nested objects, arrays of objects, $ref, etc.).
+    // Schema Row Builder — shared by Input Schema (M4) and Output Schema (M5).
+    //
+    // Renders form[<field>] as a list of {name, type, required, description}
+    // rows the user edits without writing JSON. Serialized back to a JSON
+    // Schema object at save time. Falls back to a raw JSON view when the
+    // persisted schema is too complex to round-trip (nested objects, arrays of
+    // objects, $ref, etc.).
+    //
+    // State is keyed by field so the two schemas are fully independent:
+    //   this.inputSchemaMode / inputSchemaRows / inputSchemaJSONError
+    //   this.outputSchemaMode / outputSchemaRows / outputSchemaJSONError
+    //
+    // Pass the field key ("inputSchema" | "outputSchema") to every helper; it
+    // tells the helper which form field to read and which state slot to write.
     showCalledAsTool: false,
-    inputSchemaMode: 'visual', // 'visual' | 'json'
+    showOutputSchema: false,
+    inputSchemaMode: 'visual',
     inputSchemaRows: [],
     inputSchemaJSONError: '',
+    outputSchemaMode: 'visual',
+    outputSchemaRows: [],
+    outputSchemaJSONError: '',
 
-    /** Supported simple types in the visual builder. */
-    get inputSchemaTypeOptions() {
+    /** Supported simple types in the visual builder — shared across fields. */
+    get schemaTypeOptions() {
         return ['string', 'number', 'integer', 'boolean'];
     },
 
     /**
-     * Parse form.inputSchema (raw JSON) into editable rows. If the schema is
+     * Parse form[field] (raw JSON) into editable rows. If the schema is
      * missing, empty, malformed, or uses features beyond flat scalar properties
      * (nested objects, arrays, enums with objects, $ref), we switch to JSON
      * mode so the user can edit the raw schema instead of silently losing data.
      */
-    hydrateInputSchemaRows() {
-        this.inputSchemaJSONError = '';
-        const raw = (this.form.inputSchema || '').trim();
+    hydrateSchemaRows(field) {
+        this[field + 'JSONError'] = '';
+        const raw = (this.form[field] || '').trim();
         if (!raw) {
-            this.inputSchemaRows = [];
-            this.inputSchemaMode = 'visual';
+            this[field + 'Rows'] = [];
+            this[field + 'Mode'] = 'visual';
             return;
         }
         let parsed;
         try {
             parsed = JSON.parse(raw);
         } catch (e) {
-            this.inputSchemaMode = 'json';
-            this.inputSchemaJSONError = e.message;
+            this[field + 'Mode'] = 'json';
+            this[field + 'JSONError'] = e.message;
             return;
         }
         const simple = this.schemaToRows(parsed);
         if (simple === null) {
-            this.inputSchemaMode = 'json';
+            this[field + 'Mode'] = 'json';
             return;
         }
-        this.inputSchemaRows = simple;
-        this.inputSchemaMode = 'visual';
+        this[field + 'Rows'] = simple;
+        this[field + 'Mode'] = 'visual';
     },
 
     /**
@@ -847,7 +864,7 @@ export const agentDesigner = () => ({
         for (const [name, propRaw] of Object.entries(schema.properties)) {
             if (!propRaw || typeof propRaw !== 'object') return null;
             const t = propRaw.type;
-            if (!this.inputSchemaTypeOptions.includes(t)) return null;
+            if (!this.schemaTypeOptions.includes(t)) return null;
             rows.push({
                 name,
                 type: t,
@@ -858,34 +875,34 @@ export const agentDesigner = () => ({
         return rows;
     },
 
-    addInputSchemaRow() {
-        this.inputSchemaRows.push({ name: '', type: 'string', required: false, description: '' });
+    addSchemaRow(field) {
+        this[field + 'Rows'].push({ name: '', type: 'string', required: false, description: '' });
     },
 
-    removeInputSchemaRow(idx) {
-        this.inputSchemaRows.splice(idx, 1);
+    removeSchemaRow(field, idx) {
+        this[field + 'Rows'].splice(idx, 1);
     },
 
-    switchInputSchemaToJSON() {
+    switchSchemaToJSON(field) {
         // Serialize current rows into the JSON textarea, then let the user edit freely.
-        this.form.inputSchema = this.serializeInputSchema();
-        this.inputSchemaMode = 'json';
+        this.form[field] = this.serializeSchema(field);
+        this[field + 'Mode'] = 'json';
     },
 
-    switchInputSchemaToVisual() {
+    switchSchemaToVisual(field) {
         // Try to re-parse whatever is in the textarea. If it's too complex, stay in JSON mode.
-        this.hydrateInputSchemaRows();
+        this.hydrateSchemaRows(field);
     },
 
     /**
      * Build a JSON Schema string from either the visual rows or the raw JSON,
      * depending on the current mode. Empty result → "" (persisted as NULL).
      */
-    serializeInputSchema() {
-        if (this.inputSchemaMode === 'json') {
-            return (this.form.inputSchema || '').trim();
+    serializeSchema(field) {
+        if (this[field + 'Mode'] === 'json') {
+            return (this.form[field] || '').trim();
         }
-        const rows = (this.inputSchemaRows || []).filter(r => r.name && r.name.trim());
+        const rows = (this[field + 'Rows'] || []).filter(r => r.name && r.name.trim());
         if (rows.length === 0) return '';
         const properties = {};
         const required = [];

@@ -15,7 +15,7 @@
    - [M2. Planner preset (ReAct / Plan-then-Act / None)](#m2-planner-preset)
    - [M3. Model parameter controls (the rest of `GenerateContentConfig`)](#m3-model-parameter-controls)
    - [M4. Input-schema visual builder (remove dead code or ship it)](#m4-input-schema-visual-builder) ✅ **done**
-   - [M5. Output-schema visual builder (replace raw JSON textarea)](#m5-output-schema-visual-builder)
+   - [M5. Output-schema visual builder (replace raw JSON textarea)](#m5-output-schema-visual-builder) ✅ **done**
    - [M6. Instruction template variable picker](#m6-instruction-template-variable-picker)
    - [M7. Global-instruction UX (root-only surfacing)](#m7-global-instruction-ux)
    - [M8. Memory service toggle + backend selector](#m8-memory-service-toggle)
@@ -270,21 +270,41 @@ Designer (row-based builder) → JSON schema object → persisted on Config.Inpu
 
 ### M5. Output-schema visual builder
 
-**ADK.** `llmagent.Config.OutputSchema (*genai.Schema)` — forces structured JSON output. When set, tools/transfers are disabled by ADK.
+> **Status: ✅ Done.** Extracted the M4 row builder into a shared `@schemaBuilder(fieldKey, emptyMessage)` templ and a generic JS helper family (`hydrateSchemaRows / serializeSchema / addSchemaRow / removeSchemaRow / switchSchemaToVisual / switchSchemaToJSON`, all parameterised by field name). Replaced the raw-JSON Output Schema textarea with `@schemaBuilder("outputSchema", ...)` inside a new collapsible section (matching the Input Schema UX). Corrected the misleading "disables tool use" copy — the new helper text explains the actual ADK behaviour (native ResponseSchema on most providers; `set_model_response` workaround tool on Gemini API ≤ 2.5). See `frontend/ui/agenteditor/agenteditor.templ` (`schemaBuilder` helper + both schema sections) and `assets/js/components/agent-designer-dialog.js` (renamed `inputSchema*` methods → generic `Schema*` family keyed by field). Backend untouched — both schemas continue to round-trip through their existing `*SchemaJSON` strings.
 
-**Today.** `agenteditor.templ` exposes `outputSchema` as a **raw JSON textarea**. Non-programmers can't write JSON schemas reliably. Also: there's no visible warning that enabling it disables tools — users will silently break their agent.
+> **Reframe (after reading ADK source).** The original framing of this item was wrong about tools being disabled — that belief came from the `llmagent.go:256-258` docstring but is contradicted by the runtime. Keeping the item, tightening the scope, and correcting the copy we ship to users.
 
-**Workflow.** Same as M4, but applied to `OutputSchema`, with a clear "enabling this disables tools and transfers" callout.
+**ADK.** `llmagent.Config.OutputSchema (*genai.Schema)` — forces the agent's reply to conform to a JSON Schema. Enforcement path (verified in `internal/llminternal/basic_processor.go:46-51` + `outputschema_processor.go:41-65`):
+
+1. **No tools attached** → the schema is passed as `genai.GenerateContentConfig.ResponseSchema` + `ResponseMIMEType = "application/json"`. Trivial case.
+2. **Tools attached, provider supports the native combo** (non-Gemini, Vertex Gemini, or a future Gemini API variant that lifts the restriction) → same native path; tools and transfer remain fully functional.
+3. **Tools attached, Gemini API + Gemini ≤ 2.5** (`googlellm/variant.go:71-76`, `NeedsOutputSchemaProcessor`) → `ResponseSchema` is NOT set on the native config. Instead ADK injects a synthetic `set_model_response` tool and a system instruction telling the model: *"use real tools for the work, then always call set_model_response with the final schema-shaped JSON"*. Tools and transfer still work — the schema is enforced at the final step via that tool.
+
+So the widely-repeated claim "OutputSchema disables tools and transfers" is only true for case 1 (where there are no tools to disable anyway). The source docstring is outdated; our UI copy currently mirrors it and is therefore wrong.
+
+**Today.** `frontend/ui/agenteditor/agenteditor.templ` exposes `outputSchema` as a raw JSON textarea (post-M4 unbundling). Warning copy is present but inaccurate — the helper text *"When set, the agent cannot use tools or transfer"* and the subtitle *"disables tool use"* contradict ADK's actual behaviour (see above). Non-programmers also can't reliably author raw JSON Schema.
+
+**Workflow.** Two parts, both purely frontend:
+
+1. Replace the textarea with the row-based builder shipped in M4 (`hydrateInputSchemaRows` / `serializeInputSchema` in `agent-designer-dialog.js`). Rename the pair to a generic `hydrateSchemaRows(field)` / `serializeSchema(field)` and call it for both `inputSchema` and `outputSchema`.
+2. Fix the warning copy so it reflects reality.
 
 **Files.**
-- Frontend: reuse the builder from M4. `agenteditor.templ` — replace the textarea with the builder component. Add an explicit warning banner.
-- Backend: none (field already exists).
+- Frontend: `agenteditor.templ` (replace textarea + rewrite helper copy); `assets/js/components/agent-designer-dialog.js` (promote the schema helpers to work on either field). No new component — reuse `@schemaBuilder` extracted from M4.
+- Backend: none. `OutputSchemaJSON` already round-trips.
 
-**UI delta.** Replace raw textarea with the row-based schema builder from M4. Add red banner: "Enabling structured output will disable all tools and sub-agent transfers for this agent."
+**UI delta.**
+- Replace the raw textarea with the row-based builder from M4.
+- Rewrite helper text. Suggested copy: *"Every reply must match this JSON Schema. Tools still work on most providers; on the Gemini API with Gemini 2.5 or earlier, ADK injects a workaround tool so your tools remain usable — the model uses them first, then returns the final schema-shaped JSON."*
+- Drop the "red banner" from the previous scope — the scary warning is based on the outdated docstring.
 
-**Acceptance.** Saving structured output with any tools attached shows the warning; the resulting agent produces valid JSON per the schema.
+**Acceptance.**
+- A non-programmer can define `{summary: string, tags: array<string>}` without typing JSON.
+- With tools attached and Gemini 2.5 selected, running the agent produces both tool calls and a valid schema-shaped final reply (the `set_model_response` workaround kicks in).
+- With tools attached and a non-Gemini provider, schema and tools both work via the native path.
+- Helper copy matches the observed behaviour.
 
-**Does-not-touch.** Input schema (M4), model config (M3).
+**Does-not-touch.** Input schema (M4 — already shipped), model config (M3). Also: do NOT touch `foundationSchemaToGenAI` or `parseAgentSchema` — M4 verified the round-trip already works.
 
 ---
 
