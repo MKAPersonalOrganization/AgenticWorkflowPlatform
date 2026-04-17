@@ -1,0 +1,92 @@
+package blog
+
+import (
+	"aicompass/frontend/components/icon"
+	"time"
+)
+
+// formatDate renders a post's publish date as "January 2, 2006".
+func formatDate(t time.Time) string {
+	return t.Format("January 2, 2006")
+}
+
+// ─── Reusable post-body helpers ──────────────────────────────────────────────
+// These mirror docs/shared.templ so post bodies read identically to the docs
+// page. Kept local to the blog package so the two surfaces stay decoupled.
+
+templ blogSection(title string) {
+	<section class="scroll-mt-24 my-10 first:mt-0">
+		<h2 class="text-2xl font-bold tracking-tight mb-4">{ title }</h2>
+		<div class="prose prose-sm dark:prose-invert max-w-none [&>p]:text-muted-foreground [&>p]:leading-relaxed [&>p]:mb-4 [&>h3]:text-lg [&>h3]:font-semibold [&>h3]:mt-8 [&>h3]:mb-3 [&>ul]:my-4 [&>ul>li]:text-muted-foreground">
+			{ children... }
+		</div>
+	</section>
+}
+
+templ blogInfoBox(title string) {
+	<div class="my-6 rounded-lg border border-primary/20 bg-primary/5 p-4">
+		<div class="flex items-center gap-2 text-sm font-semibold text-primary mb-1">
+			@icon.Sparkles(icon.Props{Class: "size-4"})
+			<span>{ title }</span>
+		</div>
+		<div class="text-sm text-muted-foreground">
+			{ children... }
+		</div>
+	</div>
+}
+
+templ blogTable() {
+	<div class="my-6 overflow-x-auto rounded-lg border border-border">
+		<table class="w-full text-sm">
+			{ children... }
+		</table>
+	</div>
+}
+
+templ blogTableRow(col1, col2, col3 string) {
+	<tr class="border-b border-border last:border-0 hover:bg-muted/30">
+		<td class="py-2.5 px-3 font-medium">{ col1 }</td>
+		<td class="py-2.5 px-3 text-muted-foreground">{ col2 }</td>
+		<td class="py-2.5 px-3 text-muted-foreground">{ col3 }</td>
+	</tr>
+}
+
+templ blogCode(text string) {
+	<code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">{ text }</code>
+}
+
+// tagChip renders a small pill for a post tag.
+templ tagChip(tag string) {
+	<span class="inline-flex items-center rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+		{ tag }
+	</span>
+}
+
+// postCard renders a single entry on the index page.
+templ postCard(p Post) {
+	<a
+		href={ templ.URL("/blog/" + p.Slug) }
+		class="group block rounded-xl border border-border bg-card p-6 transition-colors hover:border-primary/40 hover:bg-accent/20"
+	>
+		<div class="flex items-center gap-2 text-xs text-muted-foreground">
+			<time datetime={ p.Date.Format("2006-01-02") }>{ formatDate(p.Date) }</time>
+			if p.Author != "" {
+				<span>·</span>
+				<span>{ p.Author }</span>
+			}
+		</div>
+		<h3 class="mt-2 text-lg font-semibold tracking-tight group-hover:text-primary transition-colors">
+			{ p.Title }
+		</h3>
+		<p class="mt-2 text-sm text-muted-foreground leading-relaxed line-clamp-3">
+			{ p.Summary }
+		</p>
+		if len(p.Tags) > 0 {
+			<div class="mt-4 flex flex-wrap gap-1.5">
+				for _, t := range p.Tags {
+					@tagChip(t)
+				}
+			</div>
+		}
+	</a>
+}

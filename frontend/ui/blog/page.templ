@@ -1,0 +1,96 @@
+package blog
+
+import (
+	"aicompass/frontend/ui"
+	"aicompass/frontend/ui/landing"
+	"aicompass/foundation/auth"
+)
+
+// PageProps are the inputs shared by the blog index and blog post pages.
+type PageProps struct {
+	User *auth.User
+}
+
+// BlogIndexPage renders the /blog index — a card grid of every published post.
+templ BlogIndexPage(props PageProps) {
+	@ui.BaseLayout(ui.LayoutProps{
+		Title:      "Blog",
+		User:       props.User,
+		HideNavbar: true,
+	}) {
+		<div class="h-full overflow-y-auto scroll-smooth relative">
+			<!-- Subtle background grid, matching /docs -->
+			<div class="fixed inset-0 pointer-events-none z-[-1]">
+				<div class="absolute inset-0 bg-grid-pattern [mask-image:radial-gradient(ellipse_at_top,black,transparent_80%)] opacity-20"></div>
+				<div class="absolute inset-0 bg-gradient-to-b from-background/50 to-background"></div>
+			</div>
+			@landing.Nav(props.User)
+			<main class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-12 relative z-10">
+				<header class="mb-10">
+					<p class="text-xs font-semibold uppercase tracking-wider text-primary mb-2">Blog</p>
+					<h1 class="text-3xl sm:text-4xl font-bold tracking-tight">Engineering notes</h1>
+					<p class="mt-3 text-lg text-muted-foreground max-w-2xl">
+						Patterns, how-tos, and deep dives from the Compass.AI team — how we build multi-agent systems on top of ADK-Go and keep the UX approachable for non-programmers.
+					</p>
+				</header>
+				<div class="grid gap-4 md:grid-cols-2">
+					for _, p := range AllPosts() {
+						@postCard(p)
+					}
+				</div>
+				if len(AllPosts()) == 0 {
+					<div class="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
+						No posts yet — check back soon.
+					</div>
+				}
+			</main>
+			@landing.Footer()
+		</div>
+	}
+}
+
+// BlogPostPage renders a single blog post. The caller resolves the post via
+// FindPost(slug); when it is nil, the handler should return 404 rather than
+// calling into this page.
+templ BlogPostPage(props PageProps, post Post) {
+	@ui.BaseLayout(ui.LayoutProps{
+		Title:      post.Title,
+		User:       props.User,
+		HideNavbar: true,
+	}) {
+		<div class="h-full overflow-y-auto scroll-smooth relative">
+			<div class="fixed inset-0 pointer-events-none z-[-1]">
+				<div class="absolute inset-0 bg-grid-pattern [mask-image:radial-gradient(ellipse_at_top,black,transparent_80%)] opacity-20"></div>
+				<div class="absolute inset-0 bg-gradient-to-b from-background/50 to-background"></div>
+			</div>
+			@landing.Nav(props.User)
+			<article class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-12 relative z-10">
+				<nav class="mb-8 text-sm">
+					<a href="/blog" class="text-muted-foreground hover:text-primary transition-colors">← All posts</a>
+				</nav>
+				<header class="mb-10 border-b border-border pb-8">
+					<div class="flex items-center gap-2 text-xs text-muted-foreground">
+						<time datetime={ post.Date.Format("2006-01-02") }>{ formatDate(post.Date) }</time>
+						if post.Author != "" {
+							<span>·</span>
+							<span>{ post.Author }</span>
+						}
+					</div>
+					<h1 class="mt-3 text-3xl sm:text-4xl font-bold tracking-tight">{ post.Title }</h1>
+					if post.Summary != "" {
+						<p class="mt-4 text-lg text-muted-foreground leading-relaxed">{ post.Summary }</p>
+					}
+					if len(post.Tags) > 0 {
+						<div class="mt-6 flex flex-wrap gap-1.5">
+							for _, t := range post.Tags {
+								@tagChip(t)
+							}
+						</div>
+					}
+				</header>
+				@post.Body
+			</article>
+			@landing.Footer()
+		</div>
+	}
+}

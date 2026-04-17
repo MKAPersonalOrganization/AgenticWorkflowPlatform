@@ -1,0 +1,111 @@
+package blog
+
+// postAgentAsToolBody renders the body of the "Agent as Tool" blog post.
+// Keep body components free of metadata — the Post{} entry in posts.go owns
+// the slug, title, date, tags, and summary.
+templ postAgentAsToolBody() {
+	<p class="text-lg text-muted-foreground leading-relaxed">
+		When you need two agents to work together, ADK-Go gives you a choice
+		that often trips up first-time users: do you <strong>transfer</strong>
+		to the other agent, or do you <strong>call</strong> it? The right
+		answer depends on one question — who should own the final reply?
+	</p>
+	@blogSection("Two directions, two patterns") {
+		<p>
+			Our multi-agent layer exposes two orthogonal ways to wire one
+			agent to another:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>• <strong>Sub-Agent (transfer)</strong> — the parent hands off; the sub-agent takes over the turn and its reply becomes the user-visible response.</li>
+			<li>• <strong>Agent-as-Tool (function call)</strong> — the parent stays in charge; it calls the other agent like any tool, reads the output, and keeps reasoning.</li>
+		</ul>
+		<p>
+			The same user query routes completely differently depending on
+			which pattern you pick. If the child should own the answer end-to-end
+			(think "escalate to the billing specialist"), transfer. If the parent
+			needs a capability but must keep responsibility for the final output
+			(think "summarise this passage, then fold it into my response"),
+			call.
+		</p>
+	}
+	@blogTable() {
+		<thead>
+			<tr>
+				<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Aspect</th>
+				<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Sub-Agent (transfer)</th>
+				<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Agent-as-Tool (call)</th>
+			</tr>
+		</thead>
+		<tbody>
+			@blogTableRow("Control flow", "Parent transfers; child drives the turn", "Parent calls, child returns, parent continues")
+			@blogTableRow("Who answers the user", "The child (directly)", "The parent (after using the child's output)")
+			@blogTableRow("Child session", "Shares the thread's session & history", "Fresh in-memory session per call — isolated")
+			@blogTableRow("Summarisation", "No extra step — child's reply is the reply", "Parent summarises by default (toggle off for raw output)")
+		</tbody>
+	}
+	@blogSection("What the caller sees") {
+		<p>
+			Under the hood, Agent-as-Tool wraps the target agent via ADK-Go's
+			@blogCode("tool/agenttool")
+			package and attaches it to the parent's tool list. The parent's LLM
+			then sees a function declaration built from three pieces of the
+			child's config:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>• <strong>Function name</strong> — derived from the child's display name (slugified so provider constraints like OpenAI's @blogCode("^[a-zA-Z0-9_-]+$") are satisfied).</li>
+			<li>• <strong>Description</strong> — the child's description, verbatim. Make it action-oriented; this text is what the parent's LLM uses to decide whether to invoke.</li>
+			<li>• <strong>Parameters</strong> — the child's <strong>Input Schema</strong>. Without one, the signature falls back to a single @blogCode("request") string.</li>
+		</ul>
+		@blogInfoBox("Publish a proper signature") {
+			<p>
+				If you want the calling LLM to produce typed arguments instead
+				of a blob of prose, set the child's <strong>Input Schema</strong>
+				in its "Called as a Tool" section. The schema is the child's
+				inbound contract — it lives on the callee, not the caller.
+			</p>
+		}
+	}
+	@blogSection("Runtime guarantees") {
+		<p>
+			Each invocation is fully isolated. The child gets a fresh in-memory
+			session per call, so it cannot read or write the parent's session
+			state, memory, or artifacts. That's a deliberate safety default —
+			you can expose a specialist agent with its own tools and knowledge
+			base without leaking state between invocations.
+		</p>
+		<p>
+			When the child itself has Sub-Agents or Agent-Tools of its own,
+			those are <strong>not</strong> propagated into the call. You always
+			get a plain leaf callable. This flattening prevents accidental
+			cycles and keeps the mental model simple: "an agent-tool is a
+			function you can call".
+		</p>
+	}
+	@blogSection("When to reach for it") {
+		<ul class="space-y-2 my-4">
+			<li>• <strong>Utility sub-tasks</strong> — "summarise this passage", "extract entities from these messages", "translate to French" — the parent needs the result but must own the final answer.</li>
+			<li>• <strong>Structured extraction</strong> — a child with an Output Schema produces validated JSON that the parent merges into a broader response.</li>
+			<li>• <strong>Capability wrapping</strong> — expose a specialist agent (with its own tools and knowledge base) as a clean callable without giving the parent those tools directly.</li>
+		</ul>
+		@blogInfoBox("Not for handoffs") {
+			<p>
+				If the child should <em>own</em> the reply end-to-end — e.g.
+				"route billing questions to the billing agent" — use a
+				<strong>Sub-Agent</strong> and let the parent transfer.
+				Agent-as-Tool always keeps the parent in the driver's seat.
+			</p>
+		}
+	}
+	@blogSection("Wiring it up") {
+		<p>
+			In the agent designer, open the <strong>Agents as Tools</strong>
+			section (distinct from <strong>Sub-Agents</strong>), pick any of
+			your other agents, and optionally toggle <em>Return raw output</em>.
+			That is it: no code, no migration, no deploy.
+		</p>
+		<p>
+			For the full cross-reference on both patterns, see the
+			<a href="/docs#custom-agents" class="text-primary hover:underline">developer documentation</a>.
+		</p>
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"aicompass/adapters/gemini"
 	"aicompass/frontend/ui"
 	authcomp "aicompass/frontend/ui/auth"
+	"aicompass/frontend/ui/blog"
 	"aicompass/frontend/ui/docs"
 	"aicompass/frontend/ui/landing"
 	"aicompass/frontend/ui/pricing"
@@ -875,6 +876,8 @@ func registerRoutes(
 	// Page routes
 	r.Get("/", authMW.OptionalAuthFunc(HandleLandingPage(log)))
 	r.Get("/docs", authMW.OptionalAuthFunc(HandleDocsPage(log)))
+	r.Get("/blog", authMW.OptionalAuthFunc(HandleBlogIndex(log)))
+	r.Get("/blog/{slug}", authMW.OptionalAuthFunc(HandleBlogPost(log)))
 	r.Get("/pricing", authMW.RequireAuthFunc(HandlePricingPage(log)))
 	r.Get("/chat", authMW.RequireAuthFunc(HandleViewChatInputScreen(log, edgequakeService)))
 }
@@ -962,6 +965,32 @@ func HandleDocsPage(log *logger.Logger) http.HandlerFunc {
 		})
 		if err := component.Render(r.Context(), w); err != nil {
 			log.Error(r.Context(), "failed to render docs page", "error", err)
+		}
+	}
+}
+
+func HandleBlogIndex(log *logger.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := auth.GetUserFromContext(r.Context())
+		component := blog.BlogIndexPage(blog.PageProps{User: user})
+		if err := component.Render(r.Context(), w); err != nil {
+			log.Error(r.Context(), "failed to render blog index", "error", err)
+		}
+	}
+}
+
+func HandleBlogPost(log *logger.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		slug := chi.URLParam(r, "slug")
+		post := blog.FindPost(slug)
+		if post == nil {
+			http.NotFound(w, r)
+			return
+		}
+		user := auth.GetUserFromContext(r.Context())
+		component := blog.BlogPostPage(blog.PageProps{User: user}, *post)
+		if err := component.Render(r.Context(), w); err != nil {
+			log.Error(r.Context(), "failed to render blog post", "slug", slug, "error", err)
 		}
 	}
 }
