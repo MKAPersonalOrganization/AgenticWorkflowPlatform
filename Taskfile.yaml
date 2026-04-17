@@ -172,3 +172,8 @@ tasks:
     desc: Run integration tests
     cmds:
       - go test -tags integration -v ./userrequirements/...
+
+  integration:dox:
+    desc: Run integration tests with gotestdox (behavior-driven output)
+    cmds:
+      - go test -tags integration -json ./userrequirements/... | gotestdox

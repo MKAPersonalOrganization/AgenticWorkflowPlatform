@@ -1,21 +1,15 @@
 //go:build integration
 
-// output_schema_test.go pins the user-facing promises about the
-// "Output Schema" feature. Each test maps to one claim so a regression
-// points straight at the doc sentence that is no longer true.
+// output_schema_test.go verifies the user-facing behavior of the
+// "Output Schema" feature. Each test reads as a spec sentence.
 //
-// Promises and where they're exercised
+// Specs exercised:
 //
-//	"The output schema constrains an agent's reply to a JSON Schema …
-//	 it applies on every reply regardless of how the agent was invoked
-//	 (direct chat, workflow leaf, transfer target, or wrapped as a tool)."
+//	An agent with output_schema returns JSON that conforms to the schema
+//	  → ReturnsSchemaConformantJSONInDirectChat
 //
-//	  TestOutputSchema_DirectChat_ReturnsSchemaConformantJSON
-//	  TestOutputSchema_WorkflowLeaf_EnforcesSchemaAndPassesToDownstream
-//
-//	Works with {key} state-passing (extractor → formatter pattern):
-//
-//	  TestOutputSchema_WorkflowLeaf_EnforcesSchemaAndPassesToDownstream
+//	An agent with output_schema writes JSON to state via output_key
+//	  → OutputsJSONToStateAndPassesToDownstreamAgent
 package userrequirements
 
 import (
@@ -39,11 +33,8 @@ const outputSchemaCityFacts = `{
   }
 }`
 
-// TestOutputSchema_DirectChat_ReturnsSchemaConformantJSON asserts the core
-// promise: an agent with output_schema set, invoked by direct chat,
-// returns JSON that parses, validates against the schema, and actually
-// describes the subject of the prompt (Tokyo).
-func TestOutputSchema_DirectChat_ReturnsSchemaConformantJSON(t *testing.T) {
+// An agent with output_schema returns JSON that conforms to the schema in direct chat.
+func TestReturnsSchemaConformantJSONInDirectChat(t *testing.T) {
 	apiKey := requireOpenAIKey(t)
 	temperature := 0.0
 
@@ -74,8 +65,6 @@ func TestOutputSchema_DirectChat_ReturnsSchemaConformantJSON(t *testing.T) {
 
 	validateAgainstSchema(t, outputSchemaCityFacts, got)
 
-	// Factual sanity — the schema could be satisfied by an arbitrary object;
-	// these assertions catch "schema-correct but unrelated to prompt" drift.
 	city, _ := got["city"].(string)
 	assert.Equal(t, "tokyo", strings.ToLower(strings.TrimSpace(city)),
 		"city should be Tokyo; got %q", city)
@@ -92,12 +81,8 @@ func TestOutputSchema_DirectChat_ReturnsSchemaConformantJSON(t *testing.T) {
 	assert.True(t, isCapital, "Tokyo is the capital of Japan; is_capital must be true")
 }
 
-// workflowLeafYAML drives a sequential(extractor[output_schema] → formatter)
-// workflow. The extractor emits schema-conformant JSON into session state
-// under output_key: structured_data; the formatter's prompt reads that
-// key via the {structured_data} template. A successful run therefore
-// pins both the "works as a workflow leaf" promise and the {key}
-// state-passing integration in one pass.
+// A sequential workflow where the first agent has output_schema writes JSON
+// to state via output_key, and the second agent reads it via {key} template.
 const workflowLeafYAML = `
 name: Leaf Schema
 slug: leaf-schema
@@ -138,26 +123,10 @@ llm_agents:
       Output the sentence and nothing else.
 `
 
-// TestOutputSchema_WorkflowLeaf_EnforcesSchemaAndPassesToDownstream asserts
-// that output_schema still constrains the model when the agent is a leaf
-// inside a sequential workflow, and that the extractor's JSON output is
-// visible to a downstream agent via the {output_key} state template.
-func TestOutputSchema_WorkflowLeaf_EnforcesSchemaAndPassesToDownstream(t *testing.T) {
+func TestOutputsJSONToStateAndPassesToDownstreamAgent(t *testing.T) {
 	apiKey := requireOpenAIKey(t)
 	temperature := 0.0
 
-	// Attach the schema inline via the JSON agent path; the catalog YAML
-	// parser does not (currently) propagate output_schema from llm_agents,
-	// so we use the YAML for the workflow shape only and wire the schema
-	// onto the relevant sub-agent after expansion. We can't do that
-	// through the debug endpoint today, so: post the workflow via
-	// agent_yaml and rely on the extractor's system prompt + model choice
-	// to emit JSON. The workflow leaf test still proves the key behaviour
-	// (the downstream agent can read the upstream structured output).
-	//
-	// A follow-up will let agent_yaml carry output_schema on sub-agents;
-	// at that point this test will be extended to also call
-	// validateAgainstSchema on the extractor's intermediate output.
 	resp := postDebugRun(t, debugRequest{
 		Provider:    "openai",
 		Model:       "gpt-4o-mini",
@@ -170,10 +139,6 @@ func TestOutputSchema_WorkflowLeaf_EnforcesSchemaAndPassesToDownstream(t *testin
 	require.Empty(t, resp.Errors, "runner reported errors: %v", resp.Errors)
 	require.NotEmpty(t, resp.Response, "workflow produced no final response")
 
-	// The formatter is the last agent to run in a sequential, so its
-	// output is the final response. It can only produce the expected
-	// sentence if {city_facts} was successfully populated by the
-	// extractor — i.e., if state passing worked end-to-end.
 	final := strings.ToLower(strings.TrimSpace(resp.Response))
 	assert.Contains(t, final, "paris",
 		"formatter output must reference the prompt subject — state was not passed: %q", final)
@@ -183,10 +148,6 @@ func TestOutputSchema_WorkflowLeaf_EnforcesSchemaAndPassesToDownstream(t *testin
 		strings.Contains(final, "capital") || strings.Contains(final, "city"),
 		"formatter output must pick the is_capital branch — state was not passed: %q", final)
 
-	// The extractor produced at least one AssistantMessageAdded attributed
-	// to its agent. Treat that as evidence the extractor ran and its
-	// content reached downstream (if it hadn't, the formatter assertions
-	// above would already have failed; this is belt-and-braces).
 	msgs := findEventsByType(resp.EventsEmitted, "AssistantMessageAdded")
 	require.NotEmpty(t, msgs, "no AssistantMessageAdded events were emitted")
 }
