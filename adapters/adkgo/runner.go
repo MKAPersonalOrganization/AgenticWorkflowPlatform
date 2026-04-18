@@ -4,7 +4,6 @@ import (
 	agentio "aicompass/foundation/agent/io"
 	"aicompass/foundation/logger"
 	"aicompass/modules/chat/thread"
-	"aicompass/plugins/artifacts"
 	"aicompass/foundation/auth"
 	"context"
 	"errors"
@@ -276,9 +275,10 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 		// 9. Build the ADK-Go agent — either a workflow agent or a regular LLM agent.
 		var adkAgent agent.Agent
 		var agentPositions map[string]AgentPosition
-		memEnabled, memPreload := r.resolveMemoryPolicy(ctx, req.UserID, agentName, agentCfg)
+		memEnabled, memPreload := r.resolveMemoryPolicy(agentCfg)
 		memoryEnabled := r.memoryService != nil && memEnabled
-		artifactsEnabled := r.artifactService != nil && r.hasArtifactsEnabled(ctx, req.UserID, agentName)
+		artEnabled, artAutoSaveBlobs := r.resolveArtifactPolicy(agentCfg)
+		artifactsEnabled := r.artifactService != nil && artEnabled
 
 		if wa, isWF := isWorkflowAgent(foundAgent); isWF {
 			// ── Workflow Agent Path ──
@@ -547,8 +547,15 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			}))
 		}
 
+		// SaveInputBlobsAsArtifacts only takes effect when the runner has an
+		// artifact service wired; gate on artifactsEnabled for cleanliness.
+		// See .READ/adk-go/runner/runner.go:270-309 — when true, inline blobs
+		// on the user message get persisted as artifacts and replaced with
+		// text placeholders the model reads as "Uploaded file: …".
+		saveInputBlobs := artifactsEnabled && artAutoSaveBlobs
 		for adkEvt, adkErr := range adkRunner.Run(ctx, req.UserID, req.SessionID, userMsg, agent.RunConfig{
-			StreamingMode: agent.StreamingModeSSE,
+			StreamingMode:              agent.StreamingModeSSE,
+			SaveInputBlobsAsArtifacts:  saveInputBlobs,
 		}, runOpts...) {
 			if adkErr != nil {
 				// Emit node failure for the currently-active workflow sub-agent.
@@ -790,54 +797,26 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 // Internal helpers
 // ──────────────────────────────────────────────────────────────────────────────
 
-// memoryToolSetID is the permission key this adapter checks before injecting
-// ADK-native `preload_memory` / `load_memory` tools and honouring the runner's
-// memory service for an agent. Previously exposed by the (now-removed)
-// `plugins/agentmemory` PluginProvider; kept here as a literal so existing
-// permission rows keep working until `Config.MemoryPolicy` ships and replaces
-// the toolset-permission gate with a proper per-agent feature flag.
-//
-// Memory is NOT a plugin in ADK — `.READ/adk-go/memory/service.go` defines it
-// as a runner-level service and the tools are in-tree. The old PluginProvider
-// was a registry stub whose CreateExecutable returned nil; removing it
-// restores the ADK shape.
-const memoryToolSetID = "memory-set"
-
-// hasMemoryEnabled checks whether memory is enabled for the given user+agent
-// via the legacy `memory-set` toolset permission. Used as a fallback in
-// resolveMemoryPolicy when the agent's per-agent MemoryPolicy is nil —
-// i.e. pre-M8 agents whose permission row still lives in
-// user_tool_set_permissions. New agents set Config.MemoryPolicy directly.
-func (r *RunnerAdapter) hasMemoryEnabled(ctx context.Context, userID, agentName string) bool {
-	if r.toolReqs == nil {
-		return false
+// resolveMemoryPolicy returns (enabled, preload) for this agent from its
+// per-agent Config.MemoryPolicy. Nil policy means memory is off — the
+// legacy `memory-set` toolset-permission fallback has been removed; users
+// configure memory exclusively through the designer's Memory card.
+func (r *RunnerAdapter) resolveMemoryPolicy(agentCfg *fagent.Config) (enabled bool, preload bool) {
+	if agentCfg == nil || agentCfg.MemoryPolicy == nil {
+		return false, false
 	}
-	return r.toolReqs.HasToolSetPermission(ctx, userID, agentName, memoryToolSetID)
+	return agentCfg.MemoryPolicy.Enabled, agentCfg.MemoryPolicy.Preload
 }
 
-// resolveMemoryPolicy returns (enabled, preload) for this agent. Reads the
-// per-agent `Config.MemoryPolicy` first; falls back to the legacy
-// `memory-set` toolset permission when the policy is nil so agents created
-// before M8 keep working. A granted legacy permission counts as
-// (enabled=true, preload=true) — that's the behaviour the old plugin
-// provided.
-func (r *RunnerAdapter) resolveMemoryPolicy(ctx context.Context, userID, agentName string, agentCfg *fagent.Config) (enabled bool, preload bool) {
-	if agentCfg != nil && agentCfg.MemoryPolicy != nil {
-		return agentCfg.MemoryPolicy.Enabled, agentCfg.MemoryPolicy.Preload
+// resolveArtifactPolicy returns (enabled, autoSaveUserBlobs) for this agent
+// from its per-agent Config.ArtifactPolicy. Nil policy means artifacts are
+// off — the legacy `artifacts-set` toolset-permission fallback has been
+// removed; users configure artifacts exclusively through the designer.
+func (r *RunnerAdapter) resolveArtifactPolicy(agentCfg *fagent.Config) (enabled bool, autoSaveUserBlobs bool) {
+	if agentCfg == nil || agentCfg.ArtifactPolicy == nil {
+		return false, false
 	}
-	if r.hasMemoryEnabled(ctx, userID, agentName) {
-		return true, true
-	}
-	return false, false
-}
-
-// hasArtifactsEnabled checks whether the artifacts plugin is enabled for the
-// given user+agent via the tool requirements permission system.
-func (r *RunnerAdapter) hasArtifactsEnabled(ctx context.Context, userID, agentName string) bool {
-	if r.toolReqs == nil {
-		return false
-	}
-	return r.toolReqs.HasToolSetPermission(ctx, userID, agentName, artifacts.ToolSetID)
+	return agentCfg.ArtifactPolicy.Enabled, agentCfg.ArtifactPolicy.AutoSaveUserBlobs
 }
 
 // threadHistoryToMessages translates thread aggregate messages into foundation

@@ -15,7 +15,6 @@
 ^modules/filesystem/.*$ => Modules: filesystem
 ^modules/analytics/.*$ => Modules: analytics
 ^plugins/todos/.*$ => Plugins: todos
-^plugins/artifacts/.*$ => Plugins: artifacts
 ^plugins/document/.*$ => Plugins: document
 ^plugins/planmode/.*$ => Plugins: planmode
 ^plugins/tts/.*$ => Plugins: tts

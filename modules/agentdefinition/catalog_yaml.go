@@ -19,19 +19,24 @@ type yamlCatalogSpec struct {
 	AuthorName        string             `yaml:"author_name"`
 	Icon              string             `yaml:"icon"` // named icon (e.g. "bot") or raw SVG
 	Featured          bool               `yaml:"featured"`
-	MemoryPolicy      *yamlMemoryPolicy  `yaml:"memory_policy,omitempty"` // per-agent cross-session memory policy
-	Workflow          *yamlWorkflowNode  `yaml:"workflow"`                // nil for single-agent entries
-	LLMAgents         []yamlSubAgent     `yaml:"llm_agents"`              // nil for single-agent entries
-	AgentTools        []yamlAgentToolRef `yaml:"agent_tools,omitempty"`   // expose sub-agents as callable tools
+	MemoryPolicy      *yamlMemoryPolicy   `yaml:"memory_policy,omitempty"`   // per-agent cross-session memory policy
+	ArtifactPolicy    *yamlArtifactPolicy `yaml:"artifact_policy,omitempty"` // per-agent artifact policy (tool + auto-save)
+	Workflow          *yamlWorkflowNode   `yaml:"workflow"`                  // nil for single-agent entries
+	LLMAgents         []yamlSubAgent      `yaml:"llm_agents"`                // nil for single-agent entries
+	AgentTools        []yamlAgentToolRef  `yaml:"agent_tools,omitempty"`     // expose sub-agents as callable tools
 }
 
 // yamlMemoryPolicy is the YAML shape for AgentMemoryPolicy. Fields map
-// verbatim onto the persisted type. Values only matter on the ROOT agent
-// (single agent or workflow root) — children inherit from the runner's
-// memory service; there's no per-child policy.
+// verbatim onto the persisted type.
 type yamlMemoryPolicy struct {
 	Enabled bool `yaml:"enabled"`
 	Preload bool `yaml:"preload,omitempty"`
+}
+
+// yamlArtifactPolicy is the YAML shape for AgentArtifactPolicy.
+type yamlArtifactPolicy struct {
+	Enabled           bool `yaml:"enabled"`
+	AutoSaveUserBlobs bool `yaml:"auto_save_user_blobs,omitempty"`
 }
 
 type yamlWorkflowNode struct {
@@ -93,6 +98,13 @@ func (s *yamlCatalogSpec) toEntry() (AgentCatalogEntry, error) {
 		e.MemoryPolicy = &AgentMemoryPolicy{
 			Enabled: s.MemoryPolicy.Enabled,
 			Preload: s.MemoryPolicy.Preload,
+		}
+	}
+
+	if s.ArtifactPolicy != nil {
+		e.ArtifactPolicy = &AgentArtifactPolicy{
+			Enabled:           s.ArtifactPolicy.Enabled,
+			AutoSaveUserBlobs: s.ArtifactPolicy.AutoSaveUserBlobs,
 		}
 	}
 

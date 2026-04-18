@@ -30,10 +30,14 @@ type AgentCatalogEntry struct {
 	GlobalInstruction string `json:"global_instruction,omitempty" db:"-"`
 
 	// MemoryPolicy controls cross-session memory for the catalog entry's
-	// root agent. Nil means "not configured" — the runner falls back to
-	// the legacy memory-set toolset permission for backwards
-	// compatibility. Mirrors AgentDefinition.MemoryPolicy.
+	// root agent. Nil means memory is off. Mirrors
+	// AgentDefinition.MemoryPolicy.
 	MemoryPolicy *AgentMemoryPolicy `json:"memory_policy,omitempty" db:"-"`
+
+	// ArtifactPolicy controls artifact support for the catalog entry's
+	// root agent. Nil means artifacts are off. Mirrors
+	// AgentDefinition.ArtifactPolicy.
+	ArtifactPolicy *AgentArtifactPolicy `json:"artifact_policy,omitempty" db:"-"`
 
 	// ── Workflow Template (optional) ──
 

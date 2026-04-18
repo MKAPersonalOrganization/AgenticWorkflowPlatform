@@ -25,15 +25,15 @@ templ docsPlugins() {
 				@docsTableRow("Elicitation", "Interactive clarification and follow-ups", "Gathering requirements, interviews")
 				@docsTableRow("Knowledge Base", "RAG queries against uploaded documents", "Research, fact-checking, document Q&A")
 				@docsTableRow("Library", "Access to reference materials and resources", "Looking up definitions, formulas, references")
-				@docsTableRow("Artifact Management", "Versioned file creation, loading, and history", "Report generation, data exports, iterative document refinement")
 				@docsTableRow("Text-to-Speech", "Convert AI responses to spoken audio", "Accessibility, narration, auditory processing")
 			</tbody>
 		}
-		@docsInfoBox("Memory isn't a plugin") {
+		@docsInfoBox("Memory and artifacts aren't plugins") {
 			<p>
-				Cross-session memory used to appear in this list. It's now a first-class agent
-				feature — toggle it in the Memory section of the agent designer. See the
-				<strong>Memory &amp; Artifacts</strong> docs section for what it does and how to enable it.
+				Cross-session memory and versioned artifact storage used to appear in this
+				list as plugins. Both are now first-class agent features — toggle them per
+				agent in the designer. See the <strong>Memory &amp; Artifacts</strong> docs
+				section for what they do and how to enable them.
 			</p>
 		}
 		<h3>How Plugins Work</h3>

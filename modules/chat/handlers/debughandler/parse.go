@@ -87,6 +87,7 @@ func parseYAMLAgent(data []byte) (string, []*agentdefinition.AgentDefinition, er
 			SystemPrompt:      entry.SystemPrompt,
 			GlobalInstruction: entry.GlobalInstruction,
 			MemoryPolicy:      entry.MemoryPolicy,
+			ArtifactPolicy:    entry.ArtifactPolicy,
 			Icon:              entry.Icon,
 		}
 

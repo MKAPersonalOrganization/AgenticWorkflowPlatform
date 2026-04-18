@@ -51,6 +51,47 @@ type AgentModelConfig struct {
 	StopSequences []string
 }
 
+// AgentArtifactPolicy controls whether an agent can list, load, and create
+// artifacts, and whether user-uploaded blobs are auto-saved.
+//
+// Shape matches ADK's artifact tooling (see .READ/adk-go/artifact/service.go
+// for the Service interface; .READ/adk-go/tool/loadartifactstool for the
+// tool; and the RunConfig.SaveInputBlobsAsArtifacts field on
+// .READ/adk-go/runner/runner.go:206):
+//
+//   - Enabled=false                    → neither load_artifacts tool nor
+//     the runner's artifact service is
+//     made visible to this agent.
+//   - Enabled=true, AutoSaveUserBlobs=false
+//                                       → load_artifacts is injected so the
+//     agent can list and read files, but
+//     uploaded inline blobs stay in the
+//     user message unchanged.
+//   - Enabled=true, AutoSaveUserBlobs=true
+//                                       → as above, plus the runner
+//     auto-persists inline blobs from
+//     the user message into the artifact
+//     service and replaces them with a
+//     text reference, so the agent sees
+//     "Uploaded file: {name}…" instead
+//     of raw bytes. Referenceable in
+//     prompts as {artifact.name}.
+//
+// Nil means the agent has no artifact capability. This is the design
+// contract — there is no legacy fallback.
+type AgentArtifactPolicy struct {
+	// Enabled turns on artifact support for this agent. When true,
+	// load_artifacts is injected and the runner's artifact service is
+	// wired for the run.
+	Enabled bool `json:"enabled"`
+
+	// AutoSaveUserBlobs, when true, asks the runner to move any inline
+	// blobs in the user message into the artifact store automatically,
+	// replacing them with text placeholders the LLM can reference.
+	// Requires Enabled=true; ignored otherwise.
+	AutoSaveUserBlobs bool `json:"auto_save_user_blobs"`
+}
+
 // AgentMemoryPolicy controls whether an agent has access to the orchestration
 // engine's cross-session memory, and how it uses it.
 //
@@ -196,10 +237,13 @@ type Config struct {
 	ModelOverride *AgentModelOverride
 
 	// MemoryPolicy controls whether this agent can recall past sessions and
-	// whether recall runs automatically. nil means "fall back to legacy
-	// toolset-permission gate" (the pre-M8 behaviour). The adapter honours
-	// this policy when non-nil.
+	// whether recall runs automatically. nil means memory is off.
 	MemoryPolicy *AgentMemoryPolicy
+
+	// ArtifactPolicy controls whether this agent can create, load, and list
+	// artifacts, and whether user-uploaded blobs are auto-saved into the
+	// artifact store. nil means artifacts are off.
+	ArtifactPolicy *AgentArtifactPolicy
 
 	// AgentTools exposes other user-owned agents as callable tools on this
 	// agent. Each ref is resolved at runtime and wrapped via ADK-Go's

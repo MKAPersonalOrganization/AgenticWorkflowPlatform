@@ -49,6 +49,20 @@ type AgentMemoryPolicy struct {
 	Preload bool `json:"preload"`
 }
 
+// AgentArtifactPolicy mirrors foundation/agent.AgentArtifactPolicy.
+type AgentArtifactPolicy struct {
+	// Enabled turns on artifact support for this agent. When true,
+	// `load_artifacts` is injected and the runner's artifact service is
+	// wired so the agent can list, read, and create files that persist
+	// across sessions.
+	Enabled bool `json:"enabled"`
+
+	// AutoSaveUserBlobs asks the runner to move inline blobs from user
+	// messages into the artifact store automatically, replacing them with
+	// text placeholders. Requires Enabled=true; ignored otherwise.
+	AutoSaveUserBlobs bool `json:"autoSaveUserBlobs"`
+}
+
 // Validate checks that all non-nil fields are within acceptable ranges.
 func (c *AgentModelConfig) Validate() error {
 	if c == nil {
@@ -152,12 +166,16 @@ type AgentDefinition struct {
 
 	// ── Memory ──
 	// MemoryPolicy controls cross-session memory for this agent. nil means
-	// "fall back to the legacy memory-set toolset permission" for agents
-	// that were configured before M8 shipped (the adapter's interim gate).
-	// Non-nil means the user has explicitly configured memory on/off and
-	// the adapter uses this value verbatim.
+	// memory is off for this agent; non-nil carries the user's choice.
 	MemoryPolicy     *AgentMemoryPolicy `json:"memory_policy,omitempty" db:"-"`
 	MemoryPolicyJSON string             `json:"-" db:"memory_policy"`
+
+	// ── Artifacts ──
+	// ArtifactPolicy controls artifact support for this agent. nil means
+	// artifacts are off; non-nil toggles the load_artifacts tool and the
+	// auto-save-inline-blobs behaviour.
+	ArtifactPolicy     *AgentArtifactPolicy `json:"artifact_policy,omitempty" db:"-"`
+	ArtifactPolicyJSON string               `json:"-" db:"artifact_policy"`
 
 	// ── Sharing ──
 	// ShareToken is a unique token that enables sharing this agent with other users.
@@ -247,7 +265,7 @@ func (a *AgentDefinition) MarshalMemoryPolicy() error {
 }
 
 // UnmarshalMemoryPolicy deserializes MemoryPolicyJSON into MemoryPolicy.
-// Empty JSON means nil — "fall back to legacy toolset-permission gate".
+// Empty JSON means nil — memory is off for this agent.
 func (a *AgentDefinition) UnmarshalMemoryPolicy() error {
 	if a.MemoryPolicyJSON == "" || a.MemoryPolicyJSON == "null" {
 		a.MemoryPolicy = nil
@@ -258,6 +276,35 @@ func (a *AgentDefinition) UnmarshalMemoryPolicy() error {
 		return fmt.Errorf("unmarshalling memory policy: %w", err)
 	}
 	a.MemoryPolicy = &mp
+	return nil
+}
+
+// MarshalArtifactPolicy serializes ArtifactPolicy to ArtifactPolicyJSON.
+func (a *AgentDefinition) MarshalArtifactPolicy() error {
+	if a.ArtifactPolicy == nil {
+		a.ArtifactPolicyJSON = ""
+		return nil
+	}
+	b, err := json.Marshal(a.ArtifactPolicy)
+	if err != nil {
+		return fmt.Errorf("marshalling artifact policy: %w", err)
+	}
+	a.ArtifactPolicyJSON = string(b)
+	return nil
+}
+
+// UnmarshalArtifactPolicy deserializes ArtifactPolicyJSON into ArtifactPolicy.
+// Empty JSON means nil — artifacts are off for this agent.
+func (a *AgentDefinition) UnmarshalArtifactPolicy() error {
+	if a.ArtifactPolicyJSON == "" || a.ArtifactPolicyJSON == "null" {
+		a.ArtifactPolicy = nil
+		return nil
+	}
+	var ap AgentArtifactPolicy
+	if err := json.Unmarshal([]byte(a.ArtifactPolicyJSON), &ap); err != nil {
+		return fmt.Errorf("unmarshalling artifact policy: %w", err)
+	}
+	a.ArtifactPolicy = &ap
 	return nil
 }
 

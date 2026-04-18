@@ -478,7 +478,7 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 	// back to the legacy memory-set toolset permission for pre-M8 agents).
 	// Artifacts stays gated by the old toolset permission — M9's scope.
 	if wbc.adapter.memoryService != nil {
-		memEnabled, memPreload := wbc.adapter.resolveMemoryPolicy(wbc.ctx, wbc.userID, node.AgentID, agentCfg)
+		memEnabled, memPreload := wbc.adapter.resolveMemoryPolicy(agentCfg)
 		if memEnabled {
 			adkTools = append(adkTools, loadmemorytool.New())
 			if memPreload {
@@ -486,8 +486,11 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 			}
 		}
 	}
-	if wbc.adapter.artifactService != nil && wbc.adapter.hasArtifactsEnabled(wbc.ctx, wbc.userID, node.AgentID) {
-		adkTools = append(adkTools, loadartifactstool.New())
+	if wbc.adapter.artifactService != nil {
+		artEnabled, _ := wbc.adapter.resolveArtifactPolicy(agentCfg)
+		if artEnabled {
+			adkTools = append(adkTools, loadartifactstool.New())
+		}
 	}
 
 	// Wrap each AgentToolRef via ADK-Go's tool/agenttool so leaf agents

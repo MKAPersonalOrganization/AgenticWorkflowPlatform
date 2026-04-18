@@ -77,6 +77,7 @@ func (p *UserAwareProvider) agentFromDefinition(def *AgentDefinition) agent.Agen
 		ModelConfig:       toAgentModelConfig(def.ModelConfig),
 		ModelOverride:     toAgentModelOverride(def.ModelOverride),
 		MemoryPolicy:      toFoundationMemoryPolicy(def.MemoryPolicy),
+		ArtifactPolicy:    toFoundationArtifactPolicy(def.ArtifactPolicy),
 		AgentTools:        toFoundationAgentToolRefs(def.AgentTools),
 	}
 
@@ -174,8 +175,7 @@ func toAgentModelOverride(src *AgentModelOverride) *agent.AgentModelOverride {
 }
 
 // toFoundationMemoryPolicy converts the persisted memory policy to the
-// foundation type consumed by the adapter. Nil signals "fall back to the
-// legacy memory-set permission gate" for pre-M8 agents.
+// foundation type consumed by the adapter. Nil means memory is off.
 func toFoundationMemoryPolicy(src *AgentMemoryPolicy) *agent.AgentMemoryPolicy {
 	if src == nil {
 		return nil
@@ -183,6 +183,18 @@ func toFoundationMemoryPolicy(src *AgentMemoryPolicy) *agent.AgentMemoryPolicy {
 	return &agent.AgentMemoryPolicy{
 		Enabled: src.Enabled,
 		Preload: src.Preload,
+	}
+}
+
+// toFoundationArtifactPolicy converts the persisted artifact policy to the
+// foundation type consumed by the adapter. Nil means artifacts are off.
+func toFoundationArtifactPolicy(src *AgentArtifactPolicy) *agent.AgentArtifactPolicy {
+	if src == nil {
+		return nil
+	}
+	return &agent.AgentArtifactPolicy{
+		Enabled:           src.Enabled,
+		AutoSaveUserBlobs: src.AutoSaveUserBlobs,
 	}
 }
 

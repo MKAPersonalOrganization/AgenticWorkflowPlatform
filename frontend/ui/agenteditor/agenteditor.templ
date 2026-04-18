@@ -1929,6 +1929,51 @@ templ agentNodeForm() {
 			</div>
 		</div>
 	</div>
+	<!-- Artifacts Section.
+	     Per-agent artifact policy. When enabled, load_artifacts is injected
+	     so the agent can list, read, and create files that persist across
+	     sessions. AutoSaveUserBlobs additionally tells the runner to move
+	     inline attachments from user messages into the artifact store and
+	     replace them with text placeholders the model reads instead of
+	     raw bytes (see .READ/adk-go/runner/runner.go:270-309). -->
+	<div class="rounded-xl border border-border bg-card overflow-hidden">
+		<button
+			type="button"
+			@click="showArtifacts = !showArtifacts"
+			class="flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent/30 transition-colors"
+			:class="showArtifacts ? 'bg-gradient-to-r from-amber-500/5 to-transparent border-b border-border/50' : ''"
+		>
+			<span class="flex items-center gap-2">
+				<div class="size-6 rounded-md bg-amber-500/10 flex items-center justify-center">
+					@icon.FileStack(icon.Props{Class: "size-3.5 text-amber-600 dark:text-amber-400"})
+				</div>
+				{ i18n.T(ctx, "Artifacts") }
+				<span x-show="artifactsEnabled" class="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400">
+					{ i18n.T(ctx, "on") }
+				</span>
+				<span x-show="artifactsEnabled && artifactsAutoSaveBlobs" class="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400">
+					{ i18n.T(ctx, "auto-save uploads") }
+				</span>
+			</span>
+			<span class="transition-transform duration-200" :class="showArtifacts ? 'rotate-180' : ''">
+				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+			</span>
+		</button>
+		<div x-show="showArtifacts" x-collapse>
+			<div class="p-4 space-y-4 border-t border-border/50">
+				<p class="text-xs text-muted-foreground leading-relaxed">
+					@icon.Info(icon.Props{Class: "size-3.5 inline me-1 text-amber-500"})
+					{ i18n.T(ctx, "Lets this agent create, list, and load versioned files that persist across conversations — reports, CSVs, generated images, refined code. Leave off for agents that don't need durable outputs.") }
+				</p>
+				<div class="space-y-1.5">
+					@toggleSwitch("artifactsEnabled", i18n.T(ctx, "Use artifacts"), i18n.T(ctx, "Adds a tool so the agent can list and load versioned files, and save new ones."))
+					<div x-show="artifactsEnabled" x-collapse>
+						@toggleSwitch("artifactsAutoSaveBlobs", i18n.T(ctx, "Auto-save uploaded files"), i18n.T(ctx, "When the user attaches a file, save it as an artifact automatically and hand the agent a text reference instead of raw bytes. Makes referring back to the file trivial."))
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
 	<!-- Sub-Agents (Coordinator) Section -->
 	<div class="rounded-xl border border-border bg-card overflow-hidden">
 		<button

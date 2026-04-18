@@ -26,6 +26,7 @@ import (
 	"aicompass/modules/chat/thread"
 	"aicompass/modules/chat/threadmgmt"
 
+	"google.golang.org/adk/artifact"
 	"google.golang.org/adk/memory"
 )
 
@@ -42,16 +43,23 @@ type Handler struct {
 	// recall would be impossible to test end-to-end. Matches how production
 	// wires a single memory.Service for the whole process.
 	memoryService memory.Service
+
+	// artifactService follows the same process-lifetime rationale — the
+	// ArtifactPolicy toggle wires a real artifact service so integration
+	// tests can exercise load_artifacts / SaveInputBlobsAsArtifacts
+	// end-to-end without needing S3.
+	artifactService artifact.Service
 }
 
 // New constructs a debug handler. The caller is expected to mount the returned
 // handler on the debug mux, not the public app router.
 func New(log *logger.Logger, threadMgr *threadmgmt.Manager, store es.EventStore) *Handler {
 	return &Handler{
-		log:           log,
-		threadMgr:     threadMgr,
-		store:         store,
-		memoryService: memory.InMemoryService(),
+		log:             log,
+		threadMgr:       threadMgr,
+		store:           store,
+		memoryService:   memory.InMemoryService(),
+		artifactService: artifact.InMemoryService(),
 	}
 }
 
@@ -174,18 +182,19 @@ func (h *Handler) HandleRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	adk, err := adkgo.NewRunnerAdapter(adkgo.RunnerAdapterConfig{
-		Log:            h.log,
-		ThreadMgr:      h.threadMgr,
-		AgentProvider:  provider,
-		ConfigResolver: staticModelConfigResolver{cfg: modelCfg},
-		APIKeyResolver: staticAPIKeyResolver{apiKey: req.APIKey},
-		MemoryService:  h.memoryService,
+		Log:             h.log,
+		ThreadMgr:       h.threadMgr,
+		AgentProvider:   provider,
+		ConfigResolver:  staticModelConfigResolver{cfg: modelCfg},
+		APIKeyResolver:  staticAPIKeyResolver{apiKey: req.APIKey},
+		MemoryService:   h.memoryService,
+		ArtifactService: h.artifactService,
 		// All remaining ports (ToolReqs, MCPResolver, A2AResolver,
 		// A2ASubAgentProvider, NewToolSetFactory, BlockEnforcer,
 		// ConfirmChecker, PluginSettingsResolver, ProfileProvider,
-		// ArtifactService, ExtraConfigFn, PromptInjectors) are nil on
-		// purpose — adapters/adkgo/runner.go nil-guards each, which
-		// reduces this path to an LLM-only turn with no tools.
+		// ExtraConfigFn, PromptInjectors) are nil on purpose —
+		// adapters/adkgo/runner.go nil-guards each, which reduces this
+		// path to an LLM-only turn with no tools.
 	})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, fmt.Sprintf("creating runner: %v", err))

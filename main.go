@@ -28,7 +28,6 @@ import (
 	"aicompass/modules/knowledge/edgequake"
 	"aicompass/modules/knowledge/rag/users"
 	"aicompass/modules/toolreqs"
-	"aicompass/plugins/artifacts"
 	"aicompass/plugins/calculator"
 	"aicompass/plugins/codebase"
 	"aicompass/plugins/cognitive"
@@ -411,17 +410,19 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	// Create and initialize tool registry.
 	//
-	// Memory is intentionally NOT registered as a plugin — it's an ADK
-	// runner-level service (`memory.Service`) with two in-tree tools
-	// (`preload_memory`, `load_memory`). The previous `plugins/agentmemory`
-	// PluginProvider was a registry stub whose CreateExecutable returned
-	// nil; it made memory look like a tool in the designer picker, which
-	// misled users. The adapter still injects the tools when the legacy
-	// `memory-set` toolset permission is granted on an agent (see
-	// adapters/adkgo/runner.go:memoryToolSetID), until `Config.MemoryPolicy`
-	// lands and replaces that gate with a proper per-agent feature flag.
+	// Memory and artifacts are intentionally NOT registered as plugins —
+	// both are runner-level services in the orchestration engine (see
+	// `memory.Service`, `artifact.Service`) with in-tree tools that the
+	// adapter injects per-agent. Their previous `plugins/agentmemory` and
+	// `plugins/artifacts` PluginProviders were registry stubs whose
+	// CreateExecutable returned nil; they made two services masquerade as
+	// tools in the designer picker, which misled users. The adapter still
+	// injects the matching tools when the legacy `memory-set` /
+	// `artifacts-set` toolset permissions are granted on an agent (see
+	// adapters/adkgo/runner.go: memoryToolSetID, artifactToolSetID), until
+	// per-agent MemoryPolicy (shipped) / ArtifactPolicy (pending) replace
+	// those gates with proper feature flags.
 	toolRegistry := toolregistry.NewRegistry(log, toolregistry.NewPostgresToolRegistryRepository(db))
-	toolregistry.RegisterPlugin(&artifacts.Provider{})
 	toolregistry.RegisterPlugin(&calculator.Provider{})
 	toolregistry.RegisterPlugin(&demoinput.Provider{})
 	toolregistry.RegisterPlugin(&codebase.Provider{})

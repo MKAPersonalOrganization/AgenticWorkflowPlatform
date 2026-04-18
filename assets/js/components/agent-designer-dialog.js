@@ -98,6 +98,7 @@ export const agentDesigner = () => ({
         },
         modelOverride: { provider: '', modelName: '' },
         memoryPolicy: null,
+        artifactPolicy: null,
     },
 
     // UI state
@@ -106,6 +107,7 @@ export const agentDesigner = () => ({
     showModelConfig: false,
     showGlobalInstruction: false,
     showMemory: false,
+    showArtifacts: false,
 
     // ── Instruction template autocomplete ─────────────────────────────
     // We expose the two ADK placeholder forms we officially support:
@@ -327,6 +329,30 @@ export const agentDesigner = () => ({
     set memoryPreload(v) {
         if (!this.form.memoryPolicy) this.form.memoryPolicy = { enabled: false, preload: false };
         this.form.memoryPolicy.preload = !!v;
+    },
+
+    // Artifacts — same shape as Memory: Enabled gates the capability;
+    // AutoSaveUserBlobs is a secondary knob that only matters when
+    // Enabled is on. Storing null when fully off means the backend
+    // receives a clean "no artifacts" and doesn't see a partially-set
+    // object.
+    get artifactsEnabled() {
+        return !!(this.form.artifactPolicy && this.form.artifactPolicy.enabled);
+    },
+    set artifactsEnabled(v) {
+        if (v) {
+            if (!this.form.artifactPolicy) this.form.artifactPolicy = { enabled: false, autoSaveUserBlobs: false };
+            this.form.artifactPolicy.enabled = true;
+        } else {
+            this.form.artifactPolicy = { enabled: false, autoSaveUserBlobs: false };
+        }
+    },
+    get artifactsAutoSaveBlobs() {
+        return !!(this.form.artifactPolicy && this.form.artifactPolicy.autoSaveUserBlobs);
+    },
+    set artifactsAutoSaveBlobs(v) {
+        if (!this.form.artifactPolicy) this.form.artifactPolicy = { enabled: false, autoSaveUserBlobs: false };
+        this.form.artifactPolicy.autoSaveUserBlobs = !!v;
     },
 
     /**
@@ -840,6 +866,7 @@ export const agentDesigner = () => ({
             },
             modelOverride: { provider: '', modelName: '' },
             memoryPolicy: null,
+            artifactPolicy: null,
         };
         this.showTools = false;
         this.showKnowledgeBases = false;
@@ -852,6 +879,7 @@ export const agentDesigner = () => ({
         this.showRequirementsPanel = false;
         this.showGlobalInstruction = false;
         this.showMemory = false;
+        this.showArtifacts = false;
         this.agentPlugins = [];
         this.agentWorkspaces = [];
         this.agentFilesystems = [];
@@ -893,12 +921,14 @@ export const agentDesigner = () => ({
                 provider: mo.provider || '',
                 modelName: mo.modelName || '',
             },
-            // Memory policy is null when the agent hasn't been reconfigured
-            // since M8 shipped — the adapter then falls back to the legacy
-            // memory-set toolset permission. Hydrating to null keeps that
-            // behaviour until the user explicitly toggles the Memory card.
             memoryPolicy: agent.memoryPolicy
                 ? { enabled: !!agent.memoryPolicy.enabled, preload: !!agent.memoryPolicy.preload }
+                : null,
+            artifactPolicy: agent.artifactPolicy
+                ? {
+                    enabled: !!agent.artifactPolicy.enabled,
+                    autoSaveUserBlobs: !!agent.artifactPolicy.autoSaveUserBlobs,
+                }
                 : null,
         };
         this.showTools = false;
@@ -912,6 +942,7 @@ export const agentDesigner = () => ({
         this.showRequirementsPanel = false;
         this.showGlobalInstruction = false;
         this.showMemory = false;
+        this.showArtifacts = false;
         this.providerModelOptions = [];
         this.providerModelsError = '';
         this.hydrateSchemaRows('inputSchema');
@@ -969,14 +1000,16 @@ export const agentDesigner = () => ({
                 outputSchema: this.serializeSchema('outputSchema'),
                 modelConfig: Object.keys(modelConfig).length > 0 ? modelConfig : null,
                 modelOverride,
-                // Send the memory policy verbatim when the user has touched
-                // the Memory card; null leaves the backend free to fall
-                // back to the legacy memory-set permission for unmigrated
-                // agents.
                 memoryPolicy: this.form.memoryPolicy
                     ? {
                         enabled: !!this.form.memoryPolicy.enabled,
                         preload: !!this.form.memoryPolicy.preload,
+                    }
+                    : null,
+                artifactPolicy: this.form.artifactPolicy
+                    ? {
+                        enabled: !!this.form.artifactPolicy.enabled,
+                        autoSaveUserBlobs: !!this.form.artifactPolicy.autoSaveUserBlobs,
                     }
                     : null,
             };

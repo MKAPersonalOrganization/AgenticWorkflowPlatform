@@ -32,6 +32,7 @@ const agentSelectColumns = `id, user_id, name, description, system_prompt, icon,
     COALESCE(model_config::text, '') as model_config,
     COALESCE(model_override::text, '') as model_override,
     COALESCE(memory_policy::text, '') as memory_policy,
+    COALESCE(artifact_policy::text, '') as artifact_policy,
     share_token, visibility,
     created_at, updated_at`
 
@@ -52,6 +53,7 @@ func hydrateAgent(a *AgentDefinition) {
 	_ = a.UnmarshalModelConfig()
 	_ = a.UnmarshalModelOverride()
 	_ = a.UnmarshalMemoryPolicy()
+	_ = a.UnmarshalArtifactPolicy()
 }
 
 func (r *postgresAgentDefinitionRepository) Create(ctx context.Context, agent *AgentDefinition) error {
@@ -82,15 +84,18 @@ func (r *postgresAgentDefinitionRepository) Create(ctx context.Context, agent *A
 	if err := agent.MarshalMemoryPolicy(); err != nil {
 		return err
 	}
+	if err := agent.MarshalArtifactPolicy(); err != nil {
+		return err
+	}
 
 	query := `
 INSERT INTO user_agents (id, user_id, name, description, system_prompt, icon, source_catalog_id,
     parent_id,
     disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
     global_instruction, input_schema, output_schema, graph, sub_agents, agent_tools, model_config, model_override,
-    memory_policy,
+    memory_policy, artifact_policy,
     share_token, visibility, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)`
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)`
 
 	_, err := r.db.ExecContext(ctx, query,
 		agent.ID,
@@ -114,6 +119,7 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $
 		nullIfEmpty(agent.ModelConfigJSON),
 		nullIfEmpty(agent.ModelOverrideJSON),
 		nullIfEmpty(agent.MemoryPolicyJSON),
+		nullIfEmpty(agent.ArtifactPolicyJSON),
 		agent.ShareToken,
 		coalesceVisibility(agent.Visibility),
 		agent.CreatedAt,
@@ -148,6 +154,9 @@ func (r *postgresAgentDefinitionRepository) Update(ctx context.Context, agent *A
 	if err := agent.MarshalMemoryPolicy(); err != nil {
 		return err
 	}
+	if err := agent.MarshalArtifactPolicy(); err != nil {
+		return err
+	}
 
 	query := `
 UPDATE user_agents
@@ -157,8 +166,8 @@ SET name = $1, description = $2, system_prompt = $3,
     output_key = $9, include_contents = $10, global_instruction = $11,
     input_schema = $12, output_schema = $13, graph = $14, sub_agents = $15,
     agent_tools = $16, model_config = $17, model_override = $18,
-    memory_policy = $19
-WHERE id = $20 AND user_id = $21`
+    memory_policy = $19, artifact_policy = $20
+WHERE id = $21 AND user_id = $22`
 
 	result, err := r.db.ExecContext(ctx, query,
 		agent.Name,
@@ -180,6 +189,7 @@ WHERE id = $20 AND user_id = $21`
 		nullIfEmpty(agent.ModelConfigJSON),
 		nullIfEmpty(agent.ModelOverrideJSON),
 		nullIfEmpty(agent.MemoryPolicyJSON),
+		nullIfEmpty(agent.ArtifactPolicyJSON),
 		agent.ID,
 		agent.UserID,
 	)

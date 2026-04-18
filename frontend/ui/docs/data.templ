@@ -116,28 +116,29 @@ templ docsMemoryArtifacts() {
 		</ul>
 		<h3>Versioned Artifacts</h3>
 		<p>
-			The <strong>Artifact Management</strong> plugin enables agents to create, version, and load
-			persistent files during execution. Artifacts are versioned automatically — each save creates a
-			new version, and agents can load any previous version by name.
+			<strong>Versioned artifacts</strong> are a built-in agent capability for creating,
+			saving, and loading persistent files across sessions — reports, CSVs, generated
+			images, refined code. Each save creates a new version, and an agent can load any
+			previous version by name.
 		</p>
 		<p>
-			When enabled, the
-			<code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">load_artifacts</code> tool
-			informs the agent about available artifacts and loads them on demand. Other tools (document
-			generation, TTS, etc.) can save artifacts directly via the artifact service.
+			Like memory, artifacts are an <strong>agent feature</strong>, not a tool or plugin
+			— toggle them per agent in the designer. When on, the agent can list available
+			artifacts, load any version, and save new ones. Other capabilities (document
+			generation, text-to-speech, etc.) can write artifacts directly too.
 		</p>
 		<p>Use cases include:</p>
 		<ul class="space-y-2 my-4">
 			<li>• Reports and analysis documents that evolve across sessions</li>
 			<li>• CSV/data exports from data processing agents</li>
-			<li>• Generated images and visualizations</li>
+			<li>• Generated images and visualisations</li>
 			<li>• Code files and scripts refined iteratively</li>
 			<li>• User-scoped files shared across all sessions (prefix with <code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">user:</code>)</li>
 		</ul>
 		<p>
-			Artifacts are backed by S3-compatible storage with a dedicated bucket, providing reliable
-			access and version history. The chat UI displays an
-			<strong>Artifact Version Saved</strong> card whenever an agent creates or updates an artifact.
+			The chat UI shows an <strong>Artifact Version Saved</strong> card whenever an agent
+			creates or updates a file, so you can see exactly what was produced and roll back
+			to an earlier version if needed.
 		</p>
 		<h3>Thread Management</h3>
 		<p>

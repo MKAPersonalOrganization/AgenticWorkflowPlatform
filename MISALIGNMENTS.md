@@ -18,8 +18,8 @@
    - [M5. Output-schema visual builder (replace raw JSON textarea)](#m5-output-schema-visual-builder) ✅ **done**
    - [M6. Instruction template variable picker](#m6-instruction-template-variable-picker) ✅ **done**
    - [M7. Global-instruction UX (root-only surfacing)](#m7-global-instruction-ux) ✅ **done**
-   - [M8. Memory service toggle + backend selector](#m8-memory-service-toggle)
-   - [M9. Artifact service — surface the `SaveInputBlobsAsArtifacts` toggle](#m9-artifact-service)
+   - [M8. Memory service toggle + backend selector](#m8-memory-service-toggle) ✅ **done**
+   - [M9. Artifact service — surface the `SaveInputBlobsAsArtifacts` toggle](#m9-artifact-service) ✅ **done**
    - [M10. Built-in code-execution toggle](#m10-code-execution-toggle)
    - [M11. Long-running-tool surfacing in chat timeline](#m11-long-running-tools)
    - [M12. A2A remote-agent node configuration](#m12-a2a-remote-agent)
@@ -361,11 +361,11 @@ Designer types "{" → autocomplete dropdown appears:
 
 ### M8. Memory service toggle
 
-> **Status: ⏳ In progress.** Step 1 done — the `plugins/agentmemory` PluginProvider stub is removed so memory no longer masquerades as a plugin in the tools picker (commit unhooks registration and deletes the package). The legacy `memory-set` toolset-permission gate is kept as an interim (inlined into `adapters/adkgo/runner.go` as `memoryToolSetID`) so already-configured agents keep working. Remaining work: the per-agent `Config.MemoryPolicy { Enabled bool; Preload bool }` + designer section + migration to drop the interim permission gate.
+> **Status: ✅ Done.** `plugins/agentmemory` PluginProvider stub removed; per-agent `Config.MemoryPolicy { Enabled, Preload }` drives tool injection exclusively; the legacy `memory-set` toolset-permission fallback was deleted in the M9 refactor. Designer has a collapsible Memory card; catalog YAML accepts `memory_policy:`; integration tests cover cross-session recall end-to-end.
 
 **ADK.** `memory.Service` is a runner-level service; `preload_memory` / `load_memory` are in-tree tools the app explicitly adds to agents that should have them. Memory is NOT a plugin in ADK.
 
-**Today.** Memory service is wired at the runner level (✅) but the per-agent toggle is still the legacy `memory-set` toolset permission (⏳) — a non-programmer-hostile path that goes through tool requirements. Needs a proper `MemoryPolicy` field on `Config`.
+**Today.** Memory is an agent feature driven by `Config.MemoryPolicy`. The orchestration engine's service is wired at the runner level; per-agent choice determines tool injection.
 
 **Workflow.**
 
@@ -391,9 +391,11 @@ Backend → maps to toolreqs permissions for the agent-memory plugin
 
 ### M9. Artifact service
 
+> **Status: ✅ Done.** `plugins/artifacts` PluginProvider stub removed; per-agent `Config.ArtifactPolicy { Enabled, AutoSaveUserBlobs }` drives both tool injection and the runner's `SaveInputBlobsAsArtifacts` knob; the legacy `artifacts-set` toolset-permission gate is gone. Designer has a collapsible Artifacts card; catalog YAML accepts `artifact_policy:`; integration tests exercise the tool-injection surface end-to-end. S3-backed `foundation/artifact/adkartifact` service unchanged — that was always the real implementation.
+
 **ADK.** `runner.Config.RunConfig.SaveInputBlobsAsArtifacts (bool)` — automatically stores user-uploaded blobs as artifacts (they then become referenceable via `{artifact.name}`).
 
-**Today.** We have `plugins/artifacts/` wired to MinIO, and users can upload attachments, but the **SaveInputBlobsAsArtifacts** toggle is hardcoded (verify in `adapters/adkgo/runner.go`). Non-programmers have no control.
+**Today.** Artifacts are an agent feature driven by `Config.ArtifactPolicy`. Setting `AutoSaveUserBlobs=true` surfaces inline blobs into the artifact store at runtime so the model sees text placeholders instead of raw bytes.
 
 **Workflow.**
 
