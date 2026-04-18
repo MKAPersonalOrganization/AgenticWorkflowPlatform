@@ -392,12 +392,29 @@ templ docsMultiAgentOrchestration() {
 				to fix a typo before the agent runs.
 			</p>
 		}
-		<h3>Global Instructions</h3>
+		<h3>Global Instructions <span class="text-[10px] font-semibold uppercase tracking-wider ms-2 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 align-middle">Root only</span></h3>
 		<p>
-			A <strong>global instruction</strong> is a shared directive applied to <strong>every agent in the tree</strong>.
-			Set it on the root agent, and all sub-agents inherit it automatically. Use this for
-			cross-cutting concerns like tone, compliance rules, or output format requirements.
+			A <strong>global instruction</strong> is a shared directive applied to <strong>every agent in the workflow</strong>.
+			It lives on the <strong>root agent</strong> and automatically covers the root
+			itself plus every sub-agent it delegates to — coordinator children, workflow
+			leaves, and agents-as-tools alike. Use it for cross-cutting rules like tone,
+			compliance language, or a required output format.
 		</p>
+		<p>
+			The designer enforces this by only showing the Global Instruction field when
+			you're editing a <strong>root</strong> agent. On a sub-agent, the field is
+			hidden — setting it there would have no effect, so the UI takes the decision
+			away from you.
+		</p>
+		@docsInfoBox("How to tell which agent is the root") {
+			<p>
+				The root is the agent users pick from your agent library — the one that
+				answers first. Coordinator sub-agents, workflow-graph leaves, and
+				agents-as-tools are all children of some root and don't get their own
+				global instruction. If the Global Instruction section isn't showing while
+				you edit an agent, that agent is a child of another one.
+			</p>
+		}
 		<h3>Input Schema (Inbound Signature)</h3>
 		<p>
 			The <strong>input schema</strong> defines the callable signature an agent publishes

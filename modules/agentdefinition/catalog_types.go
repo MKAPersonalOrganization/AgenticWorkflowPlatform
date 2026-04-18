@@ -19,6 +19,16 @@ type AgentCatalogEntry struct {
 	Featured     bool     `json:"featured" db:"featured"`
 	AddCount     int64    `json:"add_count" db:"add_count"` // Popularity counter
 
+	// GlobalInstruction is a workflow-wide directive applied to every
+	// agent in the tree — not just the root's own system prompt. The
+	// orchestration engine only honours it when declared on the root
+	// (see .READ/adk-go/agent/llmagent/llmagent.go:232), so it lives at
+	// the top level of a catalog entry regardless of whether the entry
+	// is a single agent or a composed workflow. Template syntax
+	// ({key} / {key?}) is supported; values resolve against session
+	// state before the LLM is called.
+	GlobalInstruction string `json:"global_instruction,omitempty" db:"-"`
+
 	// ── Workflow Template (optional) ──
 
 	// WorkflowGraphJSON is a JSON-encoded WorkflowNode tree template.

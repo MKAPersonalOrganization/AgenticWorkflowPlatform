@@ -103,6 +103,7 @@ export const agentDesigner = () => ({
     expanded: false,
     showSubAgents: false,
     showModelConfig: false,
+    showGlobalInstruction: false,
 
     // ── Instruction template autocomplete ─────────────────────────────
     // We expose the two ADK placeholder forms we officially support:
@@ -297,6 +298,25 @@ export const agentDesigner = () => ({
         } finally {
             this.loading = false;
         }
+    },
+
+    /**
+     * Whether the agent currently being edited is a root agent (no parent
+     * workflow). Root-only controls — most importantly the Global
+     * Instruction editor — read this to hide themselves for sub-agents.
+     *
+     * Why root-only: ADK enforces that only the root agent's
+     * GlobalInstruction takes effect at runtime (see
+     * .READ/adk-go/agent/llmagent/llmagent.go — "ONLY the
+     * GlobalInstruction in the root agent will take effect"). Exposing
+     * it on sub-agents would silently do nothing and mislead the user.
+     *
+     * A brand-new agent (no editingAgent yet) counts as root — new agents
+     * start as top-level entries in the user's library.
+     */
+    isRootNode() {
+        if (!this.editingAgent) return true;
+        return !this.editingAgent.parentId;
     },
 
     /** Fetch a single agent by ID */
@@ -800,6 +820,7 @@ export const agentDesigner = () => ({
         this.showOutputSchema = false;
         this.showModelConfig = false;
         this.showRequirementsPanel = false;
+        this.showGlobalInstruction = false;
         this.agentPlugins = [];
         this.agentWorkspaces = [];
         this.agentFilesystems = [];
@@ -851,6 +872,7 @@ export const agentDesigner = () => ({
         this.showOutputSchema = false;
         this.showModelConfig = false;
         this.showRequirementsPanel = false;
+        this.showGlobalInstruction = false;
         this.providerModelOptions = [];
         this.providerModelsError = '';
         this.hydrateSchemaRows('inputSchema');
@@ -1365,6 +1387,7 @@ export const agentDesigner = () => ({
      */
     closeRequirementsPanel() {
         this.showRequirementsPanel = false;
+        this.showGlobalInstruction = false;
         this.reqConfigTarget = null;
     },
 

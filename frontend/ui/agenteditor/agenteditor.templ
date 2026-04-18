@@ -1124,24 +1124,23 @@ templ AgentDesignerDialog() {
 								:style="'width:' + panelW + 'px;'"
 							>
 								<template x-if="!node">
-									<div class="flex flex-col h-full">
-										<div class="flex flex-col items-center justify-center flex-1 px-4 py-12 text-center space-y-3">
-											<div class="w-9 h-9 rounded-lg flex items-center justify-center bg-muted border-border">
-												@icon.MousePointerClick(icon.Props{Class: "size-4 text-muted-foreground"})
-											</div>
-											<div class="space-y-1">
-												<p class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "Properties") }</p>
-												<p class="text-[10px] text-muted-foreground leading-relaxed">{ i18n.T(ctx, "Select a node to view and edit its settings.") }</p>
-											</div>
+									<!-- Empty state when no node is selected. Intentionally
+									     no System Prompt or Global Instruction editor here:
+									     a pipeline is rooted at a Sequential / Parallel / Loop
+									     agent, and those types have neither a per-instance
+									     Instruction field (only llmagent.Config does) nor a
+									     GlobalInstruction the orchestration engine will honour
+									     (asLLMAgent(workflowRoot) is nil — see
+									     .READ/adk-go/internal/llminternal/agent_transfer.go:186
+									     and instruction_processor.go:48). Either field shown
+									     here would persist but silently do nothing at runtime. -->
+									<div class="flex flex-col items-center justify-center h-full px-4 py-12 text-center space-y-3">
+										<div class="w-9 h-9 rounded-lg flex items-center justify-center bg-muted border-border">
+											@icon.MousePointerClick(icon.Props{Class: "size-4 text-muted-foreground"})
 										</div>
-										<div class="border-t p-3 space-y-2 border-border">
-											<p class="text-[8px] uppercase tracking-widest text-muted-foreground font-semibold">{ i18n.T(ctx, "Workflow Instructions") }</p>
-											<textarea
-												x-model="$store.flow.systemPrompt"
-												rows="6"
-												placeholder="Shared instructions for all agents in this workflow..."
-												class="w-full text-[11px] rounded-lg px-2.5 py-2 text-foreground placeholder:text-muted-foreground outline-none resize-none focus:ring-1 focus:ring-primary/40 bg-background border-border"
-											></textarea>
+										<div class="space-y-1">
+											<p class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "Properties") }</p>
+											<p class="text-[10px] text-muted-foreground leading-relaxed">{ i18n.T(ctx, "Select a node in the canvas to view and edit its settings.") }</p>
 										</div>
 									</div>
 								</template>
@@ -1161,7 +1160,17 @@ templ AgentDesignerDialog() {
 											<div class="flex items-center gap-0.5 shrink-0">
 												<button @click="moveUp()" :disabled="!canMoveUp" title="Move up" class="w-6 h-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors">↑</button>
 												<button @click="moveDown()" :disabled="!canMoveDown" title="Move down" class="w-6 h-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors">↓</button>
-												<button x-show="!isRoot" @click="deleteNode()" title="Delete node" class="w-6 h-6 flex items-center justify-center rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors">✕</button>
+												<!-- Delete node. Trash icon + confirm() because the earlier '✕'
+												     glyph was easy to mistake for a close-panel control and
+												     fired deleteNode() on a single click. -->
+												<button
+													x-show="!isRoot"
+													@click="confirm('Delete this node from the workflow? This cannot be undone.') && deleteNode()"
+													title="Delete node"
+													class="w-6 h-6 flex items-center justify-center rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors"
+												>
+													@icon.Trash2(icon.Props{Class: "size-3.5"})
+												</button>
 											</div>
 										</div>
 										<!-- Scrollable Content -->
@@ -1820,6 +1829,57 @@ templ agentNodeForm() {
 						</div>
 					</div>
 				</div>
+			</div>
+		</div>
+	</div>
+	<!-- Global Instruction Section.
+	     Root-only — only the root agent's GlobalInstruction takes effect at
+	     runtime. Hidden when editing a sub-agent (parentId non-empty) so
+	     users don't waste time on a value that would be silently ignored.
+	     Reference: .READ/adk-go/agent/llmagent/llmagent.go:232 and
+	     .READ/adk-go/internal/llminternal/instruction_processor.go (the
+	     processor walks to the root via parents.RootAgent and uses its
+	     value, not the current agent's). -->
+	<div x-show="isRootNode()" x-cloak class="rounded-xl border border-border bg-card overflow-hidden">
+		<button
+			type="button"
+			@click="showGlobalInstruction = !showGlobalInstruction"
+			class="flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent/30 transition-colors"
+			:class="showGlobalInstruction ? 'bg-gradient-to-r from-emerald-500/5 to-transparent border-b border-border/50' : ''"
+		>
+			<span class="flex items-center gap-2">
+				<div class="size-6 rounded-md bg-emerald-500/10 flex items-center justify-center">
+					@icon.Globe(icon.Props{Class: "size-3.5 text-emerald-600 dark:text-emerald-400"})
+				</div>
+				{ i18n.T(ctx, "Global Instruction") }
+				<span class="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
+					{ i18n.T(ctx, "Root only") }
+				</span>
+				<span x-show="form.globalInstruction && form.globalInstruction.trim().length > 0" class="text-[10px] text-muted-foreground">
+					{ i18n.T(ctx, "set") }
+				</span>
+			</span>
+			<span class="transition-transform duration-200" :class="showGlobalInstruction ? 'rotate-180' : ''">
+				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+			</span>
+		</button>
+		<div x-show="showGlobalInstruction" x-collapse>
+			<div class="p-4 space-y-3 border-t border-border/50">
+				<p class="text-xs text-muted-foreground leading-relaxed">
+					@icon.Info(icon.Props{Class: "size-3.5 inline me-1 text-emerald-500"})
+					{ i18n.T(ctx, "A shared directive applied to every agent in this workflow — coordinator and sub-agents alike. Use it for cross-cutting rules like tone, compliance, or output format that should hold no matter which agent is talking.") }
+				</p>
+				@textarea.Textarea(textarea.Props{
+					Placeholder: i18n.T(ctx, "e.g. Always respond in British English. Never cite sources you cannot link. Decline requests outside the customer's enrolled products."),
+					Class:       "min-h-[100px] resize-y text-sm leading-relaxed",
+					Rows:        4,
+					Attributes: templ.Attributes{
+						"x-model": "form.globalInstruction",
+					},
+				})
+				<p class="text-[10px] text-muted-foreground leading-relaxed">
+					{ i18n.T(ctx, "Only the root agent's global instruction takes effect — that's the agent you're editing when this section is visible. Leave empty if you don't need a workflow-wide rule.") }
+				</p>
 			</div>
 		</div>
 	</div>

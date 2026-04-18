@@ -430,14 +430,20 @@ templ AgentsDialog() {
 											{ i18n.T(ctx, "Controls whether conversation history is forwarded when this agent runs as a sub-agent. 'Fresh Context' starts with a clean slate.") }
 										</p>
 									</div>
-									<!-- Global Instruction -->
-									<div class="space-y-2">
+									<!-- Global Instruction — root-only. Only the root agent's
+									     GlobalInstruction takes effect at runtime (see
+									     .READ/adk-go/agent/llmagent/llmagent.go:232), so hide
+									     the editor entirely when editing a sub-agent. -->
+									<div x-show="isRootNode()" x-cloak class="space-y-2">
 										<span class="text-xs font-medium text-foreground flex items-center gap-1.5">
 											@icon.Globe(icon.Props{Class: "size-3.5 text-muted-foreground"})
 											{ i18n.T(ctx, "Global Instruction") }
+											<span class="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
+												{ i18n.T(ctx, "Root only") }
+											</span>
 										</span>
 										@textarea.Textarea(textarea.Props{
-											Placeholder: i18n.T(ctx, "Shared instruction applied to all agents in the workflow tree..."),
+											Placeholder: i18n.T(ctx, "Shared instruction applied to every agent in this workflow..."),
 											Class:       "min-h-[60px] resize-y text-xs",
 											Rows:        2,
 											Attributes: templ.Attributes{
@@ -445,7 +451,7 @@ templ AgentsDialog() {
 											},
 										})
 										<p class="text-[10px] text-muted-foreground">
-											{ i18n.T(ctx, "Only effective when this agent is the root of a workflow. Applies to all agents in the tree (e.g., organization policies, safety rules).") }
+											{ i18n.T(ctx, "Applies to the root agent and every sub-agent it delegates to. Use for cross-cutting rules like tone, compliance, or output format.") }
 										</p>
 									</div>
 									<!-- Output Schema -->

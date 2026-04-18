@@ -84,6 +84,14 @@ type agentResponse struct {
 	SystemPrompt             string                   `json:"systemPrompt"`
 	Icon                     string                   `json:"icon"`
 	SourceCatalogID          string                   `json:"sourceCatalogId,omitempty"`
+	// ParentID is the workflow that owns this agent. Empty for top-level
+	// agents. The designer UI uses this to gate root-only controls — the
+	// Global Instruction editor in particular. ADK enforces the same rule
+	// at runtime: only the root agent's GlobalInstruction takes effect
+	// (see `.READ/adk-go/agent/llmagent/llmagent.go:232` — "ONLY the
+	// GlobalInstruction in the root agent will take effect"). Exposing
+	// it on children would silently do nothing, so we hide it there.
+	ParentID                 string                   `json:"parentId,omitempty"`
 	Graph                    *CompositionNode         `json:"graph,omitempty"`
 	IsComposed               bool                     `json:"isComposed"`
 	IsCoordinator            bool                     `json:"isCoordinator"`
@@ -153,6 +161,7 @@ func toAgentResponse(a *AgentDefinition) agentResponse {
 		SystemPrompt:             a.SystemPrompt,
 		Icon:                     agentIconOrDefault(a.Icon),
 		SourceCatalogID:          a.SourceCatalogID,
+		ParentID:                 a.ParentID,
 		Graph:                    a.Graph,
 		IsComposed:               a.IsComposed(),
 		IsCoordinator:            a.IsCoordinator(),

@@ -17,6 +17,20 @@ export const agentsManager = () => ({
     // Currently active agent (synced from localStorage / chat component)
     selectedAgent: localStorage.getItem('selectedAgent') || '',
 
+    /**
+     * Whether the currently edited agent is a root (no parent workflow).
+     * Gates the Global Instruction editor — ADK only honours the root's
+     * GlobalInstruction at runtime (see .READ/adk-go/agent/llmagent/
+     * llmagent.go — "ONLY the GlobalInstruction in the root agent will
+     * take effect"), so we hide it on sub-agents to avoid ignored input.
+     * New agents (no editingAgent) are treated as root — they start as
+     * top-level entries in the user's library.
+     */
+    isRootNode() {
+        if (!this.editingAgent) return true;
+        return !this.editingAgent.parentId;
+    },
+
     // Unified form state — a single form for both simple and composed agents
     editingAgent: null, // null = create mode, object = edit mode
     form: {

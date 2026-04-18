@@ -74,14 +74,17 @@ func parseYAMLAgent(data []byte) (string, []*agentdefinition.AgentDefinition, er
 		idMap := make(map[string]string)
 		var defs []*agentdefinition.AgentDefinition
 
-		// Create first entry as root
+		// Create first entry as root. GlobalInstruction only takes effect on
+		// the root (see .READ/adk-go/agent/llmagent/llmagent.go:232), so it
+		// lives here regardless of whether the entry declares sub-agents.
 		rootID := fagent.GenerateID()
 		root := &agentdefinition.AgentDefinition{
-			ID:           rootID,
-			Name:         entry.Name,
-			Description:  entry.Description,
-			SystemPrompt: entry.SystemPrompt,
-			Icon:         entry.Icon,
+			ID:                rootID,
+			Name:              entry.Name,
+			Description:       entry.Description,
+			SystemPrompt:      entry.SystemPrompt,
+			GlobalInstruction: entry.GlobalInstruction,
+			Icon:              entry.Icon,
 		}
 
 		// If there are sub-agents in llm_agents, create them
@@ -176,14 +179,19 @@ func parseYAMLAgent(data []byte) (string, []*agentdefinition.AgentDefinition, er
 		tools[i] = &agentToolRefs[i]
 	}
 
+	// Workflow root. GlobalInstruction propagates from every agent's LLM call
+	// via the orchestration engine's instruction processor, which walks to the
+	// root before appending its global instruction to each request (see
+	// .READ/adk-go/internal/llminternal/instruction_processor.go:48-56).
 	root := &agentdefinition.AgentDefinition{
-		ID:           fagent.GenerateID(),
-		Name:         entry.Name,
-		Description:  entry.Description,
-		SystemPrompt: entry.SystemPrompt,
-		Icon:         entry.Icon,
-		Graph:        &graph,
-		AgentTools:   tools,
+		ID:                fagent.GenerateID(),
+		Name:              entry.Name,
+		Description:       entry.Description,
+		SystemPrompt:      entry.SystemPrompt,
+		GlobalInstruction: entry.GlobalInstruction,
+		Icon:              entry.Icon,
+		Graph:             &graph,
+		AgentTools:        tools,
 	}
 	defs = append([]*agentdefinition.AgentDefinition{root}, defs...)
 	return root.ID, defs, nil

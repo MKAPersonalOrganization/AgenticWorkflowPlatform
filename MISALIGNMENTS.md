@@ -17,7 +17,7 @@
    - [M4. Input-schema visual builder (remove dead code or ship it)](#m4-input-schema-visual-builder) ✅ **done**
    - [M5. Output-schema visual builder (replace raw JSON textarea)](#m5-output-schema-visual-builder) ✅ **done**
    - [M6. Instruction template variable picker](#m6-instruction-template-variable-picker) ✅ **done**
-   - [M7. Global-instruction UX (root-only surfacing)](#m7-global-instruction-ux)
+   - [M7. Global-instruction UX (root-only surfacing)](#m7-global-instruction-ux) ✅ **done**
    - [M8. Memory service toggle + backend selector](#m8-memory-service-toggle)
    - [M9. Artifact service — surface the `SaveInputBlobsAsArtifacts` toggle](#m9-artifact-service)
    - [M10. Built-in code-execution toggle](#m10-code-execution-toggle)
@@ -338,6 +338,8 @@ Designer types "{" → autocomplete dropdown appears:
 ---
 
 ### M7. Global-instruction UX
+
+> **Status: ✅ Done.** Global Instruction editor is now root-only in both dialogs: `frontend/ui/agenteditor/agenteditor.templ` (new designer — section didn't exist before, added as a collapsible emerald card with a "Root only" pill) and `frontend/ui/agents/agents.templ` (legacy AgentsDialog — existing block wrapped in `x-show="isRootNode()"`). Both stores expose an `isRootNode()` helper that returns `true` when the currently edited agent has no `parentId`, matching ADK's runtime rule verified at `.READ/adk-go/agent/llmagent/llmagent.go:232` and `.READ/adk-go/internal/llminternal/instruction_processor.go:48-56` (the processor walks `parents.RootAgent()` and uses that agent's value). Backend exposes `parentId` on `agentResponse` (`modules/agentdefinition/handler.go`). No adapter change — ADK already ignores non-root values at runtime, so explicit zeroing would be cosmetic. Docs updated in `frontend/ui/docs/agents.templ` with a "Root only" tag on the Global Instructions heading + an info box explaining which agent counts as root.
 
 **ADK.** `GlobalInstruction` only takes effect on the **root** agent (see `llmagent` doc). Child agents' values are silently ignored.
 
