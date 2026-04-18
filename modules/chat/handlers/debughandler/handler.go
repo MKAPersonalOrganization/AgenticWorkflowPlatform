@@ -34,12 +34,25 @@ type Handler struct {
 	log       *logger.Logger
 	threadMgr *threadmgmt.Manager
 	store     es.EventStore
+
+	// memoryService is held once per Handler (process lifetime), not per
+	// request, so sessions added after one /debug/agent:run can be recalled
+	// from a later /debug/agent:run with the same UserID. Without this,
+	// every debug run would get a fresh InMemoryService and cross-session
+	// recall would be impossible to test end-to-end. Matches how production
+	// wires a single memory.Service for the whole process.
+	memoryService memory.Service
 }
 
 // New constructs a debug handler. The caller is expected to mount the returned
 // handler on the debug mux, not the public app router.
 func New(log *logger.Logger, threadMgr *threadmgmt.Manager, store es.EventStore) *Handler {
-	return &Handler{log: log, threadMgr: threadMgr, store: store}
+	return &Handler{
+		log:           log,
+		threadMgr:     threadMgr,
+		store:         store,
+		memoryService: memory.InMemoryService(),
+	}
 }
 
 // DebugRequest is the JSON body accepted by POST /debug/agent:run.
@@ -166,7 +179,7 @@ func (h *Handler) HandleRun(w http.ResponseWriter, r *http.Request) {
 		AgentProvider:  provider,
 		ConfigResolver: staticModelConfigResolver{cfg: modelCfg},
 		APIKeyResolver: staticAPIKeyResolver{apiKey: req.APIKey},
-		MemoryService:  memory.InMemoryService(),
+		MemoryService:  h.memoryService,
 		// All remaining ports (ToolReqs, MCPResolver, A2AResolver,
 		// A2ASubAgentProvider, NewToolSetFactory, BlockEnforcer,
 		// ConfirmChecker, PluginSettingsResolver, ProfileProvider,

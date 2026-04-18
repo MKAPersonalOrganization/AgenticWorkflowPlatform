@@ -115,8 +115,8 @@ graph TB
             GeminiAdapter["<b>Gemini Adapter</b><br/>Grounded search client"]
         end
 
-        subgraph Plugins["Plugin Layer (15 plugins)"]
-            PluginList["<b>agentmemory</b> · <b>artifacts</b> · <b>calculator</b><br/><b>codebase</b> · <b>cognitive</b> · <b>demoinput</b><br/><b>document</b> · <b>fsplugin</b> · <b>knowledgebase</b><br/><b>library</b> · <b>planmode</b> · <b>todos</b><br/><b>tracker</b> · <b>tts</b> · <b>websearch</b>"]
+        subgraph Plugins["Plugin Layer (14 plugins)"]
+            PluginList["<b>artifacts</b> · <b>calculator</b> · <b>codebase</b><br/><b>cognitive</b> · <b>demoinput</b> · <b>document</b><br/><b>fsplugin</b> · <b>knowledgebase</b> · <b>library</b><br/><b>planmode</b> · <b>todos</b> · <b>tracker</b><br/><b>tts</b> · <b>websearch</b>"]
         end
 
         subgraph Foundation["Foundation Layer (15 packages)"]

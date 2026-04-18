@@ -34,6 +34,21 @@ type AgentModelConfig struct {
 	StopSequences []string `json:"stopSequences,omitempty"`
 }
 
+// AgentMemoryPolicy mirrors foundation/agent.AgentMemoryPolicy and is the
+// shape persisted on an AgentDefinition. The JSON tags use camelCase to
+// match the frontend payload.
+type AgentMemoryPolicy struct {
+	// Enabled turns on cross-session memory for this agent. When true,
+	// the orchestration engine's `load_memory` tool is injected so the
+	// model can search past sessions on demand.
+	Enabled bool `json:"enabled"`
+
+	// Preload, when true, also injects `preload_memory` so relevant
+	// memories are searched and added to the system instruction at the
+	// start of every turn. Requires Enabled=true; ignored otherwise.
+	Preload bool `json:"preload"`
+}
+
 // Validate checks that all non-nil fields are within acceptable ranges.
 func (c *AgentModelConfig) Validate() error {
 	if c == nil {
@@ -135,6 +150,15 @@ type AgentDefinition struct {
 	ModelOverride     *AgentModelOverride `json:"model_override,omitempty" db:"-"`
 	ModelOverrideJSON string              `json:"-" db:"model_override"`
 
+	// ── Memory ──
+	// MemoryPolicy controls cross-session memory for this agent. nil means
+	// "fall back to the legacy memory-set toolset permission" for agents
+	// that were configured before M8 shipped (the adapter's interim gate).
+	// Non-nil means the user has explicitly configured memory on/off and
+	// the adapter uses this value verbatim.
+	MemoryPolicy     *AgentMemoryPolicy `json:"memory_policy,omitempty" db:"-"`
+	MemoryPolicyJSON string             `json:"-" db:"memory_policy"`
+
 	// ── Sharing ──
 	// ShareToken is a unique token that enables sharing this agent with other users.
 	// Empty means the agent is private. Generate via the share endpoint.
@@ -205,6 +229,35 @@ func (a *AgentDefinition) UnmarshalModelConfig() error {
 		return fmt.Errorf("unmarshalling model config: %w", err)
 	}
 	a.ModelConfig = &mc
+	return nil
+}
+
+// MarshalMemoryPolicy serializes MemoryPolicy to MemoryPolicyJSON for storage.
+func (a *AgentDefinition) MarshalMemoryPolicy() error {
+	if a.MemoryPolicy == nil {
+		a.MemoryPolicyJSON = ""
+		return nil
+	}
+	b, err := json.Marshal(a.MemoryPolicy)
+	if err != nil {
+		return fmt.Errorf("marshalling memory policy: %w", err)
+	}
+	a.MemoryPolicyJSON = string(b)
+	return nil
+}
+
+// UnmarshalMemoryPolicy deserializes MemoryPolicyJSON into MemoryPolicy.
+// Empty JSON means nil — "fall back to legacy toolset-permission gate".
+func (a *AgentDefinition) UnmarshalMemoryPolicy() error {
+	if a.MemoryPolicyJSON == "" || a.MemoryPolicyJSON == "null" {
+		a.MemoryPolicy = nil
+		return nil
+	}
+	var mp AgentMemoryPolicy
+	if err := json.Unmarshal([]byte(a.MemoryPolicyJSON), &mp); err != nil {
+		return fmt.Errorf("unmarshalling memory policy: %w", err)
+	}
+	a.MemoryPolicy = &mp
 	return nil
 }
 

@@ -77,6 +77,8 @@ func parseYAMLAgent(data []byte) (string, []*agentdefinition.AgentDefinition, er
 		// Create first entry as root. GlobalInstruction only takes effect on
 		// the root (see .READ/adk-go/agent/llmagent/llmagent.go:232), so it
 		// lives here regardless of whether the entry declares sub-agents.
+		// MemoryPolicy likewise is a root-level configuration — the adapter
+		// reads it per-agent when building the ADK tool list.
 		rootID := fagent.GenerateID()
 		root := &agentdefinition.AgentDefinition{
 			ID:                rootID,
@@ -84,6 +86,7 @@ func parseYAMLAgent(data []byte) (string, []*agentdefinition.AgentDefinition, er
 			Description:       entry.Description,
 			SystemPrompt:      entry.SystemPrompt,
 			GlobalInstruction: entry.GlobalInstruction,
+			MemoryPolicy:      entry.MemoryPolicy,
 			Icon:              entry.Icon,
 		}
 
@@ -183,12 +186,17 @@ func parseYAMLAgent(data []byte) (string, []*agentdefinition.AgentDefinition, er
 	// via the orchestration engine's instruction processor, which walks to the
 	// root before appending its global instruction to each request (see
 	// .READ/adk-go/internal/llminternal/instruction_processor.go:48-56).
+	// MemoryPolicy lives on the workflow root too, but note that workflow
+	// LEAVES each have their own policy at runtime — the adapter reads
+	// agentCfg.MemoryPolicy per leaf. For a catalog-level policy we set it
+	// on the root here; leaves declared in llm_agents don't carry one.
 	root := &agentdefinition.AgentDefinition{
 		ID:                fagent.GenerateID(),
 		Name:              entry.Name,
 		Description:       entry.Description,
 		SystemPrompt:      entry.SystemPrompt,
 		GlobalInstruction: entry.GlobalInstruction,
+		MemoryPolicy:      entry.MemoryPolicy,
 		Icon:              entry.Icon,
 		Graph:             &graph,
 		AgentTools:        tools,

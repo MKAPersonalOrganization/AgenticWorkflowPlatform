@@ -28,7 +28,6 @@ import (
 	"aicompass/modules/knowledge/edgequake"
 	"aicompass/modules/knowledge/rag/users"
 	"aicompass/modules/toolreqs"
-	"aicompass/plugins/agentmemory"
 	"aicompass/plugins/artifacts"
 	"aicompass/plugins/calculator"
 	"aicompass/plugins/codebase"
@@ -410,9 +409,18 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}
 	log.Info(ctx, "startup", "status", "filesystem module initialized")
 
-	// Create and initialize tool registry
+	// Create and initialize tool registry.
+	//
+	// Memory is intentionally NOT registered as a plugin — it's an ADK
+	// runner-level service (`memory.Service`) with two in-tree tools
+	// (`preload_memory`, `load_memory`). The previous `plugins/agentmemory`
+	// PluginProvider was a registry stub whose CreateExecutable returned
+	// nil; it made memory look like a tool in the designer picker, which
+	// misled users. The adapter still injects the tools when the legacy
+	// `memory-set` toolset permission is granted on an agent (see
+	// adapters/adkgo/runner.go:memoryToolSetID), until `Config.MemoryPolicy`
+	// lands and replaces that gate with a proper per-agent feature flag.
 	toolRegistry := toolregistry.NewRegistry(log, toolregistry.NewPostgresToolRegistryRepository(db))
-	toolregistry.RegisterPlugin(&agentmemory.Provider{})
 	toolregistry.RegisterPlugin(&artifacts.Provider{})
 	toolregistry.RegisterPlugin(&calculator.Provider{})
 	toolregistry.RegisterPlugin(&demoinput.Provider{})

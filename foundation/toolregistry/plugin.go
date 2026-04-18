@@ -47,7 +47,7 @@ type SettingsField struct {
 // Plugins call only the getters they need, making dependencies explicit and
 // avoiding unnecessary allocations for services the requesting plugin doesn't use.
 //
-// # Plugin usage matrix (15 plugins, 2025-07)
+// # Plugin usage matrix (14 plugins, 2025-07)
 //
 // Only 7 plugins actively consume FactoryDeps; the other 8 ignore it entirely.
 //
@@ -56,10 +56,10 @@ type SettingsField struct {
 //	document      → ArtifactStore
 //	websearch     → PluginSettings, GroundedSearchClientFactory
 //	fsplugin      → AgentFilesystem
-//	agentmemory, artifacts, calculator, codebase, cognitive, demoinput, library, planmode, todos, tracker → (none)
+//	artifacts, calculator, codebase, cognitive, demoinput, library, planmode, todos, tracker → (none)
 //
 // The interface is intentionally kept as a single composite rather than split
-// into narrow per-concern interfaces. With only 10 methods and 15 plugins, the
+// into narrow per-concern interfaces. With only 10 methods and 14 plugins, the
 // ISP trade-off favours simplicity. If many more plugins are added, consider
 // splitting into ArtifactProvider, KBConfigProvider, etc.
 type FactoryDeps interface {

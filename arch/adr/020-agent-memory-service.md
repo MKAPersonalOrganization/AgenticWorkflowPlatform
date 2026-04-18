@@ -1,6 +1,14 @@
 # ADR 020: Agent Memory Service
 
-**Status:** Accepted
+**Status:** Partially superseded. The "Per-Agent Toggle via Plugin System"
+section below described the original design where memory was exposed through
+a `plugins/agentmemory` PluginProvider stub in the tools picker. That package
+has been removed — memory is an orchestration-engine service, not a plugin,
+and surfacing it as a tool misled non-programmers. The toolset-permission
+gate (`memory-set`) is kept as an interim so already-configured agents keep
+working; a per-agent `Config.MemoryPolicy { Enabled; Preload }` will replace
+it in a follow-up (MISALIGNMENTS §M8). Everything else in this ADR — the
+service interface, the tools, the runner wiring — still stands.
 
 ## Context
 

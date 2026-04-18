@@ -51,6 +51,38 @@ type AgentModelConfig struct {
 	StopSequences []string
 }
 
+// AgentMemoryPolicy controls whether an agent has access to the orchestration
+// engine's cross-session memory, and how it uses it.
+//
+// Shape matches the two tools ADK ships for memory
+// (.READ/adk-go/tool/preloadmemorytool, .READ/adk-go/tool/loadmemorytool):
+//
+//   - Enabled=false              → neither tool is injected; the agent has
+//     no memory capability.
+//   - Enabled=true, Preload=false → load_memory is injected. The model may
+//     call it on demand with a custom query.
+//   - Enabled=true, Preload=true  → both load_memory and preload_memory are
+//     injected. preload_memory runs before every
+//     turn and injects relevant memories into the
+//     system instruction without the model doing
+//     anything; load_memory stays available for
+//     explicit lookups.
+//
+// The memory Service itself is wired once at the runner (a deployment
+// concern); this policy is a per-agent choice about which tools appear on
+// the agent. Nil means "use the legacy toolset-permission gate" so existing
+// agents configured through the old plugin-style toggle keep working.
+type AgentMemoryPolicy struct {
+	// Enabled turns on cross-session memory for this agent. When true,
+	// load_memory is injected.
+	Enabled bool `json:"enabled"`
+
+	// Preload, when true, also injects preload_memory so relevant memories
+	// are searched and added to the system instruction at the start of
+	// every turn. Requires Enabled=true; ignored otherwise.
+	Preload bool `json:"preload"`
+}
+
 // Config defines the configuration for an agent.
 //
 // Config is the central description of an agent's identity, behaviour, and
@@ -162,6 +194,12 @@ type Config struct {
 	// ModelOverride selects a specific provider and model for this agent,
 	// replacing the user's global default. nil means use the global default.
 	ModelOverride *AgentModelOverride
+
+	// MemoryPolicy controls whether this agent can recall past sessions and
+	// whether recall runs automatically. nil means "fall back to legacy
+	// toolset-permission gate" (the pre-M8 behaviour). The adapter honours
+	// this policy when non-nil.
+	MemoryPolicy *AgentMemoryPolicy
 
 	// AgentTools exposes other user-owned agents as callable tools on this
 	// agent. Each ref is resolved at runtime and wrapped via ADK-Go's

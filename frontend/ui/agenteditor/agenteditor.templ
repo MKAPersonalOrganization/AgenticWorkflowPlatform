@@ -1883,6 +1883,52 @@ templ agentNodeForm() {
 			</div>
 		</div>
 	</div>
+	<!-- Memory Section.
+	     Controls the per-agent memory policy. The orchestration engine
+	     exposes memory as a runner-level service plus two in-tree tools
+	     (load_memory + preload_memory). This card is the user-facing
+	     toggle for those tools — replaces the old "Agent Memory" plugin
+	     entry that used to live in the Tools picker. The adapter reads
+	     Config.MemoryPolicy when non-null; pre-M8 agents that still have
+	     the legacy memory-set toolset permission keep working. -->
+	<div class="rounded-xl border border-border bg-card overflow-hidden">
+		<button
+			type="button"
+			@click="showMemory = !showMemory"
+			class="flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent/30 transition-colors"
+			:class="showMemory ? 'bg-gradient-to-r from-cyan-500/5 to-transparent border-b border-border/50' : ''"
+		>
+			<span class="flex items-center gap-2">
+				<div class="size-6 rounded-md bg-cyan-500/10 flex items-center justify-center">
+					@icon.Brain(icon.Props{Class: "size-3.5 text-cyan-600 dark:text-cyan-400"})
+				</div>
+				{ i18n.T(ctx, "Memory") }
+				<span x-show="memoryEnabled" class="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-700 dark:text-cyan-400">
+					{ i18n.T(ctx, "on") }
+				</span>
+				<span x-show="memoryEnabled && memoryPreload" class="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-700 dark:text-cyan-400">
+					{ i18n.T(ctx, "auto-preload") }
+				</span>
+			</span>
+			<span class="transition-transform duration-200" :class="showMemory ? 'rotate-180' : ''">
+				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+			</span>
+		</button>
+		<div x-show="showMemory" x-collapse>
+			<div class="p-4 space-y-4 border-t border-border/50">
+				<p class="text-xs text-muted-foreground leading-relaxed">
+					@icon.Info(icon.Props{Class: "size-3.5 inline me-1 text-cyan-500"})
+					{ i18n.T(ctx, "When on, past conversations with this user are indexed and the agent can search them. Leave off for one-shot agents that don't need to remember anything between runs.") }
+				</p>
+				<div class="space-y-1.5">
+					@toggleSwitch("memoryEnabled", i18n.T(ctx, "Remember past conversations"), i18n.T(ctx, "Gives the agent a tool to search earlier sessions on demand."))
+					<div x-show="memoryEnabled" x-collapse>
+						@toggleSwitch("memoryPreload", i18n.T(ctx, "Auto-recall every turn"), i18n.T(ctx, "Searches memory before each reply and injects relevant context automatically. Costs an extra search per turn."))
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
 	<!-- Sub-Agents (Coordinator) Section -->
 	<div class="rounded-xl border border-border bg-card overflow-hidden">
 		<button

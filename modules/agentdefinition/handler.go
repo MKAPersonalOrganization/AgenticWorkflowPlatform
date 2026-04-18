@@ -56,6 +56,7 @@ type createRequest struct {
 	OutputSchema             string                     `json:"outputSchema"`
 	ModelConfig              *agentModelConfigRequest   `json:"modelConfig,omitempty"`
 	ModelOverride            *agentModelOverrideRequest `json:"modelOverride,omitempty"`
+	MemoryPolicy             *AgentMemoryPolicy         `json:"memoryPolicy,omitempty"`
 }
 
 type updateRequest struct {
@@ -75,6 +76,7 @@ type updateRequest struct {
 	OutputSchema             string                     `json:"outputSchema"`
 	ModelConfig              *agentModelConfigRequest   `json:"modelConfig,omitempty"`
 	ModelOverride            *agentModelOverrideRequest `json:"modelOverride,omitempty"`
+	MemoryPolicy             *AgentMemoryPolicy         `json:"memoryPolicy,omitempty"`
 }
 
 type agentResponse struct {
@@ -106,6 +108,7 @@ type agentResponse struct {
 	OutputSchema             string                   `json:"outputSchema,omitempty"`
 	ModelConfig              *AgentModelConfig        `json:"modelConfig,omitempty"`
 	ModelOverride            *AgentModelOverride      `json:"modelOverride,omitempty"`
+	MemoryPolicy             *AgentMemoryPolicy       `json:"memoryPolicy,omitempty"`
 	ShareToken               string                   `json:"shareToken,omitempty"`
 	Visibility               string                   `json:"visibility,omitempty"`
 	CreatedAt                string                   `json:"createdAt"`
@@ -176,6 +179,7 @@ func toAgentResponse(a *AgentDefinition) agentResponse {
 		OutputSchema:             a.OutputSchemaJSON,
 		ModelConfig:              a.ModelConfig,
 		ModelOverride:            a.ModelOverride,
+		MemoryPolicy:             a.MemoryPolicy,
 		ShareToken:               a.ShareToken,
 		Visibility:               a.Visibility,
 		CreatedAt:                a.CreatedAt.Format("2006-01-02T15:04:05Z"),
@@ -222,6 +226,7 @@ func (h *storeHandler) create(w http.ResponseWriter, r *http.Request) {
 		OutputSchemaJSON:         req.OutputSchema,
 		ModelConfig:              toModelConfig(req.ModelConfig),
 		ModelOverride:            toModelOverride(req.ModelOverride),
+		MemoryPolicy:             req.MemoryPolicy,
 	}
 
 	if err := h.svc.create(r.Context(), agent); err != nil {
@@ -348,6 +353,7 @@ func (h *storeHandler) update(w http.ResponseWriter, r *http.Request) {
 		OutputSchemaJSON:         req.OutputSchema,
 		ModelConfig:              toModelConfig(req.ModelConfig),
 		ModelOverride:            toModelOverride(req.ModelOverride),
+		MemoryPolicy:             req.MemoryPolicy,
 	}
 
 	if err := h.svc.update(r.Context(), agent); err != nil {

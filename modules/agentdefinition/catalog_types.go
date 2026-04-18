@@ -29,6 +29,12 @@ type AgentCatalogEntry struct {
 	// state before the LLM is called.
 	GlobalInstruction string `json:"global_instruction,omitempty" db:"-"`
 
+	// MemoryPolicy controls cross-session memory for the catalog entry's
+	// root agent. Nil means "not configured" — the runner falls back to
+	// the legacy memory-set toolset permission for backwards
+	// compatibility. Mirrors AgentDefinition.MemoryPolicy.
+	MemoryPolicy *AgentMemoryPolicy `json:"memory_policy,omitempty" db:"-"`
+
 	// ── Workflow Template (optional) ──
 
 	// WorkflowGraphJSON is a JSON-encoded WorkflowNode tree template.

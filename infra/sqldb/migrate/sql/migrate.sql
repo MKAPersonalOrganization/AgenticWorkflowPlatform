@@ -1190,3 +1190,11 @@ CREATE INDEX IF NOT EXISTS idx_rubrics_user_id ON rubrics(user_id);
 -- Description: Add agent_tools JSONB column for the agent-as-tool pattern
 -- (wrap another agent via ADK-Go's tool/agenttool so the parent can call it).
 ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS agent_tools JSONB;
+
+-- Version: 1.81
+-- Description: Add memory_policy JSONB column to user_agents. Replaces the
+-- legacy memory-set toolset-permission gate with a proper per-agent feature
+-- flag. Nullable; when null the runner adapter falls back to the legacy
+-- permission check so existing agents keep working during the migration
+-- window.
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS memory_policy JSONB;

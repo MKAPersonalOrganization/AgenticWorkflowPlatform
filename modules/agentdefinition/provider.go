@@ -76,6 +76,7 @@ func (p *UserAwareProvider) agentFromDefinition(def *AgentDefinition) agent.Agen
 		OutputSchema:      parseAgentSchema(def.OutputSchemaJSON),
 		ModelConfig:       toAgentModelConfig(def.ModelConfig),
 		ModelOverride:     toAgentModelOverride(def.ModelOverride),
+		MemoryPolicy:      toFoundationMemoryPolicy(def.MemoryPolicy),
 		AgentTools:        toFoundationAgentToolRefs(def.AgentTools),
 	}
 
@@ -169,6 +170,19 @@ func toAgentModelOverride(src *AgentModelOverride) *agent.AgentModelOverride {
 	return &agent.AgentModelOverride{
 		Provider:  src.Provider,
 		ModelName: src.ModelName,
+	}
+}
+
+// toFoundationMemoryPolicy converts the persisted memory policy to the
+// foundation type consumed by the adapter. Nil signals "fall back to the
+// legacy memory-set permission gate" for pre-M8 agents.
+func toFoundationMemoryPolicy(src *AgentMemoryPolicy) *agent.AgentMemoryPolicy {
+	if src == nil {
+		return nil
+	}
+	return &agent.AgentMemoryPolicy{
+		Enabled: src.Enabled,
+		Preload: src.Preload,
 	}
 }
 

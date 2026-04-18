@@ -4,7 +4,6 @@ import (
 	agentio "aicompass/foundation/agent/io"
 	"aicompass/foundation/logger"
 	"aicompass/modules/chat/thread"
-	"aicompass/plugins/agentmemory"
 	"aicompass/plugins/artifacts"
 	"aicompass/foundation/auth"
 	"context"
@@ -277,7 +276,8 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 		// 9. Build the ADK-Go agent — either a workflow agent or a regular LLM agent.
 		var adkAgent agent.Agent
 		var agentPositions map[string]AgentPosition
-		memoryEnabled := r.memoryService != nil && r.hasMemoryEnabled(ctx, req.UserID, agentName)
+		memEnabled, memPreload := r.resolveMemoryPolicy(ctx, req.UserID, agentName, agentCfg)
+		memoryEnabled := r.memoryService != nil && memEnabled
 		artifactsEnabled := r.artifactService != nil && r.hasArtifactsEnabled(ctx, req.UserID, agentName)
 
 		if wa, isWF := isWorkflowAgent(foundAgent); isWF {
@@ -307,9 +307,16 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			// 6. Build tools from agent config + enabled tool sets + MCP.
 			adkTools := r.resolveTools(ctx, req.UserID, agentName, modelCfg, req.SessionID, agentCfg, req, precomputedRules)
 
-			// 6b. Inject ADK-native tools gated by plugin permissions.
+			// 6b. Inject ADK-native memory tools when the agent's MemoryPolicy
+			// says so (or the legacy toolset permission is set on pre-M8
+			// agents). load_memory is injected whenever memory is enabled;
+			// preload_memory is only injected when Preload is requested,
+			// matching ADK's two-tool memory model.
 			if memoryEnabled {
-				adkTools = append(adkTools, preloadmemorytool.New(), loadmemorytool.New())
+				adkTools = append(adkTools, loadmemorytool.New())
+				if memPreload {
+					adkTools = append(adkTools, preloadmemorytool.New())
+				}
 			}
 			if artifactsEnabled {
 				adkTools = append(adkTools, loadartifactstool.New())
@@ -783,13 +790,45 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 // Internal helpers
 // ──────────────────────────────────────────────────────────────────────────────
 
-// hasMemoryEnabled checks whether the agent memory plugin is enabled for the
-// given user+agent via the tool requirements permission system.
+// memoryToolSetID is the permission key this adapter checks before injecting
+// ADK-native `preload_memory` / `load_memory` tools and honouring the runner's
+// memory service for an agent. Previously exposed by the (now-removed)
+// `plugins/agentmemory` PluginProvider; kept here as a literal so existing
+// permission rows keep working until `Config.MemoryPolicy` ships and replaces
+// the toolset-permission gate with a proper per-agent feature flag.
+//
+// Memory is NOT a plugin in ADK — `.READ/adk-go/memory/service.go` defines it
+// as a runner-level service and the tools are in-tree. The old PluginProvider
+// was a registry stub whose CreateExecutable returned nil; removing it
+// restores the ADK shape.
+const memoryToolSetID = "memory-set"
+
+// hasMemoryEnabled checks whether memory is enabled for the given user+agent
+// via the legacy `memory-set` toolset permission. Used as a fallback in
+// resolveMemoryPolicy when the agent's per-agent MemoryPolicy is nil —
+// i.e. pre-M8 agents whose permission row still lives in
+// user_tool_set_permissions. New agents set Config.MemoryPolicy directly.
 func (r *RunnerAdapter) hasMemoryEnabled(ctx context.Context, userID, agentName string) bool {
 	if r.toolReqs == nil {
 		return false
 	}
-	return r.toolReqs.HasToolSetPermission(ctx, userID, agentName, agentmemory.ToolSetID)
+	return r.toolReqs.HasToolSetPermission(ctx, userID, agentName, memoryToolSetID)
+}
+
+// resolveMemoryPolicy returns (enabled, preload) for this agent. Reads the
+// per-agent `Config.MemoryPolicy` first; falls back to the legacy
+// `memory-set` toolset permission when the policy is nil so agents created
+// before M8 keep working. A granted legacy permission counts as
+// (enabled=true, preload=true) — that's the behaviour the old plugin
+// provided.
+func (r *RunnerAdapter) resolveMemoryPolicy(ctx context.Context, userID, agentName string, agentCfg *fagent.Config) (enabled bool, preload bool) {
+	if agentCfg != nil && agentCfg.MemoryPolicy != nil {
+		return agentCfg.MemoryPolicy.Enabled, agentCfg.MemoryPolicy.Preload
+	}
+	if r.hasMemoryEnabled(ctx, userID, agentName) {
+		return true, true
+	}
+	return false, false
 }
 
 // hasArtifactsEnabled checks whether the artifacts plugin is enabled for the

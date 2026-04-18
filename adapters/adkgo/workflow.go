@@ -474,9 +474,17 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 		wbc.threadID, agentCfg, wbc.req, precomputedRules,
 	)
 
-	// Inject ADK-native tools gated by plugin permissions.
-	if wbc.adapter.memoryService != nil && wbc.adapter.hasMemoryEnabled(wbc.ctx, wbc.userID, node.AgentID) {
-		adkTools = append(adkTools, preloadmemorytool.New(), loadmemorytool.New())
+	// Inject ADK-native memory tools from the leaf's MemoryPolicy (falling
+	// back to the legacy memory-set toolset permission for pre-M8 agents).
+	// Artifacts stays gated by the old toolset permission — M9's scope.
+	if wbc.adapter.memoryService != nil {
+		memEnabled, memPreload := wbc.adapter.resolveMemoryPolicy(wbc.ctx, wbc.userID, node.AgentID, agentCfg)
+		if memEnabled {
+			adkTools = append(adkTools, loadmemorytool.New())
+			if memPreload {
+				adkTools = append(adkTools, preloadmemorytool.New())
+			}
+		}
 	}
 	if wbc.adapter.artifactService != nil && wbc.adapter.hasArtifactsEnabled(wbc.ctx, wbc.userID, node.AgentID) {
 		adkTools = append(adkTools, loadartifactstool.New())

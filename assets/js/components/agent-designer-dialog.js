@@ -97,6 +97,7 @@ export const agentDesigner = () => ({
             stopSequences: [],
         },
         modelOverride: { provider: '', modelName: '' },
+        memoryPolicy: null,
     },
 
     // UI state
@@ -104,6 +105,7 @@ export const agentDesigner = () => ({
     showSubAgents: false,
     showModelConfig: false,
     showGlobalInstruction: false,
+    showMemory: false,
 
     // ── Instruction template autocomplete ─────────────────────────────
     // We expose the two ADK placeholder forms we officially support:
@@ -298,6 +300,33 @@ export const agentDesigner = () => ({
         } finally {
             this.loading = false;
         }
+    },
+
+    /**
+     * Convenience getters / setters for the Memory card. The form stores
+     * memoryPolicy as either null (adapter falls back to the legacy
+     * memory-set permission) or { enabled, preload }. Toggling "enabled"
+     * from null materialises the object; toggling it back to false keeps
+     * the object but flags both switches off so the backend sees an
+     * explicit disable rather than a "don't know".
+     */
+    get memoryEnabled() {
+        return !!(this.form.memoryPolicy && this.form.memoryPolicy.enabled);
+    },
+    set memoryEnabled(v) {
+        if (v) {
+            if (!this.form.memoryPolicy) this.form.memoryPolicy = { enabled: false, preload: false };
+            this.form.memoryPolicy.enabled = true;
+        } else {
+            this.form.memoryPolicy = { enabled: false, preload: false };
+        }
+    },
+    get memoryPreload() {
+        return !!(this.form.memoryPolicy && this.form.memoryPolicy.preload);
+    },
+    set memoryPreload(v) {
+        if (!this.form.memoryPolicy) this.form.memoryPolicy = { enabled: false, preload: false };
+        this.form.memoryPolicy.preload = !!v;
     },
 
     /**
@@ -810,6 +839,7 @@ export const agentDesigner = () => ({
                 stopSequences: [],
             },
             modelOverride: { provider: '', modelName: '' },
+            memoryPolicy: null,
         };
         this.showTools = false;
         this.showKnowledgeBases = false;
@@ -821,6 +851,7 @@ export const agentDesigner = () => ({
         this.showModelConfig = false;
         this.showRequirementsPanel = false;
         this.showGlobalInstruction = false;
+        this.showMemory = false;
         this.agentPlugins = [];
         this.agentWorkspaces = [];
         this.agentFilesystems = [];
@@ -862,6 +893,13 @@ export const agentDesigner = () => ({
                 provider: mo.provider || '',
                 modelName: mo.modelName || '',
             },
+            // Memory policy is null when the agent hasn't been reconfigured
+            // since M8 shipped — the adapter then falls back to the legacy
+            // memory-set toolset permission. Hydrating to null keeps that
+            // behaviour until the user explicitly toggles the Memory card.
+            memoryPolicy: agent.memoryPolicy
+                ? { enabled: !!agent.memoryPolicy.enabled, preload: !!agent.memoryPolicy.preload }
+                : null,
         };
         this.showTools = false;
         this.showKnowledgeBases = false;
@@ -873,6 +911,7 @@ export const agentDesigner = () => ({
         this.showModelConfig = false;
         this.showRequirementsPanel = false;
         this.showGlobalInstruction = false;
+        this.showMemory = false;
         this.providerModelOptions = [];
         this.providerModelsError = '';
         this.hydrateSchemaRows('inputSchema');
@@ -930,6 +969,16 @@ export const agentDesigner = () => ({
                 outputSchema: this.serializeSchema('outputSchema'),
                 modelConfig: Object.keys(modelConfig).length > 0 ? modelConfig : null,
                 modelOverride,
+                // Send the memory policy verbatim when the user has touched
+                // the Memory card; null leaves the backend free to fall
+                // back to the legacy memory-set permission for unmigrated
+                // agents.
+                memoryPolicy: this.form.memoryPolicy
+                    ? {
+                        enabled: !!this.form.memoryPolicy.enabled,
+                        preload: !!this.form.memoryPolicy.preload,
+                    }
+                    : null,
             };
 
             if (this.editingAgent && this.editingAgent.icon) {

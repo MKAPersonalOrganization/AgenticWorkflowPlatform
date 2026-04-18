@@ -19,9 +19,19 @@ type yamlCatalogSpec struct {
 	AuthorName        string             `yaml:"author_name"`
 	Icon              string             `yaml:"icon"` // named icon (e.g. "bot") or raw SVG
 	Featured          bool               `yaml:"featured"`
-	Workflow          *yamlWorkflowNode  `yaml:"workflow"`              // nil for single-agent entries
-	LLMAgents         []yamlSubAgent     `yaml:"llm_agents"`            // nil for single-agent entries
-	AgentTools        []yamlAgentToolRef `yaml:"agent_tools,omitempty"` // expose sub-agents as callable tools
+	MemoryPolicy      *yamlMemoryPolicy  `yaml:"memory_policy,omitempty"` // per-agent cross-session memory policy
+	Workflow          *yamlWorkflowNode  `yaml:"workflow"`                // nil for single-agent entries
+	LLMAgents         []yamlSubAgent     `yaml:"llm_agents"`              // nil for single-agent entries
+	AgentTools        []yamlAgentToolRef `yaml:"agent_tools,omitempty"`   // expose sub-agents as callable tools
+}
+
+// yamlMemoryPolicy is the YAML shape for AgentMemoryPolicy. Fields map
+// verbatim onto the persisted type. Values only matter on the ROOT agent
+// (single agent or workflow root) — children inherit from the runner's
+// memory service; there's no per-child policy.
+type yamlMemoryPolicy struct {
+	Enabled bool `yaml:"enabled"`
+	Preload bool `yaml:"preload,omitempty"`
 }
 
 type yamlWorkflowNode struct {
@@ -77,6 +87,13 @@ func (s *yamlCatalogSpec) toEntry() (AgentCatalogEntry, error) {
 		AuthorName:        s.AuthorName,
 		Icon:              s.Icon,
 		Featured:          s.Featured,
+	}
+
+	if s.MemoryPolicy != nil {
+		e.MemoryPolicy = &AgentMemoryPolicy{
+			Enabled: s.MemoryPolicy.Enabled,
+			Preload: s.MemoryPolicy.Preload,
+		}
 	}
 
 	if s.Workflow != nil {

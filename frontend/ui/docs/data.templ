@@ -61,29 +61,59 @@ templ docsMemoryArtifacts() {
 	@docsSection("memory", "Memory & Artifacts", iconBrain, "text-cyan-500") {
 		<h3>Cross-Session Memory</h3>
 		<p>
-			The <strong>Agent Memory</strong> plugin gives agents persistent recall across conversations.
-			When enabled, sessions are indexed after each run using PostgreSQL full-text search.
-			The plugin provides two complementary tools:
+			<strong>Cross-session memory</strong> is a built-in agent capability that gives
+			each agent persistent recall across conversations. When enabled, sessions are
+			indexed after each run using PostgreSQL full-text search, and the agent gets two
+			complementary recall paths:
 		</p>
 		<ul class="space-y-2 my-4">
 			<li>
-				<strong><code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">preload_memory</code></strong>
-				— Runs automatically on every LLM turn. Searches past conversations using the user's
-				current query and injects matching context into the agent's instructions. The agent
-				doesn't need to do anything — memory just works.
+				<strong>Automatic preload</strong> — before every turn, the agent searches past
+				conversations using the user's current message and injects matching context into
+				its instructions. The agent doesn't need to do anything — memory just works.
 			</li>
 			<li>
-				<strong><code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">load_memory</code></strong>
-				— An on-demand tool the agent can call explicitly with a custom query. Useful when
-				the agent needs to search for something specific that differs from the user's current
-				message (e.g. "What did we discuss about the API redesign last week?").
+				<strong>On-demand recall</strong> — the agent can also search memory explicitly
+				with a custom query, useful when it needs to look up something specific that
+				differs from the user's current message (e.g. "What did we discuss about the
+				API redesign last week?").
 			</li>
 		</ul>
 		<p>
-			Memory is managed as a standard plugin — enable or disable it per-agent in the agent designer's
-			tool configuration panel. You can also block <code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">load_memory</code>
-			individually if you only want automatic preloading.
+			Memory is an <strong>agent feature</strong>, not a tool or plugin — toggle it per
+			agent in the designer's Memory section with two switches:
 		</p>
+		<ul class="space-y-2 my-4">
+			<li>
+				<strong>Remember past conversations</strong> — turns memory on for this agent.
+				Adds an on-demand search tool so the model can look things up in prior sessions
+				when it decides it needs to.
+			</li>
+			<li>
+				<strong>Auto-recall every turn</strong> — also searches memory before each reply
+				and injects relevant context automatically. Costs an extra search per turn;
+				useful for agents that should feel like they already remember, without the model
+				having to decide to look.
+			</li>
+		</ul>
+		<h4>What to expect</h4>
+		<ul class="space-y-2 my-4">
+			<li>
+				<strong>Matches on words, not meaning.</strong>
+				"colour" and "colours" both match; "colour" and "hue" don't. Phrase things the
+				way you'd expect the agent to encounter them again.
+			</li>
+			<li>
+				<strong>Your memory is yours.</strong>
+				An agent only sees your past conversations — never another user's.
+				Everything you've said to any of your agents pools into one searchable history.
+			</li>
+			<li>
+				<strong>A conversation becomes searchable after it ends.</strong>
+				Anything said earlier in the current turn is already in view; things said in
+				prior conversations become recallable once those conversations complete.
+			</li>
+		</ul>
 		<h3>Versioned Artifacts</h3>
 		<p>
 			The <strong>Artifact Management</strong> plugin enables agents to create, version, and load

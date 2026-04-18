@@ -16,7 +16,6 @@
 ^modules/analytics/.*$ => Modules: analytics
 ^plugins/todos/.*$ => Plugins: todos
 ^plugins/artifacts/.*$ => Plugins: artifacts
-^plugins/agentmemory/.*$ => Plugins: agentmemory
 ^plugins/document/.*$ => Plugins: document
 ^plugins/planmode/.*$ => Plugins: planmode
 ^plugins/tts/.*$ => Plugins: tts
