@@ -104,6 +104,28 @@ export const agentDesigner = () => ({
     showSubAgents: false,
     showModelConfig: false,
 
+    // ── Instruction template autocomplete ─────────────────────────────
+    // We expose the two ADK placeholder forms we officially support:
+    //   {key}   — required, resolved from session state
+    //   {key?}  — optional, silent empty string when missing
+    // Scoped-prefix ({user:key}, {app:key}, {temp:key}) and artifact
+    // references ({artifact.name}) still resolve at runtime in ADK but
+    // are intentionally hidden from the picker to keep the UI
+    // approachable for non-programmers.
+    availableStateKeys: [],           // [{key, scope, source}] from backend
+    promptAutocomplete: {
+        open: false,
+        query: '',
+        triggerIndex: -1,             // index of the '{' that opened the popover
+        items: [],
+        activeIndex: 0,
+    },
+    // A single syntax hint for the optional ?-suffix variant. Users
+    // type the bare name; the hint reminds them the suffix is available.
+    promptStaticHints: [
+        { scope: 'optional', key: 'key?', detail: "Optional — silent when the key isn't in session state" },
+    ],
+
     // Sub-agent selection state
     subAgentDialogOpen: false,
 
@@ -292,6 +314,246 @@ export const agentDesigner = () => ({
             console.error('Failed to fetch agent:', err);
             return null;
         }
+    },
+
+    // ── Instruction template autocomplete ─────────────────────────────
+
+    /**
+     * Load the list of state keys that can be referenced from this
+     * agent's instruction. Backed by GET /v1/agent-definitions/{id}/
+     * available-state-keys, which aggregates OutputKey values across the
+     * user's agents. Missing-endpoint failures are non-fatal — the user
+     * can still type keys by hand.
+     */
+    async fetchAvailableStateKeys(agentId) {
+        if (!agentId) {
+            this.availableStateKeys = [];
+            return;
+        }
+        try {
+            const response = await fetch(`/v1/agent-definitions/${encodeURIComponent(agentId)}/available-state-keys`);
+            if (!response.ok) {
+                this.availableStateKeys = [];
+                return;
+            }
+            const data = await response.json();
+            this.availableStateKeys = Array.isArray(data.keys) ? data.keys : [];
+        } catch (err) {
+            console.error('Failed to fetch available state keys:', err);
+            this.availableStateKeys = [];
+        }
+    },
+
+    /**
+     * Handle keystrokes inside the system-prompt textarea. Typing '{'
+     * opens the picker; typing '}' or whitespace closes it. While open
+     * the input narrows the list by prefix. Matches ADK's lexer, which
+     * only substitutes keys matching ^[a-zA-Z_][a-zA-Z0-9_]*$ — anything
+     * else is treated as literal text.
+     */
+    handlePromptInput(event) {
+        const ta = event.target;
+        const caret = ta.selectionStart;
+        const text = ta.value;
+
+        // '{' opens the popover and anchors it at the trigger index.
+        if (event.data === '{') {
+            this.promptAutocomplete.triggerIndex = caret - 1;
+            this.promptAutocomplete.query = '';
+            this.promptAutocomplete.activeIndex = 0;
+            this.refreshPromptAutocompleteItems();
+            this.promptAutocomplete.open = true;
+            return;
+        }
+
+        if (!this.promptAutocomplete.open) return;
+
+        // '}' commits the literal typing and closes the popover.
+        if (event.data === '}') {
+            this.closePromptAutocomplete();
+            return;
+        }
+
+        const trigger = this.promptAutocomplete.triggerIndex;
+        if (trigger < 0 || caret <= trigger) {
+            this.closePromptAutocomplete();
+            return;
+        }
+        const query = text.slice(trigger + 1, caret);
+        // ADK's regex starts with [a-zA-Z_]; anything else means the
+        // user isn't writing a template key, so close.
+        if (!/^[a-zA-Z0-9_:.?]*$/.test(query)) {
+            this.closePromptAutocomplete();
+            return;
+        }
+        this.promptAutocomplete.query = query;
+        this.promptAutocomplete.activeIndex = 0;
+        this.refreshPromptAutocompleteItems();
+    },
+
+    /**
+     * Keyboard navigation inside the popover. ArrowUp/Down move the
+     * active item; Enter/Tab insert it; Escape closes without inserting.
+     */
+    handlePromptKeydown(event) {
+        if (!this.promptAutocomplete.open) return;
+        const items = this.promptAutocomplete.items;
+        if (items.length === 0) {
+            if (event.key === 'Escape') this.closePromptAutocomplete();
+            return;
+        }
+        switch (event.key) {
+            case 'ArrowDown':
+                event.preventDefault();
+                this.promptAutocomplete.activeIndex =
+                    (this.promptAutocomplete.activeIndex + 1) % items.length;
+                break;
+            case 'ArrowUp':
+                event.preventDefault();
+                this.promptAutocomplete.activeIndex =
+                    (this.promptAutocomplete.activeIndex - 1 + items.length) % items.length;
+                break;
+            case 'Enter':
+            case 'Tab': {
+                event.preventDefault();
+                const item = items[this.promptAutocomplete.activeIndex];
+                if (item) this.insertStateKey(event.target, item);
+                break;
+            }
+            case 'Escape':
+                event.preventDefault();
+                this.closePromptAutocomplete();
+                break;
+        }
+    },
+
+    /**
+     * Rebuild the filtered list combining live OutputKey suggestions
+     * (from the backend, already sorted by priority DESC) with the static
+     * ADK syntax hints. Prefix match on the query — case-insensitive —
+     * keeps the popover responsive as the user types.
+     *
+     * Priority tiers come from the backend (see
+     * modules/agentdefinition/service.go StateKeySuggestion) and mirror
+     * ADK's sample corpus — self > direct sub-agents > workflow peers
+     * > library. Static syntax hints land below the live entries as a
+     * low-priority "syntax reference" group.
+     */
+    refreshPromptAutocompleteItems() {
+        const q = (this.promptAutocomplete.query || '').toLowerCase();
+        const live = (this.availableStateKeys || []).map(k => ({
+            key: k.key,
+            scope: k.scope || 'session',
+            source: k.source || '',
+            priority: k.priority || 0,
+            kind: 'state',
+        }));
+        const statics = (this.promptStaticHints || []).map(h => ({
+            key: h.key,
+            scope: h.scope,
+            source: h.detail || '',
+            priority: -1, // below all live suggestions
+            kind: 'syntax',
+        }));
+        const all = [...live, ...statics];
+        this.promptAutocomplete.items = q
+            ? all.filter(it => it.key.toLowerCase().startsWith(q))
+            : all;
+    },
+
+    /**
+     * Return a short group label for a suggestion's priority, used to
+     * render a sticky divider above rows that change tier. Mirrors the
+     * backend tiers in service.go GetAvailableStateKeys.
+     */
+    promptSuggestionGroup(item) {
+        if (!item) return '';
+        if (item.kind === 'syntax') return 'Syntax reference';
+        const p = item.priority || 0;
+        if (p >= 100) return 'This agent';
+        if (p >= 80)  return 'Direct sub-agents';
+        if (p >= 70)  return 'Workflow children';
+        if (p >= 60)  return 'Workflow peers';
+        return 'Other agents in your library';
+    },
+
+    /**
+     * Whether the given item should show a group header above it — true
+     * only when the previous item belonged to a different group.
+     */
+    promptShowGroupHeader(idx) {
+        if (idx === 0) return true;
+        const items = this.promptAutocomplete.items;
+        return this.promptSuggestionGroup(items[idx]) !== this.promptSuggestionGroup(items[idx - 1]);
+    },
+
+    /**
+     * Replace the {<typed> fragment with {<key>} and place the caret
+     * after the closing brace. For syntax hints that already contain
+     * their own punctuation (e.g. `key?`, `artifact.name`) we insert
+     * verbatim so the user can just replace the placeholder name.
+     */
+    insertStateKey(textarea, item) {
+        const trigger = this.promptAutocomplete.triggerIndex;
+        if (trigger < 0) {
+            this.closePromptAutocomplete();
+            return;
+        }
+        const value = textarea.value;
+        const caret = textarea.selectionStart;
+        const before = value.slice(0, trigger);
+        const after = value.slice(caret);
+        // The '{' is already in the text at trigger; we append the key +
+        // '}'. The key may include its own trailing '?' for optional.
+        const insertion = '{' + item.key + '}';
+        const next = before + insertion + after;
+        textarea.value = next;
+        this.form.systemPrompt = next;
+        const newCaret = before.length + insertion.length;
+        textarea.setSelectionRange(newCaret, newCaret);
+        textarea.focus();
+        this.closePromptAutocomplete();
+    },
+
+    closePromptAutocomplete() {
+        this.promptAutocomplete.open = false;
+        this.promptAutocomplete.triggerIndex = -1;
+        this.promptAutocomplete.query = '';
+        this.promptAutocomplete.items = [];
+        this.promptAutocomplete.activeIndex = 0;
+    },
+
+
+    /**
+     * Return the list of template references in the prompt that don't
+     * match any known OutputKey. We only support {key} and {key?} — any
+     * other form (scoped prefixes, artifact refs) is flagged so the user
+     * either declares the key or rewrites the reference.
+     *
+     * Mirrors ADK's placeholder regex (`{+[^{}]*}+`) in
+     * .READ/adk-go/internal/llminternal/instruction_processor.go, but
+     * applies our tighter identifier rule before flagging unknowns.
+     */
+    get unknownPromptKeys() {
+        const text = this.form.systemPrompt || '';
+        if (!text.includes('{')) return [];
+        const matches = text.match(/\{+[^{}]*\}+/g) || [];
+        const known = new Set((this.availableStateKeys || []).map(k => k.key));
+        const unknown = [];
+        const seen = new Set();
+        for (const raw of matches) {
+            let v = raw.replace(/^\{+|\}+$/g, '').trim();
+            if (v.endsWith('?')) v = v.slice(0, -1);
+            if (!v) continue;
+            // Non-identifier strings are treated as literal text by ADK
+            // (see isValidStateName) — no point flagging them as typos.
+            if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(v)) continue;
+            if (known.has(v)) continue;
+            if (seen.has(v)) continue;
+            seen.add(v);
+            unknown.push(v);
+        }
+        return unknown;
     },
 
     // ══════════════════════════════════════════
@@ -545,6 +807,8 @@ export const agentDesigner = () => ({
         this.providerModelsError = '';
         this.hydrateSchemaRows('inputSchema');
         this.hydrateSchemaRows('outputSchema');
+        this.closePromptAutocomplete();
+        this.availableStateKeys = [];
         this.view = 'agentForm';
     },
 
@@ -591,12 +855,14 @@ export const agentDesigner = () => ({
         this.providerModelsError = '';
         this.hydrateSchemaRows('inputSchema');
         this.hydrateSchemaRows('outputSchema');
+        this.closePromptAutocomplete();
         this.view = 'agentForm';
 
         // Load tool/KB/FS data
         this.fetchAgentPlugins(agent.id);
         this.fetchAgentWorkspaces(agent.id);
         this.fetchAgentFilesystems(agent.id);
+        this.fetchAvailableStateKeys(agent.id);
 
         // Pre-load model list if this agent already has a provider override saved
         if (mo.provider) {

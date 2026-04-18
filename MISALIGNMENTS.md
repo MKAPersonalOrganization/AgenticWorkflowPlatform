@@ -16,7 +16,7 @@
    - [M3. Model parameter controls (the rest of `GenerateContentConfig`)](#m3-model-parameter-controls)
    - [M4. Input-schema visual builder (remove dead code or ship it)](#m4-input-schema-visual-builder) ✅ **done**
    - [M5. Output-schema visual builder (replace raw JSON textarea)](#m5-output-schema-visual-builder) ✅ **done**
-   - [M6. Instruction template variable picker](#m6-instruction-template-variable-picker)
+   - [M6. Instruction template variable picker](#m6-instruction-template-variable-picker) ✅ **done**
    - [M7. Global-instruction UX (root-only surfacing)](#m7-global-instruction-ux)
    - [M8. Memory service toggle + backend selector](#m8-memory-service-toggle)
    - [M9. Artifact service — surface the `SaveInputBlobsAsArtifacts` toggle](#m9-artifact-service)
@@ -309,6 +309,8 @@ So the widely-repeated claim "OutputSchema disables tools and transfers" is only
 ---
 
 ### M6. Instruction template variable picker
+
+> **Status: ✅ Done.** System-prompt textarea triggers a `{`-anchored autocomplete popover listing live session-state keys — OutputKey values aggregated across the user's agents — plus a single `{key?}` optional-suffix hint. Scoped prefixes and artifact refs are intentionally omitted from the picker to keep the UI approachable for non-programmers (they still resolve at runtime if typed). Backend: `GET /v1/agent-definitions/{id}/available-state-keys` → `Service.GetAvailableStateKeys` with priority-tiered suggestions (self / direct sub-agents / workflow children / workflow peers / library) grounded in ADK sample frequency. Reverse-lookup detects when the current agent is a leaf inside someone else's workflow and elevates that workflow's peers. Priority tiers render as group headers in the popover. Undefined `{foo}` references surface as a warning card below the textarea. Regex mirrors `.READ/adk-go/internal/llminternal/instruction_processor.go`; inline comments cite the file so the alignment survives. Docs: "Output Keys and Template Variables" section in `frontend/ui/docs/agents.templ`. Tests: `modules/agentdefinition/available_state_keys_test.go` (tier priorities + dedup + sort) and `userrequirements/instruction_template_variables_test.go` (runtime substitution via `/debug/agent:run`). See also `modules/agentdefinition/{service,handler,module}.go`, `assets/js/components/agent-designer-dialog.js`, `frontend/ui/agenteditor/agenteditor.templ`.
 
 **ADK.** `llmagent` instruction templates support `{state_key}`, `{state_key?}` (optional), `{artifact.name}`, `{artifact.name?}`. The regex for keys is `^[a-zA-Z_][a-zA-Z0-9_]*$` — anything else is treated as literal.
 

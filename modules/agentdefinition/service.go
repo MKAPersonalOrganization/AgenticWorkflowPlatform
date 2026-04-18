@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -291,6 +292,210 @@ func (s *Service) listByUser(ctx context.Context, userID string) ([]AgentDefinit
 		return nil, err
 	}
 	return excludeSubAgents(agents), nil
+}
+
+// StateKeySuggestion describes a template variable that can appear in an
+// instruction prompt. It feeds the designer's "{"-triggered picker.
+//
+// Shape is driven by ADK's template rules in
+// .READ/adk-go/internal/llminternal/instruction_processor.go — at runtime
+// InjectSessionState replaces {key}, {key?}, {app:key}, {user:key},
+// {temp:key}, {artifact.name}, {artifact.name?} with values from session
+// state or the artifact store; anything that doesn't match the valid-state
+// regex (^[a-zA-Z_][a-zA-Z0-9_]*$, optionally with an app:/user:/temp:
+// prefix) is left as literal text.
+//
+// We can only enumerate OutputKey-driven session keys at design time.
+// The other write patterns visible in ADK samples — callback-written
+// state (.READ/adk-samples/.../callbacks/after_agent_callback/callback.py)
+// and tool-written state (.READ/adk-samples/.../tools/…) — live in code
+// we don't parse, so they can't be auto-suggested. Scoped prefixes
+// (app:/user:/temp:) and {artifact.*} are surfaced by the UI as static
+// hints since their names are only known at runtime.
+type StateKeySuggestion struct {
+	// Key is the bare identifier to insert between the braces (no '?' and
+	// no leading '{'/'}'). For session-scoped OutputKeys it's a single
+	// identifier; the UI composes the final `{key}` form.
+	Key string `json:"key"`
+	// Scope is "session" for OutputKey-backed keys. Reserved for future
+	// values ("artifact", "user", "app", "temp") if we ever start tracking
+	// those at design time.
+	Scope string `json:"scope"`
+	// Source is a human-readable hint about where the key comes from
+	// (e.g. "self", "sub-agent output: Researcher"). Shown as secondary
+	// text next to each suggestion in the picker.
+	Source string `json:"source,omitempty"`
+	// Priority ranks suggestions in the picker. Higher = more relevant
+	// to the agent being edited. The ordering mirrors ADK's sample usage:
+	// an agent's own OutputKey and its direct sub-agents' outputs are the
+	// most common references, then workflow peers (sub-agent OutputKey →
+	// sibling instruction is the dominant multi-agent read pattern), then
+	// everything else in the user's library as a fallback.
+	Priority int `json:"priority"`
+}
+
+// priority tiers for StateKeySuggestion. Values are coarse; only ordering
+// matters. See GetAvailableStateKeys for where each tier is applied.
+const (
+	prioritySelf        = 100 // the agent's own OutputKey
+	priorityDirectChild = 80  // sub-agent / agent-tool of the current agent
+	priorityGraphChild  = 70  // leaf inside the current agent's own Graph
+	priorityWorkflow    = 60  // peer in a workflow that contains this agent
+	priorityLibrary     = 20  // any other OutputKey declared by the user
+)
+
+// GetAvailableStateKeys collects the template variables that can appear
+// in this agent's instruction, ranked by how likely they are to be the
+// right choice. The ranking matches ADK's sample corpus — a leaf agent
+// inside a workflow overwhelmingly references OutputKeys set by earlier
+// peers in the same workflow (pattern A in
+// .READ/adk-samples/python/agents/academic-research/academic_research/agent.py
+// and pattern B in
+// .READ/adk-samples/python/agents/small-business-loan-agent/...callbacks/after_agent_callback/callback.py),
+// so those are elevated above the rest of the library.
+//
+// Tiers (highest first):
+//
+//   - self           — the agent's own OutputKey
+//   - sub-agent      — OutputKeys of agents referenced as SubAgents/AgentTools
+//   - graph child    — OutputKeys of agents referenced inside this agent's Graph
+//   - workflow peer  — OutputKeys of peers in any workflow that embeds this
+//     agent (the reverse lookup — matches Sequential/Parallel/Loop layouts)
+//   - library        — any other OutputKey declared across the user's agents,
+//     so references still resolve if the workflow isn't wired yet
+func (s *Service) GetAvailableStateKeys(ctx context.Context, userID, agentID string) ([]StateKeySuggestion, error) {
+	agent, err := s.repo.GetByID(ctx, agentID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	all, err := s.repo.ListByUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	byID := make(map[string]*AgentDefinition, len(all))
+	for i := range all {
+		byID[all[i].ID] = &all[i]
+	}
+
+	// Highest-priority entry wins when a key appears in multiple tiers.
+	// Source/priority both update on upgrade so the label matches the
+	// tier actually displayed.
+	best := make(map[string]StateKeySuggestion)
+	addKey := func(key, source string, priority int) {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			return
+		}
+		existing, ok := best[key]
+		if ok && existing.Priority >= priority {
+			return
+		}
+		best[key] = StateKeySuggestion{
+			Key:      key,
+			Scope:    "session",
+			Source:   source,
+			Priority: priority,
+		}
+	}
+
+	if agent.OutputKey != "" {
+		addKey(agent.OutputKey, "self", prioritySelf)
+	}
+	for _, ref := range agent.SubAgents {
+		if ref == nil {
+			continue
+		}
+		// A SubAgentRef may override the child's OutputKey at the call
+		// site — surface both so either name works in the prompt.
+		if ref.OutputKey != "" {
+			if child, ok := byID[ref.AgentID]; ok {
+				addKey(ref.OutputKey, "sub-agent output: "+child.Name, priorityDirectChild)
+			} else {
+				addKey(ref.OutputKey, "sub-agent output", priorityDirectChild)
+			}
+		}
+		if child, ok := byID[ref.AgentID]; ok && child.OutputKey != "" {
+			addKey(child.OutputKey, "sub-agent output: "+child.Name, priorityDirectChild)
+		}
+	}
+	for _, ref := range agent.AgentTools {
+		if ref == nil {
+			continue
+		}
+		if child, ok := byID[ref.AgentID]; ok && child.OutputKey != "" {
+			addKey(child.OutputKey, "agent-tool output: "+child.Name, priorityDirectChild)
+		}
+	}
+	if agent.Graph != nil {
+		for _, id := range agent.Graph.CollectAgentIDs() {
+			if id == agent.ID {
+				continue
+			}
+			if child, ok := byID[id]; ok && child.OutputKey != "" {
+				addKey(child.OutputKey, "workflow step: "+child.Name, priorityGraphChild)
+			}
+		}
+	}
+
+	// Reverse lookup: find workflows (agents with a Graph) that embed the
+	// current agent, then surface its peers' OutputKeys. This covers the
+	// dominant ADK pattern — editing a leaf that's a sub-agent inside a
+	// Sequential/Parallel/Loop, referencing an earlier peer's output.
+	for i := range all {
+		workflow := &all[i]
+		if workflow.ID == agent.ID || workflow.Graph == nil {
+			continue
+		}
+		members := workflow.Graph.CollectAgentIDs()
+		containsCurrent := false
+		for _, id := range members {
+			if id == agent.ID {
+				containsCurrent = true
+				break
+			}
+		}
+		if !containsCurrent {
+			continue
+		}
+		for _, id := range members {
+			if id == agent.ID {
+				continue
+			}
+			peer, ok := byID[id]
+			if !ok || peer.OutputKey == "" {
+				continue
+			}
+			addKey(peer.OutputKey,
+				"workflow peer: "+workflow.Name+" → "+peer.Name,
+				priorityWorkflow)
+		}
+	}
+
+	// Library-wide fallback — any other OutputKey the user has declared,
+	// so a reference still resolves if the workflow isn't wired yet.
+	for i := range all {
+		other := &all[i]
+		if other.ID == agent.ID || other.OutputKey == "" {
+			continue
+		}
+		addKey(other.OutputKey, "agent: "+other.Name, priorityLibrary)
+	}
+
+	suggestions := make([]StateKeySuggestion, 0, len(best))
+	for _, sug := range best {
+		suggestions = append(suggestions, sug)
+	}
+	// Descending priority, then alphabetical by key for stable ordering
+	// across calls with identical input.
+	sort.Slice(suggestions, func(i, j int) bool {
+		if suggestions[i].Priority != suggestions[j].Priority {
+			return suggestions[i].Priority > suggestions[j].Priority
+		}
+		return suggestions[i].Key < suggestions[j].Key
+	})
+	return suggestions, nil
 }
 
 // GetConsumers returns all agents that reference the given agent ID in their graph.

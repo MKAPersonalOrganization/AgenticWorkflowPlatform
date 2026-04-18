@@ -259,11 +259,10 @@ templ docsMultiAgentOrchestration() {
 			parent always produces the final user-visible response.
 		</p>
 		<p>
-			Under the hood this maps to ADK-Go's <code>tool/agenttool</code> package: the
-			target agent is built, wrapped as a <code>tool.Tool</code>, and appended to the
-			parent's tools. The child runs inside an <strong>isolated in-memory session</strong>
-			per call, so it cannot read or write the parent's session state, memory, or
-			artifacts — safe by default.
+			Under the hood the target agent is built, wrapped as a function tool, and
+			appended to the parent's tools. The child runs inside an
+			<strong>isolated in-memory session</strong> per call, so it cannot read or
+			write the parent's session state, memory, or artifacts — safe by default.
 		</p>
 		<h4>Wiring it in the designer</h4>
 		<p>
@@ -323,19 +322,74 @@ templ docsMultiAgentOrchestration() {
 			<li>• <strong>Default (Include History)</strong> — The sub-agent sees all prior messages. Best for agents that need to reference earlier conversation context.</li>
 			<li>• <strong>None (Fresh Context)</strong> — The sub-agent starts with a clean slate. Best for independent specialists that should not be influenced by upstream dialogue.</li>
 		</ul>
-		<h3>Output Keys</h3>
+		<h3>Output Keys and Template Variables</h3>
 		<p>
 			Each agent can store its final output in <strong>session state</strong> under a named key.
-			Downstream agents can then reference this output using template syntax
-			in their system prompts. This enables structured data flow through multi-step pipelines.
+			Downstream agents reference those outputs with template placeholders inside their
+			system prompts. The orchestration engine substitutes each placeholder with the live
+			session-state value before the model is called.
 		</p>
 		@docsInfoBox("Example Pipeline") {
 			<p>
 				<strong>Step 1:</strong> Data Analyst agent with <code>output_key: research_data</code>
 				<br/>
-				<strong>Step 2:</strong> Report Writer agent whose system prompt references the output key.
-				The Report Writer receives the structured data produced by the Data Analyst without
-				needing the full conversation history.
+				<strong>Step 2:</strong> Report Writer agent whose system prompt contains
+				<code>&#123;research_data&#125;</code>. Before the Report Writer runs, the
+				placeholder is replaced by whatever the Data Analyst produced — no need to
+				forward the full conversation history.
+			</p>
+		}
+		<h4>Template Syntax</h4>
+		<p>
+			Keys may only contain letters, digits, and underscores, and must start with a
+			letter or underscore. Anything that doesn't match is left as literal text.
+		</p>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Syntax</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Meaning</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow2("{key}", "Required — resolves to the session-state value; the run errors if the key is missing.")
+				@docsTableRow2("{key?}", "Optional — empty string when the key is missing; the run proceeds.")
+			</tbody>
+		}
+		<h4>The Template Variable Picker</h4>
+		<p>
+			The designer surfaces a <strong>&#123;-triggered autocomplete</strong> under the system-prompt
+			textarea. Typing <code>&#123;</code> opens a popover listing every key the orchestration engine
+			can resolve at runtime, grouped by how relevant it is to the agent you're editing:
+		</p>
+		@docsTable() {
+			<thead>
+				<tr>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Group</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Contents</th>
+				</tr>
+			</thead>
+			<tbody>
+				@docsTableRow2("This agent", "The agent's own output key — referenced by agents downstream of it.")
+				@docsTableRow2("Direct sub-agents", "Output keys of agents listed under Sub-Agents or Agents-as-Tools.")
+				@docsTableRow2("Workflow children", "For a composed agent, the output keys of every leaf inside its own graph.")
+				@docsTableRow2("Workflow peers", "For a leaf, the output keys of other leaves in any workflow that contains it — the dominant read pattern in multi-step pipelines.")
+				@docsTableRow2("Other agents in your library", "Fallback entries — any output key you've declared elsewhere, so references still resolve once you wire the workflow.")
+				@docsTableRow2("Syntax reference", "The optional ? suffix, so you can mark a placeholder as safe to omit without looking up the syntax.")
+			</tbody>
+		}
+		<p>
+			<strong>Keyboard.</strong> Use <code>↑</code> / <code>↓</code> to move between
+			suggestions, <code>Enter</code> or <code>Tab</code> to insert, <code>Esc</code> to close.
+			If you type a reference that doesn't match any known key, a warning appears below
+			the textarea. Add <code>?</code> to silence it when the key may legitimately be absent.
+		</p>
+		@docsInfoBox("How it works") {
+			<p>
+				The picker lists the output keys declared across your agents, grouped by how
+				likely they are to be upstream of the agent you're editing. If you reference
+				a key that isn't in the list, the warning below the textarea gives you a chance
+				to fix a typo before the agent runs.
 			</p>
 		}
 		<h3>Global Instructions</h3>

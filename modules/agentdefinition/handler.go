@@ -504,6 +504,48 @@ func (h *storeHandler) search(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// availableStateKeysResponse is the envelope for the template-variable
+// picker surfaced by the designer's system-prompt autocomplete.
+//
+// ADK's instruction processor
+// (.READ/adk-go/internal/llminternal/instruction_processor.go) resolves
+// `{key}` / `{key?}` / `{app:key}` / `{user:key}` / `{temp:key}` against
+// session state and `{artifact.name}` / `{artifact.name?}` against the
+// artifact store. We only enumerate session-scoped OutputKeys here; the
+// designer UI renders scoped-prefix and artifact syntax as static hints
+// since their names are not known at design time.
+type availableStateKeysResponse struct {
+	Keys []StateKeySuggestion `json:"keys"`
+}
+
+// availableStateKeys handles GET /v1/agent-definitions/{id}/available-state-keys
+func (h *storeHandler) availableStateKeys(w http.ResponseWriter, r *http.Request) {
+	user := auth.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	agentID := r.PathValue("id")
+	if agentID == "" {
+		http.Error(w, "Agent ID is required", http.StatusBadRequest)
+		return
+	}
+
+	keys, err := h.svc.GetAvailableStateKeys(r.Context(), user.ID, agentID)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to get available state keys", "error", err)
+		http.Error(w, "Failed to get available state keys", http.StatusInternalServerError)
+		return
+	}
+
+	if keys == nil {
+		keys = []StateKeySuggestion{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(availableStateKeysResponse{Keys: keys})
+}
+
 // consumers handles GET /v1/agent-definitions/{id}/consumers
 func (h *storeHandler) consumers(w http.ResponseWriter, r *http.Request) {
 	user := auth.GetUserFromContext(r.Context())
