@@ -23,6 +23,5 @@ _tmp/
 tls/
 /edgequake/
 
-# Code-maat analysis output
-.maat/
-code-maat.jar
+# Hotspot analysis output
+.hotspots/
