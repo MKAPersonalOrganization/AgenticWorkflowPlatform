@@ -1,0 +1,23 @@
+# Pinned dependencies for scripts/go_hotspots.py.
+# Install with: pip install -r scripts/requirements-hotspots.txt
+# Python 3.10+ required.
+
+# Git access (replaces raw subprocess parsing).
+GitPython>=3.1.40,<4.0
+
+# Natural-language + ISO date parsing (replaces handcrafted regex).
+dateparser>=1.2.0,<2.0
+
+# Go AST parsing (replaces custom regex+brace function parser).
+tree-sitter>=0.23.0,<0.26
+tree-sitter-go>=0.23.0,<0.26
+
+# Nested circle-pack layout (d3-hierarchy port; replaces inlined
+# Wang/Bostock implementation).
+circlify>=0.15.0,<0.16
+
+# Static PNG output.
+matplotlib>=3.7,<4.0
+
+# Interactive HTML output.
+plotly>=5.18,<7.0

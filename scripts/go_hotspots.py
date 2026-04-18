@@ -2,13 +2,13 @@
 """
 go_hotspots.py — Code-as-a-Crime-Scene hotspot analysis for Go.
 
-This script ranks the parts of a Go codebase that are both most-changed (git
-commits) and most-complex (effective lines of Go code). Hotspots are where
-refactoring pays off most (Tornhill, *Your Code as a Crime Scene*, ch. 3).
+Ranks the parts of a Go codebase that are both most-changed (git commits) and
+most-complex (effective lines of Go code). Hotspots are where refactoring pays
+off most — Tornhill, *Your Code as a Crime Scene*, ch. 3.
 
 Output surfaces:
-
   PNG       — a circle-pack enclosure diagram (for humans)
+  HTML      — an interactive Plotly report with hover tooltips (for humans)
   JSON      — a versioned, structured report (for CI gates and AI consumers)
   CSV       — per-leaf table (for spreadsheets / ad-hoc scripts)
   stdout    — ranked top-20 table (suppress with --quiet)
@@ -19,78 +19,109 @@ Software is fractal, so the tool is recursive. Point it at:
   - a single-package directory → leaves are top-level funcs/methods
   - a single .go file          → leaves are top-level funcs/methods
 
-JSON report schema: go-hotspots/1. Baseline comparison, signal annotations,
-and templated refactoring suggestions make each hotspot actionable for both
-humans and automated refactoring agents.
+JSON report schema: go-hotspots/1.
+
+This is a production-grade rewrite: custom Go parser, custom circle-pack
+algorithm and custom date parser have been replaced with battle-tested
+open-source libraries:
+  - tree-sitter + tree-sitter-go for Go AST parsing
+  - circlify for nested circle packing (d3-hierarchy port)
+  - dateparser for flexible --since/--until input
+  - GitPython for git history access
+  - matplotlib for PNG, plotly for interactive HTML
 """
 from __future__ import annotations
 
 import argparse
 import csv
 import json
+import logging
 import math
 import os
 import re
-import subprocess
 import sys
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
+log = logging.getLogger("go_hotspots")
 
-# Optional: delegate nested circle packing to the `circlify` library when
-# it's available (actively maintained, handles edge cases better than our
-# inlined Wang/Bostock routine). Falls back to the built-in pack_siblings
-# when the library isn't installed so the tool remains zero-dep beyond
-# matplotlib.
-try:
-    import circlify as _circlify  # type: ignore
-except ImportError:  # pragma: no cover
-    _circlify = None  # type: ignore
 
-# Optional: emit an interactive HTML report via plotly when requested. The
-# PNG remains the primary artefact; plotly gives hover tooltips carrying
-# signals, authors, recent commits, and suggested actions — a dramatic
-# UX upgrade for exploration.
+# --------------------------------------------------------------------------
+# Dependency imports — fail with actionable messages if anything is missing.
+# The tool has five hard dependencies; they are all pip-installable and
+# pinned in scripts/requirements-hotspots.txt.
+# --------------------------------------------------------------------------
+
+def _missing_dep(name: str, pip_name: str) -> "None":
+    sys.stderr.write(
+        f"error: go_hotspots requires the '{name}' package.\n"
+        f"  install with:  pip install {pip_name}\n"
+        f"  or install all deps: pip install -r scripts/requirements-hotspots.txt\n"
+    )
+    sys.exit(2)
+
+
 try:
-    import plotly.graph_objects as _go  # type: ignore
-except ImportError:  # pragma: no cover
-    _go = None  # type: ignore
+    import numpy as np  # type: ignore
+    import matplotlib.pyplot as plt  # type: ignore
+    from matplotlib.patches import Rectangle  # type: ignore
+    from matplotlib.colors import LinearSegmentedColormap  # type: ignore
+    from matplotlib.lines import Line2D  # type: ignore
+except ImportError:
+    _missing_dep("matplotlib", "matplotlib")
+
+try:
+    import circlify  # type: ignore
+except ImportError:
+    _missing_dep("circlify", "circlify")
+
+try:
+    import plotly.graph_objects as pgo  # type: ignore
+except ImportError:
+    _missing_dep("plotly", "plotly")
+
+try:
+    import dateparser  # type: ignore
+    from dateparser.search import search_dates as _dateparser_search  # type: ignore
+except ImportError:
+    _missing_dep("dateparser", "dateparser")
+
+try:
+    from git import Repo, InvalidGitRepositoryError, GitCommandError  # type: ignore
+except ImportError:
+    _missing_dep("GitPython", "GitPython")
+
+try:
+    import tree_sitter_go  # type: ignore
+    from tree_sitter import Language, Parser  # type: ignore
+except ImportError:
+    _missing_dep("tree-sitter + tree-sitter-go", "tree_sitter tree_sitter_go")
+
+
+# --------------------------------------------------------------------------
+# Constants
+# --------------------------------------------------------------------------
 
 SCHEMA_VERSION = "go-hotspots/1"
-TOOL_VERSION = "1.0"
+TOOL_VERSION = "2.0"
 
-# Exit code contract:
-#   0 — clean run, no thresholds exceeded
-#   1 — thresholds exceeded (finding-level failure, intended for CI gates)
-#   2 — script could not run (bad args, missing input, git failure)
 EXIT_OK = 0
 EXIT_THRESHOLD = 1
 EXIT_ERROR = 2
 
+SKIP_DIRS = frozenset({"vendor", "testdata", ".git", "node_modules"})
 
-def die(msg: str, code: int = EXIT_ERROR) -> None:
-    print(msg, file=sys.stderr)
-    sys.exit(code)
-
-SKIP_DIRS = {"vendor", "testdata", ".git", "node_modules"}
-_BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
-
-# Default exclude patterns for common generated Go files. These are auto-
-# applied so a typical invocation doesn't have to spell them out; the user
-# can opt out with --no-default-excludes or add their own via --exclude.
 DEFAULT_EXCLUDES: tuple[str, ...] = (
-    r"_templ\.go$",        # a-h/templ
-    r"_mock\.go$",         # gomock, mockery
-    r"_mocks\.go$",        # mockery (plural)
-    r"\.pb\.go$",          # protoc
-    r"\.pb\.gw\.go$",      # grpc-gateway
-    r"_gen\.go$",          # go generate conventions
-    r"(^|/)zz_generated",  # kubebuilder-style
-    r"bindata\.go$",       # go-bindata
+    r"_templ\.go$",
+    r"_mock\.go$",
+    r"_mocks\.go$",
+    r"\.pb\.go$",
+    r"\.pb\.gw\.go$",
+    r"_gen\.go$",
+    r"(^|/)zz_generated",
+    r"bindata\.go$",
 )
 
 BUG_KEYWORDS = re.compile(
@@ -99,52 +130,48 @@ BUG_KEYWORDS = re.compile(
     re.IGNORECASE,
 )
 
-# Git silently ignores unparseable --since/--until values and returns zero
-# commits — indistinguishable from a genuinely empty window. We validate the
-# value in Python first so bad input fails loudly.
-_DATE_FORMATS = (
-    "%Y-%m-%d",
-    "%Y-%m-%dT%H:%M:%S",
-    "%Y-%m-%dT%H:%M:%SZ",
-    "%Y-%m-%d %H:%M:%S",
-    "%Y/%m/%d",
-)
-_RELATIVE_DATE_RE = re.compile(
-    r"^\s*(\d+)\s*(second|minute|hour|day|week|month|year)s?"
-    r"(?:\s+ago)?\s*$",
-    re.IGNORECASE,
-)
-_WEEKDAY_RE = re.compile(
-    r"^\s*(last\s+|this\s+|next\s+)?("
-    r"sunday|monday|tuesday|wednesday|thursday|friday|saturday|"
-    r"week|month|year"
-    r")\s*$",
-    re.IGNORECASE,
-)
-_NAMED_DATES = {"yesterday", "today", "now", "midnight", "noon"}
+
+class HotspotError(Exception):
+    """Raised for any recoverable tool error; main() converts to exit 2."""
+
+
+# --------------------------------------------------------------------------
+# Date parsing — delegated to dateparser so any natural-language expression
+# that works for humans also works here.
+# --------------------------------------------------------------------------
+
+_DATEPARSER_SETTINGS = {
+    "RETURN_AS_TIMEZONE_AWARE": False,
+    "PREFER_DATES_FROM": "past",
+}
 
 
 def normalize_date(flag: str, value: str) -> str:
-    s = value.strip()
+    """Validate a --since/--until expression and return a form git accepts.
+
+    dateparser handles both ISO dates and natural-language ("3 weeks ago",
+    "last monday", "yesterday"). We convert to ISO date string so git's
+    interpretation is unambiguous — git silently ignores unparseable input.
+    """
+    s = (value or "").strip()
     if not s:
-        die(f"error: {flag} cannot be empty")
-    for fmt in _DATE_FORMATS:
+        raise HotspotError(f"{flag} cannot be empty")
+    parsed = dateparser.parse(s, settings=_DATEPARSER_SETTINGS)
+    if parsed is None:
+        # `last monday`, `last tuesday` etc. need dateparser.search
         try:
-            datetime.strptime(s, fmt)
-            return s
-        except ValueError:
-            pass
-    m = _RELATIVE_DATE_RE.match(s)
-    if m:
-        return f"{m.group(1)} {m.group(2).lower()}s ago"
-    if s.lower() in _NAMED_DATES or _WEEKDAY_RE.match(s):
-        return s
-    die(
-        f"error: {flag} value {value!r} is not a recognised date.\n"
-        "  Use an ISO date (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS),\n"
-        "  a relative phrase such as '3 weeks ago' or '2 days',\n"
-        "  or 'yesterday' / 'last monday' / 'last week'."
-    )
+            found = _dateparser_search(s, languages=["en"])
+        except Exception:
+            found = None
+        if found:
+            parsed = found[0][1]
+    if parsed is None:
+        raise HotspotError(
+            f"{flag} value {value!r} is not a recognised date.\n"
+            "  Try an ISO date (2024-01-01), a relative phrase ('3 weeks ago'),\n"
+            "  or a named day ('yesterday', 'last monday')."
+        )
+    return parsed.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def compile_excludes(patterns: list[str] | None) -> re.Pattern | None:
@@ -154,25 +181,137 @@ def compile_excludes(patterns: list[str] | None) -> re.Pattern | None:
     try:
         return re.compile(combined)
     except re.error as e:
-        die(f"error: invalid --exclude pattern: {e}")
+        raise HotspotError(f"invalid --exclude pattern: {e}") from e
 
 
 # --------------------------------------------------------------------------
-# Git / filesystem helpers
+# LOC counter — language-neutral "effective lines" (non-blank, non-comment).
+# Small and correct; not worth a library dependency.
 # --------------------------------------------------------------------------
+
+_BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+
+
+def count_effective_loc(path: Path) -> int:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError as e:
+        log.warning("unreadable file %s: %s", path, e)
+        return 0
+    return _count_loc_text(text)
+
+
+def _count_loc_text(text: str) -> int:
+    text = _BLOCK_COMMENT.sub("", text)
+    return sum(
+        1
+        for line in text.splitlines()
+        if (s := line.strip()) and not s.startswith("//")
+    )
+
+
+# --------------------------------------------------------------------------
+# Go parser — tree-sitter + tree-sitter-go.
+# Replaces the previous regex+brace-counting implementation. Handles
+# generics (including generic receivers), multi-line signatures, nested
+# closures (ignored) and invalid code (tree-sitter ERROR nodes are skipped).
+# --------------------------------------------------------------------------
+
+_GO_LANGUAGE = Language(tree_sitter_go.language())
+_GO_PARSER = Parser(_GO_LANGUAGE)
+
+
+def _receiver_type_name(recv_node) -> str | None:
+    """Return the receiver type name from a method_declaration's receiver.
+
+    Walks the subtree looking for the first type_identifier — robust
+    against pointer receivers, generic receivers, and generic pointer
+    receivers (`*Foo[T]`, `Bar[K, V]`).
+    """
+    if recv_node is None:
+        return None
+    stack = [recv_node]
+    while stack:
+        node = stack.pop()
+        if node.type == "type_identifier":
+            return node.text.decode("utf-8", errors="replace")
+        stack.extend(reversed(node.children))
+    return None
+
+
+def parse_go_functions(path: Path) -> list[dict]:
+    """Return all top-level funcs/methods in *path* with precise line ranges."""
+    try:
+        source = path.read_bytes()
+    except OSError as e:
+        log.warning("unreadable file %s: %s", path, e)
+        return []
+    tree = _GO_PARSER.parse(source)
+    funcs: list[dict] = []
+    for node in tree.root_node.children:
+        if node.type not in ("function_declaration", "method_declaration"):
+            continue
+        name_node = node.child_by_field_name("name")
+        if name_node is None:
+            continue
+        name = name_node.text.decode("utf-8", errors="replace")
+        if node.type == "method_declaration":
+            recv = _receiver_type_name(node.child_by_field_name("receiver"))
+            display = f"{recv}.{name}" if recv else name
+        else:
+            display = name
+        start_line = node.start_point[0] + 1
+        end_line = node.end_point[0] + 1
+        body = source[node.start_byte:node.end_byte].decode(
+            "utf-8", errors="replace")
+        funcs.append({
+            "name": display,
+            "start_line": start_line,
+            "end_line": end_line,
+            "loc": _count_loc_text(body),
+        })
+    return funcs
+
+
+# --------------------------------------------------------------------------
+# Filesystem helpers
+# --------------------------------------------------------------------------
+
+def collect_go_files(root: Path) -> Iterable[Path]:
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames
+                       if d not in SKIP_DIRS and not d.startswith(".")]
+        for name in filenames:
+            if name.endswith(".go"):
+                yield Path(dirpath) / name
+
+
+def _dir_has_go(d: Path) -> bool:
+    try:
+        for _dirpath, dirnames, filenames in os.walk(d):
+            dirnames[:] = [x for x in dirnames
+                           if x not in SKIP_DIRS and not x.startswith(".")]
+            if any(f.endswith(".go") for f in filenames):
+                return True
+    except OSError:
+        pass
+    return False
+
 
 def find_git_root(path: Path) -> Path:
+    """Locate the enclosing git working tree via GitPython."""
     try:
-        out = subprocess.check_output(
-            ["git", "-C", str(path), "rev-parse", "--show-toplevel"],
-            stderr=subprocess.DEVNULL,
-        )
-    except subprocess.CalledProcessError:
-        die(f"error: {path} is not inside a git repository")
-    return Path(out.decode().strip())
+        repo = Repo(str(path), search_parent_directories=True)
+    except InvalidGitRepositoryError as e:
+        raise HotspotError(f"{path} is not inside a git repository") from e
+    wt = repo.working_tree_dir
+    if not wt:
+        raise HotspotError(f"{path} is inside a bare git repository")
+    return Path(wt)
 
 
 def find_go_module(scope: Path) -> tuple[Path, str] | None:
+    """Walk up from *scope* looking for go.mod; return (dir, module_path)."""
     cur = scope.resolve()
     while True:
         gomod = cur / "go.mod"
@@ -188,146 +327,17 @@ def find_go_module(scope: Path) -> tuple[Path, str] | None:
                             val = val[1:-1]
                         if val:
                             return cur, val
-            except OSError:
-                pass
+            except OSError as e:
+                log.debug("couldn't read %s: %s", gomod, e)
         if cur.parent == cur:
             return None
         cur = cur.parent
 
 
-def collect_go_files(root: Path) -> Iterable[Path]:
-    for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames
-                       if d not in SKIP_DIRS and not d.startswith(".")]
-        for name in filenames:
-            if name.endswith(".go"):
-                yield Path(dirpath) / name
-
-
-def count_effective_loc(path: Path) -> int:
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return 0
-    return _count_loc_text(text)
-
-
-def _count_loc_text(text: str) -> int:
-    text = _BLOCK_COMMENT.sub("", text)
-    loc = 0
-    for line in text.splitlines():
-        s = line.strip()
-        if s and not s.startswith("//"):
-            loc += 1
-    return loc
-
-
 # --------------------------------------------------------------------------
-# Go function parser
-# --------------------------------------------------------------------------
-
-_FUNC_START_RE = re.compile(
-    r'^func\s+'
-    r'(?:\(\s*(?:\w+\s+)?(?:\*\s*)?(?P<recv>\w+)'
-    r'(?:\s*\[[^\]]*\])?\s*\)\s+)?'
-    r'(?P<name>\w+)\b'
-)
-
-
-def _strip_go_noise(text: str) -> str:
-    out: list[str] = []
-    i = 0
-    n = len(text)
-    while i < n:
-        c = text[i]
-        if c == '/' and i + 1 < n and text[i + 1] == '/':
-            j = text.find('\n', i)
-            if j == -1:
-                out.append(' ' * (n - i)); i = n
-            else:
-                out.append(' ' * (j - i)); i = j
-        elif c == '/' and i + 1 < n and text[i + 1] == '*':
-            j = text.find('*/', i + 2)
-            end = n if j == -1 else j + 2
-            block = text[i:end]
-            out.append(''.join(ch if ch == '\n' else ' ' for ch in block))
-            i = end
-        elif c == '`':
-            j = text.find('`', i + 1)
-            end = n if j == -1 else j + 1
-            block = text[i:end]
-            out.append(''.join(ch if ch == '\n' else ' ' for ch in block))
-            i = end
-        elif c in ('"', "'"):
-            quote = c
-            j = i + 1
-            while j < n:
-                if text[j] == '\\' and j + 1 < n:
-                    j += 2; continue
-                if text[j] == quote or text[j] == '\n':
-                    break
-                j += 1
-            j = min(j + 1, n)
-            block = text[i:j]
-            out.append(''.join(ch if ch == '\n' else ' ' for ch in block))
-            i = j
-        else:
-            out.append(c); i += 1
-    return ''.join(out)
-
-
-def _find_func_end(stripped_lines: list[str], start_idx: int) -> int | None:
-    depth = 0
-    opened = False
-    for i in range(start_idx, len(stripped_lines)):
-        for ch in stripped_lines[i]:
-            if ch == '{':
-                depth += 1; opened = True
-            elif ch == '}':
-                depth -= 1
-                if opened and depth == 0:
-                    return i + 1
-    return None
-
-
-def parse_go_functions(path: Path) -> list[dict]:
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return []
-    lines = text.splitlines()
-    stripped_lines = _strip_go_noise(text).splitlines()
-    while len(stripped_lines) < len(lines):
-        stripped_lines.append("")
-
-    functions: list[dict] = []
-    i = 0
-    n = len(lines)
-    while i < n:
-        m = _FUNC_START_RE.match(stripped_lines[i])
-        if not m:
-            i += 1; continue
-        end = _find_func_end(stripped_lines, i)
-        if end is None:
-            i += 1; continue
-        name = m.group("name")
-        recv = m.group("recv")
-        display = f"{recv}.{name}" if recv else name
-        body = "\n".join(lines[i:end])
-        functions.append({
-            "name": display,
-            "start_line": i + 1,
-            "end_line": end,
-            "loc": _count_loc_text(body),
-        })
-        i = end
-    return functions
-
-
-# --------------------------------------------------------------------------
-# Git history — package-level (one log call) and function-level (per-func).
-# Both return (hashes_per_leaf, commit_meta) so enrichment can look up any
-# hash's author/date/subject anywhere downstream.
+# Git history — GitPython wraps subprocess cleanly.
+# Package mode: single `git log --name-only` call, batch-parsed.
+# Function mode: one `git log -L` per function.
 # --------------------------------------------------------------------------
 
 _LOG_PRETTY = "__C__%H%x09%an%x09%ad%x09%s"
@@ -338,10 +348,17 @@ def _parse_commit_line(prefixed: str) -> tuple[str, dict] | None:
         return None
     parts = prefixed[5:].split("\t", 3)
     if len(parts) < 4:
-        # Pad missing subject (unlikely but safe).
         parts += [""] * (4 - len(parts))
-    h, author, date, subject = parts[0], parts[1], parts[2], parts[3]
+    h, author, date, subject = parts
     return h, {"author": author, "date": date, "subject": subject}
+
+
+def _run_git_log(repo: Repo, *args: str, **kwargs: str) -> str:
+    try:
+        return repo.git.log(*args, **kwargs)
+    except GitCommandError as e:
+        stderr = (e.stderr or "").strip() or str(e)
+        raise HotspotError(f"git log failed — {stderr}") from e
 
 
 def git_commit_history(
@@ -350,28 +367,26 @@ def git_commit_history(
     exclude_regex: re.Pattern | None = None,
     live_files: set[str] | None = None,
 ) -> tuple[dict[str, set[str]], dict[str, dict]]:
-    """Distinct-commit history for every .go path under `scope`.
+    """Distinct-commit history for every .go path under *scope*.
 
-    Returns (commits_per_file, commit_meta) from a single `git log` invocation
-    — cheaper than running log once per leaf, and commit_meta is the authoritative
-    source for enrichment downstream.
+    Returns (commits_per_file, commit_meta) from a single `git log` call.
     """
-    cmd = ["git", "-C", str(git_root), "log",
-           f"--pretty=format:{_LOG_PRETTY}",
-           "--date=short", "--name-only"]
-    if since:
-        cmd.append(f"--since={since}")
-    if until:
-        cmd.append(f"--until={until}")
+    repo = Repo(str(git_root))
     rel = scope.resolve().relative_to(git_root)
-    cmd.append("--")
-    cmd.append("." if str(rel) == "." else str(rel))
-    try:
-        out = subprocess.check_output(
-            cmd, stderr=subprocess.PIPE).decode(errors="replace")
-    except subprocess.CalledProcessError as e:
-        err = e.stderr.decode(errors="replace").strip() or "(no stderr)"
-        die(f"error: git log failed — {err}")
+    path_arg = "." if str(rel) == "." else str(rel)
+
+    kwargs: dict[str, str] = {
+        "pretty": f"format:{_LOG_PRETTY}",
+        "date": "short",
+        "name_only": True,
+    }
+    if since:
+        kwargs["since"] = since
+    if until:
+        kwargs["until"] = until
+
+    log.debug("git log for %s (since=%s until=%s)", path_arg, since, until)
+    out = _run_git_log(repo, "--", path_arg, **kwargs)
 
     commits_per_file: dict[str, set[str]] = defaultdict(set)
     commit_meta: dict[str, dict] = {}
@@ -391,6 +406,8 @@ def git_commit_history(
         if exclude_regex is not None and exclude_regex.search(path):
             continue
         commits_per_file[path].add(current)
+    log.info("package-mode git log: %d commits, %d files touched",
+             len(commit_meta), len(commits_per_file))
     return commits_per_file, commit_meta
 
 
@@ -398,22 +415,21 @@ def git_function_history(
     git_root: Path, rel_path: str, start: int, end: int,
     since: str | None, until: str | None,
 ) -> tuple[set[str], dict[str, dict]]:
-    """Per-function history via `git log -L <start>,<end>:<file>`.
-
-    Returns (set of commit hashes touching the range, meta for those hashes).
-    """
-    cmd = ["git", "-C", str(git_root), "log",
-           f"-L{start},{end}:{rel_path}",
-           f"--pretty=format:{_LOG_PRETTY}",
-           "--date=short", "-s"]
+    """Per-function history via `git log -L <start>,<end>:<file>`."""
+    repo = Repo(str(git_root))
+    kwargs: dict[str, str] = {
+        "pretty": f"format:{_LOG_PRETTY}",
+        "date": "short",
+    }
     if since:
-        cmd.append(f"--since={since}")
+        kwargs["since"] = since
     if until:
-        cmd.append(f"--until={until}")
+        kwargs["until"] = until
     try:
-        out = subprocess.check_output(
-            cmd, stderr=subprocess.PIPE).decode(errors="replace")
-    except subprocess.CalledProcessError:
+        out = repo.git.log(f"-L{start},{end}:{rel_path}", "-s", **kwargs)
+    except GitCommandError as e:
+        log.debug("git log -L failed for %s:%d-%d: %s",
+                  rel_path, start, end, (e.stderr or "").strip())
         return set(), {}
     hashes: set[str] = set()
     meta: dict[str, dict] = {}
@@ -479,7 +495,6 @@ def collect_leaf_packages(
                 import_path = rel_str
         else:
             import_path = rel_str
-
         revisions = len(d["commits"])
         leaves.append({
             "kind": "package",
@@ -612,7 +627,7 @@ def build_function_tree(
 
     if scope.is_file():
         if scope.suffix != ".go":
-            die(f"error: {scope} is not a .go file")
+            raise HotspotError(f"{scope} is not a .go file")
         root = Node(root_display)
         funcs = collect_functions_for_file(
             scope, git_root, since, until, root_display, commit_meta)
@@ -629,10 +644,10 @@ def build_function_tree(
         if f.is_file() and f.suffix == ".go"
     )
     if not go_files:
-        die(
-            f"error: {scope} has no .go files directly (function mode "
-            "only analyses one package at a time; point me at the single "
-            "package dir, or pass --mode package for the nested view)"
+        raise HotspotError(
+            f"{scope} has no .go files directly (function mode analyses one "
+            "package at a time; point me at the single package dir, or pass "
+            "--mode package for the nested view)"
         )
     for gf in go_files:
         if not include_tests and gf.name.endswith("_test.go"):
@@ -676,22 +691,9 @@ def detect_mode(scope: Path, explicit: str) -> str:
     return "package"
 
 
-def _dir_has_go(d: Path) -> bool:
-    try:
-        for _dirpath, dirnames, filenames in os.walk(d):
-            dirnames[:] = [x for x in dirnames
-                           if x not in SKIP_DIRS and not x.startswith(".")]
-            if any(f.endswith(".go") for f in filenames):
-                return True
-    except OSError:
-        pass
-    return False
-
-
 # --------------------------------------------------------------------------
 # Enrichment — signals, recent commits, author distribution, suggestions.
-# This is the part that makes each hotspot actionable for a reviewer or an
-# AI refactoring agent: not just "this is hot", but WHY and WHAT TO DO.
+# Pure domain logic; unchanged from the original.
 # --------------------------------------------------------------------------
 
 def enrich_leaves(leaves: list[dict], commit_meta: dict[str, dict]) -> None:
@@ -710,8 +712,7 @@ def _enrich_leaf(leaf: dict, commit_meta: dict[str, dict]) -> None:
             "date": m.get("date", ""),
             "author": m.get("author", ""),
             "subject": m.get("subject", ""),
-            "looks_like_fix": bool(
-                BUG_KEYWORDS.search(m.get("subject", ""))),
+            "looks_like_fix": bool(BUG_KEYWORDS.search(m.get("subject", ""))),
         }
         for h, m in known[:5]
     ]
@@ -761,7 +762,7 @@ def _compute_signals(
         elif loc >= 1500:
             signals.append({"kind": "large", "severity": "medium",
                             "detail": f"{loc} LOC"})
-    else:  # function
+    else:
         if loc >= 150:
             signals.append({"kind": "large", "severity": "high",
                             "detail": f"{loc} LOC"})
@@ -851,155 +852,16 @@ def _compute_actions(leaf: dict) -> list[str]:
 
 
 # --------------------------------------------------------------------------
-# Circle packing (Wang / Bostock front-chain)
+# Circle packing — delegated to circlify (d3-hierarchy port).
 # --------------------------------------------------------------------------
 
-class _PCircle:
-    __slots__ = ("r", "x", "y", "data", "_prev", "_next")
-    def __init__(self, r: float, data=None):
-        self.r = r; self.x = 0.0; self.y = 0.0; self.data = data
-        self._prev: _PCircle | None = None; self._next: _PCircle | None = None
+def pack_tree(node: Node, scale: float = 100.0) -> None:
+    """Lay out *node* and its children as a nested circle-pack.
 
-
-def _place(a: _PCircle, b: _PCircle, c: _PCircle) -> None:
-    dx = b.x - a.x; dy = b.y - a.y; d2 = dx * dx + dy * dy
-    if d2 > 0:
-        a2 = (c.r + a.r) ** 2; b2 = (c.r + b.r) ** 2
-        if a2 > b2:
-            x = (d2 + b2 - a2) / (2 * d2)
-            y = math.sqrt(max(0.0, b2 / d2 - x * x))
-            c.x = b.x - x * dx - y * dy
-            c.y = b.y - x * dy + y * dx
-        else:
-            x = (d2 + a2 - b2) / (2 * d2)
-            y = math.sqrt(max(0.0, a2 / d2 - x * x))
-            c.x = a.x + x * dx - y * dy
-            c.y = a.y + x * dy + y * dx
-    else:
-        c.x = a.x + c.r; c.y = a.y
-
-
-def _intersects(a: _PCircle, b: _PCircle, tol: float = 1e-9) -> bool:
-    dr = a.r + b.r - tol
-    dx = b.x - a.x; dy = b.y - a.y
-    return dr > 0 and dr * dr > dx * dx + dy * dy
-
-
-def _score(a: _PCircle) -> float:
-    b = a._next
-    if b is None:
-        return 0.0
-    ab = a.r + b.r
-    if ab == 0:
-        return 0.0
-    dx = (a.x * b.r + b.x * a.r) / ab
-    dy = (a.y * b.r + b.y * a.r) / ab
-    return dx * dx + dy * dy
-
-
-def _enclose(circles: list[_PCircle]) -> tuple[float, float, float]:
-    if not circles:
-        return 0.0, 0.0, 0.0
-    cx = sum(c.x for c in circles) / len(circles)
-    cy = sum(c.y for c in circles) / len(circles)
-    R = max(math.hypot(c.x - cx, c.y - cy) + c.r for c in circles)
-    for _ in range(64):
-        changed = False
-        for c in circles:
-            d = math.hypot(c.x - cx, c.y - cy)
-            if d + c.r > R + 1e-9:
-                new_R = (R + d + c.r) / 2
-                if d > 1e-12:
-                    t = (new_R - R) / d
-                    cx += (c.x - cx) * t
-                    cy += (c.y - cy) * t
-                R = new_R; changed = True
-        if not changed:
-            break
-    return cx, cy, R
-
-
-def pack_siblings(circles: list[_PCircle]) -> float:
-    n = len(circles)
-    if n == 0:
-        return 0.0
-    a = circles[0]; a.x = a.y = 0.0
-    if n < 2:
-        return a.r
-    b = circles[1]; a.x = -b.r; b.x = a.r; b.y = 0.0
-    if n < 3:
-        cx, cy, R = _enclose(circles)
-        for c in circles:
-            c.x -= cx; c.y -= cy
-        return R
-    c = circles[2]; _place(b, a, c)
-    a._next = c; a._prev = b
-    b._next = a; b._prev = c
-    c._next = b; c._prev = a
-    i = 3
-    while i < n:
-        c = circles[i]; _place(a, b, c)
-        j = b._next; k = a._prev; sj = b.r; sk = a.r
-        overlap = False
-        while True:
-            if sj <= sk:
-                if _intersects(j, c):
-                    b = j; a._next = b; b._prev = a
-                    overlap = True; break
-                sj += j.r; j = j._next
-            else:
-                if _intersects(k, c):
-                    a = k; a._next = b; b._prev = a
-                    overlap = True; break
-                sk += k.r; k = k._prev
-            if j is k._next:
-                break
-        if overlap:
-            continue
-        c._prev = a; c._next = b
-        a._next = c; b._prev = c
-        b = c
-        best = _score(a); cur = c._next
-        while cur is not b:
-            s = _score(cur)
-            if s < best:
-                a = cur; best = s
-            cur = cur._next
-        b = a._next
-        i += 1
-    cx, cy, R = _enclose(circles)
-    for c in circles:
-        c.x -= cx; c.y -= cy
-    return R
-
-
-def pack_tree(node: Node, pad: float = 1.8) -> None:
-    node.x = 0.0; node.y = 0.0
-    if node.pkg is not None and not node.children:
-        loc = max(1.0, float(node.pkg["loc"]))
-        node.r = math.sqrt(loc / math.pi)
-        return
-    if not node.children:
-        node.r = 1.0; return
-    for c in node.children:
-        pack_tree(c, pad)
-    peers = [_PCircle(c.r + pad, c) for c in node.children]
-    R = pack_siblings(peers)
-    for peer, child in zip(peers, node.children):
-        child.x = peer.x
-        child.y = peer.y
-    node.r = R
-
-
-def pack_tree_circlify(node: Node, scale: float = 100.0) -> None:
-    """Pack a Node tree using the `circlify` library (if installed).
-
-    circlify returns absolute coordinates relative to a unit enclosing
-    circle; our renderer works in parent-relative coordinates. We walk the
-    result, stash absolute (x, y) per node, then convert to parent-relative
-    offsets the renderer can recurse through unchanged.
+    circlify returns absolute coordinates inside a unit enclosing circle;
+    our renderer wants parent-relative coordinates, so we walk the result
+    once and convert to offsets from each parent's centre.
     """
-    assert _circlify is not None
     node.x = 0.0
     node.y = 0.0
 
@@ -1027,7 +889,7 @@ def pack_tree_circlify(node: Node, scale: float = 100.0) -> None:
         return {"id": nid, "datum": total, "children": children_entries}
 
     top = [_entry(c) for c in node.children]
-    circles = _circlify.circlify(top, show_enclosure=False)
+    circles = circlify.circlify(top, show_enclosure=False)
 
     abs_pos: dict[str, tuple[float, float]] = {}
     max_extent = 0.0
@@ -1050,7 +912,8 @@ def pack_tree_circlify(node: Node, scale: float = 100.0) -> None:
         if n is node or nid is None:
             ax_, ay = 0.0, 0.0
             if n is node:
-                n.x = 0.0; n.y = 0.0
+                n.x = 0.0
+                n.y = 0.0
         else:
             ax_, ay = abs_pos.get(nid, (pax, pay))
             n.x = ax_ - pax
@@ -1061,26 +924,40 @@ def pack_tree_circlify(node: Node, scale: float = 100.0) -> None:
     _set_relative(node, 0.0, 0.0)
 
 
-def pack_tree_dispatch(node: Node, pad: float = 1.8) -> str:
-    """Pack `node`; return the name of the engine used ('circlify'|'native')."""
-    if _circlify is not None:
-        pack_tree_circlify(node)
-        return "circlify"
-    pack_tree(node, pad)
-    return "native"
-
-
 # --------------------------------------------------------------------------
-# Rendering
+# PNG rendering (matplotlib)
 # --------------------------------------------------------------------------
 
 LEAF_EDGE = "#1a1a1a"
 LEAF_EDGE_HOT = "#000000"
 LEAF_LW = 0.7
-LEAF_LW_HOT = 2.4
+LEAF_LW_HOT = 2.6
 GROUP_EDGE = "#a6a6a6"
-GROUP_FILL = "#fcfcfc"
+GROUP_FILL = "#fafafa"
 ROOT_EDGE = "#b8b8b8"
+
+
+def _hotspot_colormap() -> LinearSegmentedColormap:
+    """Truncated YlOrRd — starts at a visible light-yellow, not near-white.
+
+    Plain YlOrRd at low heat blends into the background, which hides
+    low-churn-but-existing packages. We skip the first ~18% of the ramp so
+    every leaf circle has a perceptible fill even at the cold end.
+    """
+    base = plt.get_cmap("YlOrRd")
+    colors = base(np.linspace(0.18, 1.0, 256))
+    return LinearSegmentedColormap.from_list("hotspots_shifted", colors)
+
+
+def _display_date(s: str | None) -> str | None:
+    """Strip a trailing HH:MM:SS from a normalized date for display.
+
+    dateparser yields 'YYYY-MM-DD HH:MM:SS'. Day precision is plenty for
+    the title; the full timestamp just adds noise.
+    """
+    if not s:
+        return s
+    return s.split(" ", 1)[0]
 
 
 def _render_leaf_circle(ax, node: Node, cx: float, cy: float,
@@ -1109,7 +986,8 @@ def _render_leaf_circle(ax, node: Node, cx: float, cy: float,
         num = str(hot_map[node.pkg["path"]])
         br = max(0.55, min(r * 0.22, 1.8))
         angle = math.radians(55)
-        bx = cx + r * math.cos(angle); by = cy + r * math.sin(angle)
+        bx = cx + r * math.cos(angle)
+        by = cy + r * math.sin(angle)
         ax.add_patch(plt.Circle(
             (bx, by), br, facecolor="#111", edgecolor="white",
             linewidth=0.9, zorder=14 + depth))
@@ -1160,15 +1038,15 @@ def plot_hotspots(
         return
     TOP_N = 12
     max_revs = max((p["revisions"] for p in leaves), default=1) or 1
-    cmap = plt.get_cmap("YlOrRd")
+    cmap = _hotspot_colormap()
     norm = plt.Normalize(vmin=0, vmax=max_revs)
     top_hot = sorted(leaves, key=lambda p: p["score"], reverse=True)[:TOP_N]
     hot_map = {p["path"]: i + 1 for i, p in enumerate(top_hot)}
-    pack_tree_dispatch(tree)
+    pack_tree(tree)
 
     fig = plt.figure(figsize=(20, 13), facecolor="white")
     gs = fig.add_gridspec(
-        3, 2, height_ratios=[0.11, 1.0, 0.035], width_ratios=[4, 1],
+        3, 2, height_ratios=[0.14, 1.0, 0.035], width_ratios=[4, 1],
         left=0.03, right=0.98, top=0.97, bottom=0.04,
         hspace=0.08, wspace=0.04)
     ax_header = fig.add_subplot(gs[0, :])
@@ -1178,34 +1056,33 @@ def plot_hotspots(
     for a in (ax_header, ax, ax_side):
         a.axis("off")
 
-    ax_header.text(0, 0.85, title, fontsize=18, fontweight="bold",
+    ax_header.text(0, 0.92, title, fontsize=19, fontweight="bold",
                    va="top", ha="left", family="sans-serif", color="#111")
     if subtitle:
-        ax_header.text(0, 0.45, subtitle, fontsize=10.5,
-                       va="top", ha="left", color="#444")
+        ax_header.text(0, 0.52, subtitle, fontsize=11,
+                       va="top", ha="left", color="#333",
+                       linespacing=1.45)
     is_fn = bool(leaves) and leaves[0].get("kind") == "function"
     if is_fn:
         caption = (
-            "Code-as-a-Crime-Scene enclosure diagram — function-level "
-            "zoom. Every filled circle is a top-level Go func/method; "
-            "outlined circles are the files housing them. Radius ∝ √(LOC) "
-            "· fill = distinct commits touching the function's line range "
-            "(git log -L) · numbered = top hotspots.")
+            "Enclosure diagram — function-level zoom. Filled circle = one "
+            "top-level Go func/method; outlined circle = the file housing "
+            "it. Radius ∝ √LOC · fill = commits touching the function's "
+            "line range (git log -L) · numbered badge = top hotspot rank.")
         cbar_label = ("Change frequency — distinct commits touching the "
                       "function — cold → hot")
         sidebar_heading = "TOP HOTSPOT FUNCTIONS"
     else:
         caption = (
-            "Code-as-a-Crime-Scene enclosure diagram. Every filled circle "
-            "is one Go package (one directory of .go files); outlined "
-            "circles are grouping directories. Radius ∝ √(Σ LOC) · fill = "
-            "distinct commits touching the package · numbered = top "
-            "hotspots.")
+            "Enclosure diagram — filled circle = one Go package; outlined "
+            "circle = grouping directory. Radius ∝ √(Σ LOC) · fill = "
+            "commits touching the package · numbered badge = top hotspot "
+            "rank. Big red circles = refactor first.")
         cbar_label = ("Change frequency — distinct commits touching the "
                       "package — cold → hot")
         sidebar_heading = "TOP HOTSPOT PACKAGES"
-    ax_header.text(0, 0.08, caption, fontsize=9, color="#888",
-                   va="top", ha="left", style="italic")
+    ax_header.text(0, 0.05, caption, fontsize=9.5, color="#555",
+                   va="top", ha="left")
 
     _render_circle(ax, tree, 0.0, 0.0, cmap, norm, hot_map, depth=0)
     margin = tree.r * 0.04
@@ -1213,50 +1090,63 @@ def plot_hotspots(
     ax.set_ylim(-tree.r - margin, tree.r + margin)
     ax.set_aspect("equal")
 
-    ax_side.text(0.0, 1.0, sidebar_heading, fontsize=12, fontweight="bold",
+    ax_side.text(0.0, 1.0, sidebar_heading, fontsize=12.5, fontweight="bold",
                  color="#111", va="top", ha="left",
                  transform=ax_side.transAxes)
-    ax_side.text(0.0, 0.975, "review these first — high churn × high size",
+    ax_side.text(0.0, 0.973, "review these first — high churn × high size",
                  fontsize=8.5, color="#666", style="italic",
                  va="top", ha="left", transform=ax_side.transAxes)
-    line_h = 1.0 / (TOP_N + 1.5)
+    ax_side.add_line(Line2D(
+        [0.0, 1.0], [0.945, 0.945], color="#ddd", linewidth=0.6,
+        transform=ax_side.transAxes, clip_on=False))
+
+    line_h = 0.935 / TOP_N  # vertical span / number of rows
     for i, p in enumerate(top_hot, 1):
-        y = 0.94 - (i - 0.5) * line_h
-        heat = norm(p["revisions"]); color = cmap(heat)
-        chip_h = line_h * 0.55
+        y_top = 0.935 - (i - 1) * line_h
+        y_mid = y_top - line_h / 2
+        heat = norm(p["revisions"])
+        color = cmap(heat)
+        chip_h = line_h * 0.62
         ax_side.add_patch(Rectangle(
-            (0.0, y - chip_h / 2), 0.085, chip_h,
+            (0.0, y_mid - chip_h / 2), 0.09, chip_h,
             transform=ax_side.transAxes, facecolor=color,
-            edgecolor="#111", linewidth=0.7, clip_on=False))
-        ax_side.text(0.0425, y, str(i), ha="center", va="center",
-                     fontsize=10.5, fontweight="bold",
+            edgecolor="#111", linewidth=0.8, clip_on=False))
+        ax_side.text(0.045, y_mid, str(i), ha="center", va="center",
+                     fontsize=11.5, fontweight="bold",
                      color="white" if heat > 0.55 else "#111",
                      transform=ax_side.transAxes)
-        ax_side.text(0.11, y + chip_h * 0.15,
+        ax_side.text(0.115, y_mid + chip_h * 0.18,
                      p.get("import_path") or p["rel_to_scope"],
-                     fontsize=9, va="center", family="monospace",
-                     color="#111", transform=ax_side.transAxes)
+                     fontsize=9.5, va="center", family="monospace",
+                     color="#111", fontweight="bold",
+                     transform=ax_side.transAxes)
         bits = f'{p["revisions"]} revs · {p["loc"]} LOC · score {p["score"]:,}'
         if p.get("files") and p.get("kind") == "package":
             bits = (f'{p["revisions"]} revs · {p["loc"]} LOC · '
                     f'{p["files"]} files · score {p["score"]:,}')
-        ax_side.text(0.11, y - chip_h * 0.45, bits,
-                     fontsize=8, va="center", color="#666",
+        ax_side.text(0.115, y_mid - chip_h * 0.45, bits,
+                     fontsize=8.5, va="center", color="#555",
                      transform=ax_side.transAxes)
+        if i < TOP_N:  # divider between rows
+            ax_side.add_line(Line2D(
+                [0.0, 1.0], [y_top - line_h, y_top - line_h],
+                color="#eee", linewidth=0.5,
+                transform=ax_side.transAxes, clip_on=False))
 
-    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm); sm.set_array([])
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
     cbar = fig.colorbar(sm, cax=ax_cbar, orientation="horizontal")
     cbar.set_label(cbar_label, fontsize=9.5, labelpad=6, color="#333")
     cbar.ax.tick_params(labelsize=8, colors="#333")
-    cbar.outline.set_edgecolor("#333"); cbar.outline.set_linewidth(0.5)
+    cbar.outline.set_edgecolor("#333")
+    cbar.outline.set_linewidth(0.5)
     fig.savefig(out_path, dpi=150, bbox_inches="tight",
                 facecolor=fig.get_facecolor())
+    plt.close(fig)
 
 
 # --------------------------------------------------------------------------
-# Interactive HTML (plotly) — optional alternative to the static PNG.
-# Same layout (circle-pack), but hover tooltips carry full signal/author/
-# commit/action context so a reader can triage without opening the JSON.
+# Interactive HTML (plotly)
 # --------------------------------------------------------------------------
 
 def _rgba_css(rgba) -> str:
@@ -1322,22 +1212,19 @@ def emit_html(
     leaves: list[dict], tree: Node, out_path: Path,
     title: str, subtitle: str,
 ) -> None:
-    """Write an interactive plotly HTML report of the packed tree."""
-    if _go is None:
-        die("error: --html requires plotly (pip install plotly)")
     if not leaves:
         return
 
     TOP_N = 12
     max_revs = max((p["revisions"] for p in leaves), default=1) or 1
-    cmap = plt.get_cmap("YlOrRd")
+    cmap = _hotspot_colormap()
     norm = plt.Normalize(vmin=0, vmax=max_revs)
     top_hot = sorted(leaves, key=lambda p: p["score"], reverse=True)[:TOP_N]
     hot_map = {p["path"]: i + 1 for i, p in enumerate(top_hot)}
 
-    pack_tree_dispatch(tree)
+    pack_tree(tree)
 
-    fig = _go.Figure()
+    fig = pgo.Figure()
     hover_x: list[float] = []
     hover_y: list[float] = []
     hover_text: list[str] = []
@@ -1357,7 +1244,6 @@ def emit_html(
                           width=2.2 if is_hot else 0.7),
                 layer="below",
             )
-            # Optional centre label if the circle is big enough
             if n.r > 6 and n.r * 2 > len(n.name) * 0.8:
                 text_color = "white" if heat > 0.55 else "#111"
                 annotations.append(dict(
@@ -1386,11 +1272,11 @@ def emit_html(
                               size=min(13, max(8, br * 1.2)),
                               color="white"),
                 ))
-            hover_x.append(cx); hover_y.append(cy)
+            hover_x.append(cx)
+            hover_y.append(cy)
             hover_text.append(_hover_html(n.pkg, hot_map.get(n.pkg["path"])))
             return
 
-        # Container
         fig.add_shape(
             type="circle", xref="x", yref="y",
             x0=cx - n.r, y0=cy - n.r,
@@ -1414,15 +1300,13 @@ def emit_html(
 
     walk(tree, 0.0, 0.0, 0)
 
-    # Invisible hover markers at leaf centres
-    fig.add_trace(_go.Scatter(
+    fig.add_trace(pgo.Scatter(
         x=hover_x, y=hover_y, mode="markers",
         marker=dict(size=10, color="rgba(0,0,0,0)"),
         hovertext=hover_text, hoverinfo="text",
         showlegend=False, name="hotspots",
     ))
 
-    # Title + subtitle stacked above the plot
     header_html = (
         f"<b>{_escape_html(title)}</b>"
         + (f"<br><span style='font-size:12px;color:#555'>"
@@ -1445,7 +1329,6 @@ def emit_html(
         width=1400, height=900,
         annotations=annotations,
     )
-    # A small footer caption explaining the legend
     fig.add_annotation(
         xref="paper", yref="paper", x=0.01, y=-0.02,
         xanchor="left", yanchor="top", showarrow=False,
@@ -1533,10 +1416,10 @@ def build_report(
 def load_baseline(path: Path) -> dict:
     try:
         return json.loads(path.read_text())
-    except FileNotFoundError:
-        die(f"error: baseline {path} does not exist")
+    except FileNotFoundError as e:
+        raise HotspotError(f"baseline {path} does not exist") from e
     except json.JSONDecodeError as e:
-        die(f"error: baseline {path} is not valid JSON — {e}")
+        raise HotspotError(f"baseline {path} is not valid JSON — {e}") from e
 
 
 def compare_to_baseline(current: dict, baseline: dict) -> dict:
@@ -1641,7 +1524,7 @@ def apply_thresholds(
 
 
 # --------------------------------------------------------------------------
-# Shared printing
+# Tabular outputs (stdout, CSV)
 # --------------------------------------------------------------------------
 
 def print_text_report(leaves: list[dict], mode: str) -> None:
@@ -1670,7 +1553,8 @@ def write_csv(leaves: list[dict], mode: str, path: Path) -> None:
                       "start_line", "end_line",
                       "loc", "revisions", "score",
                       "signals", "author_count", "bug_fix_count"]
-            w = csv.DictWriter(fh, fieldnames=fields); w.writeheader()
+            w = csv.DictWriter(fh, fieldnames=fields)
+            w.writeheader()
             for p in leaves:
                 w.writerow({
                     "import_path": p["import_path"],
@@ -1690,7 +1574,8 @@ def write_csv(leaves: list[dict], mode: str, path: Path) -> None:
             fields = ["import_path", "package", "path",
                       "files", "loc", "revisions", "score",
                       "signals", "author_count", "bug_fix_count"]
-            w = csv.DictWriter(fh, fieldnames=fields); w.writeheader()
+            w = csv.DictWriter(fh, fieldnames=fields)
+            w.writeheader()
             for p in leaves:
                 w.writerow({
                     "import_path": p.get("import_path") or "",
@@ -1708,10 +1593,10 @@ def write_csv(leaves: list[dict], mode: str, path: Path) -> None:
 
 
 # --------------------------------------------------------------------------
-# Main
+# CLI
 # --------------------------------------------------------------------------
 
-def main() -> None:
+def _build_argparser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -1727,12 +1612,10 @@ def main() -> None:
     ap.add_argument("--no-image", action="store_true",
                     help="skip writing the PNG (CI / headless use)")
     ap.add_argument("--html", type=Path, default=None,
-                    help="interactive Plotly HTML report path. When plotly "
-                         "is installed the HTML is auto-written next to "
-                         "--out unless --no-html is set.")
+                    help="interactive Plotly HTML report path. Auto-written "
+                         "next to --out unless --no-html is set.")
     ap.add_argument("--no-html", action="store_true",
-                    help="skip the interactive HTML even if plotly is "
-                         "installed")
+                    help="skip the interactive HTML")
     ap.add_argument("--csv", type=Path, default=None,
                     help="write per-leaf CSV to this path")
     ap.add_argument("--json", type=Path, default=None,
@@ -1753,71 +1636,107 @@ def main() -> None:
                          "≥ this percent vs baseline (e.g. 20)")
     ap.add_argument("--quiet", action="store_true",
                     help="suppress the top-20 stdout table")
+    ap.add_argument("--verbose", "-v", action="count", default=0,
+                    help="-v for INFO, -vv for DEBUG")
     ap.add_argument("--include-tests", action="store_true")
     ap.add_argument("--ignore-dead-files", action="store_true",
-                    help="[deprecated; on by default] kept as a no-op for "
-                         "backward compatibility")
+                    help="[deprecated; on by default] no-op")
     ap.add_argument("--keep-dead-files", action="store_true",
                     help="keep commits whose only affected files no longer "
-                         "exist on disk (opt out of the accurate default)")
+                         "exist on disk")
     ap.add_argument("--exclude", action="append", default=None,
                     metavar="REGEX",
                     help="exclude .go files matching this regex (repeatable). "
-                         "Added on top of the auto-applied defaults for "
-                         "generated files.")
+                         "Added on top of the auto-applied defaults.")
     ap.add_argument("--no-default-excludes", action="store_true",
                     help=f"don't auto-exclude common generated Go files. "
                          f"Defaults: {', '.join(DEFAULT_EXCLUDES)}")
-    args = ap.parse_args()
+    return ap
 
+
+def _setup_logging(verbose: int) -> None:
+    level = logging.WARNING
+    if verbose == 1:
+        level = logging.INFO
+    elif verbose >= 2:
+        level = logging.DEBUG
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        datefmt="%H:%M:%S",
+        stream=sys.stderr,
+    )
+
+
+def _resolve_outputs(args: argparse.Namespace) -> None:
+    if (args.html is None and not args.no_html and not args.no_image):
+        args.html = args.out.with_suffix(".html")
+
+
+def _build_title_subtitle(
+    leaves: list[dict], mode: str, root_display: str, args: argparse.Namespace,
+    total_files: int, total_commits: int,
+) -> tuple[str, str]:
+    window_bits = []
+    if args.since:
+        window_bits.append(f"since {_display_date(args.since)}")
+    if args.until:
+        window_bits.append(f"until {_display_date(args.until)}")
+    title_since = (" · " + " · ".join(window_bits)) if window_bits else ""
+    top = leaves[0]
+    if mode == "function":
+        counts_line = f"{len(leaves)} functions · Σ {total_commits} commits"
+        top_line = (f"top hotspot: {top['name']} "
+                    f"({top['revisions']} revs × {top['loc']} LOC)")
+        subtitle = f"{counts_line}\n{top_line}"
+        title = f"Function hotspots in {root_display}{title_since}"
+    else:
+        counts_line = (f"{len(leaves)} packages · {total_files} files · "
+                       f"{total_commits} commits")
+        top_line = (
+            f"top hotspot: {top.get('import_path') or top['rel_to_scope']} "
+            f"({top['revisions']} revs × {top['loc']} LOC)")
+        subtitle = f"{counts_line}\n{top_line}"
+        title = f"Go hotspots in {root_display}{title_since}"
+    return title, subtitle
+
+
+def run(args: argparse.Namespace) -> int:
     scope = args.directory.resolve()
     if not scope.exists():
-        die(f"error: {scope} does not exist")
+        raise HotspotError(f"{scope} does not exist")
     if not scope.is_dir() and not (scope.is_file() and scope.suffix == ".go"):
-        die(f"error: {scope} must be a directory or a .go file")
+        raise HotspotError(f"{scope} must be a directory or a .go file")
 
     if args.since:
         args.since = normalize_date("--since", args.since)
     if args.until:
         args.until = normalize_date("--until", args.until)
     if args.fail_on_new_hotspot and args.baseline is None:
-        die("error: --fail-on-new-hotspot requires --baseline")
+        raise HotspotError("--fail-on-new-hotspot requires --baseline")
     if args.fail_on_worsening_pct is not None and args.baseline is None:
-        die("error: --fail-on-worsening-pct requires --baseline")
+        raise HotspotError("--fail-on-worsening-pct requires --baseline")
 
-    # Excludes: defaults + user additions, unless opted out. We pass the
-    # merged list to filters so the JSON report records exactly what ran.
     effective_excludes: list[str] = []
     if not args.no_default_excludes:
         effective_excludes.extend(DEFAULT_EXCLUDES)
     if args.exclude:
         effective_excludes.extend(args.exclude)
-    args.exclude = effective_excludes  # report surface shows merged list
+    args.exclude = effective_excludes
     exclude_regex = compile_excludes(effective_excludes)
 
-    # Dead-file handling is on by default (accurate); keep flag for opt-out.
     ignore_dead_files = not args.keep_dead_files
-    args.ignore_dead_files = ignore_dead_files  # for JSON report surface
+    args.ignore_dead_files = ignore_dead_files
 
-    # HTML is auto-emitted next to the PNG when plotly is available and the
-    # user didn't ask to skip it.
-    if (args.html is None and _go is not None and not args.no_html
-            and not args.no_image):
-        args.html = args.out.with_suffix(".html")
+    _resolve_outputs(args)
 
     base = scope if scope.is_dir() else scope.parent
     git_root = find_git_root(base)
     module_info = find_go_module(base)
     mode = detect_mode(scope, args.mode)
+    log.info("git_root=%s module=%s mode=%s",
+             git_root, module_info[1] if module_info else None, mode)
 
-    leaves: list[dict]
-    tree: Node
-    commit_meta: dict[str, dict]
-    total_files: int
-    total_commits: int
-    root_display: str
-
-    # ---- collect leaves + tree (mode-specific) ----
     if mode == "function":
         if module_info is not None:
             mod_dir, mod_path = module_info
@@ -1835,19 +1754,18 @@ def main() -> None:
 
         tree, leaves, commit_meta = build_function_tree(
             scope, git_root, args.include_tests,
-            args.since, args.until, exclude_regex,
-            root_display,
+            args.since, args.until, exclude_regex, root_display,
         )
         if not leaves:
-            die("error: no Go functions found in the given scope")
+            raise HotspotError("no Go functions found in the given scope")
         total_files = 1 if scope.is_file() else len({
             p["file_path"] for p in leaves if p.get("file_path")
         })
         total_commits = len(commit_meta)
     else:
         if not scope.is_dir():
-            die(f"error: {scope} is a file; --mode package needs "
-                     "a directory.")
+            raise HotspotError(f"{scope} is a file; --mode package needs "
+                               "a directory")
         live_files: set[str] | None = None
         if ignore_dead_files:
             live_files = {
@@ -1863,16 +1781,15 @@ def main() -> None:
                 bits.append(f"since {args.since!r}")
             if args.until:
                 bits.append(f"until {args.until!r}")
-            die(
-                f"error: no commits touched any .go file in {scope} "
-                f"({' / '.join(bits)}).\n"
-                "  The window is empty — widen the date range or check "
+            raise HotspotError(
+                f"no commits touched any .go file in {scope} "
+                f"({' / '.join(bits)}). Widen the date range or check "
                 "the dates.")
         leaves = collect_leaf_packages(
             scope, git_root, commits_per_file, args.include_tests,
             module_info, exclude_regex=exclude_regex)
         if not leaves:
-            die("error: no Go packages found under the given directory")
+            raise HotspotError("no Go packages found under the given directory")
         total_files = sum(p["files"] for p in leaves)
         all_commits: set[str] = set()
         for commits in commits_per_file.values():
@@ -1892,21 +1809,17 @@ def main() -> None:
             root_display = scope.name
         tree = build_tree(leaves, root_name=root_display)
 
-    # ---- rank + enrich ----
     leaves.sort(key=lambda p: p["score"], reverse=True)
     enrich_leaves(leaves, commit_meta)
 
-    # ---- text output ----
     if not args.quiet:
         print_text_report(leaves, mode)
 
-    # ---- CSV ----
     if args.csv:
         write_csv(leaves, mode, args.csv)
         if not args.quiet:
             print(f"wrote {args.csv}")
 
-    # ---- report ----
     thresholds_spec = {
         "fail_on_score": args.fail_on_score,
         "fail_on_new_hotspot": bool(args.fail_on_new_hotspot),
@@ -1917,38 +1830,17 @@ def main() -> None:
         thresholds_spec, total_files, total_commits, args.top_n,
     )
 
-    # ---- baseline diff ----
     if args.baseline is not None:
         baseline = load_baseline(args.baseline)
         report["baseline_delta"] = compare_to_baseline(report, baseline)
 
-    # ---- JSON ----
     if args.json is not None:
         args.json.write_text(json.dumps(report, indent=2) + "\n")
         if not args.quiet:
             print(f"wrote {args.json}")
 
-    # ---- title/subtitle (shared by PNG and HTML) ----
-    window_bits = []
-    if args.since:
-        window_bits.append(f"since {args.since}")
-    if args.until:
-        window_bits.append(f"until {args.until}")
-    title_since = (" " + " / ".join(window_bits)) if window_bits else ""
-    top = leaves[0]
-    if mode == "function":
-        subtitle = (
-            f"{len(leaves)} functions · Σ {total_commits} commits     "
-            f"top hotspot: {top['name']} "
-            f"({top['revisions']} revs × {top['loc']} LOC)")
-        title = f"Function hotspots in {root_display}{title_since}"
-    else:
-        subtitle = (
-            f"{len(leaves)} packages · {total_files} files · "
-            f"{total_commits} commits     "
-            f"top hotspot: {top.get('import_path') or top['rel_to_scope']} "
-            f"({top['revisions']} revs × {top['loc']} LOC)")
-        title = f"Go hotspots in {root_display}{title_since}"
+    title, subtitle = _build_title_subtitle(
+        leaves, mode, root_display, args, total_files, total_commits)
 
     if not args.no_image:
         plot_hotspots(leaves, tree, args.out, title, subtitle)
@@ -1960,11 +1852,23 @@ def main() -> None:
         if not args.quiet:
             print(f"wrote {args.html}")
 
-    # ---- thresholds / exit code ----
     exit_code, msgs = apply_thresholds(report, args)
     for m in msgs:
         print(m, file=sys.stderr)
-    sys.exit(exit_code)
+    return exit_code
+
+
+def main() -> None:
+    args = _build_argparser().parse_args()
+    _setup_logging(args.verbose)
+    try:
+        sys.exit(run(args))
+    except HotspotError as e:
+        log.error("%s", e)
+        sys.exit(EXIT_ERROR)
+    except KeyboardInterrupt:
+        sys.stderr.write("\ninterrupted\n")
+        sys.exit(130)
 
 
 if __name__ == "__main__":
