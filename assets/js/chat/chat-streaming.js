@@ -330,6 +330,9 @@ export function createStreamingMethods() {
                 case 'ARTIFACT_VERSION_SAVED':
                     this.__handleArtifactVersionSaved(event.value, state, threadId);
                     break;
+                case 'CODE_EXECUTION_RAN':
+                    this.__handleCodeExecutionRan(event.value, state, threadId);
+                    break;
                 default:
                     console.warn('[Streaming] Unknown custom event:', event.name);
             }

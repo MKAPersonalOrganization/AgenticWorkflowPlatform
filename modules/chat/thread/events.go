@@ -72,6 +72,39 @@ func (e *ToolResultAdded) EventType() string         { return "ToolResultAdded" 
 func (e *ToolResultAdded) EventTimestamp() time.Time { return e.Timestamp }
 func (e *ToolResultAdded) AggregateID() string       { return e.ThreadID }
 
+// CodeExecutionRan is emitted when the LLM provider's built-in code
+// executor runs code during a turn. It carries both the source the model
+// generated and the sandbox's output, so the UI can render a card with
+// the code block alongside stdout/stderr.
+//
+// Provider-agnostic: the domain event shape is the same whether the
+// provider was Gemini (current) or OpenAI / Anthropic (future). The
+// adapter's event translator normalises each provider's native response
+// parts into this event.
+type CodeExecutionRan struct {
+	ThreadID  string    `json:"threadId"`
+	MessageID string    `json:"messageId"`
+	// Language identifies the source syntax (e.g. "python"). Lower-cased
+	// for consistent rendering; empty when the provider doesn't say.
+	Language string `json:"language,omitempty"`
+	// Code is the source the model generated and asked the provider's
+	// sandbox to run. Shown to the user as a read-only highlighted block.
+	Code string `json:"code"`
+	// Output is whatever the sandbox emitted (stdout on success, stderr
+	// or an error description on failure).
+	Output string `json:"output,omitempty"`
+	// Outcome mirrors the provider's enum ("OUTCOME_OK",
+	// "OUTCOME_FAILED", "OUTCOME_DEADLINE_EXCEEDED" for Gemini). The UI
+	// uses it to decide whether to render a success or error style.
+	Outcome   string    `json:"outcome,omitempty"`
+	AgentName string    `json:"agentName,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+func (e *CodeExecutionRan) EventType() string         { return "CodeExecutionRan" }
+func (e *CodeExecutionRan) EventTimestamp() time.Time { return e.Timestamp }
+func (e *CodeExecutionRan) AggregateID() string       { return e.ThreadID }
+
 // ThreadTitleUpdated indicates that a thread's title has been changed.
 type ThreadTitleUpdated struct {
 	ThreadID  string    `json:"threadId"`

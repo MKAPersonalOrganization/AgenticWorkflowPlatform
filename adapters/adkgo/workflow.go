@@ -533,6 +533,10 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 		agentModelCfg = agentCfg.ModelConfig
 	}
 	genCfg := buildGenerateContentConfig(leafModelCfg, agentModelCfg, wbc.req.Config)
+	// Built-in code execution — provider dispatch. Each leaf carries
+	// its own CodeExecutionPolicy, so a workflow can mix code-executing
+	// and non-code-executing leaves freely.
+	wbc.adapter.applyCodeExecutionTool(agentCfg, leafModelCfg, genCfg)
 
 	agentName := wbc.uniqueName(foundAgent.Name())
 

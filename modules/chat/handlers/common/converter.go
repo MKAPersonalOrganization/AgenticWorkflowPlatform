@@ -248,6 +248,24 @@ func toAguiEventsInternal(event any) []any {
 			}),
 		)}
 
+	case *thread.CodeExecutionRan:
+		// Surfaces Gemini-executed (and future OpenAI / Anthropic)
+		// code snippets to the chat stream. Frontend renders a card
+		// with the source in a highlighted block and the sandbox
+		// output below. No user action — read-only.
+		return []any{aguievents.NewCustomEvent(
+			"CODE_EXECUTION_RAN",
+			aguievents.WithValue(map[string]any{
+				"messageId": evt.MessageID,
+				"language":  evt.Language,
+				"code":      evt.Code,
+				"output":    evt.Output,
+				"outcome":   evt.Outcome,
+				"agentName": evt.AgentName,
+				"timestamp": evt.Timestamp,
+			}),
+		)}
+
 	case *thread.UserMessageAdded, *thread.AssistantMessageAdded, *thread.ThreadCreated:
 		// These are handled by the frontend locally or via snapshots, no need to stream
 		return []any{}

@@ -99,6 +99,7 @@ export const agentDesigner = () => ({
         modelOverride: { provider: '', modelName: '' },
         memoryPolicy: null,
         artifactPolicy: null,
+        codeExecutionPolicy: null,
     },
 
     // UI state
@@ -108,6 +109,7 @@ export const agentDesigner = () => ({
     showGlobalInstruction: false,
     showMemory: false,
     showArtifacts: false,
+    showCodeExecution: false,
 
     // ── Instruction template autocomplete ─────────────────────────────
     // We expose the two ADK placeholder forms we officially support:
@@ -353,6 +355,31 @@ export const agentDesigner = () => ({
     set artifactsAutoSaveBlobs(v) {
         if (!this.form.artifactPolicy) this.form.artifactPolicy = { enabled: false, autoSaveUserBlobs: false };
         this.form.artifactPolicy.autoSaveUserBlobs = !!v;
+    },
+
+    // Code execution — single Boolean. Toggle materialises / clears the
+    // policy object so the backend sees an explicit choice rather than
+    // partial state.
+    get codeExecutionEnabled() {
+        return !!(this.form.codeExecutionPolicy && this.form.codeExecutionPolicy.enabled);
+    },
+    set codeExecutionEnabled(v) {
+        if (v) {
+            this.form.codeExecutionPolicy = { enabled: true };
+        } else {
+            this.form.codeExecutionPolicy = { enabled: false };
+        }
+    },
+
+    // Helper: is the currently selected model provider one where the
+    // built-in code executor is actually wired? Used by the UI to show a
+    // "Gemini only today" hint when another provider is active, without
+    // hiding the toggle (the user can still save it — the adapter just
+    // won't do anything with non-Gemini providers right now).
+    get codeExecutionSupportedByProvider() {
+        const p = (this.form.modelOverride && this.form.modelOverride.provider || '').toLowerCase();
+        if (!p) return true; // unknown / using global default — assume ok
+        return ['google', 'gemini', 'vertex', 'vertexai'].includes(p);
     },
 
     /**
@@ -867,6 +894,7 @@ export const agentDesigner = () => ({
             modelOverride: { provider: '', modelName: '' },
             memoryPolicy: null,
             artifactPolicy: null,
+            codeExecutionPolicy: null,
         };
         this.showTools = false;
         this.showKnowledgeBases = false;
@@ -880,6 +908,7 @@ export const agentDesigner = () => ({
         this.showGlobalInstruction = false;
         this.showMemory = false;
         this.showArtifacts = false;
+        this.showCodeExecution = false;
         this.agentPlugins = [];
         this.agentWorkspaces = [];
         this.agentFilesystems = [];
@@ -930,6 +959,9 @@ export const agentDesigner = () => ({
                     autoSaveUserBlobs: !!agent.artifactPolicy.autoSaveUserBlobs,
                 }
                 : null,
+            codeExecutionPolicy: agent.codeExecutionPolicy
+                ? { enabled: !!agent.codeExecutionPolicy.enabled }
+                : null,
         };
         this.showTools = false;
         this.showKnowledgeBases = false;
@@ -943,6 +975,7 @@ export const agentDesigner = () => ({
         this.showGlobalInstruction = false;
         this.showMemory = false;
         this.showArtifacts = false;
+        this.showCodeExecution = false;
         this.providerModelOptions = [];
         this.providerModelsError = '';
         this.hydrateSchemaRows('inputSchema');
@@ -1011,6 +1044,9 @@ export const agentDesigner = () => ({
                         enabled: !!this.form.artifactPolicy.enabled,
                         autoSaveUserBlobs: !!this.form.artifactPolicy.autoSaveUserBlobs,
                     }
+                    : null,
+                codeExecutionPolicy: this.form.codeExecutionPolicy
+                    ? { enabled: !!this.form.codeExecutionPolicy.enabled }
                     : null,
             };
 

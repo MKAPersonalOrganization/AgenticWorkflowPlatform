@@ -336,6 +336,49 @@ templ FileCard(ctx context.Context) {
 	</div>
 }
 
+// CodeExecutionCard renders the code the LLM asked the provider's sandbox
+// to run plus the output it got back. Nothing runs on our infrastructure —
+// this is a read-only audit trail of what Gemini (or future OpenAI /
+// Anthropic code interpreters) executed. Outcome drives the style so the
+// user can tell at a glance whether the run succeeded.
+templ CodeExecutionCard() {
+	<div
+		x-show="message.type === 'code_execution'"
+		x-cloak
+		class="w-full my-2 animate-in fade-in slide-in-from-bottom-2 duration-300"
+	>
+		<div
+			class="rounded-lg border overflow-hidden shadow-modern-xs"
+			:class="message.ok ? 'border-teal-500/30 bg-card' : 'border-destructive/30 bg-card'"
+		>
+			<!-- Header: icon + language + outcome pill -->
+			<div
+				class="flex items-center gap-2.5 px-3 py-2 border-b"
+				:class="message.ok ? 'border-teal-500/20 bg-teal-500/5' : 'border-destructive/20 bg-destructive/5'"
+			>
+				<svg class="size-4 shrink-0" :class="message.ok ? 'text-teal-600 dark:text-teal-400' : 'text-destructive'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+					<polyline points="4 17 10 11 4 5"></polyline>
+					<line x1="12" y1="19" x2="20" y2="19"></line>
+				</svg>
+				<span class="text-[10px] font-semibold uppercase tracking-wider" :class="message.ok ? 'text-teal-700 dark:text-teal-400' : 'text-destructive'" x-text="'code · ' + (message.language || 'python')"></span>
+				<span x-show="!message.ok" class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-destructive/10 text-destructive" x-text="message.outcome || 'failed'"></span>
+				<template x-if="message.agentName">
+					<span class="ms-auto text-[10px] text-muted-foreground shrink-0" x-text="message.agentName"></span>
+				</template>
+			</div>
+			<!-- Code block -->
+			<pre class="px-3 py-2 text-[12px] font-mono leading-relaxed overflow-x-auto bg-muted/30 text-foreground"><code x-text="message.code"></code></pre>
+			<!-- Output (only if present) -->
+			<template x-if="message.output">
+				<div class="border-t border-border/50">
+					<div class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/50">{ i18n.T(ctx, "Output") }</div>
+					<pre class="px-3 py-2 text-[11px] font-mono leading-relaxed overflow-x-auto whitespace-pre-wrap text-foreground/80" x-text="message.output"></pre>
+				</div>
+			</template>
+		</div>
+	</div>
+}
+
 // ArtifactSavedCard renders a compact notification when an agent creates or
 // updates a versioned artifact via the artifact service.
 templ ArtifactSavedCard() {
@@ -581,6 +624,10 @@ templ MessageList() {
 				@FileCard(ctx)
 				<!-- Artifact Version Saved Card -->
 				@ArtifactSavedCard()
+				<!-- Code Execution Card — surfaces code the LLM ran in the
+				     provider's sandbox (Gemini today). Read-only source +
+				     output, rendered inline with the turn that produced it. -->
+				@CodeExecutionCard()
 			</div>
 		</template>
 		<!-- Right-click Context Menu -->

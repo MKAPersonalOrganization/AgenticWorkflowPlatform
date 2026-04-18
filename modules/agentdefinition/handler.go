@@ -58,6 +58,7 @@ type createRequest struct {
 	ModelOverride            *agentModelOverrideRequest `json:"modelOverride,omitempty"`
 	MemoryPolicy             *AgentMemoryPolicy         `json:"memoryPolicy,omitempty"`
 	ArtifactPolicy           *AgentArtifactPolicy       `json:"artifactPolicy,omitempty"`
+	CodeExecutionPolicy      *AgentCodeExecutionPolicy  `json:"codeExecutionPolicy,omitempty"`
 }
 
 type updateRequest struct {
@@ -79,6 +80,7 @@ type updateRequest struct {
 	ModelOverride            *agentModelOverrideRequest `json:"modelOverride,omitempty"`
 	MemoryPolicy             *AgentMemoryPolicy         `json:"memoryPolicy,omitempty"`
 	ArtifactPolicy           *AgentArtifactPolicy       `json:"artifactPolicy,omitempty"`
+	CodeExecutionPolicy      *AgentCodeExecutionPolicy  `json:"codeExecutionPolicy,omitempty"`
 }
 
 type agentResponse struct {
@@ -112,6 +114,7 @@ type agentResponse struct {
 	ModelOverride            *AgentModelOverride      `json:"modelOverride,omitempty"`
 	MemoryPolicy             *AgentMemoryPolicy       `json:"memoryPolicy,omitempty"`
 	ArtifactPolicy           *AgentArtifactPolicy     `json:"artifactPolicy,omitempty"`
+	CodeExecutionPolicy      *AgentCodeExecutionPolicy `json:"codeExecutionPolicy,omitempty"`
 	ShareToken               string                   `json:"shareToken,omitempty"`
 	Visibility               string                   `json:"visibility,omitempty"`
 	CreatedAt                string                   `json:"createdAt"`
@@ -184,6 +187,7 @@ func toAgentResponse(a *AgentDefinition) agentResponse {
 		ModelOverride:            a.ModelOverride,
 		MemoryPolicy:             a.MemoryPolicy,
 		ArtifactPolicy:           a.ArtifactPolicy,
+		CodeExecutionPolicy:      a.CodeExecutionPolicy,
 		ShareToken:               a.ShareToken,
 		Visibility:               a.Visibility,
 		CreatedAt:                a.CreatedAt.Format("2006-01-02T15:04:05Z"),
@@ -232,6 +236,7 @@ func (h *storeHandler) create(w http.ResponseWriter, r *http.Request) {
 		ModelOverride:            toModelOverride(req.ModelOverride),
 		MemoryPolicy:             req.MemoryPolicy,
 		ArtifactPolicy:           req.ArtifactPolicy,
+		CodeExecutionPolicy:      req.CodeExecutionPolicy,
 	}
 
 	if err := h.svc.create(r.Context(), agent); err != nil {
@@ -360,6 +365,7 @@ func (h *storeHandler) update(w http.ResponseWriter, r *http.Request) {
 		ModelOverride:            toModelOverride(req.ModelOverride),
 		MemoryPolicy:             req.MemoryPolicy,
 		ArtifactPolicy:           req.ArtifactPolicy,
+		CodeExecutionPolicy:      req.CodeExecutionPolicy,
 	}
 
 	if err := h.svc.update(r.Context(), agent); err != nil {

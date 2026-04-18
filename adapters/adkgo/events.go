@@ -192,6 +192,14 @@ func translateModelEvent(evt *session.Event, ctx EventContext) []thread.Event {
 	// Tool results (function responses) within the same event.
 	events = append(events, translateFunctionResponses(evt, ctx)...)
 
+	// Built-in code execution parts (Gemini today; OpenAI / Anthropic
+	// later plug into the same translation). The provider emits
+	// ExecutableCode (source) and CodeExecutionResult (stdout/stderr)
+	// as distinct genai.Parts. We pair them into a single
+	// CodeExecutionRan domain event keyed by their shared ID so the UI
+	// can render code + output together.
+	events = append(events, translateCodeExecution(evt, ctx)...)
+
 	// Token usage.
 	if u := translateUsageMetadata(evt, ctx); u != nil {
 		events = append(events, u)
@@ -424,6 +432,82 @@ func translateArtifactDelta(evt *session.Event, ctx EventContext) []thread.Event
 // This is the single source of truth for error detection. tools.go guarantees
 // the shape; events.go just reads it.
 // ──────────────────────────────────────────────────────────────────────────────
+
+// translateCodeExecution walks an event's content parts and emits one
+// CodeExecutionRan domain event per (ExecutableCode, CodeExecutionResult)
+// pair that came back from the provider. Pairs are matched by the `ID`
+// field — Gemini sets the same ID on both parts so the UI can render
+// the source and its output in a single card.
+//
+// Edge cases:
+//   - An ExecutableCode without a matching result is still emitted (with
+//     empty Output) so the UI can at least show the generated source.
+//   - A CodeExecutionResult without a prior ExecutableCode is dropped
+//     silently — it would render as output-without-context, which is
+//     worse than not rendering at all.
+//   - Multiple pairs in the same event are supported (the model can
+//     execute several times per turn).
+//
+// Provider-agnostic by design: the function reads `genai.Part` fields
+// (ExecutableCode, CodeExecutionResult) that exist for every provider
+// in the genai types; only Gemini populates them today, but when OpenAI
+// or Anthropic adapters surface their own code-interpreter outputs they
+// will translate through this same path.
+func translateCodeExecution(evt *session.Event, ctx EventContext) []thread.Event {
+	if evt == nil || evt.Content == nil {
+		return nil
+	}
+	now := coalesceTime(evt.Timestamp)
+
+	// Collect code blocks and results keyed by ID for pairing.
+	type codeEntry struct {
+		language string
+		code     string
+	}
+	codes := make(map[string]codeEntry)
+	var codeOrder []string
+	results := make(map[string]*genai.CodeExecutionResult)
+
+	for _, p := range evt.Content.Parts {
+		if p == nil {
+			continue
+		}
+		if p.ExecutableCode != nil {
+			id := p.ExecutableCode.ID
+			codes[id] = codeEntry{
+				language: strings.ToLower(string(p.ExecutableCode.Language)),
+				code:     p.ExecutableCode.Code,
+			}
+			codeOrder = append(codeOrder, id)
+		}
+		if p.CodeExecutionResult != nil {
+			results[p.CodeExecutionResult.ID] = p.CodeExecutionResult
+		}
+	}
+
+	if len(codes) == 0 {
+		return nil
+	}
+
+	events := make([]thread.Event, 0, len(codes))
+	for _, id := range codeOrder {
+		c := codes[id]
+		evtOut := &thread.CodeExecutionRan{
+			ThreadID:  ctx.ThreadID,
+			MessageID: evt.ID,
+			Language:  c.language,
+			Code:      c.code,
+			AgentName: ctx.AgentName,
+			Timestamp: now,
+		}
+		if res, ok := results[id]; ok && res != nil {
+			evtOut.Output = res.Output
+			evtOut.Outcome = string(res.Outcome)
+		}
+		events = append(events, evtOut)
+	}
+	return events
+}
 
 func translateFunctionResponses(evt *session.Event, ctx EventContext) []thread.Event {
 	var events []thread.Event

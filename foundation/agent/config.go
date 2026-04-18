@@ -51,6 +51,31 @@ type AgentModelConfig struct {
 	StopSequences []string
 }
 
+// AgentCodeExecutionPolicy controls whether the agent may ask the LLM
+// provider's built-in code executor to run code during a turn.
+//
+// The policy is intentionally provider-agnostic — the adapter decides how
+// to wire it up for the active model:
+//
+//   - Gemini: add `&genai.Tool{CodeExecution: &genai.ToolCodeExecution{}}`
+//     to the request's tool list. Google runs the code inside its own
+//     sandbox and returns `ExecutableCode` + `CodeExecutionResult` parts.
+//   - OpenAI / Anthropic: not wired yet; adapter silently skips on those
+//     providers. Adding support later is drop-in — implement the
+//     provider's native code-interpreter in the adapter's dispatch
+//     helper without touching this type.
+//
+// Code never runs on our infrastructure. The provider sandboxes the
+// execution; we only render the produced source and output in the chat
+// timeline.
+type AgentCodeExecutionPolicy struct {
+	// Enabled turns on built-in code execution for this agent. When true
+	// and the active provider supports it, the adapter adds the native
+	// code-interpreter tool to the request. Ignored on providers that
+	// don't (yet) implement it.
+	Enabled bool `json:"enabled"`
+}
+
 // AgentArtifactPolicy controls whether an agent can list, load, and create
 // artifacts, and whether user-uploaded blobs are auto-saved.
 //
@@ -244,6 +269,11 @@ type Config struct {
 	// artifacts, and whether user-uploaded blobs are auto-saved into the
 	// artifact store. nil means artifacts are off.
 	ArtifactPolicy *AgentArtifactPolicy
+
+	// CodeExecutionPolicy controls whether the agent may use the LLM
+	// provider's built-in code executor (Gemini today; OpenAI / Anthropic
+	// in the future). nil means code execution is off.
+	CodeExecutionPolicy *AgentCodeExecutionPolicy
 
 	// AgentTools exposes other user-owned agents as callable tools on this
 	// agent. Each ref is resolved at runtime and wrapped via ADK-Go's

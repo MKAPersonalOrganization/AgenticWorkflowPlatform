@@ -20,7 +20,7 @@
    - [M7. Global-instruction UX (root-only surfacing)](#m7-global-instruction-ux) ✅ **done**
    - [M8. Memory service toggle + backend selector](#m8-memory-service-toggle) ✅ **done**
    - [M9. Artifact service — surface the `SaveInputBlobsAsArtifacts` toggle](#m9-artifact-service) ✅ **done**
-   - [M10. Built-in code-execution toggle](#m10-code-execution-toggle)
+   - [M10. Built-in code-execution toggle](#m10-code-execution-toggle) ✅ **done**
    - [M11. Long-running-tool surfacing in chat timeline](#m11-long-running-tools)
    - [M12. A2A remote-agent node configuration](#m12-a2a-remote-agent)
    - [M13. MCP toolset picker at agent level](#m13-mcp-toolset-picker)
@@ -31,6 +31,7 @@
    - [M18. Streaming-mode toggle](#m18-streaming-mode-toggle)
    - [M19. Agent-card export (expose our agent as A2A)](#m19-agent-card-export)
    - [M20. Tool-confirmation hint UX](#m20-tool-confirmation-hint-ux)
+   - [M21. OpenAI Responses API migration (unlocks code interpreter, file search, web search, computer use)](#m21-openai-responses-api-migration)
 4. [Custom patterns we should replace with ADK natives](#4-custom-vs-adk-native)
 5. [Cross-cutting UI cleanup](#5-cross-cutting-ui-cleanup)
 6. [Scope guards — things we deliberately are *not* building](#6-scope-guards)
@@ -418,6 +419,8 @@ Designer toggle → Config.ArtifactPolicy.AutoSaveInputs
 
 ### M10. Code-execution toggle
 
+> **Status: ✅ Done.** Per-agent `Config.CodeExecutionPolicy { Enabled }` drives a provider-agnostic toggle in the designer's new Code Execution card. Adapter dispatches by `modelCfg.Provider`: Gemini appends `&genai.Tool{CodeExecution: &genai.ToolCodeExecution{}}` to the request's `GenerateContentConfig.Tools`; OpenAI and Anthropic fall through silently with a TODO pointing at the future wiring. Response parts (`ExecutableCode` + `CodeExecutionResult`) are normalised into a new `CodeExecutionRan` domain event, projected to AG-UI as `CODE_EXECUTION_RAN`, and rendered as a read-only code + output card (`CodeExecutionCard` in `frontend/ui/messagelist/messagelist.templ`). Code never runs on our infrastructure — the provider sandboxes it. Integration test seeds a large multiplication on Gemini, asserts the exact product appears in the reply AND a `CodeExecutionRan` event carries the source.
+
 **ADK.** Gemini models can enable built-in code execution via `GenerateContentConfig` — results arrive as `genai.Part.CodeExecutionResult`.
 
 **Today.** Not exposed. Non-programmers who'd benefit most ("Make the agent able to compute things reliably") can't enable it.
@@ -429,6 +432,7 @@ Designer toggle → Config.CodeExecution.Enabled
          → adapters/adkgo/model.go appends code-execution tool in genai config
 Frontend chat → render genai.Part.CodeExecutionResult as a code block with output
 ```
+
 
 **Files.**
 - Backend: new bool on `Config`, guarded by provider capability in `adapters/adkgo/model.go` (silently ignored for non-supporting providers).
@@ -710,6 +714,39 @@ Backend → maps to RequireConfirmation + RequireConfirmationProvider
 **Acceptance.** A `file_delete` tool configured with `path starts-with /etc → confirm, else → allow` behaves accordingly.
 
 **Does-not-touch.** Tool plugin implementations.
+
+---
+
+### M21. OpenAI Responses API migration
+
+**ADK / SDK.** OpenAI's `/v1/chat/completions` endpoint (what we use today) only supports **custom function tools**. Every built-in OpenAI tool — `code_interpreter`, `file_search`, `web_search`, `computer_use`, `image_generation`, remote MCP — lives exclusively on the **Responses API** (`/v1/responses`). The official `openai-go` SDK has full first-class support for it: `client.Responses.New(...)`, `client.Responses.NewStreaming(...)`, typed union `ToolUnionParam` with a `OfCodeInterpreter *ToolCodeInterpreterParam` case, typed streaming events (`ResponseCodeInterpreterCallCodeDeltaEvent`, `…CallCodeDoneEvent`, `…CallCompletedEvent`), and a typed `ResponseCodeInterpreterToolCall` response item with `Code`, `Outputs`, `ContainerID`, `Status`.
+
+**Today.** `adapters/adkgo/model.go:newOpenAIModel` goes through `client.Chat.Completions.New` / `.NewStreaming` exclusively. That rules out code interpreter (M10's OpenAI path), and every other built-in OpenAI tool by extension. The M10 infrastructure (`AgentCodeExecutionPolicy`, `CodeExecutionRan` domain event, `applyCodeExecutionTool` dispatch switch, `translateCodeExecution` parser) is already provider-agnostic and has a `default:` branch with a `TODO(M10-followups)` comment pointing at this migration.
+
+**Workflow.** Migrate the OpenAI provider off Chat Completions to Responses. The foundation / persistence / designer UI / domain event don't change — only the provider adapter. Once the provider is on Responses, wiring `code_interpreter` is a three-line addition to the existing `applyCodeExecutionTool` switch, and the OpenAI integration test mirrors the Gemini M10 spec.
+
+**Files.**
+- `adapters/adkgo/model.go` — rewrite `newOpenAIModel`'s Run path: replace `chat.Completions.New` with `responses.New`; replace the `ChatCompletionChoice.Message` parse with a walk over `Response.Output []ResponseOutputItemUnion`; replace the streaming delta-accumulator with a switch over `ResponseStreamEventUnion` types.
+- `adapters/adkgo/runner.go:applyCodeExecutionTool` — new `openai` / `openai-compatible` case in the provider switch that appends `{Type: "code_interpreter", Container: {Type: "auto"}}` to the request's tool list (adapted to whatever we pass to the Responses API; likely lives in a small OpenAI-specific config object rather than `genai.GenerateContentConfig`).
+- `adapters/adkgo/events.go:translateCodeExecution` — extend to recognise OpenAI's `ResponseCodeInterpreterToolCall` items and normalise into the existing `CodeExecutionRan` domain event.
+- `userrequirements/code_execution_test.go` — new spec `TestAgentWithCodeExecutionPolicyRunsCodeOnOpenAI` using `gpt-4o-mini` + the Responses-API-backed OpenAI provider. Mirror the Gemini assertion shape: expected integer in the reply + at least one `CodeExecutionRan` event.
+
+**UI delta.** None. The designer toggle, the chat code-card, and the Capabilities docs already render provider-agnostically. The existing warning in the designer ("Code execution is currently only wired on Gemini …") flips off automatically when OpenAI is selected once the adapter supports it (`codeExecutionSupportedByProvider` helper covers the provider check).
+
+**Acceptance.**
+- An agent with `CodeExecutionPolicy.Enabled=true` + OpenAI model emits `CodeExecutionRan` events with non-empty `Code` + `Output`.
+- Regular chat/tool-use flows on OpenAI still work — no regression on function-calling, streaming latency, multi-turn state, or cost.
+- `gpt-4o-mini` + `87654321 × 98765432` integration test passes the same way the Gemini one does.
+- The designer's "Gemini-only" warning disappears when the selected provider is OpenAI (provider list update in `codeExecutionSupportedByProvider`).
+
+**Blast radius.** Medium. Roughly:
+- ~200–400 LOC in `adapters/adkgo/model.go` for the Responses-API streaming rewrite.
+- Multi-turn conversation state: decision point on `PreviousResponseID` chaining vs re-sending the full message array. Former is lighter on tokens but changes our history-replay model; latter is a one-liner.
+- Regression risk: every OpenAI run in the app uses this code path; needs careful diffing of event translation + error paths.
+
+**Why now / why wait.** OpenAI is investing in the Responses API and treating Chat Completions as legacy for new features (every built-in tool they've shipped in the last year is Responses-only). Migrating gains code interpreter immediately + positions us to pick up file search, web search, image generation, computer use, and remote MCP without further OpenAI-side work. Waiting means writing the adapter a second time once more built-ins land.
+
+**Does-not-touch.** The foundation `AgentCodeExecutionPolicy` type (provider-agnostic), the domain event (provider-agnostic), the designer UI (provider-agnostic), the Anthropic adapter path (separate M if/when we add Claude's code_execution). Also: no legacy Chat Completions fallback — Responses API is stable enough to be the sole path once we move.
 
 ---
 

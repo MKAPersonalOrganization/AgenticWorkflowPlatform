@@ -334,6 +334,14 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 				agentModelCfg = agentCfg.ModelConfig
 			}
 			genCfg := buildGenerateContentConfig(modelCfg, agentModelCfg, req.Config)
+			// Built-in code execution — provider-dispatched. Appends the
+			// provider's native code-interpreter Tool to genCfg.Tools
+			// when the agent's policy is enabled and the provider supports
+			// it. The ADK flow clones this Tools slice into each LLM
+			// request (see basicRequestProcessor in the vendored
+			// internal/llminternal/basic_processor.go) so the model sees
+			// the capability alongside whatever other tools are attached.
+			r.applyCodeExecutionTool(agentCfg, modelCfg, genCfg)
 
 			// Build native ADK tool and model callbacks: logging + enforcement.
 			var beforeModelCBs []llmagent.BeforeModelCallback
@@ -806,6 +814,54 @@ func (r *RunnerAdapter) resolveMemoryPolicy(agentCfg *fagent.Config) (enabled bo
 		return false, false
 	}
 	return agentCfg.MemoryPolicy.Enabled, agentCfg.MemoryPolicy.Preload
+}
+
+// applyCodeExecutionTool appends the provider-specific built-in code
+// execution tool onto genCfg.Tools when the agent's policy is enabled
+// and the active provider has native code-interpreter support.
+//
+// Why genCfg.Tools and not the adk tool.Tool list: Gemini's code executor
+// is enabled by adding a bare `&genai.Tool{CodeExecution: ...}` entry to
+// the request's Tools slice — it's a capability flag, not a function the
+// model calls. The ADK flow clones the agent's GenerateContentConfig
+// (including Tools) into every request, so pre-populating it here is the
+// simplest provider-aware wiring. Function tools from the agent's Tool
+// list get appended alongside in ADK's tools processor.
+//
+// Dispatch table:
+//
+//   - google (Gemini): ships. Adds &genai.Tool{CodeExecution: &genai.ToolCodeExecution{}}.
+//     Google runs the code inside its own sandbox (no execution on our
+//     infra) and returns ExecutableCode + CodeExecutionResult parts,
+//     which events.go normalises to CodeExecutionRan domain events.
+//   - openai:           not wired. When we're ready, add OpenAI's
+//     Responses-API code-interpreter tool via an
+//     equivalent entry in the OpenAI adapter layer.
+//     Policy shape doesn't change.
+//   - anthropic:        not wired. Same pattern — Claude's
+//     code_execution tool will plug in here.
+//
+// Deliberately tolerant: nil policy, nil modelCfg, nil genCfg, or an
+// unrecognised provider all leave genCfg untouched. The agent still
+// runs with its other tools intact.
+func (r *RunnerAdapter) applyCodeExecutionTool(agentCfg *fagent.Config, modelCfg *fagent.ModelConfig, genCfg *genai.GenerateContentConfig) {
+	if agentCfg == nil || agentCfg.CodeExecutionPolicy == nil || !agentCfg.CodeExecutionPolicy.Enabled {
+		return
+	}
+	if modelCfg == nil || genCfg == nil {
+		return
+	}
+	switch strings.ToLower(modelCfg.Provider) {
+	case "google", "gemini", "vertex", "vertexai":
+		genCfg.Tools = append(genCfg.Tools, &genai.Tool{
+			CodeExecution: &genai.ToolCodeExecution{},
+		})
+	default:
+		// TODO(M10-followups): wire OpenAI + Anthropic code interpreters
+		// here when their adapters grow native support. Keep the
+		// foundation AgentCodeExecutionPolicy shape unchanged; only
+		// this dispatch needs to learn each provider's invocation.
+	}
 }
 
 // resolveArtifactPolicy returns (enabled, autoSaveUserBlobs) for this agent

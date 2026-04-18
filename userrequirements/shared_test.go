@@ -102,6 +102,22 @@ func requireOpenAIKey(t *testing.T) string {
 	return key
 }
 
+// requireGeminiKey returns a real Gemini API key or skips the test. Used
+// by specs that only fire on the Google provider (e.g. built-in code
+// execution). Accepts either GEMINI_API_KEY or GOOGLE_API_KEY so whichever
+// environment variable the runner has is fine.
+func requireGeminiKey(t *testing.T) string {
+	t.Helper()
+	if key := os.Getenv("GEMINI_API_KEY"); key != "" {
+		return key
+	}
+	if key := os.Getenv("GOOGLE_API_KEY"); key != "" {
+		return key
+	}
+	t.Skip("GEMINI_API_KEY / GOOGLE_API_KEY not set")
+	return ""
+}
+
 // validateAgainstSchema fails the test when the given instance violates the
 // JSON Schema. The schema is parsed via the vendored
 // github.com/google/jsonschema-go library, the same validator the product

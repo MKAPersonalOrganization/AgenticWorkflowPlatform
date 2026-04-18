@@ -76,9 +76,10 @@ func (p *UserAwareProvider) agentFromDefinition(def *AgentDefinition) agent.Agen
 		OutputSchema:      parseAgentSchema(def.OutputSchemaJSON),
 		ModelConfig:       toAgentModelConfig(def.ModelConfig),
 		ModelOverride:     toAgentModelOverride(def.ModelOverride),
-		MemoryPolicy:      toFoundationMemoryPolicy(def.MemoryPolicy),
-		ArtifactPolicy:    toFoundationArtifactPolicy(def.ArtifactPolicy),
-		AgentTools:        toFoundationAgentToolRefs(def.AgentTools),
+		MemoryPolicy:        toFoundationMemoryPolicy(def.MemoryPolicy),
+		ArtifactPolicy:      toFoundationArtifactPolicy(def.ArtifactPolicy),
+		CodeExecutionPolicy: toFoundationCodeExecutionPolicy(def.CodeExecutionPolicy),
+		AgentTools:          toFoundationAgentToolRefs(def.AgentTools),
 	}
 
 	if len(def.SubAgents) > 0 {
@@ -195,6 +196,18 @@ func toFoundationArtifactPolicy(src *AgentArtifactPolicy) *agent.AgentArtifactPo
 	return &agent.AgentArtifactPolicy{
 		Enabled:           src.Enabled,
 		AutoSaveUserBlobs: src.AutoSaveUserBlobs,
+	}
+}
+
+// toFoundationCodeExecutionPolicy converts the persisted policy to the
+// foundation type consumed by the adapter. Nil means code execution is
+// off — adapter never tries to add the provider's code-interpreter tool.
+func toFoundationCodeExecutionPolicy(src *AgentCodeExecutionPolicy) *agent.AgentCodeExecutionPolicy {
+	if src == nil {
+		return nil
+	}
+	return &agent.AgentCodeExecutionPolicy{
+		Enabled: src.Enabled,
 	}
 }
 

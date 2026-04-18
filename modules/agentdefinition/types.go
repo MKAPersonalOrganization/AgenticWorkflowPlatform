@@ -49,6 +49,16 @@ type AgentMemoryPolicy struct {
 	Preload bool `json:"preload"`
 }
 
+// AgentCodeExecutionPolicy mirrors foundation/agent.AgentCodeExecutionPolicy.
+// Intentionally provider-agnostic — the adapter dispatches the "enabled"
+// flag to whatever code-interpreter mechanism the active model supports.
+type AgentCodeExecutionPolicy struct {
+	// Enabled lets the agent ask the LLM provider's sandbox to run code.
+	// Gemini is wired today; OpenAI / Anthropic fall through silently
+	// until their provider adapters gain support.
+	Enabled bool `json:"enabled"`
+}
+
 // AgentArtifactPolicy mirrors foundation/agent.AgentArtifactPolicy.
 type AgentArtifactPolicy struct {
 	// Enabled turns on artifact support for this agent. When true,
@@ -176,6 +186,13 @@ type AgentDefinition struct {
 	// auto-save-inline-blobs behaviour.
 	ArtifactPolicy     *AgentArtifactPolicy `json:"artifact_policy,omitempty" db:"-"`
 	ArtifactPolicyJSON string               `json:"-" db:"artifact_policy"`
+
+	// ── Code Execution ──
+	// CodeExecutionPolicy controls whether the agent may use the LLM
+	// provider's built-in code executor. nil means off; non-nil enables
+	// the adapter's provider-specific dispatch.
+	CodeExecutionPolicy     *AgentCodeExecutionPolicy `json:"code_execution_policy,omitempty" db:"-"`
+	CodeExecutionPolicyJSON string                    `json:"-" db:"code_execution_policy"`
 
 	// ── Sharing ──
 	// ShareToken is a unique token that enables sharing this agent with other users.
@@ -305,6 +322,35 @@ func (a *AgentDefinition) UnmarshalArtifactPolicy() error {
 		return fmt.Errorf("unmarshalling artifact policy: %w", err)
 	}
 	a.ArtifactPolicy = &ap
+	return nil
+}
+
+// MarshalCodeExecutionPolicy serializes CodeExecutionPolicy for storage.
+func (a *AgentDefinition) MarshalCodeExecutionPolicy() error {
+	if a.CodeExecutionPolicy == nil {
+		a.CodeExecutionPolicyJSON = ""
+		return nil
+	}
+	b, err := json.Marshal(a.CodeExecutionPolicy)
+	if err != nil {
+		return fmt.Errorf("marshalling code execution policy: %w", err)
+	}
+	a.CodeExecutionPolicyJSON = string(b)
+	return nil
+}
+
+// UnmarshalCodeExecutionPolicy deserializes CodeExecutionPolicyJSON.
+// Empty JSON means nil — code execution is off for this agent.
+func (a *AgentDefinition) UnmarshalCodeExecutionPolicy() error {
+	if a.CodeExecutionPolicyJSON == "" || a.CodeExecutionPolicyJSON == "null" {
+		a.CodeExecutionPolicy = nil
+		return nil
+	}
+	var cp AgentCodeExecutionPolicy
+	if err := json.Unmarshal([]byte(a.CodeExecutionPolicyJSON), &cp); err != nil {
+		return fmt.Errorf("unmarshalling code execution policy: %w", err)
+	}
+	a.CodeExecutionPolicy = &cp
 	return nil
 }
 

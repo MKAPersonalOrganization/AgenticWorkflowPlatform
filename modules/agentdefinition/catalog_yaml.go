@@ -19,9 +19,10 @@ type yamlCatalogSpec struct {
 	AuthorName        string             `yaml:"author_name"`
 	Icon              string             `yaml:"icon"` // named icon (e.g. "bot") or raw SVG
 	Featured          bool               `yaml:"featured"`
-	MemoryPolicy      *yamlMemoryPolicy   `yaml:"memory_policy,omitempty"`   // per-agent cross-session memory policy
-	ArtifactPolicy    *yamlArtifactPolicy `yaml:"artifact_policy,omitempty"` // per-agent artifact policy (tool + auto-save)
-	Workflow          *yamlWorkflowNode   `yaml:"workflow"`                  // nil for single-agent entries
+	MemoryPolicy        *yamlMemoryPolicy        `yaml:"memory_policy,omitempty"`         // per-agent cross-session memory policy
+	ArtifactPolicy      *yamlArtifactPolicy      `yaml:"artifact_policy,omitempty"`       // per-agent artifact policy (tool + auto-save)
+	CodeExecutionPolicy *yamlCodeExecutionPolicy `yaml:"code_execution_policy,omitempty"` // provider-agnostic code execution toggle
+	Workflow            *yamlWorkflowNode        `yaml:"workflow"`                        // nil for single-agent entries
 	LLMAgents         []yamlSubAgent      `yaml:"llm_agents"`                // nil for single-agent entries
 	AgentTools        []yamlAgentToolRef  `yaml:"agent_tools,omitempty"`     // expose sub-agents as callable tools
 }
@@ -37,6 +38,13 @@ type yamlMemoryPolicy struct {
 type yamlArtifactPolicy struct {
 	Enabled           bool `yaml:"enabled"`
 	AutoSaveUserBlobs bool `yaml:"auto_save_user_blobs,omitempty"`
+}
+
+// yamlCodeExecutionPolicy is the YAML shape for AgentCodeExecutionPolicy.
+// Provider-agnostic — the adapter decides how to wire the flag into the
+// active model's native code-interpreter (Gemini wired today).
+type yamlCodeExecutionPolicy struct {
+	Enabled bool `yaml:"enabled"`
 }
 
 type yamlWorkflowNode struct {
@@ -105,6 +113,12 @@ func (s *yamlCatalogSpec) toEntry() (AgentCatalogEntry, error) {
 		e.ArtifactPolicy = &AgentArtifactPolicy{
 			Enabled:           s.ArtifactPolicy.Enabled,
 			AutoSaveUserBlobs: s.ArtifactPolicy.AutoSaveUserBlobs,
+		}
+	}
+
+	if s.CodeExecutionPolicy != nil {
+		e.CodeExecutionPolicy = &AgentCodeExecutionPolicy{
+			Enabled: s.CodeExecutionPolicy.Enabled,
 		}
 	}
 

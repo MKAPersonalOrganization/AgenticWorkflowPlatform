@@ -1974,6 +1974,58 @@ templ agentNodeForm() {
 			</div>
 		</div>
 	</div>
+	<!-- Code Execution Section.
+	     Provider-agnostic toggle at the UI layer. When on + the active
+	     model is Gemini, the adapter appends &genai.Tool{CodeExecution: ...}
+	     to the request so Google's sandbox runs the generated Python and
+	     returns ExecutableCode + CodeExecutionResult parts. OpenAI /
+	     Anthropic: the toggle saves but has no effect until their adapters
+	     wire their own native code-interpreter paths. Nothing runs on our
+	     infrastructure — the provider sandboxes the execution. -->
+	<div class="rounded-xl border border-border bg-card overflow-hidden">
+		<button
+			type="button"
+			@click="showCodeExecution = !showCodeExecution"
+			class="flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent/30 transition-colors"
+			:class="showCodeExecution ? 'bg-gradient-to-r from-teal-500/5 to-transparent border-b border-border/50' : ''"
+		>
+			<span class="flex items-center gap-2">
+				<div class="size-6 rounded-md bg-teal-500/10 flex items-center justify-center">
+					@icon.Terminal(icon.Props{Class: "size-3.5 text-teal-600 dark:text-teal-400"})
+				</div>
+				{ i18n.T(ctx, "Code Execution") }
+				<span x-show="codeExecutionEnabled" class="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-700 dark:text-teal-400">
+					{ i18n.T(ctx, "on") }
+				</span>
+			</span>
+			<span class="transition-transform duration-200" :class="showCodeExecution ? 'rotate-180' : ''">
+				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+			</span>
+		</button>
+		<div x-show="showCodeExecution" x-collapse>
+			<div class="p-4 space-y-4 border-t border-border/50">
+				<p class="text-xs text-muted-foreground leading-relaxed">
+					@icon.Info(icon.Props{Class: "size-3.5 inline me-1 text-teal-500"})
+					{ i18n.T(ctx, "Lets the agent run Python to do precise calculations and data work. The code runs in the AI provider's own sandbox — never on our servers. The output appears inline in the chat.") }
+				</p>
+				<div class="space-y-1.5">
+					@toggleSwitch("codeExecutionEnabled", i18n.T(ctx, "Let the agent run code"), i18n.T(ctx, "Best for math, data crunching, format conversion, and anything where the model would otherwise guess."))
+				</div>
+				<!-- Friendly nudge when the current provider doesn't have it wired yet.
+				     We keep the toggle savable on every provider so the value sticks
+				     across model changes; the adapter is the one that no-ops on
+				     non-Gemini providers today. -->
+				<div
+					x-show="codeExecutionEnabled && !codeExecutionSupportedByProvider"
+					x-cloak
+					class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed"
+				>
+					@icon.TriangleAlert(icon.Props{Class: "size-3.5 inline me-1"})
+					{ i18n.T(ctx, "Code execution is currently only wired on Gemini. Your selected model provider doesn't run the code yet — the setting will kick in once we add it for this provider.") }
+				</div>
+			</div>
+		</div>
+	</div>
 	<!-- Sub-Agents (Coordinator) Section -->
 	<div class="rounded-xl border border-border bg-card overflow-hidden">
 		<button

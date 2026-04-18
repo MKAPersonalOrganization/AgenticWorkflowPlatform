@@ -622,6 +622,34 @@ export function createEventHandlerMethods() {
             }
         },
 
+        /**
+         * Handle CODE_EXECUTION_RAN — the LLM provider's sandbox executed
+         * code during this turn. Render a read-only card carrying the
+         * source the model generated and the sandbox's output, so the user
+         * can see exactly what ran. Code never runs on our servers — the
+         * provider isolates the execution.
+         */
+        __handleCodeExecutionRan(value, state, threadId) {
+            const { messageId, language, code, output, outcome, agentName } = value;
+            const ok = !outcome || outcome === 'OUTCOME_OK';
+
+            state.messages.push({
+                id: `code_exec_${messageId || ''}_${Date.now()}`,
+                type: 'code_execution',
+                language: (language || 'python').toLowerCase(),
+                code: code || '',
+                output: output || '',
+                outcome: outcome || '',
+                ok,
+                agentName: agentName || '',
+                timestamp: new Date().toISOString(),
+            });
+
+            if (threadId === this.__currentThreadId && !this.__abortScroll) {
+                this.$nextTick(() => this.__scrollToBottomStreaming());
+            }
+        },
+
         // ============================================
         // ============================================
         // Tool Call Message Helpers

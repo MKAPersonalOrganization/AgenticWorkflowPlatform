@@ -39,6 +39,10 @@ type AgentCatalogEntry struct {
 	// AgentDefinition.ArtifactPolicy.
 	ArtifactPolicy *AgentArtifactPolicy `json:"artifact_policy,omitempty" db:"-"`
 
+	// CodeExecutionPolicy controls whether the catalog entry's root agent
+	// may use the LLM provider's built-in code executor. Nil means off.
+	CodeExecutionPolicy *AgentCodeExecutionPolicy `json:"code_execution_policy,omitempty" db:"-"`
+
 	// ── Workflow Template (optional) ──
 
 	// WorkflowGraphJSON is a JSON-encoded WorkflowNode tree template.

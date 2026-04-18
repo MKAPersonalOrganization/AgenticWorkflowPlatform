@@ -114,6 +114,40 @@ templ docsMemoryArtifacts() {
 				prior conversations become recallable once those conversations complete.
 			</li>
 		</ul>
+		<h3>Code Execution</h3>
+		<p>
+			<strong>Code execution</strong> lets an agent run Python to do things it would
+			otherwise guess at — multi-step math, data manipulation, unit conversions,
+			parsing, format normalisation. When enabled, the agent can write code, run it,
+			read the output, and use the result to form its final reply.
+		</p>
+		<p>
+			Code runs in the AI provider's own sandbox, never on our servers. It's
+			isolated, has no network access, and keeps no state between turns. The chat
+			shows a read-only card with the source and output so you can audit exactly
+			what ran.
+		</p>
+		<h4>What to expect</h4>
+		<ul class="space-y-2 my-4">
+			<li>
+				<strong>Best for precise work.</strong> Give the agent code execution when
+				you'd rather it compute than guess — arithmetic on long numbers, date maths,
+				regex, JSON reshaping, statistics.
+			</li>
+			<li>
+				<strong>No network, no file persistence.</strong> The sandbox can't call
+				external APIs or remember things between turns. If the agent needs data from
+				the internet, pair it with a web-search tool; if it needs persistent files,
+				enable Artifacts.
+			</li>
+			<li>
+				<strong>Only available on Gemini today.</strong> The toggle saves on any
+				provider, but only the Gemini provider actually runs the code right now. A
+				warning appears in the designer when the selected provider doesn't support
+				it yet. Support for other providers will come incrementally without any
+				change to the toggle.
+			</li>
+		</ul>
 		<h3>Versioned Artifacts</h3>
 		<p>
 			<strong>Versioned artifacts</strong> are a built-in agent capability for creating,
