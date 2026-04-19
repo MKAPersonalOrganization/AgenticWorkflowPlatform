@@ -12,9 +12,20 @@ import numpy as np
 import networkx as nx
 from itertools import combinations
 
+# Default walk-exclude set. DO NOT add 'assets' here — the frontend
+# source lives under assets/js and participates in the strongest
+# intra-module coupling relationships in the repo (chat Alpine stores,
+# locale files, templ-adjacent JS). Excluding assets blinded the
+# earlier coupling reports entirely; keep it in scope.
+_DEFAULT_WALK_EXCLUDES = {
+    '.git', 'node_modules', 'vendor', 'bin', '.venv',
+    '__pycache__', 'dist', 'build',
+}
+
+
 def build_graph(root_path, exclude_dirs=None):
     if exclude_dirs is None:
-        exclude_dirs = {'.git', 'node_modules', 'vendor', 'bin', '.venv', '__pycache__', 'assets'}
+        exclude_dirs = _DEFAULT_WALK_EXCLUDES
     
     abs_root = os.path.abspath(root_path)
     
@@ -48,7 +59,7 @@ def build_graph(root_path, exclude_dirs=None):
 
 def get_current_files(root_path, exclude_dirs=None):
     if exclude_dirs is None:
-        exclude_dirs = {'.git', 'node_modules', 'vendor', 'bin', '.venv', '__pycache__', 'assets'}
+        exclude_dirs = _DEFAULT_WALK_EXCLUDES
     
     files = []
     for root, dirs, filenames in os.walk(root_path):
@@ -241,7 +252,23 @@ def _commit_weight(ts, now_ts, half_life_days):
     age_days = max(0.0, (now_ts - ts) / 86400.0)
     return 0.5 ** (age_days / half_life_days)
 
-def build_cooccurrence_matrix(commits, files, half_life_days=0, now_ts=None):
+def build_cooccurrence_matrix(commits, files, half_life_days=0, now_ts=None,
+                              cross_package_only=False):
+    """Pair-wise temporal coupling matrix.
+
+    Historically this function hard-skipped intra-package pairs
+    (``get_package(f1) == get_package(f2)``) on the theory that
+    *cross*-package coupling is the "interesting" signal. That's true
+    for a classical layered application, but on this repo it throws
+    away the strongest co-change relationships: siblings inside an
+    Alpine component directory, the adkgo runner/workflow pair, two
+    locale JSON files, the types.go + repo.go pair inside any
+    agentdefinition-style module.
+
+    The filter is now **opt-in** via ``cross_package_only=True``.
+    Default behaviour keeps intra-package pairs so the strongest
+    real couplings actually show up.
+    """
     file_to_idx = {f["path"]: i for i, f in enumerate(files)}
     n = len(files)
     matrix = np.zeros((n, n), dtype=float)
@@ -253,7 +280,7 @@ def build_cooccurrence_matrix(commits, files, half_life_days=0, now_ts=None):
             continue
         w = _commit_weight(ts, now_ts, half_life_days)
         for f1, f2 in combinations(unique, 2):
-            if get_package(f1) == get_package(f2):
+            if cross_package_only and get_package(f1) == get_package(f2):
                 continue
             i, j = file_to_idx[f1], file_to_idx[f2]
             matrix[i, j] += w
@@ -772,6 +799,13 @@ def main():
     parser.add_argument("--exclude", action="append", default=[], help="Glob to exclude (repeatable)")
     parser.add_argument("--no-default-excludes", action="store_true", help="Disable built-in excludes (go.sum, *.pb.go, *_templ.go, ...)")
     parser.add_argument("--no-structural", action="store_true", help="Skip Go import structural overlay")
+    parser.add_argument("--cross-package-only", action="store_true",
+                        help="Drop intra-package co-change pairs. Off by "
+                             "default — on this codebase the strongest "
+                             "real coupling is intra-package (e.g. "
+                             "chat-state.js ↔ chat-streaming.js). Set "
+                             "only when you explicitly want a cross-"
+                             "package architectural view.")
     parser.add_argument("--viz", type=str, default=None, help="Write package coupling graph PNG to this path")
     parser.add_argument("--viz-level", choices=["top", "leaf"], default="top",
                         help="top = one node per top-level group (clean, default); leaf = full hierarchical edge bundling")
@@ -816,6 +850,7 @@ def main():
     git_matrix = build_cooccurrence_matrix(
         commits, [{"path": f} for f in git_files],
         half_life_days=args.half_life_days, now_ts=now_ts,
+        cross_package_only=args.cross_package_only,
     )
     
     files, combined, tree_aligned, git_aligned = combine_matrices(
@@ -830,6 +865,11 @@ def main():
         if args.verbose:
             print(f"  module={module}, packages with imports: {len(struct_graph)}")
 
+    # File revisions are needed both to score pairs and to compute the
+    # normalized view further down. Compute once, use twice.
+    file_revs = count_file_revisions(commits, set(files),
+                                     half_life_days=args.half_life_days, now_ts=now_ts)
+
     n = len(files)
     pairs = []
     for i in range(n):
@@ -838,7 +878,19 @@ def main():
             if cooc_w <= 0:
                 continue
             dist = int(tree_aligned[i][j])
-            score = cooc_w * dist
+            # Score prioritises *how often two files actually move
+            # together* (cooc) and uses a Jaccard bonus as a tie-
+            # breaker. The previous formula was ``cooc × tree_distance``
+            # which rewarded pairs merely because they lived in
+            # distant directories — on a monorepo that systematically
+            # hides same-module coupling. Distance is preserved on
+            # the tuple as a metadata column so older consumers that
+            # read it still see the right value.
+            r1 = file_revs.get(files[i], 0.0)
+            r2 = file_revs.get(files[j], 0.0)
+            union = r1 + r2 - cooc_w
+            jaccard = (cooc_w / union) if union > 0 else 0.0
+            score = cooc_w * (1.0 + jaccard)
             pairs.append((files[i], files[j], dist, cooc_w, score))
 
     pairs.sort(key=lambda x: -x[4])
@@ -847,8 +899,6 @@ def main():
     package_pairs = aggregate_by_package(pairs)
     top_packages = package_pairs[:args.top]
 
-    file_revs = count_file_revisions(commits, set(files),
-                                     half_life_days=args.half_life_days, now_ts=now_ts)
     normalized_pairs = []
     for f1, f2, dist, cooc, _score in pairs:
         if cooc < args.min_cooc:

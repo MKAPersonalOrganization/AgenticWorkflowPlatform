@@ -225,7 +225,11 @@ def load_package_deps(path: str | None) -> dict:
     }
 
 
-def load_coupling(path: str, cooc_floor: int = 6) -> dict[str, list[dict]]:
+def load_coupling(path: str, cooc_floor: int = 3) -> dict[str, list[dict]]:
+    # Default floor matches file_coupling.py's own `--min-cooc=3` so
+    # the synthesizer doesn't quietly re-filter the producer's
+    # already-filtered output. The old default of 6 threw away
+    # ~80% of the reported pairs on this codebase.
     """Return by-file map of coupling partners."""
     d = json.loads(Path(path).read_text())
     pairs = d.get("top_pairs_normalized") or d.get("top_pairs") or []
@@ -401,7 +405,7 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
     lines.append("| Δmean | `complexity_trend.py` | Last sample mean indent minus first sample mean indent (whole window) |")
     lines.append("| max-indent | `complexity_trend.py` | Deepest whitespace-indent in the last sampled revision |")
     lines.append("| fix-pct | `bugfix_density.py` | Fraction of this file's commits whose subject line matched fix keywords (`fix`, `bug`, `hotfix`, `regression`, `crash`, `revert`, `typo`, etc., word-bounded) |")
-    lines.append("| coupling count | `file_coupling.py` | Number of partner files that co-change with this one at cooccurrence ≥ 6 |")
+    lines.append("| coupling count | `file_coupling.py` | Number of partner files that co-change with this one at cooccurrence ≥ 3 (includes intra-package pairs by default; cross-package only with `--cross-package-only`) |")
     lines.append("| LCOM4 | `cohesion.py` | Max number of disjoint method groups across any Go type in the file. 1 = cohesive. ≥ 2 = the type could be split into that many types with no shared state or calls. Go-only; ignores receiverless functions; known false-positives on types that delegate to an embedded interface. |")
     lines.append("| CCN / Mod / High | `cyclomatic.py` | Max per-function cyclomatic complexity / max *modified* CCN (switch counts as 1) / count of functions ≥ threshold. A large gap between CCN and Mod means the file's complexity is switch-driven (a dispatcher), not tangled logic — refactor-by-splitting won't help. Multi-language (Go, JS, TS, Python, …); skips templ. |")
     lines.append("| Dups | `cyclomatic.py` | Number of duplicate (cloned) code blocks touching this file. Only populated when cyclomatic.py is run with `--duplicates`. Clones of ≥ 6 lines across files or within a file. |")
@@ -1173,8 +1177,10 @@ def main() -> int:
                                            "(optional; structural Go package coupling via goda)")
     ap.add_argument("--out-md", type=str, help="write markdown data report to this path")
     ap.add_argument("--out-json", type=str, help="write merged data JSON to this path")
-    ap.add_argument("--cooccur-floor", type=int, default=6,
-                    help="coupling co-occurrence threshold (default 6)")
+    ap.add_argument("--cooccur-floor", type=int, default=3,
+                    help="coupling co-occurrence threshold (default 3; "
+                         "matches file_coupling.py's own --min-cooc so "
+                         "pairs aren't silently filtered twice)")
     ap.add_argument("--md-min-signals", type=int, default=2,
                     help="in markdown, only show files present in ≥ N analyses (default 2); JSON always has the full dataset")
     ap.add_argument("--md-min-commits", type=int, default=3,
