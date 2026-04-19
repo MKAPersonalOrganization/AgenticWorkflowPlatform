@@ -105,11 +105,11 @@ templ PDFViewer(props PDFViewerProps) {
 			<!-- Error state -->
 			<template x-if="error">
 				<div class="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-background/80 z-20">
-					<div class="bg-red-50 text-red-500 p-3 rounded-full mb-4">
+					<div class="bg-destructive/10 text-destructive p-3 rounded-full mb-4">
 						@icon.TriangleAlert(icon.Props{Class: "size-8"})
 					</div>
-					<h3 class="font-semibold text-red-900 border-none mb-1">{ i18n.T(ctx, "Failed to load PDF") }</h3>
-					<p class="text-xs text-red-600 mb-6 max-w-xs" x-text="error"></p>
+					<h3 class="font-semibold text-destructive border-none mb-1">{ i18n.T(ctx, "Failed to load PDF") }</h3>
+					<p class="text-xs text-destructive/80 mb-6 max-w-xs" x-text="error"></p>
 					@button.Button(button.Props{
 						Variant: button.VariantOutline,
 						Size:    button.SizeSm,

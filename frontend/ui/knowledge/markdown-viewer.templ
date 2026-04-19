@@ -38,7 +38,7 @@ templ MarkdownViewer(props MarkdownViewerProps) {
 				<button
 					@click="copyContent()"
 					class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium transition-all hover:bg-muted"
-					:class="copied ? 'text-green-600' : 'text-muted-foreground hover:text-foreground'"
+					:class="copied ? 'text-success' : 'text-muted-foreground hover:text-foreground'"
 				>
 					<template x-if="!copied">
 						@icon.Copy(icon.Props{Class: "size-3"})

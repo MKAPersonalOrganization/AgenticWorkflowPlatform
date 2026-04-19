@@ -292,6 +292,9 @@ templ ThreadsDialog() {
 }
 
 // ThreadsButtonTrigger renders the threads icon button for the navbar.
+// Icon is Telescope — the dialog is a temporal-order palette for
+// exploring past conversations, so "peering into history" fits better
+// than a speech bubble (which reads as "start a chat").
 templ ThreadsButtonTrigger() {
 	@dialog.Trigger(dialog.TriggerProps{
 		For: "threads-dialog",
@@ -305,7 +308,7 @@ templ ThreadsButtonTrigger() {
 				"title":  i18n.T(ctx, "Chat History"),
 			},
 		}) {
-			@icon.MessageCircle(icon.Props{Class: "size-5"})
+			@icon.Telescope(icon.Props{Class: "size-5"})
 			<span class="sr-only">{ i18n.T(ctx, "Chat History") }</span>
 		}
 	}

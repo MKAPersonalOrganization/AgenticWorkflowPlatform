@@ -68,22 +68,22 @@ templ ToolConfirmationDialog() {
 				});
 			}
 		}"
-		class="my-3 rounded-xl border border-amber-500/30 bg-amber-500/5 overflow-hidden shadow-lg shadow-amber-500/10"
+		class="my-3 rounded-xl border border-warning/30 bg-warning/5 overflow-hidden shadow-lg shadow-warning/10"
 	>
 		<!-- Header -->
-		<div class="flex items-center gap-3 px-4 py-3 bg-amber-500/10 border-b border-amber-500/20">
-			<div class="flex-shrink-0 w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center">
-				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-amber-600 dark:text-amber-400">
+		<div class="flex items-center gap-3 px-4 py-3 bg-warning/10 border-b border-warning/20">
+			<div class="flex-shrink-0 w-8 h-8 rounded-full bg-warning/20 flex items-center justify-center">
+				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-warning">
 					<path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path>
 					<path d="M12 8v4"></path>
 					<path d="M12 16h.01"></path>
 				</svg>
 			</div>
 			<div class="flex-1 min-w-0">
-				<div class="text-sm font-semibold text-amber-700 dark:text-amber-300">
+				<div class="text-sm font-semibold text-warning">
 					Confirmation Required
 				</div>
-				<div class="text-xs text-amber-600/70 dark:text-amber-400/70" x-text="message.name"></div>
+				<div class="text-xs text-warning/70" x-text="message.name"></div>
 			</div>
 		</div>
 		<!-- Question -->
@@ -105,7 +105,7 @@ templ ToolConfirmationDialog() {
 			<button
 				type="button"
 				@click="confirm()"
-				class="px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600 transition-all duration-200 shadow-sm shadow-emerald-500/20"
+				class="px-4 py-2 rounded-lg bg-success text-success-foreground text-sm font-medium hover:bg-success/90 transition-all duration-200 shadow-sm shadow-success/20"
 			>
 				<span class="flex items-center gap-1.5">
 					<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -131,20 +131,20 @@ templ ToolCustomInputDialog() {
 				});
 			}
 		}"
-		class="my-3 rounded-xl border border-blue-500/30 bg-blue-500/5 overflow-hidden shadow-lg shadow-blue-500/10"
+		class="my-3 rounded-xl border border-info/30 bg-info/5 overflow-hidden shadow-lg shadow-info/10"
 	>
 		<!-- Header -->
-		<div class="flex items-center gap-3 px-4 py-3 bg-blue-500/10 border-b border-blue-500/20">
-			<div class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
-				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-600 dark:text-blue-400">
+		<div class="flex items-center gap-3 px-4 py-3 bg-info/10 border-b border-info/20">
+			<div class="flex-shrink-0 w-8 h-8 rounded-full bg-info/20 flex items-center justify-center">
+				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-info">
 					<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
 				</svg>
 			</div>
 			<div class="flex-1 min-w-0">
-				<div class="text-sm font-semibold text-blue-700 dark:text-blue-300">
+				<div class="text-sm font-semibold text-info">
 					Input Required
 				</div>
-				<div class="text-xs text-blue-600/70 dark:text-blue-400/70" x-text="message.name"></div>
+				<div class="text-xs text-info/70" x-text="message.name"></div>
 			</div>
 		</div>
 		<!-- Question -->
@@ -155,7 +155,7 @@ templ ToolCustomInputDialog() {
 				x-model="userInput"
 				@keydown.enter="submit()"
 				placeholder="Type your response..."
-				class="w-full px-3 py-2 rounded-lg border border-border/40 bg-background text-sm text-foreground placeholder-foreground/40 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50"
+				class="w-full px-3 py-2 rounded-lg border border-border/40 bg-background text-sm text-foreground placeholder-foreground/40 focus:outline-none focus:ring-2 focus:ring-info/40 focus:border-info/50"
 			/>
 		</div>
 		<!-- Actions -->
@@ -164,7 +164,7 @@ templ ToolCustomInputDialog() {
 				type="button"
 				@click="submit()"
 				:disabled="!userInput.trim()"
-				class="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-all duration-200 shadow-sm shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+				class="px-4 py-2 rounded-lg bg-info text-info-foreground text-sm font-medium hover:bg-info/90 transition-all duration-200 shadow-sm shadow-info/20 disabled:opacity-50 disabled:cursor-not-allowed"
 			>
 				<span class="flex items-center gap-1.5">
 					<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>

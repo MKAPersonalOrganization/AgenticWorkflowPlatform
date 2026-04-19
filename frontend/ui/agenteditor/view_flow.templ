@@ -47,13 +47,13 @@ templ flowView() {
 							</template>
 							<div class="flex items-center gap-1">
 								<template x-if="isPipelineValid">
-									<span class="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
+									<span class="flex items-center gap-1 text-[10px] text-success">
 										@icon.CircleCheck(icon.Props{Class: "size-3.5"})
 										{ i18n.T(ctx, "Valid") }
 									</span>
 								</template>
 								<template x-if="!isPipelineValid">
-									<span class="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400">
+									<span class="flex items-center gap-1 text-[10px] text-warning">
 										@icon.TriangleAlert(icon.Props{Class: "size-3.5"})
 										<span x-text="pipelineErrors.length + ' issue' + (pipelineErrors.length !== 1 ? 's' : '')"></span>
 									</span>
@@ -89,7 +89,7 @@ templ flowView() {
 									@click="togglePropertyPanel()"
 									:title="propertyPanelVisible ? 'Hide Properties' : 'Show Properties'"
 									class="flex items-center justify-center w-7 h-7 rounded text-xs transition-all duration-150"
-									:class="propertyPanelVisible ? 'text-indigo-400 bg-indigo-500/15 hover:bg-indigo-500/25' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'"
+									:class="propertyPanelVisible ? 'text-primary bg-primary/15 hover:bg-primary/25' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'"
 								>
 									@icon.PanelRight(icon.Props{Class: "size-3.5"})
 								</button>
@@ -116,12 +116,12 @@ templ flowView() {
 						<div class="flex items-center gap-4 px-3 py-1 border-b border-border/30 shrink-0">
 							<span
 								class="text-[10px] font-mono tabular-nums"
-								:class="$store.flow.nodeCount() > 40 ? 'text-amber-500' : 'text-muted-foreground'"
+								:class="$store.flow.nodeCount() > 40 ? 'text-warning' : 'text-muted-foreground'"
 								x-text="$store.flow.nodeCount() + ' / 50 nodes'"
 							></span>
 							<span
 								class="text-[10px] font-mono tabular-nums"
-								:class="$store.flow.maxDepth() > 4 ? 'text-amber-500' : 'text-muted-foreground'"
+								:class="$store.flow.maxDepth() > 4 ? 'text-warning' : 'text-muted-foreground'"
 								x-text="'depth ' + $store.flow.maxDepth() + ' / 5'"
 							></span>
 							<span class="flex-1"></span>
@@ -247,8 +247,8 @@ templ flowView() {
                                                                                                                 :disabled="evalRunning || !currentAgentId"
                                                                                                                 class="w-full flex items-center gap-1.5 px-2 py-1 rounded text-[11px] cursor-pointer hover:disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                                                                         >
-                                                                                                                @icon.Play(icon.Props{Class: "size-3 text-green-600"})
-                                                                                                                <span class="text-green-700 dark:text-green-400">Run All</span>
+                                                                                                                @icon.Play(icon.Props{Class: "size-3 text-success"})
+                                                                                                                <span class="text-success">Run All</span>
                                                                                                         </button>
 
                                                                                                         <!-- Toggle to show/hide individual cases -->
@@ -280,13 +280,13 @@ templ flowView() {
                                                                                                                                         </template>
                                                                                                                                         <!-- Status icon from testResults -->
                                                                                                                                         <template x-if="getCaseResult(tc.id)?.status === 'passed'">
-                                                                                                                                                @icon.CircleCheck(icon.Props{Class: "size-3 text-green-600 flex-shrink-0"})
+                                                                                                                                                @icon.CircleCheck(icon.Props{Class: "size-3 text-success flex-shrink-0"})
                                                                                                                                         </template>
                                                                                                                                         <template x-if="getCaseResult(tc.id)?.status === 'failed' || getCaseResult(tc.id)?.status === 'error'">
-                                                                                                                                                @icon.CircleX(icon.Props{Class: "size-3 text-red-600 flex-shrink-0"})
+                                                                                                                                                @icon.CircleX(icon.Props{Class: "size-3 text-destructive flex-shrink-0"})
                                                                                                                                         </template>
                                                                                                                                         <template x-if="getCaseResult(tc.id)?.status === 'running'">
-                                                                                                                                                <span class="animate-spin size-3 border border-blue-500 border-t-transparent rounded-full flex-shrink-0"></span>
+                                                                                                                                                <span class="animate-spin size-3 border border-info border-t-transparent rounded-full flex-shrink-0"></span>
                                                                                                                                         </template>
                                                                                                                                         <template x-if="!getCaseResult(tc.id)">
                                                                                                                                                 @icon.Circle(icon.Props{Class: "size-3 text-muted-foreground flex-shrink-0"})
@@ -297,7 +297,7 @@ templ flowView() {
                                                                                                                                         <template x-if="getCaseResult(tc.id)?.score != null">
                                                                                                                                                 <span
                                                                                                                                                         class="text-[9px] font-mono px-1 rounded"
-                                                                                                                                                        :class="getCaseResult(tc.id).score >= 0.8 ? 'text-green-700 dark:text-green-400' : getCaseResult(tc.id).score >= 0.5 ? 'text-yellow-700 dark:text-yellow-400' : 'text-red-700 dark:text-red-400'"
+                                                                                                                                                        :class="getCaseResult(tc.id).score >= 0.8 ? 'text-success' : getCaseResult(tc.id).score >= 0.5 ? 'text-warning' : 'text-destructive'"
                                                                                                                                                         x-text="getCaseResult(tc.id).score.toFixed(2)"
                                                                                                                                                 ></span>
                                                                                                                                         </template>
@@ -309,10 +309,10 @@ templ flowView() {
                                                                                                                                                 <template x-for="metric in getCaseResult(tc.id).metrics" :key="metric.metric_id">
                                                                                                                                                         <div class="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground">
                                                                                                                                                                 <template x-if="metric.status === 'passed'">
-                                                                                                                                                                        @icon.CircleCheck(icon.Props{Class: "size-2.5 text-green-600 flex-shrink-0"})
+                                                                                                                                                                        @icon.CircleCheck(icon.Props{Class: "size-2.5 text-success flex-shrink-0"})
                                                                                                                                                                 </template>
                                                                                                                                                                 <template x-if="metric.status !== 'passed'">
-                                                                                                                                                                        @icon.CircleX(icon.Props{Class: "size-2.5 text-red-600 flex-shrink-0"})
+                                                                                                                                                                        @icon.CircleX(icon.Props{Class: "size-2.5 text-destructive flex-shrink-0"})
                                                                                                                                                                 </template>
                                                                                                                                                                 <span class="flex-1 truncate font-mono" x-text="metric.metric_id"></span>
                                                                                                                                                                 <span class="font-mono" x-text="metric.score?.toFixed(2) ?? '-'"></span>
@@ -334,7 +334,7 @@ templ flowView() {
                                                                                         @click="runAllEvalSets()"
                                                                                         :disabled="evalRunning || !currentAgentId || evalSets.length === 0"
                                                                                         class="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                                                                        :class="!evalRunning && currentAgentId && evalSets.length > 0 ? 'bg-violet-500 text-white hover:bg-violet-600 shadow-sm' : 'bg-muted text-muted-foreground'"
+                                                                                        :class="!evalRunning && currentAgentId && evalSets.length > 0 ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm' : 'bg-muted text-muted-foreground'"
                                                                                 >
                                                                                         @icon.Play(icon.Props{Class: "size-3.5"})
                                                                                         Run All Tests
@@ -380,8 +380,8 @@ templ flowView() {
 								class="shrink-0 w-1 cursor-col-resize group relative z-10 bg-muted"
 							>
 								<div
-									class="absolute inset-y-0 -left-1 -right-1 group-hover:bg-indigo-500/20 transition-colors duration-150"
-									:class="dragging ? 'bg-indigo-500/30' : ''"
+									class="absolute inset-y-0 -left-1 -right-1 group-hover:bg-primary/20 transition-colors duration-150"
+									:class="dragging ? 'bg-primary/30' : ''"
 								></div>
 							</div>
 							<!-- Property Panel -->
@@ -441,7 +441,7 @@ templ flowView() {
 													x-show="!isRoot"
 													@click="confirm('Delete this node from the workflow? This cannot be undone.') && deleteNode()"
 													title="Delete node"
-													class="w-6 h-6 flex items-center justify-center rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors"
+													class="w-6 h-6 flex items-center justify-center rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
 												>
 													@icon.Trash2(icon.Props{Class: "size-3.5"})
 												</button>
@@ -460,7 +460,7 @@ templ flowView() {
 												<div class="space-y-3">
 													<!-- Agent Selector -->
 													<div>
-														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">LLM Agent <span class="text-rose-500">*</span></label>
+														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">LLM Agent <span class="text-destructive">*</span></label>
 														<select :value="node.agent_id" @change="set('agent_id', $event.target.value)" class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border">
 															<option value="">— select agent —</option>
 															<template x-for="ag in agents" :key="ag.id">
@@ -542,7 +542,7 @@ templ flowView() {
 															</h4>
 															<button
 																@click="editAgent()"
-																class="text-[9px] text-indigo-400 hover:text-indigo-300 font-medium transition-colors px-2 py-0.5 rounded border border-indigo-400/30 hover:border-indigo-400/60 hover:bg-indigo-500/5"
+																class="text-[9px] text-primary hover:text-primary/80 font-medium transition-colors px-2 py-0.5 rounded border border-primary/30 hover:border-primary/60 hover:bg-primary/5"
 															>
 																@icon.Pencil(icon.Props{Class: "size-2.5 inline me-1"})
 																Edit Agent
@@ -612,7 +612,7 @@ templ flowView() {
 																@icon.GitBranch(icon.Props{Class: "size-3 inline me-0.5"})
 																Branch Condition
 															</label>
-															<input :value="node.condition || ''" @input="set('condition', $event.target.value)" type="text" placeholder="e.g. technical, billing" class="w-full text-[11px] font-mono rounded-lg px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-red-400/40 bg-background border-border"/>
+															<input :value="node.condition || ''" @input="set('condition', $event.target.value)" type="text" placeholder="e.g. technical, billing" class="w-full text-[11px] font-mono rounded-lg px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-destructive/40 bg-background border-border"/>
 															<p class="text-[9px] text-muted-foreground mt-1">{ i18n.T(ctx, "Value to match against evaluator output. Use * for fallback/default branch.") }</p>
 														</div>
 													</template>
@@ -623,7 +623,7 @@ templ flowView() {
 											<template x-if="node.type === 'remote'">
 												<div class="space-y-3">
 													<div>
-														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">A2A Connector <span class="text-rose-500">*</span></label>
+														<label class="block text-[8px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">A2A Connector <span class="text-destructive">*</span></label>
 														<select :value="node.a2a_connector_id" @change="set('a2a_connector_id', $event.target.value)" class="w-full text-[11px] rounded-lg px-2.5 py-1.5 text-foreground outline-none focus:ring-1 focus:ring-primary/40 bg-background border-border">
 															<option value="">— select connector —</option>
 															<template x-for="conn in connectors" :key="conn.id">
@@ -674,8 +674,8 @@ templ flowView() {
 
 													<!-- Evaluator warning: missing -->
 													<template x-if="!node.children || node.children.length < 2">
-														<div class="rounded-lg p-2.5 bg-amber-500/10 border border-amber-500/20">
-															<p class="text-[10px] text-amber-600 dark:text-amber-400 flex items-start gap-1.5">
+														<div class="rounded-lg p-2.5 bg-warning/10 border border-warning/20">
+															<p class="text-[10px] text-warning flex items-start gap-1.5">
 																<span class="shrink-0 mt-0.5">⚠️</span>
 																<span>{ i18n.T(ctx, "Needs at least an evaluator + 1 branch. Add agents as children.") }</span>
 															</p>
@@ -684,12 +684,12 @@ templ flowView() {
 
 													<!-- Evaluator warning: missing output_key -->
 													<template x-if="node.children && node.children.length >= 2 && evaluatorNode && !evaluatorHasOutputKey">
-														<div class="rounded-lg p-2.5 bg-red-500/10 border border-red-500/20">
-															<p class="text-[10px] text-red-600 dark:text-red-400 flex items-start gap-1.5">
+														<div class="rounded-lg p-2.5 bg-destructive/10 border border-destructive/20">
+															<p class="text-[10px] text-destructive flex items-start gap-1.5">
 																<span class="shrink-0 mt-0.5">🔑</span>
 																<span>
 																	{ i18n.T(ctx, "Evaluator agent needs output_key set in the agent settings. This is how the router reads the classification.") }
-																	<button type="button" @click="editEvaluatorAgent()" class="underline font-semibold hover:text-red-500 transition-colors inline">{ i18n.T(ctx, "Open agent → State & Context → Output Variable") }</button>
+																	<button type="button" @click="editEvaluatorAgent()" class="underline font-semibold hover:text-destructive transition-colors inline">{ i18n.T(ctx, "Open agent → State & Context → Output Variable") }</button>
 																</span>
 															</p>
 														</div>
@@ -700,17 +700,17 @@ templ flowView() {
 														<div class="space-y-1.5">
 															<!-- Evaluator status -->
 															<div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border"
-																:class="evaluatorHasOutputKey ? 'bg-blue-500/10 border-blue-500/20' : 'bg-red-500/10 border-red-500/20'">
+																:class="evaluatorHasOutputKey ? 'bg-info/10 border-info/20' : 'bg-destructive/10 border-destructive/20'">
 																<span class="text-[8px]">🎯</span>
-																<span class="text-[10px] font-medium" :class="evaluatorHasOutputKey ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'">
+																<span class="text-[10px] font-medium" :class="evaluatorHasOutputKey ? 'text-info' : 'text-destructive'">
 																	<template x-if="evaluatorAgent" x-text="'Evaluator: ' + evaluatorAgent.name"></template>
 																	<template x-if="!evaluatorAgent">No evaluator agent set</template>
 																</span>
 																<template x-if="evaluatorHasOutputKey">
-																	<span class="text-[8px] font-mono px-1 py-0.5 rounded bg-blue-500/20 text-blue-500" x-text="'→ ' + evaluatorAgent.output_key"></span>
+																	<span class="text-[8px] font-mono px-1 py-0.5 rounded bg-info/20 text-info" x-text="'→ ' + evaluatorAgent.output_key"></span>
 																</template>
 																<template x-if="!evaluatorHasOutputKey && evaluatorAgent">
-																	<span class="text-[8px] font-mono text-red-400">no output_key</span>
+																	<span class="text-[8px] font-mono text-destructive">no output_key</span>
 																</template>
 															</div>
 															<!-- Branches -->
@@ -724,7 +724,7 @@ templ flowView() {
 																	</template>
 																	<!-- Condition badge -->
 																	<template x-if="child.condition">
-																		<span class="text-[8px] font-mono px-1 py-0.5 rounded bg-red-500/10 text-red-500" x-text="child.condition === '*' ? '*' : child.condition"></span>
+																		<span class="text-[8px] font-mono px-1 py-0.5 rounded bg-destructive/10 text-destructive" x-text="child.condition === '*' ? '*' : child.condition"></span>
 																	</template>
 																	<template x-if="!child.condition">
 																		<span class="text-[8px] font-mono text-muted-foreground/50">no condition</span>
@@ -746,14 +746,14 @@ templ flowView() {
 							</div>
 							<!-- Validation errors footer -->
 							<template x-if="pipelineErrors.length > 0">
-								<div class="shrink-0 px-4 py-2 border-t border-amber-500/20 bg-amber-500/5 flex items-start gap-2">
-									@icon.TriangleAlert(icon.Props{Class: "size-3.5 text-amber-500 shrink-0 mt-0.5"})
+								<div class="shrink-0 px-4 py-2 border-t border-warning/20 bg-warning/5 flex items-start gap-2">
+									@icon.TriangleAlert(icon.Props{Class: "size-3.5 text-warning shrink-0 mt-0.5"})
 									<div class="flex-1 min-w-0">
 										<template x-for="(err, idx) in pipelineErrors.slice(0,3)" :key="idx">
-											<p class="text-[10px] text-amber-600 dark:text-amber-400 truncate" x-text="err"></p>
+											<p class="text-[10px] text-warning truncate" x-text="err"></p>
 										</template>
 										<template x-if="pipelineErrors.length > 3">
-											<p class="text-[10px] text-amber-500/70" x-text="'+ ' + (pipelineErrors.length - 3) + ' more'"></p>
+											<p class="text-[10px] text-warning/70" x-text="'+ ' + (pipelineErrors.length - 3) + ' more'"></p>
 										</template>
 									</div>
 								</div>
@@ -857,8 +857,7 @@ templ flowView() {
 						x-transition:leave-end="opacity-0"
 						@click="$store.flow._showHelp = false"
 						@keydown.escape.window="if ($store.flow?._showHelp) $store.flow._showHelp = false"
-						class="absolute inset-0 z-50 flex items-center justify-center"
-						style="background:rgba(0,0,0,0.5); backdrop-filter:blur(2px);"
+						class="absolute inset-0 z-50 flex items-center justify-center bg-black/30 dark:bg-black/60 backdrop-blur-[2px]"
 					>
 						<div @click.stop class="rounded-xl border border-border shadow-2xl max-w-md w-full bg-background">
 							<div class="px-5 pt-5 pb-3">

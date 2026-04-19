@@ -152,15 +152,15 @@ templ docsMCP() {
 		</p>
 		@docsInfoBox("Connector Lifecycle") {
 			<div class="flex flex-wrap items-center gap-2 mt-2 text-sm">
-				@statusBadge("Created", "bg-gray-500")
+				@statusBadge("Created", "bg-muted-foreground")
 				<span class="text-muted-foreground">→</span>
-				@statusBadge("Connecting", "bg-blue-500")
+				@statusBadge("Connecting", "bg-info")
 				<span class="text-muted-foreground">→</span>
-				@statusBadge("Connected", "bg-green-500")
+				@statusBadge("Connected", "bg-success")
 				<span class="text-muted-foreground">or</span>
-				@statusBadge("Auth Required", "bg-yellow-500")
+				@statusBadge("Auth Required", "bg-warning")
 				<span class="text-muted-foreground">→</span>
-				@statusBadge("Authorizing", "bg-purple-500")
+				@statusBadge("Authorizing", "bg-primary")
 			</div>
 		}
 		<h3>Setting Up an MCP Connector</h3>
@@ -247,15 +247,15 @@ templ docsA2A() {
 		<h3>Connector Lifecycle</h3>
 		@docsInfoBox("Status Flow") {
 			<div class="flex flex-wrap items-center gap-2 mt-2 text-sm">
-				@statusBadge("Created", "bg-gray-500")
+				@statusBadge("Created", "bg-muted-foreground")
 				<span class="text-muted-foreground">→</span>
-				@statusBadge("Discovering", "bg-blue-500")
+				@statusBadge("Discovering", "bg-info")
 				<span class="text-muted-foreground">→</span>
-				@statusBadge("Connected", "bg-green-500")
+				@statusBadge("Connected", "bg-success")
 				<span class="text-muted-foreground">or</span>
-				@statusBadge("Auth Required", "bg-yellow-500")
+				@statusBadge("Auth Required", "bg-warning")
 				<span class="text-muted-foreground">or</span>
-				@statusBadge("Error", "bg-red-500")
+				@statusBadge("Error", "bg-destructive")
 			</div>
 		}
 		<h3>Setting Up an A2A Connector</h3>

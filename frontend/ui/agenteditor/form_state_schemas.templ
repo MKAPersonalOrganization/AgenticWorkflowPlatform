@@ -94,11 +94,11 @@ templ formInputSchemaSection() {
 			type="button"
 			@click="showCalledAsTool = !showCalledAsTool"
 			class="flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent/30 transition-colors"
-			:class="showCalledAsTool ? 'bg-gradient-to-r from-slate-500/5 to-transparent border-b border-border/50' : ''"
+			:class="showCalledAsTool ? 'bg-gradient-to-r from-muted to-transparent border-b border-border/50' : ''"
 		>
 			<span class="flex items-center gap-2">
-				<div class="size-6 rounded-md bg-slate-500/10 flex items-center justify-center">
-					@icon.ArrowDownToLine(icon.Props{Class: "size-3.5 text-slate-600 dark:text-slate-400"})
+				<div class="size-6 rounded-md bg-muted flex items-center justify-center">
+					@icon.ArrowDownToLine(icon.Props{Class: "size-3.5 text-muted-foreground"})
 				</div>
 				{ i18n.T(ctx, "Called as a Tool") }
 				<span class="text-[10px] text-muted-foreground" x-text="inputSchemaRows.length > 0 ? '(' + inputSchemaRows.length + ' arg' + (inputSchemaRows.length === 1 ? '' : 's') + ')' : ''"></span>
@@ -110,7 +110,7 @@ templ formInputSchemaSection() {
 		<div x-show="showCalledAsTool" x-collapse>
 			<div class="p-4 space-y-3 border-t border-border/50">
 				<p class="text-xs text-muted-foreground leading-relaxed">
-					@icon.Info(icon.Props{Class: "size-3.5 inline me-1 text-slate-500"})
+					@icon.Info(icon.Props{Class: "size-3.5 inline me-1 text-muted-foreground"})
 					{ i18n.T(ctx, "Define the arguments another agent must provide when calling this one as a tool. Leave empty for a single free-text argument. Ignored on direct chat — only matters when this agent is exposed via 'Agents as Tools' or A2A.") }
 				</p>
 				@schemaBuilder("inputSchema", i18n.T(ctx, "No arguments — callers will pass a single free-text request."))
@@ -129,11 +129,11 @@ templ formOutputSchemaSection() {
 			type="button"
 			@click="showOutputSchema = !showOutputSchema"
 			class="flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent/30 transition-colors"
-			:class="showOutputSchema ? 'bg-gradient-to-r from-slate-500/5 to-transparent border-b border-border/50' : ''"
+			:class="showOutputSchema ? 'bg-gradient-to-r from-muted to-transparent border-b border-border/50' : ''"
 		>
 			<span class="flex items-center gap-2">
-				<div class="size-6 rounded-md bg-slate-500/10 flex items-center justify-center">
-					@icon.ArrowUpToLine(icon.Props{Class: "size-3.5 text-slate-600 dark:text-slate-400"})
+				<div class="size-6 rounded-md bg-muted flex items-center justify-center">
+					@icon.ArrowUpToLine(icon.Props{Class: "size-3.5 text-muted-foreground"})
 				</div>
 				{ i18n.T(ctx, "Output Schema") }
 				<span class="text-[10px] text-muted-foreground" x-text="outputSchemaRows.length > 0 ? '(' + outputSchemaRows.length + ' field' + (outputSchemaRows.length === 1 ? '' : 's') + ')' : ''"></span>
@@ -145,7 +145,7 @@ templ formOutputSchemaSection() {
 		<div x-show="showOutputSchema" x-collapse>
 			<div class="p-4 space-y-3 border-t border-border/50">
 				<p class="text-xs text-muted-foreground leading-relaxed">
-					@icon.Info(icon.Props{Class: "size-3.5 inline me-1 text-slate-500"})
+					@icon.Info(icon.Props{Class: "size-3.5 inline me-1 text-muted-foreground"})
 					{ i18n.T(ctx, "Constrain every reply to a JSON Schema. Tools and sub-agent transfer continue to work — the orchestration engine enforces the schema natively on most providers and falls back to an equivalent workaround on older Gemini models. Leave empty to keep replies free-form.") }
 				</p>
 				@schemaBuilder("outputSchema", i18n.T(ctx, "No schema — replies are free-form. Add a field to turn on structured output."))

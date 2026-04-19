@@ -195,7 +195,7 @@ templ FilesystemDialog() {
 									<!-- Drive Icon -->
 									<div class="shrink-0 flex items-center justify-center size-12 rounded-lg bg-muted">
 										<template x-if="fs.type === 'local'">
-											@icon.HardDrive(icon.Props{Class: "size-6 text-blue-500"})
+											@icon.HardDrive(icon.Props{Class: "size-6 text-info"})
 										</template>
 										<template x-if="fs.type === 'github'">
 											@icon.Github(icon.Props{Class: "size-6 text-foreground"})
@@ -320,10 +320,10 @@ templ FilesystemDialog() {
 								</div>
 								<div x-show="githubStatus.connected" x-cloak>
 									<!-- Connected Banner -->
-									<div class="flex items-center justify-between mb-3 p-2 rounded-md bg-green-500/10 border border-green-500/20">
+									<div class="flex items-center justify-between mb-3 p-2 rounded-md bg-success/10 border border-success/20">
 										<div class="flex items-center gap-2">
 											<img x-show="githubStatus.avatar" :src="githubStatus.avatar" class="size-6 rounded-full" alt=""/>
-											<span class="text-sm font-medium text-green-700 dark:text-green-400">
+											<span class="text-sm font-medium text-success">
 												{ i18n.T(ctx, "Connected as") } <span x-text="'@' + githubStatus.username"></span>
 											</span>
 										</div>
@@ -593,9 +593,9 @@ templ FilesystemDialog() {
 							</div>
 						</div>
 						<!-- ── Inline Mkdir ────────────────────────────────── -->
-						<div x-show="showMkdir" x-cloak class="flex items-center gap-2 px-4 py-2 border-b bg-blue-500/5">
-							<div class="flex items-center justify-center size-8 rounded bg-blue-500/10">
-								@icon.FolderPlus(icon.Props{Class: "size-4 text-blue-500"})
+						<div x-show="showMkdir" x-cloak class="flex items-center gap-2 px-4 py-2 border-b bg-info/5">
+							<div class="flex items-center justify-center size-8 rounded bg-info/10">
+								@icon.FolderPlus(icon.Props{Class: "size-4 text-info"})
 							</div>
 							@input.Input(input.Props{
 								Placeholder: "New folder name...",

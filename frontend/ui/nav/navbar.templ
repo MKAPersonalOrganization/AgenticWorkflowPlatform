@@ -2,6 +2,7 @@ package nav
 
 import (
 	a2acomp "aicompass/frontend/ui/a2a"
+	"aicompass/frontend/ui/agenteditor"
 	"aicompass/frontend/components/button"
 	"aicompass/frontend/ui/filesystem"
 	"aicompass/frontend/ui/i18n"
@@ -15,6 +16,87 @@ import (
 type NavbarProps struct {
 	Class string
 	User  *auth.User // Authenticated user (nil if not authenticated)
+}
+
+type TopBarProps struct {
+	User *auth.User // Authenticated user (nil if not authenticated)
+}
+
+// TopBar renders the thin horizontal header at the top of the app with the
+// home/brand logo. Lives above the left navbar + main content row. Kept
+// deliberately minimal — just the brand on the left. Owns its own hover
+// glow CSS and the ai-token rotation script so it keeps working even when
+// the Navbar below isn't rendered (e.g., HideNavbar pages).
+// BottomBar renders a very thin status strip at the bottom of the app.
+// Right-side slot currently holds the debugger toggle for the chat view —
+// the chat component (home.templ) listens for `toggle-debug-panel` on
+// window and flips its local showDebugPanel state. Keeping the button
+// global (not nested in chat scope) means it's available from any view;
+// views without a debug panel simply ignore the event.
+templ BottomBar(props ...TopBarProps) {
+	{{ var p TopBarProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<footer class="h-6 shrink-0 flex items-center justify-end px-2 bg-sidebar border-t border-sidebar-border/50 z-40">
+		if p.User != nil {
+			<button
+				type="button"
+				@click="$dispatch('toggle-debug-panel')"
+				title={ i18n.T(ctx, "Toggle Debugger (Ctrl+Shift+D)") }
+				aria-label={ i18n.T(ctx, "Toggle Debugger") }
+				class="inline-flex items-center justify-center size-5 rounded text-muted-foreground/70 hover:text-foreground hover:bg-sidebar-accent/60 transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3">
+					<path d="m18 16 4-4-4-4"></path>
+					<path d="m6 8-4 4 4 4"></path>
+					<path d="m14.5 4-5 16"></path>
+				</svg>
+			</button>
+		}
+	</footer>
+}
+
+templ TopBar(props ...TopBarProps) {
+	{{ var p TopBarProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<style>
+		.nav-brand:hover svg {
+			filter: drop-shadow(0 0 6px hsl(var(--primary) / 0.5));
+		}
+		.nav-brand svg {
+			transition: transform 0.12s linear;
+		}
+	</style>
+	<script>
+		(function () {
+			let _angle = 0;
+			window.addEventListener('ai-token', function () {
+				_angle += 1;
+				const svg = document.querySelector('.nav-brand svg');
+				if (svg) svg.style.transform = 'rotate(' + _angle + 'deg)';
+			});
+		})();
+	</script>
+	<header class="h-10 shrink-0 flex items-center px-3 bg-sidebar border-b border-sidebar-border/50 z-40">
+		<a
+			href="/"
+			class="nav-brand flex items-center gap-2 h-8 px-2 rounded-md hover:bg-sidebar-accent/60 transition-colors"
+			title="Home"
+		>
+			@icon.CompassLogoAnimated("size-[22px] text-primary")
+		</a>
+		<div class="flex-1"></div>
+		if p.User != nil {
+			<!-- Agent Designer — lives in the top bar because it's a
+			     global tool, orthogonal to the left nav's chat/service
+			     clusters. Dialog is mounted in layout.templ for
+			     authenticated users, so we gate on p.User to match. -->
+			@agenteditor.AgentDesignerHeaderButton()
+		}
+	</header>
 }
 
 templ Navbar(props ...NavbarProps) {
@@ -40,40 +122,12 @@ templ Navbar(props ...NavbarProps) {
 			transform: scale(0.94) !important;
 			transition-duration: 0.07s !important;
 		}
-		/* Brand logo wrapper pulse-on-hover */
-		#main-navbar .nav-brand:hover svg {
-			filter: drop-shadow(0 0 6px hsl(var(--primary) / 0.5));
-		}
-		/* Token-driven rotation — smooth step per token */
-		#main-navbar .nav-brand svg {
-			transition: transform 0.12s linear;
-		}
 	</style>
-	<script>
-		(function () {
-			let _angle = 0;
-			window.addEventListener('ai-token', function () {
-				_angle += 1;
-				const svg = document.querySelector('#main-navbar .nav-brand svg');
-				if (svg) svg.style.transform = 'rotate(' + _angle + 'deg)';
-			});
-		})();
-	</script>
 	<!-- Left Navigation Bar -->
 	<nav
-		class={ "h-full w-[52px] flex flex-col items-center pb-3 gap-0.5 shrink-0 z-40 bg-sidebar border-e border-sidebar-border/50 shadow-[1px_0_20px_rgba(0,0,0,0.06)]", p.Class }
+		class={ "h-full w-10 flex flex-col items-center pt-2 pb-3 gap-0.5 shrink-0 z-40 bg-sidebar border-e border-sidebar-border/50 shadow-[1px_0_20px_rgba(0,0,0,0.06)]", p.Class }
 		id="main-navbar"
 	>
-		<!-- Brand Logo -->
-		<a
-			href="/"
-			class="nav-brand flex items-center justify-center w-full h-[52px] shrink-0 transition-opacity duration-200 hover:opacity-80"
-			title="Home"
-		>
-			@icon.CompassLogoAnimated("size-[22px] text-primary")
-		</a>
-		<!-- Top divider -->
-		<div class="w-6 h-px bg-linear-to-r from-transparent via-sidebar-border to-transparent shrink-0 mb-0.5"></div>
 		if p.User != nil {
 			<!-- Chat History -->
 			<div class="nav-item w-full flex justify-center">
@@ -86,7 +140,7 @@ templ Navbar(props ...NavbarProps) {
 				@button.Button(button.Props{
 					Size:    button.SizeIcon,
 					Variant: button.VariantGhost,
-					Class:   "size-9 text-yellow-500",
+					Class:   "size-9 text-warning",
 					Attributes: templ.Attributes{
 						"title": i18n.T(ctx, "Administrator"),
 					},
@@ -102,7 +156,7 @@ templ Navbar(props ...NavbarProps) {
 		     grouped with integrations (A2A, Plugins & Tools). All four are
 		     service/config surfaces so they share one pill. -->
 		if p.User != nil {
-			<div class="hidden md:flex flex-col items-center gap-0.5 w-full bg-sidebar-accent/30 rounded-xl py-1 px-0.5 mb-1 mx-1">
+			<div class="hidden md:flex flex-col items-center gap-0.5 w-full bg-sidebar-accent/30 rounded-lg py-1 mb-1">
 				<div class="nav-item w-full flex justify-center">
 					@filesystem.FilesystemButtonTrigger()
 				</div>
@@ -118,7 +172,7 @@ templ Navbar(props ...NavbarProps) {
 			</div>
 		}
 		<!-- Separator -->
-		<div class="w-6 h-px bg-linear-to-r from-transparent via-sidebar-border/60 to-transparent my-1 shrink-0"></div>
+		<div class="w-5 h-px bg-linear-to-r from-transparent via-sidebar-border/60 to-transparent my-1 shrink-0"></div>
 		<!-- Account Settings -->
 		@AccountSettings(AccountSettingsProps{
 			User:    p.User,

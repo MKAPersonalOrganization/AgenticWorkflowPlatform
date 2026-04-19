@@ -157,7 +157,7 @@ templ formAgentsAsToolsSection() {
 // reflects the picker state live.
 templ agentToolsSelectionDialog() {
 	<div class="fixed inset-0 z-[60] flex items-center justify-center p-4">
-		<div class="fixed inset-0 bg-black/60 backdrop-blur-sm" @click="agentToolsDialogOpen = false"></div>
+		<div class="fixed inset-0 bg-black/30 dark:bg-black/60 backdrop-blur-sm" @click="agentToolsDialogOpen = false"></div>
 		<div class="relative w-full max-w-2xl bg-card border border-border rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
 			<div class="flex items-center justify-between px-4 py-3 border-b border-border/50 shrink-0">
 				<h3 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Add Agent Tools") }</h3>
@@ -202,7 +202,7 @@ templ agentToolsSelectionDialog() {
 // (availableAgentsForSubAgent handles that in Alpine).
 templ subAgentSelectionDialog() {
 	<div class="fixed inset-0 z-[60] flex items-center justify-center p-4">
-		<div class="fixed inset-0 bg-black/60 backdrop-blur-sm" @click="subAgentDialogOpen = false"></div>
+		<div class="fixed inset-0 bg-black/30 dark:bg-black/60 backdrop-blur-sm" @click="subAgentDialogOpen = false"></div>
 		<div class="relative w-full max-w-2xl bg-card border border-border rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
 			<div class="flex items-center justify-between px-4 py-3 border-b border-border/50 shrink-0">
 				<h3 class="text-sm font-semibold text-foreground">{ i18n.T(ctx, "Select Sub-Agents") }</h3>

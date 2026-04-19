@@ -15,10 +15,10 @@ templ toastStack() {
 			<div
 				class="pointer-events-auto max-w-xs px-4 py-3 rounded-xl shadow-lg text-xs font-medium transition-all duration-300 flex items-center gap-2.5 backdrop-blur-sm"
 				:class="{
-					'bg-emerald-600/95 text-white': t.type === 'success',
-					'bg-red-600/95 text-white': t.type === 'error',
-					'bg-sky-600/95 text-white': t.type === 'info',
-					'bg-amber-600/95 text-white': t.type === 'warning',
+					'bg-success text-success-foreground': t.type === 'success',
+					'bg-destructive text-destructive-foreground': t.type === 'error',
+					'bg-info text-info-foreground': t.type === 'info',
+					'bg-warning text-warning-foreground': t.type === 'warning',
 					'opacity-0 translate-y-4 scale-95': t.leaving,
 					'opacity-100 translate-y-0 scale-100': !t.leaving,
 				}"

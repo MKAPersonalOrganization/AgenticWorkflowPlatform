@@ -1,17 +1,17 @@
 package chat
 
-import "aicompass/frontend/ui/agenteditor"
 import "aicompass/frontend/components/button"
 import "aicompass/frontend/ui/i18n"
 import "aicompass/frontend/components/icon"
 
 // Header renders the desktop chat header with action buttons.
+// The Agent Designer trigger used to live here; it now lives in the app's
+// global TopBar (frontend/ui/nav/navbar.templ) so it's reachable from any
+// view, not only the chat view.
 templ Header() {
 	<div class="absolute top-0 z-10 hidden md:flex h-14 w-full items-center justify-between p-2 font-semibold">
 		<div class="flex items-center gap-2"></div>
 		<div class="flex items-center gap-2">
-			<!-- Agent Designer -->
-			@agenteditor.AgentDesignerHeaderButton()
 			<!-- Right Side Actions -->
 			<!-- New Chat -->
 			<div x-show="hasMessages || isStreaming" x-cloak>
@@ -31,23 +31,7 @@ templ Header() {
 			<div x-show="hasMessages" x-cloak x-transition.opacity>
 				@Search()
 			</div>
-			<!-- Debug Panel Toggle -->
-			@button.Button(button.Props{
-				Size:    button.SizeIcon,
-				Variant: button.VariantGhost,
-				Class:   "size-9 text-muted-foreground hover:text-foreground hover:bg-accent/60 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-				Attributes: templ.Attributes{
-					"@click":  "toggleDebugPanel()",
-					"title":   i18n.T(ctx, "Toggle Debugger (Ctrl+Shift+D)"),
-					":class":  "showDebugPanel ? 'text-primary bg-accent/40' : ''",
-				},
-			}) {
-				<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5">
-					<path d="m18 16 4-4-4-4"></path>
-					<path d="m6 8-4 4 4 4"></path>
-					<path d="m14.5 4-5 16"></path>
-				</svg>
-			}
+			<!-- Debugger toggle moved to the global BottomBar. -->
 			<!-- Artifacts Toggle -->
 			@ArtifactsToggle()
 		</div>

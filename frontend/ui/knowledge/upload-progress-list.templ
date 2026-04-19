@@ -46,7 +46,7 @@ templ UploadProgressList() {
 						<div class="mt-1 h-1.5 rounded-full bg-muted overflow-hidden">
 							<div
 								class="h-full rounded-full transition-all duration-300"
-								:class="file.error ? 'bg-destructive' : (file.progress >= 100 ? 'bg-green-500' : 'bg-primary')"
+								:class="file.error ? 'bg-destructive' : (file.progress >= 100 ? 'bg-success' : 'bg-primary')"
 								:style="'width: ' + file.progress + '%'"
 							></div>
 						</div>
@@ -60,7 +60,7 @@ templ UploadProgressList() {
 							</span>
 						</template>
 						<template x-if="!file.error && file.progress >= 100">
-							<span class="text-green-500 flex items-center gap-1">
+							<span class="text-success flex items-center gap-1">
 								@icon.CircleCheck(icon.Props{Class: "size-3"})
 								{ i18n.T(ctx, "Done") }
 							</span>

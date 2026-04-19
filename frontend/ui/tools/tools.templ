@@ -256,11 +256,11 @@ templ ToolsDialog() {
 											<span
 												class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium"
 												:class="{
-													'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400': detailItem.status === 'connected',
-													'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400': detailItem.status === 'connecting',
-													'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400': detailItem.status === 'auth_required',
-													'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400': detailItem.status === 'error',
-													'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300': detailItem.status === 'disconnected' || detailItem.status === 'created'
+													'bg-success/15 text-success': detailItem.status === 'connected',
+													'bg-info/15 text-info': detailItem.status === 'connecting',
+													'bg-warning/15 text-warning': detailItem.status === 'auth_required',
+													'bg-destructive/15 text-destructive': detailItem.status === 'error',
+													'bg-muted text-muted-foreground': detailItem.status === 'disconnected' || detailItem.status === 'created'
 												}"
 												x-text="detailItem.status.replace('_', ' ')"
 											></span>
@@ -385,7 +385,7 @@ templ ToolsDialog() {
 													@icon.Settings(icon.Props{Class: "size-4 text-muted-foreground"})
 													<h4 class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "Plugin Settings") }</h4>
 													<template x-if="isConfigured(detailItem.plugin_id)">
-														<span class="ms-1 inline-flex items-center rounded-full bg-green-500/10 px-1.5 py-0.5 text-[9px] font-medium text-green-600 dark:text-green-400 ring-1 ring-inset ring-green-500/20">{ i18n.T(ctx, "Configured") }</span>
+														<span class="ms-1 inline-flex items-center rounded-full bg-success/10 px-1.5 py-0.5 text-[9px] font-medium text-success ring-1 ring-inset ring-success/20">{ i18n.T(ctx, "Configured") }</span>
 													</template>
 												</div>
 												<!-- Settings fields -->
@@ -445,7 +445,7 @@ templ ToolsDialog() {
 															x-show="isConfigured(detailItem.plugin_id)"
 														>{ i18n.T(ctx, "Reset settings") }</button>
 														<div class="flex items-center gap-3 ms-auto">
-															<span x-show="saved[detailItem.plugin_id]" x-transition class="text-[11px] text-emerald-600 font-medium flex items-center gap-1">
+															<span x-show="saved[detailItem.plugin_id]" x-transition class="text-[11px] text-success font-medium flex items-center gap-1">
 																@icon.Check(icon.Props{Class: "size-3"})
 																{ i18n.T(ctx, "Saved") }
 															</span>
@@ -546,11 +546,11 @@ templ MCPConnectorDialogCard() {
 					<span
 						class="absolute -bottom-0.5 -end-0.5 size-2.5 rounded-full border-2 border-background"
 						:class="{
-							'bg-emerald-500': conn.status === 'connected',
-							'bg-yellow-500 animate-pulse': conn.status === 'connecting',
-							'bg-orange-500': conn.status === 'auth_required' || conn.status === 'authorizing',
-							'bg-red-500': conn.status === 'error',
-							'bg-gray-400': conn.status === 'created' || conn.status === 'disconnected'
+							'bg-success': conn.status === 'connected',
+							'bg-info animate-pulse': conn.status === 'connecting',
+							'bg-warning': conn.status === 'auth_required' || conn.status === 'authorizing',
+							'bg-destructive': conn.status === 'error',
+							'bg-muted-foreground': conn.status === 'created' || conn.status === 'disconnected'
 						}"
 					></span>
 				</div>
@@ -576,7 +576,7 @@ templ MCPConnectorDialogCard() {
 					<template x-if="conn.status === 'auth_required'">
 						<button
 							@click.stop="mcpAuthorize(conn)"
-							class="p-1.5 rounded-md hover:bg-accent text-orange-500 hover:text-orange-600 transition-colors"
+							class="p-1.5 rounded-md hover:bg-accent text-warning hover:text-warning/80 transition-colors"
 							title="Authorize"
 						>
 							@icon.KeyRound(icon.Props{Class: "size-3.5"})

@@ -144,7 +144,7 @@ templ MCPConnectorCard() {
 			<!-- MCP icon with status dot -->
 			<div class="relative">
 				<div
-					class="size-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 bg-blue-500/10 text-blue-500"
+					class="size-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 bg-info/10 text-info"
 				>
 					@icon.MCPLogo("size-4")
 				</div>
@@ -152,11 +152,11 @@ templ MCPConnectorCard() {
 				<span
 					class="absolute -bottom-0.5 -end-0.5 size-2.5 rounded-full border-2 border-sidebar"
 					:class="{
-						'bg-emerald-500': conn.status === 'connected',
-						'bg-yellow-500 animate-pulse': conn.status === 'connecting',
-						'bg-orange-500': conn.status === 'auth_required' || conn.status === 'authorizing',
-						'bg-red-500': conn.status === 'error',
-						'bg-gray-400': conn.status === 'created' || conn.status === 'disconnected'
+						'bg-success': conn.status === 'connected',
+						'bg-info animate-pulse': conn.status === 'connecting',
+						'bg-warning': conn.status === 'auth_required' || conn.status === 'authorizing',
+						'bg-destructive': conn.status === 'error',
+						'bg-muted-foreground': conn.status === 'created' || conn.status === 'disconnected'
 					}"
 				></span>
 			</div>
@@ -167,7 +167,7 @@ templ MCPConnectorCard() {
 				</div>
 				<p class="text-xs text-muted-foreground truncate mt-0.5 leading-snug" x-text="conn.server_url"></p>
 				<div class="flex items-center gap-1.5 mt-1">
-					<span class="inline-block px-1.5 py-0 text-[9px] font-medium rounded-full bg-blue-500/10 text-blue-500">
+					<span class="inline-block px-1.5 py-0 text-[9px] font-medium rounded-full bg-info/10 text-info">
 						MCP
 					</span>
 					<span
@@ -193,7 +193,7 @@ templ MCPConnectorCard() {
 				<template x-if="conn.status === 'auth_required'">
 					<button
 						@click.stop="mcpAuthorize(conn)"
-						class="p-1 rounded-md hover:bg-accent text-orange-500 hover:text-orange-600"
+						class="p-1 rounded-md hover:bg-accent text-warning hover:text-warning/80"
 						:title="'Authorize'"
 					>
 						@icon.KeyRound(icon.Props{Class: "size-3"})

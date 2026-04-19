@@ -161,11 +161,10 @@ templ EvaluationDialog() {
 											<span 
 												class="text-xs font-mono px-1.5 py-0.5 rounded"
 												:class="{
-													'bg-green-100 text-green-800': run.status === 'completed',
-													'bg-yellow-100 text-yellow-800': run.status === 'running',
-													'bg-red-100 text-red-800': run.status === 'failed',
-													'bg-gray-100 text-gray-800': run.status === 'cancelled',
-													'bg-muted text-muted-foreground': !run.status
+													'bg-success/15 text-success': run.status === 'completed',
+													'bg-warning/15 text-warning': run.status === 'running',
+													'bg-destructive/15 text-destructive': run.status === 'failed',
+													'bg-muted text-muted-foreground': run.status === 'cancelled' || !run.status
 												}"
 												x-text="run.status"></span>
 											<span class="text-xs text-muted-foreground" x-text="run.num_runs + ' runs'"></span>

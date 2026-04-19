@@ -30,26 +30,26 @@ templ PipelineStatusSummary() {
 			>
 				<!-- Animated processing indicator -->
 				<div class="relative flex items-center justify-center" x-show="!pipelineStatus?.cancellation_requested">
-					<div class="h-2.5 w-2.5 rounded-full bg-blue-500 animate-pulse"></div>
-					<div class="absolute h-5 w-5 rounded-full border-2 border-blue-500/30 animate-ping"></div>
+					<div class="h-2.5 w-2.5 rounded-full bg-info animate-pulse"></div>
+					<div class="absolute h-5 w-5 rounded-full border-2 border-info/30 animate-ping"></div>
 				</div>
 				<!-- Cancelling indicator -->
 				<div class="relative flex items-center justify-center" x-show="pipelineStatus?.cancellation_requested" x-cloak>
-					<div class="h-2.5 w-2.5 rounded-full bg-orange-500 animate-pulse"></div>
+					<div class="h-2.5 w-2.5 rounded-full bg-warning animate-pulse"></div>
 				</div>
 				<span class="text-sm font-medium" x-show="!pipelineStatus?.cancellation_requested">{ i18n.T(ctx, "Pipeline Active") }</span>
-				<span class="text-sm font-medium text-orange-600 dark:text-orange-400" x-show="pipelineStatus?.cancellation_requested" x-cloak>{ i18n.T(ctx, "Cancelling...") }</span>
+				<span class="text-sm font-medium text-warning" x-show="pipelineStatus?.cancellation_requested" x-cloak>{ i18n.T(ctx, "Cancelling...") }</span>
 				<!-- Quick stage counts -->
 				<div class="flex items-center gap-2 text-xs text-muted-foreground">
 					<span class="flex items-center gap-1" x-show="pipelineStatus?.pending > 0">
 						@icon.Clock(icon.Props{Class: "size-3"})
 						<span x-text="pipelineStatus?.pending"></span>
 					</span>
-					<span class="flex items-center gap-1 text-blue-500" x-show="pipelineStatus?.processing > 0">
+					<span class="flex items-center gap-1 text-info" x-show="pipelineStatus?.processing > 0">
 						@icon.LoaderCircle(icon.Props{Class: "size-3 animate-spin"})
 						<span x-text="pipelineStatus?.processing"></span>
 					</span>
-					<span class="flex items-center gap-1 text-green-500" x-show="pipelineStatus?.completed > 0">
+					<span class="flex items-center gap-1 text-success" x-show="pipelineStatus?.completed > 0">
 						@icon.CircleCheck(icon.Props{Class: "size-3"})
 						<span x-text="pipelineStatus?.completed"></span>
 					</span>
@@ -115,17 +115,17 @@ templ PipelineStatusSummary() {
 						<p class="text-lg font-bold" x-text="pipelineStatus?.pending || 0"></p>
 						<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Pending") }</p>
 					</div>
-					<div class="rounded-md border border-blue-500/20 bg-blue-500/5 p-2 text-center">
-						@icon.LoaderCircle(icon.Props{Class: "size-4 mx-auto mb-1 text-blue-500 animate-spin"})
-						<p class="text-lg font-bold text-blue-600 dark:text-blue-400" x-text="pipelineStatus?.processing || 0"></p>
+					<div class="rounded-md border border-info/20 bg-info/5 p-2 text-center">
+						@icon.LoaderCircle(icon.Props{Class: "size-4 mx-auto mb-1 text-info animate-spin"})
+						<p class="text-lg font-bold text-info" x-text="pipelineStatus?.processing || 0"></p>
 						<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Processing") }</p>
 					</div>
-					<div class="rounded-md border border-green-500/20 bg-green-500/5 p-2 text-center">
-						@icon.CircleCheck(icon.Props{Class: "size-4 mx-auto mb-1 text-green-500"})
-						<p class="text-lg font-bold text-green-600 dark:text-green-400" x-text="pipelineStatus?.completed || 0"></p>
+					<div class="rounded-md border border-success/20 bg-success/5 p-2 text-center">
+						@icon.CircleCheck(icon.Props{Class: "size-4 mx-auto mb-1 text-success"})
+						<p class="text-lg font-bold text-success" x-text="pipelineStatus?.completed || 0"></p>
 						<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Completed") }</p>
 					</div>
-					<div class="rounded-md border border-red-500/20 bg-red-500/5 p-2 text-center">
+					<div class="rounded-md border border-destructive/20 bg-destructive/5 p-2 text-center">
 						@icon.CircleX(icon.Props{Class: "size-4 mx-auto mb-1 text-destructive"})
 						<p class="text-lg font-bold text-destructive" x-text="pipelineStatus?.failed || 0"></p>
 						<p class="text-[10px] text-muted-foreground">{ i18n.T(ctx, "Failed") }</p>

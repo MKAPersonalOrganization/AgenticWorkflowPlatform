@@ -140,7 +140,7 @@ templ checkoutDialog() {
 	>
 		<!-- Backdrop -->
 		<div
-			class="fixed inset-0 z-[60] bg-black/50 transition-opacity"
+			class="fixed inset-0 z-[60] bg-black/30 dark:bg-black/60 transition-opacity"
 			x-show="open"
 			x-transition:enter="ease-out duration-300"
 			x-transition:enter-start="opacity-0"
@@ -211,10 +211,10 @@ templ checkoutDialog() {
 						<p class="text-sm text-destructive" x-text="errorMsg"></p>
 					</div>
 					<!-- Success message -->
-					<div x-show="succeeded" x-cloak class="rounded-xl border border-green-500/20 bg-gradient-to-br from-green-500/5 to-transparent p-6 text-center space-y-4">
+					<div x-show="succeeded" x-cloak class="rounded-xl border border-success/20 bg-gradient-to-br from-success/5 to-transparent p-6 text-center space-y-4">
 						<div class="flex justify-center">
-							<div class="flex items-center justify-center size-14 rounded-full bg-green-500/10 ring-2 ring-green-500/20">
-								@icon.BadgeCheck(icon.Props{Class: "size-8 text-green-600 dark:text-green-400"})
+							<div class="flex items-center justify-center size-14 rounded-full bg-success/10 ring-2 ring-success/20">
+								@icon.BadgeCheck(icon.Props{Class: "size-8 text-success"})
 							</div>
 						</div>
 						<div class="space-y-1">
@@ -222,11 +222,11 @@ templ checkoutDialog() {
 							<p class="text-sm text-muted-foreground">{ i18n.T(ctx, "Your Full Access subscription is now active.") }</p>
 						</div>
 						<div class="flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
-							<span class="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2.5 py-0.5 text-green-600 dark:text-green-400 ring-1 ring-inset ring-green-500/20 font-medium">
+							<span class="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-0.5 text-success ring-1 ring-inset ring-success/20 font-medium">
 								@icon.Sparkles(icon.Props{Class: "size-3"})
 								{ i18n.T(ctx, "Unlimited conversations") }
 							</span>
-							<span class="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2.5 py-0.5 text-green-600 dark:text-green-400 ring-1 ring-inset ring-green-500/20 font-medium">
+							<span class="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-0.5 text-success ring-1 ring-inset ring-success/20 font-medium">
 								@icon.Sparkles(icon.Props{Class: "size-3"})
 								{ i18n.T(ctx, "All AI models") }
 							</span>
