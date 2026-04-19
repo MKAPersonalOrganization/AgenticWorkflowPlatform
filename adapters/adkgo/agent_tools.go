@@ -146,9 +146,8 @@ func (r *RunnerAdapter) buildAgentToolFromRef(
 		Config:    req.Config,
 		Context:   req.Context,
 	}
-	childRules := evaluateRequirements(ctx, childCfg, childInv)
 
-	childTools := r.resolveTools(ctx, userID, ref.AgentID, childModelCfg, threadID, childCfg, req, childRules)
+	childTools := r.resolveTools(ctx, userID, ref.AgentID, childModelCfg, threadID, childCfg, req)
 
 	childPrompt := r.buildSystemPrompt(ctx, foundAgent, userID, ref.AgentID, threadID, childCfg, childInv)
 

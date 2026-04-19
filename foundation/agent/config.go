@@ -235,17 +235,6 @@ type Config struct {
 	// instead. The two are orthogonal and may be combined on one agent.
 	SubAgents []Agent
 
-	// Requirements are declarative constraints evaluated before each LLM turn.
-	// Requirements that implement ToolProvider automatically contribute tools.
-	// Requirements that implement PromptProvider automatically contribute to the system prompt.
-	//
-	// Example:
-	//
-	//    Requirements: []agent.Requirement{
-	//        agent.NewConditionalRequirement("think", agent.ForceAtStep(1)),
-	//    },
-	Requirements []Requirement
-
 	// MaxIterations limits the number of turns in a single run.
 	// Default is 10. Set to 0 for unlimited.
 	MaxIterations int
@@ -371,26 +360,3 @@ func DefaultConfig(name string) Config {
 	}
 }
 
-// CollectRequirementTools returns all tools provided by Requirements
-// that implement ToolProvider.
-func (cfg *Config) CollectRequirementTools() []ExecutableTool {
-	var tools []ExecutableTool
-	for _, req := range cfg.Requirements {
-		if tp, ok := req.(ToolProvider); ok {
-			tools = append(tools, tp.ProvidedTools()...)
-		}
-	}
-	return tools
-}
-
-// CollectRequirementPrompts returns concatenated prompt additions from
-// Requirements that implement PromptProvider.
-func (cfg *Config) CollectRequirementPrompts() string {
-	var additions string
-	for _, req := range cfg.Requirements {
-		if pp, ok := req.(PromptProvider); ok {
-			additions += "\n\n" + pp.PromptAddition()
-		}
-	}
-	return additions
-}

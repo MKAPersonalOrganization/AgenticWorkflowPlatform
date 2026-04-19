@@ -48,11 +48,10 @@ type ToolRequirementConfig struct {
 
 	// MaxInvocations limits how many times the tool may be called per
 	// conversation turn. 0 means unlimited.
-	// Maps to agent.ConditionalRequirement.MaxInvocations.
 	MaxInvocations int `json:"max_invocations,omitempty"`
 
 	// Priority controls evaluation precedence when multiple requirements
-	// conflict. Higher priority wins. Maps to agent.Rule.Priority.
+	// conflict. Higher priority wins.
 	Priority int `json:"priority,omitempty"`
 
 	// CustomRules holds additional key/value pairs for future extensibility

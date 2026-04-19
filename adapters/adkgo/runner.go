@@ -447,12 +447,8 @@ func (r *RunnerAdapter) buildRegularLLMAgent(
 	inv *fagent.Invocation,
 	memoryEnabled, memPreload, artifactsEnabled bool,
 ) (agent.Agent, error) {
-	// Evaluate requirements once and reuse rules for tool filtering
-	// and LLM guidance injection.
-	precomputedRules := evaluateRequirements(ctx, agentCfg, inv)
-
 	// Build tools from agent config + enabled tool sets + MCP.
-	adkTools := r.resolveTools(ctx, req.UserID, agentName, modelCfg, req.SessionID, agentCfg, req, precomputedRules)
+	adkTools := r.resolveTools(ctx, req.UserID, agentName, modelCfg, req.SessionID, agentCfg, req)
 
 	// Inject ADK-native memory tools when the agent's MemoryPolicy says
 	// so. load_memory is injected whenever memory is enabled; preload_memory
@@ -497,7 +493,6 @@ func (r *RunnerAdapter) buildRegularLLMAgent(
 		genCfg:               genCfg,
 		tools:                adkTools,
 		prompt:               systemPrompt,
-		beforeAgentCallbacks: buildBeforeRunHooks(precomputedRules),
 		beforeModelCallbacks: beforeModelCBs,
 		afterModelCallbacks:  afterModelCBs,
 		beforeToolCallbacks:  beforeToolCBs,
@@ -808,13 +803,9 @@ func threadHistoryToMessages(msgs []thread.Message) []*fagent.Message {
 // resolveTools builds the complete tool set for an agent invocation.
 // It collects tools from:
 //  1. Agent-level static tools from Config.Tools
-//  2. Requirement-provided tools (ToolProvider interface)
-//  3. Permission-gated tool sets
-//  4. MCP-connected tools
-//  5. Sub-agent tools (if agent has SubAgents, they become callable tools)
-//
-// Tools blocked by Requirements are filtered out at build time, matching
-// ADK-Go's pattern of resolving tools in request processors.
+//  2. Permission-gated tool sets
+//  3. MCP-connected tools
+//  4. A2A-connected tools
 func (r *RunnerAdapter) resolveTools(
 	ctx context.Context,
 	userID, agentName string,
@@ -822,7 +813,6 @@ func (r *RunnerAdapter) resolveTools(
 	threadID string,
 	agentCfg *fagent.Config,
 	req *fagent.RunRequest,
-	precomputedRules []fagent.Rule,
 ) []adktool.Tool {
 	var execTools []fagent.ExecutableTool
 
@@ -833,16 +823,9 @@ func (r *RunnerAdapter) resolveTools(
 				execTools = append(execTools, et)
 			}
 		}
-
-		// 2. Collect tools from Requirements that implement ToolProvider.
-		for _, req := range agentCfg.Requirements {
-			if tp, ok := req.(fagent.ToolProvider); ok {
-				execTools = append(execTools, tp.ProvidedTools()...)
-			}
-		}
 	}
 
-	// 3. Build per-request tool factory.
+	// 2. Build per-request tool factory.
 	var toolFactory ToolSetFactory
 	if r.newToolSetFactory != nil {
 		var pluginSettings map[string]map[string]string
@@ -863,7 +846,7 @@ func (r *RunnerAdapter) resolveTools(
 		})
 	}
 
-	// 4. Get enabled tool sets via the tool requirements service.
+	// 3. Get enabled tool sets via the tool requirements service.
 	if r.toolReqs != nil && toolFactory != nil {
 		enabledToolSetIDs, err := r.toolReqs.GetEnabledToolSets(ctx, userID, agentName)
 		if err != nil {
@@ -919,28 +902,6 @@ func (r *RunnerAdapter) resolveTools(
 		}
 	}
 
-	// 5. Pre-filter tools blocked by pre-computed requirement rules.
-	// Requirements were already evaluated once in Run(); we reuse the results
-	// to avoid double evaluation (and ensure History is populated).
-	if len(precomputedRules) > 0 {
-		blocked := make(map[string]bool)
-		for _, rule := range precomputedRules {
-			if rule.Blocked || rule.Hidden {
-				blocked[rule.TargetTool] = true
-			}
-		}
-
-		if len(blocked) > 0 {
-			filtered := make([]fagent.ExecutableTool, 0, len(execTools))
-			for _, t := range execTools {
-				if !blocked[t.Name()] {
-					filtered = append(filtered, t)
-				}
-			}
-			execTools = filtered
-		}
-	}
-
 	// Wrap foundation tools as adk-go tools.
 	return WrapExecutableTools(execTools, threadID, userID)
 }
@@ -949,7 +910,6 @@ func (r *RunnerAdapter) resolveTools(
 // It includes:
 //   - Static SystemPrompt from agent config
 //   - InstructionFunc (runtime-generated prompt additions)
-//   - Requirement-provided prompt additions (PromptProvider interface)
 //   - PromptInjector additions (knowledge bases, skills, etc.)
 //   - User context
 func (r *RunnerAdapter) buildSystemPrompt(
@@ -967,15 +927,6 @@ func (r *RunnerAdapter) buildSystemPrompt(
 		if agentCfg.InstructionFunc != nil && inv != nil {
 			if dynamic, err := agentCfg.InstructionFunc(inv); err == nil && dynamic != "" {
 				systemPrompt += "\n\n" + dynamic
-			}
-		}
-	}
-
-	// Collect prompt additions from Requirements that implement PromptProvider.
-	if agentCfg != nil {
-		for _, req := range agentCfg.Requirements {
-			if pp, ok := req.(fagent.PromptProvider); ok {
-				systemPrompt += "\n\n" + pp.PromptAddition()
 			}
 		}
 	}

@@ -46,7 +46,7 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 	agentName := wbc.uniqueName(leafCtx.foundAgent.Name())
 	recordLeafPosition(wbc, agentName, parentCtx)
 
-	cbs := buildLeafCallbacks(wbc, agentName, node.AgentID, leafCtx.precomputedRules)
+	cbs := buildLeafCallbacks(wbc, agentName, node.AgentID)
 
 	prompt := wbc.adapter.buildSystemPrompt(
 		wbc.ctx, leafCtx.foundAgent, wbc.userID, node.AgentID, wbc.threadID, leafCtx.agentCfg, leafCtx.invocation,
@@ -60,7 +60,6 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 		genCfg:               model.genCfg,
 		tools:                tools,
 		prompt:               prompt,
-		beforeAgentCallbacks: cbs.beforeAgent,
 		beforeModelCallbacks: cbs.beforeModel,
 		afterModelCallbacks:  cbs.afterModel,
 		beforeToolCallbacks:  cbs.beforeTool,
@@ -70,15 +69,12 @@ func buildLeafAgent(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo, is
 }
 
 // leafContext bundles the per-leaf lookups that every downstream stage needs:
-// the resolved foundation agent, its typed Config (may be nil), a built-up
-// Invocation shell for requirements evaluation, and the evaluated rules.
-// The rules are precomputed once and reused for both tool filtering and
-// BeforeAgent guidance injection.
+// the resolved foundation agent, its typed Config (may be nil), and a built-up
+// Invocation shell used downstream for InstructionFunc evaluation and the like.
 type leafContext struct {
-	foundAgent       fagent.Agent
-	agentCfg         *fagent.Config
-	invocation       *fagent.Invocation
-	precomputedRules []fagent.Rule
+	foundAgent fagent.Agent
+	agentCfg   *fagent.Config
+	invocation *fagent.Invocation
 }
 
 func resolveLeafContext(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo) (*leafContext, error) {
@@ -96,24 +92,22 @@ func resolveLeafContext(wbc *workflowBuildContext, node *fagent.WorkflowNodeInfo
 		Context:   wbc.req.Context,
 	}
 	return &leafContext{
-		foundAgent:       foundAgent,
-		agentCfg:         agentCfg,
-		invocation:       inv,
-		precomputedRules: evaluateRequirements(wbc.ctx, agentCfg, inv),
+		foundAgent: foundAgent,
+		agentCfg:   agentCfg,
+		invocation: inv,
 	}, nil
 }
 
 // collectLeafTools merges every tool source a leaf may expose:
-//  1. Configured tools (via adapter.resolveTools, filtered by precomputed rules)
+//  1. Configured tools (via adapter.resolveTools)
 //  2. Memory tools — loadmemorytool / preloadmemorytool — gated by MemoryPolicy
-//     (falling back to the legacy memory-set toolset permission for pre-M8 agents)
-//  3. Artifact tools — loadartifactstool — gated by the old toolset permission (M9 scope)
+//  3. Artifact tools — loadartifactstool — gated by ArtifactPolicy
 //  4. AgentTool wrappers for peer agents declared in agentCfg
 //  5. exit_loop tool when this leaf is the loop's final child
 func collectLeafTools(wbc *workflowBuildContext, agentID string, leafCtx *leafContext, isLastInLoop bool) []adktool.Tool {
 	tools := wbc.adapter.resolveTools(
 		wbc.ctx, wbc.userID, agentID, wbc.modelCfg,
-		wbc.threadID, leafCtx.agentCfg, wbc.req, leafCtx.precomputedRules,
+		wbc.threadID, leafCtx.agentCfg, wbc.req,
 	)
 
 	if wbc.adapter.memoryService != nil {
@@ -208,11 +202,9 @@ func recordLeafPosition(wbc *workflowBuildContext, agentName string, parentCtx *
 //  1. Tool + model logging (records timing and token usage)
 //  2. Block enforcement (BlockMiddleware; before-only)
 //  3. Confirmation enforcement (ADK-native HITL protocol)
-//  4. Requirements-driven BeforeAgent hooks (guidance injection)
-//  5. Tool error handling (ErrConfirmationRequired / ErrConfirmationRejected
+//  4. Tool error handling (ErrConfirmationRequired / ErrConfirmationRejected
 //     sentinels from ADK-Go v1.0.0; logs unexpected native tool errors)
 type leafCallbacks struct {
-	beforeAgent []agent.BeforeAgentCallback
 	beforeModel []llmagent.BeforeModelCallback
 	afterModel  []llmagent.AfterModelCallback
 	beforeTool  []llmagent.BeforeToolCallback
@@ -220,7 +212,7 @@ type leafCallbacks struct {
 	onToolError []llmagent.OnToolErrorCallback
 }
 
-func buildLeafCallbacks(wbc *workflowBuildContext, agentName, agentID string, precomputedRules []fagent.Rule) leafCallbacks {
+func buildLeafCallbacks(wbc *workflowBuildContext, agentName, agentID string) leafCallbacks {
 	var cbs leafCallbacks
 
 	if wbc.adapter.log != nil {
@@ -242,8 +234,6 @@ func buildLeafCallbacks(wbc *workflowBuildContext, agentName, agentID string, pr
 	if wbc.adapter.confirmChecker != nil {
 		cbs.beforeTool = append(cbs.beforeTool, buildConfirmationCallback(wbc.adapter.confirmChecker, agentName, wbc.userID, ""))
 	}
-
-	cbs.beforeAgent = buildBeforeRunHooks(precomputedRules)
 
 	return cbs
 }
