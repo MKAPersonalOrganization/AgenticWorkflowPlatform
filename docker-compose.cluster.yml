@@ -1,7 +1,7 @@
-# docker-compose.cluster.yml — Distributed Cluster (10 app pods + Redis Sentinel)
+# docker-compose.cluster.yml — Distributed Cluster (3 app pods + Redis Sentinel)
 #
 # Simulates a production-like distributed deployment on a single machine:
-#   - 10 stateless app replicas behind an Nginx load balancer
+#   - 3 stateless app replicas behind an Nginx load balancer
 #   - Redis Sentinel (1 master + 2 replicas + 3 sentinels) for HA cache
 #   - PostgreSQL (single, same as prod — PgBouncer would be next step)
 #   - Shared MinIO, EdgeQuake
@@ -16,7 +16,7 @@
 
 services:
   # ===========================================================================
-  # Load Balancer — distributes HTTPS traffic across 10 app pods
+  # Load Balancer — distributes HTTPS traffic across 3 app pods
   # ===========================================================================
   lb:
     image: nginx:1.27-alpine
@@ -119,7 +119,7 @@ services:
       start_period: 30s
 
   # ===========================================================================
-  # Application — 10 stateless replicas
+  # Application — 3 stateless replicas
   # ===========================================================================
   app:
     build:
@@ -127,7 +127,7 @@ services:
       dockerfile: Dockerfile
     image: ai-chat-platform:local
     deploy:
-      replicas: 10
+      replicas: 3
     # No host port — only reachable via the load balancer.
     expose:
       - "8090"
@@ -175,7 +175,7 @@ services:
       - APP_STRIPE_PRICE_ID=${APP_STRIPE_PRICE_ID}
       # Cluster mode — migrations are handled by the migrate init container
       - APP_SKIP_MIGRATIONS=true
-      # Tuning for cluster mode — lower per-pod DB connections since 10 pods share the pool
+      # Tuning for cluster mode — lower per-pod DB connections since 3 pods share the pool
       - APP_DB_MAX_IDLE_CONNS=10
       - APP_DB_MAX_OPEN_CONNS=20
       # A2A: Allow connecting to private/Docker-internal agent addresses
@@ -330,7 +330,7 @@ services:
         condition: service_healthy
 
   # ===========================================================================
-  # PostgreSQL — shared by all 10 pods (200 max_connections for 10×20 pool)
+  # PostgreSQL — shared by all 3 pods (60 max_connections for 3×20 pool)
   # ===========================================================================
   app-postgres:
     image: postgres:16-alpine

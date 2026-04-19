@@ -91,7 +91,7 @@ Do not restart the cluster hoping it'll fix itself. It won't.
 
 ## Workflow E — Ship a backend change to the cluster
 
-Goal: the 10 app pods are running the new binary without losing DB state.
+Goal: the 3 app pods are running the new binary without losing DB state.
 
 1. `go build ./...` — compile check locally.
 2. `task up:cluster` — rebuilds the Docker image and recreates containers in place. **Never** `task down:cluster` unless you mean to wipe Postgres (see `pitfalls.md` #7).

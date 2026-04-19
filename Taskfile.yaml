@@ -108,7 +108,7 @@ tasks:
       - docker compose -f docker-compose.yml --profile prod up -d
 
   up:cluster:
-    desc: "Distributed cluster: 10 app pods + Redis HA + Nginx LB"
+    desc: "Distributed cluster: 3 app pods + Redis HA + Nginx LB"
     cmds:
       - docker compose -f docker-compose.cluster.yml build --no-cache app
       # Start everything, then wait only on long-running services.
@@ -116,7 +116,7 @@ tasks:
       #  and would cause --wait to report failure if included.)
       - docker compose -f docker-compose.cluster.yml up -d
       - docker compose -f docker-compose.cluster.yml up -d --wait migrate app lb
-      - echo "✓ Cluster running — 10 pods behind https://localhost:8090"
+      - echo "✓ Cluster running — 3 pods behind https://localhost:8090"
       - docker compose -f docker-compose.cluster.yml ps app
 
   down:cluster:
