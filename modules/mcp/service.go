@@ -179,41 +179,23 @@ func (s *Service) invalidateConnectorCache(connectorID, userID string) {
 // Optional OAuth client credentials are persisted with the connector so they
 // are available during the connect phase (aligns with agentstack's create_connector).
 func (s *Service) CreateConnector(ctx context.Context, userID, serverURL, title, clientID, clientSecret string) (*MCPConnector, error) {
-	// Validate URL.
-	parsed, err := url.Parse(serverURL)
+	parsed, err := validateConnectorURL(serverURL)
 	if err != nil {
-		return nil, fmt.Errorf("invalid server URL: %w", err)
-	}
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return nil, fmt.Errorf("server URL must use http or https scheme")
-	}
-
-	// SSRF protection: block obvious internal addresses.
-	if err := validateExternalHost(parsed.Hostname()); err != nil {
 		return nil, err
 	}
-
-	// Enforce per-user connector limit.
-	count, err := s.repo.CountByUser(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("checking connector count: %w", err)
-	}
-	if count >= maxConnectorsPerUser {
-		return nil, fmt.Errorf("%w: maximum of %d per user", ErrConnectorLimitReached, maxConnectorsPerUser)
+	if err := s.enforceConnectorQuota(ctx, userID); err != nil {
+		return nil, err
 	}
 
 	if title == "" {
 		title = parsed.Host
 	}
-
-	// Auto-match against connector presets (agentstack's match_preset=true default).
-	// If a preset matches, apply its metadata and credentials.
-	var matchedPreset *ConnectorPreset
-	if preset := MatchPreset(serverURL, s.presets); preset != nil {
-		matchedPreset = preset
-		if title == parsed.Host && preset.Name != "" {
-			title = preset.Name
-		}
+	// Auto-match against connector presets (agentstack's match_preset=true
+	// default) — if a preset matches we borrow its display name and
+	// (below) fall back to its OAuth credentials.
+	matchedPreset := MatchPreset(serverURL, s.presets)
+	if matchedPreset != nil && title == parsed.Host && matchedPreset.Name != "" {
+		title = matchedPreset.Name
 	}
 
 	connector := &MCPConnector{
@@ -222,26 +204,69 @@ func (s *Service) CreateConnector(ctx context.Context, userID, serverURL, title,
 		ServerURL: serverURL,
 		Status:    ConnectorStatusCreated,
 	}
-
-	// Apply OAuth credentials: prefer user-supplied, then preset.
-	if clientID != "" {
-		connector.OAuthClientID = toNullString(clientID)
-		connector.OAuthClientSecret = toNullString(clientSecret)
-	} else if matchedPreset != nil && matchedPreset.ClientID != "" {
-		connector.OAuthClientID = toNullString(matchedPreset.ClientID)
-		connector.OAuthClientSecret = toNullString(matchedPreset.ClientSecret)
-	}
+	applyConnectorOAuthCreds(connector, clientID, clientSecret, matchedPreset)
 
 	if err := s.repo.Create(ctx, connector); err != nil {
-		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
+		if isDuplicateKeyError(err) {
 			return nil, fmt.Errorf("%w: %s", ErrDuplicateConnector, serverURL)
 		}
 		return nil, fmt.Errorf("creating connector: %w", err)
 	}
 
 	s.log.Info(ctx, "mcp connector created", "id", connector.ID, "url", serverURL, "user_id", userID)
-
 	return connector, nil
+}
+
+// validateConnectorURL parses serverURL, enforces http/https scheme, and
+// runs the SSRF host check. Returns the parsed URL so the caller can
+// read Host / Hostname without reparsing.
+func validateConnectorURL(serverURL string) (*url.URL, error) {
+	parsed, err := url.Parse(serverURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid server URL: %w", err)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return nil, fmt.Errorf("server URL must use http or https scheme")
+	}
+	if err := validateExternalHost(parsed.Hostname()); err != nil {
+		return nil, err
+	}
+	return parsed, nil
+}
+
+// enforceConnectorQuota blocks creation when the user has reached
+// maxConnectorsPerUser. Lookup cost is one index read on user_id.
+func (s *Service) enforceConnectorQuota(ctx context.Context, userID string) error {
+	count, err := s.repo.CountByUser(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("checking connector count: %w", err)
+	}
+	if count >= maxConnectorsPerUser {
+		return fmt.Errorf("%w: maximum of %d per user", ErrConnectorLimitReached, maxConnectorsPerUser)
+	}
+	return nil
+}
+
+// applyConnectorOAuthCreds prefers caller-supplied clientID/secret; falls
+// back to the preset's credentials only when the caller provided nothing.
+func applyConnectorOAuthCreds(c *MCPConnector, clientID, clientSecret string, preset *ConnectorPreset) {
+	if clientID != "" {
+		c.OAuthClientID = toNullString(clientID)
+		c.OAuthClientSecret = toNullString(clientSecret)
+		return
+	}
+	if preset != nil && preset.ClientID != "" {
+		c.OAuthClientID = toNullString(preset.ClientID)
+		c.OAuthClientSecret = toNullString(preset.ClientSecret)
+	}
+}
+
+// isDuplicateKeyError inspects repo error text for the pg unique-violation
+// markers. Repo layer doesn't expose typed errors today; matching here
+// keeps the service layer's error translation in one place.
+func isDuplicateKeyError(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "duplicate key") || strings.Contains(msg, "unique constraint")
 }
 
 // GetConnector retrieves a connector by ID, verifying it belongs to the user.
@@ -1228,35 +1253,58 @@ func isTransientError(err error) bool {
 	return false
 }
 
-// validateExternalHost blocks requests to localhost, private RFC-1918 ranges,
-// and cloud metadata endpoints.
+// validateExternalHost blocks requests to localhost, private RFC-1918
+// ranges, and cloud metadata endpoints (SSRF defence). Each rule is a
+// small predicate so the intent of each block is greppable.
 func validateExternalHost(host string) error {
 	host = strings.ToLower(host)
-	if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "0.0.0.0" {
+	if isLoopbackHost(host) {
 		return fmt.Errorf("server URL cannot point to localhost")
 	}
-	// RFC-1918 private ranges: 10.0.0.0/8, 192.168.0.0/16, 172.16.0.0/12.
-	if strings.HasPrefix(host, "10.") || strings.HasPrefix(host, "192.168.") {
+	if isPrivateIPv4(host) || isPrivateIPv6(host) {
 		return fmt.Errorf("server URL cannot point to private network addresses")
 	}
-	// 172.16.0.0/12 = 172.16.x.x through 172.31.x.x only.
+	if isLinkLocalOrMetadata(host) {
+		return fmt.Errorf("server URL cannot point to link-local or cloud metadata addresses")
+	}
+	return nil
+}
+
+func isLoopbackHost(host string) bool {
+	switch host {
+	case "localhost", "127.0.0.1", "::1", "0.0.0.0":
+		return true
+	}
+	return false
+}
+
+// isPrivateIPv4 covers RFC-1918 ranges: 10.0.0.0/8, 192.168.0.0/16, and
+// 172.16.0.0/12 (172.16.x.x through 172.31.x.x — the `172.` prefix alone
+// is not enough, so we parse and check the CIDR).
+func isPrivateIPv4(host string) bool {
+	if strings.HasPrefix(host, "10.") || strings.HasPrefix(host, "192.168.") {
+		return true
+	}
 	if strings.HasPrefix(host, "172.") {
 		ip := net.ParseIP(host)
 		if ip != nil {
 			_, private172, _ := net.ParseCIDR("172.16.0.0/12")
 			if private172.Contains(ip) {
-				return fmt.Errorf("server URL cannot point to private network addresses")
+				return true
 			}
 		}
 	}
-	// IPv6 private ranges.
-	if strings.HasPrefix(host, "fc") || strings.HasPrefix(host, "fd") || strings.HasPrefix(host, "fe80") {
-		return fmt.Errorf("server URL cannot point to private network addresses")
-	}
-	if strings.HasPrefix(host, "169.254.") || host == "metadata.google.internal" {
-		return fmt.Errorf("server URL cannot point to link-local or cloud metadata addresses")
-	}
-	return nil
+	return false
+}
+
+// isPrivateIPv6 checks the unique-local (fc/fd) and link-local (fe80)
+// prefixes.
+func isPrivateIPv6(host string) bool {
+	return strings.HasPrefix(host, "fc") || strings.HasPrefix(host, "fd") || strings.HasPrefix(host, "fe80")
+}
+
+func isLinkLocalOrMetadata(host string) bool {
+	return strings.HasPrefix(host, "169.254.") || host == "metadata.google.internal"
 }
 
 // toNullString converts a string to sql.NullString.
