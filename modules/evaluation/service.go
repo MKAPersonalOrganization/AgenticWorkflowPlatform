@@ -706,35 +706,7 @@ func (s *service) createEvalRun(ctx context.Context, userID string, req EvalRunC
 		return EvalRun{}, fmt.Errorf("creating evaluation run: %w", err)
 	}
 
-	// Execute all evaluators against all cases synchronously
-	var results []EvalResult
-	evaluators := getRegisteredEvaluators()
-
-	for inv := 1; inv <= numRuns; inv++ {
-		for _, ec := range cases {
-			// Build eval request (real agent invocation or mock fallback)
-			evalReq := s.buildEvalRequest(ctx, userID, req.AgentID.String(), ec)
-
-			for _, eval := range evaluators {
-				evalResult := eval.Evaluate(ctx, evalReq)
-				detailsJSON := evalResult.Details
-				if detailsJSON == nil {
-					detailsJSON = json.RawMessage(`{}`)
-				}
-				results = append(results, EvalResult{
-					ID:         uuid.New(),
-					RunID:      run.ID,
-					CaseID:     ec.ID,
-					MetricID:   eval.MetricID(),
-					Score:      &evalResult.Score,
-					Status:     evalResult.Status,
-					Details:    detailsJSON,
-					Invocation: inv,
-					CreatedAt:  time.Now(),
-				})
-			}
-		}
-	}
+	results := s.runEvaluators(ctx, userID, req.AgentID.String(), run.ID, cases, numRuns)
 
 	// Batch insert results
 	if len(results) > 0 {
@@ -751,6 +723,40 @@ func (s *service) createEvalRun(ctx context.Context, userID string, req EvalRunC
 	// Refresh run with completed_at
 	run, _ = s.repo.GetEvalRun(ctx, run.ID)
 	return run, nil
+}
+
+// runEvaluators executes every registered evaluator against every case, numRuns
+// times, and returns the flat result list ready for batch insert.
+func (s *service) runEvaluators(ctx context.Context, userID, agentID string, runID uuid.UUID, cases []EvalCase, numRuns int) []EvalResult {
+	evaluators := getRegisteredEvaluators()
+	var results []EvalResult
+	for inv := 1; inv <= numRuns; inv++ {
+		for _, ec := range cases {
+			evalReq := s.buildEvalRequest(ctx, userID, agentID, ec)
+			for _, eval := range evaluators {
+				results = append(results, buildEvalResult(runID, ec.ID, inv, eval, eval.Evaluate(ctx, evalReq)))
+			}
+		}
+	}
+	return results
+}
+
+func buildEvalResult(runID, caseID uuid.UUID, invocation int, eval Evaluator, r EvalResultOutput) EvalResult {
+	details := r.Details
+	if details == nil {
+		details = json.RawMessage(`{}`)
+	}
+	return EvalResult{
+		ID:         uuid.New(),
+		RunID:      runID,
+		CaseID:     caseID,
+		MetricID:   eval.MetricID(),
+		Score:      &r.Score,
+		Status:     r.Status,
+		Details:    details,
+		Invocation: invocation,
+		CreatedAt:  time.Now(),
+	}
 }
 
 // buildMockEvalRequest creates an EvalRequest using expected data as the "actual" response.

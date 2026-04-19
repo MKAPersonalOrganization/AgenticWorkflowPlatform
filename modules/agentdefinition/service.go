@@ -720,49 +720,68 @@ func (s *Service) validateNode(ctx context.Context, node *CompositionNode, userI
 
 	switch node.Type {
 	case NodeAgent:
-		if node.AgentID == "" {
-			return fmt.Errorf("node %q: agent node requires agent_id", node.ID)
-		}
-		if len(node.Children) > 0 {
-			return fmt.Errorf("node %q: agent node cannot have children", node.ID)
-		}
-		// Verify the referenced agent exists and belongs to the user.
-		_, err := s.repo.GetByID(ctx, node.AgentID, userID)
-		if err != nil {
-			return fmt.Errorf("node %q: agent %q not found: %w", node.ID, node.AgentID, err)
-		}
-
+		return s.validateAgentNode(ctx, node, userID)
 	case NodeRemote:
-		if node.A2AConnectorID == "" {
-			return fmt.Errorf("node %q: remote node requires a2a_connector_id", node.ID)
-		}
-		if len(node.Children) > 0 {
-			return fmt.Errorf("node %q: remote node cannot have children", node.ID)
-		}
-
+		return validateRemoteNode(node)
 	case NodeSequential, NodeParallel, NodeLoop, NodeConditional:
-		if len(node.Children) == 0 {
-			return fmt.Errorf("node %q: %s node requires at least one child", node.ID, node.Type)
+		return s.validateCompositeNode(ctx, node, userID, depth)
+	}
+	return nil
+}
+
+func (s *Service) validateAgentNode(ctx context.Context, node *CompositionNode, userID string) error {
+	if node.AgentID == "" {
+		return fmt.Errorf("node %q: agent node requires agent_id", node.ID)
+	}
+	if len(node.Children) > 0 {
+		return fmt.Errorf("node %q: agent node cannot have children", node.ID)
+	}
+	if _, err := s.repo.GetByID(ctx, node.AgentID, userID); err != nil {
+		return fmt.Errorf("node %q: agent %q not found: %w", node.ID, node.AgentID, err)
+	}
+	return nil
+}
+
+func validateRemoteNode(node *CompositionNode) error {
+	if node.A2AConnectorID == "" {
+		return fmt.Errorf("node %q: remote node requires a2a_connector_id", node.ID)
+	}
+	if len(node.Children) > 0 {
+		return fmt.Errorf("node %q: remote node cannot have children", node.ID)
+	}
+	return nil
+}
+
+func (s *Service) validateCompositeNode(ctx context.Context, node *CompositionNode, userID string, depth int) error {
+	if len(node.Children) == 0 {
+		return fmt.Errorf("node %q: %s node requires at least one child", node.ID, node.Type)
+	}
+	if node.AgentID != "" {
+		return fmt.Errorf("node %q: composite node should not have agent_id", node.ID)
+	}
+	if node.Type == NodeLoop {
+		if err := normalizeLoopIterations(node); err != nil {
+			return err
 		}
-		if node.AgentID != "" {
-			return fmt.Errorf("node %q: composite node should not have agent_id", node.ID)
+	}
+	for i := range node.Children {
+		if err := s.validateNode(ctx, &node.Children[i], userID, depth+1); err != nil {
+			return err
 		}
-		if node.Type == NodeLoop {
-			if node.MaxIterations < 0 {
-				node.MaxIterations = 0
-			}
-			if node.MaxIterations > 100 {
-				return fmt.Errorf("node %q: max_iterations cannot exceed 100", node.ID)
-			}
-			if node.MaxIterations == 0 {
-				node.MaxIterations = 3
-			}
-		}
-		for i := range node.Children {
-			if err := s.validateNode(ctx, &node.Children[i], userID, depth+1); err != nil {
-				return err
-			}
-		}
+	}
+	return nil
+}
+
+// normalizeLoopIterations clamps MaxIterations into [0, 100], defaulting 0 → 3.
+func normalizeLoopIterations(node *CompositionNode) error {
+	if node.MaxIterations < 0 {
+		node.MaxIterations = 0
+	}
+	if node.MaxIterations > 100 {
+		return fmt.Errorf("node %q: max_iterations cannot exceed 100", node.ID)
+	}
+	if node.MaxIterations == 0 {
+		node.MaxIterations = 3
 	}
 	return nil
 }
