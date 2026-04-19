@@ -195,6 +195,51 @@ tasks:
       - echo "" && echo "Outputs saved to .hotspots/"
       - xdg-open .hotspots/go_hotspots.png 2>/dev/null || open .hotspots/go_hotspots.png 2>/dev/null || true
 
+  # ─── Complexity-trend analysis ────────────────────────────────────────
+  # scripts/complexity_trend.py visualises whitespace-indentation complexity
+  # per revision (Tornhill, Your Code as a Crime Scene, ch. 5) to spot
+  # structures that are deteriorating faster than they're growing.
+  #
+  # Reuses the .hotspots/.venv from hotspots:setup for matplotlib. Outputs
+  # land in .hotspots/complexity_trend/.
+
+  trends:
+    desc: "Complexity trend for specific files. Usage: task trends -- path/a.go path/b.js. Env: SINCE (default '6 months ago'), SAMPLES (default 20)."
+    deps: [hotspots:setup]
+    vars:
+      SINCE: '{{.SINCE | default "6 months ago"}}'
+      SAMPLES: '{{.SAMPLES | default "20"}}'
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "Usage: task trends -- <path> [path...]"; exit 1
+        fi
+        .hotspots/.venv/bin/python3 scripts/complexity_trend.py \
+          --since "{{.SINCE}}" --samples {{.SAMPLES}} --summary \
+          --out .hotspots/complexity_trend \
+          {{.CLI_ARGS}}
+      - echo "" && echo "Outputs saved to .hotspots/complexity_trend/"
+      - xdg-open .hotspots/complexity_trend/_summary.png 2>/dev/null || open .hotspots/complexity_trend/_summary.png 2>/dev/null || true
+
+  trends:top:
+    desc: "Rank + plot the top N deteriorating files repo-wide. Env: TOP (default 10), SINCE (default '6 months ago'), SAMPLES (default 20), MIN_COMMITS (default 8), MIN_LOC (default 150)."
+    deps: [hotspots:setup]
+    vars:
+      TOP: '{{.TOP | default "10"}}'
+      SINCE: '{{.SINCE | default "6 months ago"}}'
+      SAMPLES: '{{.SAMPLES | default "20"}}'
+      MIN_COMMITS: '{{.MIN_COMMITS | default "8"}}'
+      MIN_LOC: '{{.MIN_LOC | default "150"}}'
+    cmds:
+      - |
+        .hotspots/.venv/bin/python3 scripts/complexity_trend.py \
+          --discover --top {{.TOP}} \
+          --since "{{.SINCE}}" --samples {{.SAMPLES}} \
+          --min-commits {{.MIN_COMMITS}} --min-loc {{.MIN_LOC}} \
+          --out .hotspots/complexity_trend
+      - echo "" && echo "Outputs saved to .hotspots/complexity_trend/"
+      - xdg-open .hotspots/complexity_trend/_summary.png 2>/dev/null || open .hotspots/complexity_trend/_summary.png 2>/dev/null || true
+
   ci:
     desc: Run CI checks (format, lint, test, arch tests, build)
     cmds:
