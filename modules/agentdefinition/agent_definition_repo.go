@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,22 +20,69 @@ func nullIfEmpty(s string) sql.NullString {
 	return sql.NullString{String: s, Valid: true}
 }
 
+// jsonColumn describes a JSONB-backed column on user_agents: its SQL name
+// and the accessor for the already-marshalled JSON string on the aggregate.
+// agentJSONColumns is the single source of truth for the order and
+// membership of JSON columns in SELECT / INSERT / UPDATE — adding a new
+// policy means appending one entry here (plus the Marshal/Unmarshal pair
+// in types.go) instead of editing three separate SQL literals.
+type jsonColumn struct {
+	name string
+	get  func(*AgentDefinition) string
+}
+
+var agentJSONColumns = []jsonColumn{
+	{"input_schema", func(a *AgentDefinition) string { return a.InputSchemaJSON }},
+	{"output_schema", func(a *AgentDefinition) string { return a.OutputSchemaJSON }},
+	{"graph", func(a *AgentDefinition) string { return a.GraphJSON }},
+	{"sub_agents", func(a *AgentDefinition) string { return a.SubAgentsJSON }},
+	{"agent_tools", func(a *AgentDefinition) string { return a.AgentToolsJSON }},
+	{"model_config", func(a *AgentDefinition) string { return a.ModelConfigJSON }},
+	{"model_override", func(a *AgentDefinition) string { return a.ModelOverrideJSON }},
+	{"memory_policy", func(a *AgentDefinition) string { return a.MemoryPolicyJSON }},
+	{"artifact_policy", func(a *AgentDefinition) string { return a.ArtifactPolicyJSON }},
+	{"code_execution_policy", func(a *AgentDefinition) string { return a.CodeExecutionPolicyJSON }},
+	{"streaming_policy", func(a *AgentDefinition) string { return a.StreamingPolicyJSON }},
+}
+
+// jsonColumnArgs returns the JSON column values as nullIfEmpty-wrapped
+// ExecContext args, in agentJSONColumns order.
+func jsonColumnArgs(a *AgentDefinition) []any {
+	args := make([]any, len(agentJSONColumns))
+	for i, c := range agentJSONColumns {
+		args[i] = nullIfEmpty(c.get(a))
+	}
+	return args
+}
+
+// jsonSelectClause returns the SELECT fragment that decodes each JSONB
+// column back to its text form with COALESCE-to-empty-string, so scan
+// targets receive a plain string.
+func jsonSelectClause() string {
+	parts := make([]string, len(agentJSONColumns))
+	for i, c := range agentJSONColumns {
+		parts[i] = fmt.Sprintf("COALESCE(%s::text, '') as %s", c.name, c.name)
+	}
+	return strings.Join(parts, ",\n    ")
+}
+
+// jsonColumnList joins the column names with ", " for INSERT clauses.
+func jsonColumnList() string {
+	parts := make([]string, len(agentJSONColumns))
+	for i, c := range agentJSONColumns {
+		parts[i] = c.name
+	}
+	return strings.Join(parts, ", ")
+}
+
 // agentSelectColumns is the standard column set for agent queries.
-// graph, model_config, and model_override are included so composed and configured agents are fully loaded.
-const agentSelectColumns = `id, user_id, name, description, system_prompt, icon, source_catalog_id,
+// JSON columns are composed from agentJSONColumns so adding a policy
+// automatically widens the SELECT.
+var agentSelectColumns = `id, user_id, name, description, system_prompt, icon, source_catalog_id,
     COALESCE(parent_id, '') as parent_id,
     disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
-    global_instruction, COALESCE(input_schema::text, '') as input_schema,
-    COALESCE(output_schema::text, '') as output_schema,
-    COALESCE(graph::text, '') as graph,
-    COALESCE(sub_agents::text, '') as sub_agents,
-    COALESCE(agent_tools::text, '') as agent_tools,
-    COALESCE(model_config::text, '') as model_config,
-    COALESCE(model_override::text, '') as model_override,
-    COALESCE(memory_policy::text, '') as memory_policy,
-    COALESCE(artifact_policy::text, '') as artifact_policy,
-    COALESCE(code_execution_policy::text, '') as code_execution_policy,
-    COALESCE(streaming_policy::text, '') as streaming_policy,
+    global_instruction,
+    ` + jsonSelectClause() + `,
     share_token, visibility,
     created_at, updated_at`
 
@@ -52,6 +100,26 @@ func newPostgresAgentDefinitionRepository(db *sqlx.DB) *postgresAgentDefinitionR
 // plug in via jsonUnmarshalers() without touching every caller.
 func hydrateAgent(a *AgentDefinition) { a.HydrateJSON() }
 
+// buildInsertQuery renders the fixed-shape INSERT into user_agents,
+// weaving agentJSONColumns into the column list and $-placeholder tail.
+func buildInsertQuery() string {
+	// 13 leading scalar placeholders + N JSON + 4 trailing scalar.
+	total := 13 + len(agentJSONColumns) + 4
+	placeholders := make([]string, total)
+	for i := range placeholders {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+	}
+	return fmt.Sprintf(`
+INSERT INTO user_agents (id, user_id, name, description, system_prompt, icon, source_catalog_id,
+    parent_id,
+    disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
+    global_instruction, %s,
+    share_token, visibility, created_at, updated_at)
+VALUES (%s)`, jsonColumnList(), strings.Join(placeholders, ", "))
+}
+
+var insertAgentQuery = buildInsertQuery()
+
 func (r *postgresAgentDefinitionRepository) Create(ctx context.Context, agent *AgentDefinition) error {
 	if agent.ID == "" {
 		agent.ID = uuid.New().String()
@@ -68,16 +136,8 @@ func (r *postgresAgentDefinitionRepository) Create(ctx context.Context, agent *A
 		return err
 	}
 
-	query := `
-INSERT INTO user_agents (id, user_id, name, description, system_prompt, icon, source_catalog_id,
-    parent_id,
-    disallow_transfer_to_parent, disallow_transfer_to_peers, output_key, include_contents,
-    global_instruction, input_schema, output_schema, graph, sub_agents, agent_tools, model_config, model_override,
-    memory_policy, artifact_policy, code_execution_policy, streaming_policy,
-    share_token, visibility, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)`
-
-	_, err := r.db.ExecContext(ctx, query,
+	args := make([]any, 0, 13+len(agentJSONColumns)+4)
+	args = append(args,
 		agent.ID,
 		agent.UserID,
 		agent.Name,
@@ -91,28 +151,43 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $
 		agent.OutputKey,
 		agent.IncludeContents,
 		agent.GlobalInstruction,
-		nullIfEmpty(agent.InputSchemaJSON),
-		nullIfEmpty(agent.OutputSchemaJSON),
-		nullIfEmpty(agent.GraphJSON),
-		nullIfEmpty(agent.SubAgentsJSON),
-		nullIfEmpty(agent.AgentToolsJSON),
-		nullIfEmpty(agent.ModelConfigJSON),
-		nullIfEmpty(agent.ModelOverrideJSON),
-		nullIfEmpty(agent.MemoryPolicyJSON),
-		nullIfEmpty(agent.ArtifactPolicyJSON),
-		nullIfEmpty(agent.CodeExecutionPolicyJSON),
-		nullIfEmpty(agent.StreamingPolicyJSON),
+	)
+	args = append(args, jsonColumnArgs(agent)...)
+	args = append(args,
 		agent.ShareToken,
 		coalesceVisibility(agent.Visibility),
 		agent.CreatedAt,
 		agent.UpdatedAt,
 	)
-	if err != nil {
+
+	if _, err := r.db.ExecContext(ctx, insertAgentQuery, args...); err != nil {
 		return fmt.Errorf("inserting agent definition: %w", err)
 	}
-
 	return nil
 }
+
+// buildUpdateQuery renders the UPDATE user_agents SET ... WHERE clause
+// using agentJSONColumns for the JSON tail. Param positions: $1..$11 are
+// the scalar SET assignments, $12..$12+N are the JSON assignments, and
+// the final two are the WHERE id/user_id.
+func buildUpdateQuery() string {
+	jsonAssigns := make([]string, len(agentJSONColumns))
+	for i, c := range agentJSONColumns {
+		jsonAssigns[i] = fmt.Sprintf("%s = $%d", c.name, 12+i)
+	}
+	idParam := 12 + len(agentJSONColumns)
+	userParam := idParam + 1
+	return fmt.Sprintf(`
+UPDATE user_agents
+SET name = $1, description = $2, system_prompt = $3,
+    icon = $4, parent_id = $5, updated_at = $6,
+    disallow_transfer_to_parent = $7, disallow_transfer_to_peers = $8,
+    output_key = $9, include_contents = $10, global_instruction = $11,
+    %s
+WHERE id = $%d AND user_id = $%d`, strings.Join(jsonAssigns, ",\n    "), idParam, userParam)
+}
+
+var updateAgentQuery = buildUpdateQuery()
 
 func (r *postgresAgentDefinitionRepository) Update(ctx context.Context, agent *AgentDefinition) error {
 	agent.UpdatedAt = time.Now().UTC()
@@ -122,19 +197,8 @@ func (r *postgresAgentDefinitionRepository) Update(ctx context.Context, agent *A
 		return err
 	}
 
-	query := `
-UPDATE user_agents
-SET name = $1, description = $2, system_prompt = $3,
-    icon = $4, parent_id = $5, updated_at = $6,
-    disallow_transfer_to_parent = $7, disallow_transfer_to_peers = $8,
-    output_key = $9, include_contents = $10, global_instruction = $11,
-    input_schema = $12, output_schema = $13, graph = $14, sub_agents = $15,
-    agent_tools = $16, model_config = $17, model_override = $18,
-    memory_policy = $19, artifact_policy = $20, code_execution_policy = $21,
-    streaming_policy = $22
-WHERE id = $23 AND user_id = $24`
-
-	result, err := r.db.ExecContext(ctx, query,
+	args := make([]any, 0, 11+len(agentJSONColumns)+2)
+	args = append(args,
 		agent.Name,
 		agent.Description,
 		agent.SystemPrompt,
@@ -146,20 +210,11 @@ WHERE id = $23 AND user_id = $24`
 		agent.OutputKey,
 		agent.IncludeContents,
 		agent.GlobalInstruction,
-		nullIfEmpty(agent.InputSchemaJSON),
-		nullIfEmpty(agent.OutputSchemaJSON),
-		nullIfEmpty(agent.GraphJSON),
-		nullIfEmpty(agent.SubAgentsJSON),
-		nullIfEmpty(agent.AgentToolsJSON),
-		nullIfEmpty(agent.ModelConfigJSON),
-		nullIfEmpty(agent.ModelOverrideJSON),
-		nullIfEmpty(agent.MemoryPolicyJSON),
-		nullIfEmpty(agent.ArtifactPolicyJSON),
-		nullIfEmpty(agent.CodeExecutionPolicyJSON),
-		nullIfEmpty(agent.StreamingPolicyJSON),
-		agent.ID,
-		agent.UserID,
 	)
+	args = append(args, jsonColumnArgs(agent)...)
+	args = append(args, agent.ID, agent.UserID)
+
+	result, err := r.db.ExecContext(ctx, updateAgentQuery, args...)
 	if err != nil {
 		return fmt.Errorf("updating agent definition: %w", err)
 	}
