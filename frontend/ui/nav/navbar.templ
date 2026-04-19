@@ -79,16 +79,6 @@ templ Navbar(props ...NavbarProps) {
 			<div class="nav-item w-full flex justify-center">
 				@threads.ThreadsButtonTrigger()
 			</div>
-			<!-- Group divider -->
-			<div class="w-5 h-px bg-linear-to-r from-transparent via-sidebar-border/50 to-transparent my-1 shrink-0 hidden md:block"></div>
-			<!-- A2A -->
-			<div class="nav-item hidden md:flex w-full justify-center">
-				@a2acomp.A2AButtonTrigger()
-			</div>
-			<!-- Plugins & Tools -->
-			<div class="nav-item hidden md:flex w-full justify-center">
-				@tools.ToolsButtonTrigger()
-			</div>
 		}
 		<!-- Admin Indicator -->
 		if p.User != nil && p.User.Role == "admin" {
@@ -108,7 +98,9 @@ templ Navbar(props ...NavbarProps) {
 		}
 		<!-- Spacer -->
 		<div class="flex-1"></div>
-		<!-- Bottom-pinned: Filesystem + Knowledge -->
+		<!-- Bottom-pinned utility cluster: data panels (Filesystem, Resources)
+		     grouped with integrations (A2A, Plugins & Tools). All four are
+		     service/config surfaces so they share one pill. -->
 		if p.User != nil {
 			<div class="hidden md:flex flex-col items-center gap-0.5 w-full bg-sidebar-accent/30 rounded-xl py-1 px-0.5 mb-1 mx-1">
 				<div class="nav-item w-full flex justify-center">
@@ -116,6 +108,12 @@ templ Navbar(props ...NavbarProps) {
 				</div>
 				<div class="nav-item w-full flex justify-center">
 					@resources.ResourcesButtonTrigger()
+				</div>
+				<div class="nav-item w-full flex justify-center">
+					@a2acomp.A2AButtonTrigger()
+				</div>
+				<div class="nav-item w-full flex justify-center">
+					@tools.ToolsButtonTrigger()
 				</div>
 			</div>
 		}
