@@ -22,7 +22,7 @@ templ docsAIModels() {
 		}
 		<h3>Streaming and Real-Time Delivery</h3>
 		<p>
-			All models stream responses in real-time using the <strong>AG-UI protocol</strong> over Server-Sent Events (SSE).
+			All models stream responses in real-time over Server-Sent Events (SSE).
 			You see tokens appear character-by-character as the AI generates them, with live tool
 			execution feedback and smooth UI updates.
 		</p>
@@ -459,33 +459,11 @@ templ docsMultiAgentOrchestration() {
 			<li>• <strong>Live preview</strong> — See an animated pipeline visualization with flow particles showing execution direction</li>
 			<li>• <strong>Drag to reorder</strong> — Rearrange agents within compositions by dragging</li>
 		</ul>
-		<h3>Architecture (For Developers)</h3>
 		<p>
-			The orchestration system uses a <strong>framework-agnostic design</strong> with a clean
-			separation between the domain model and the execution engine:
+			<strong>Precedence resolution:</strong> per-node overrides in a workflow take priority over
+			agent-level defaults, which take priority over system defaults. This means the same agent
+			can behave differently depending on where it appears in a workflow.
 		</p>
-		@docsTable() {
-			<thead>
-				<tr>
-					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Layer</th>
-					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Responsibility</th>
-				</tr>
-			</thead>
-			<tbody>
-				@docsTableRow2("foundation/agent", "Framework-agnostic Config struct: name, system prompt, tools, transfer policy, output key, include contents, global instruction, I/O schemas")
-				@docsTableRow2("modules/agentdefinition", "Unified AgentDefinition with CompositionNode graph stored as JSONB. Supports per-node overrides of transfer policy and context control.")
-				@docsTableRow2("adapters/adkgo", "Bridges foundation types to the agent execution engine. Resolves precedence: node override > agent definition > default.")
-				@docsTableRow2("adapters.go", "Composition root. Converts DB models to foundation types and wires everything together.")
-			</tbody>
-		}
-		<p>
-			The adapter layer supports <strong>precedence resolution</strong>: per-node overrides in a workflow
-			take priority over agent-level defaults, which take priority over system defaults. This means
-			the same agent can behave differently depending on where it appears in a workflow.
-		</p>
-		@docsInfoBox("Orchestration Engine") {
-			<p>The orchestration engine provides battle-tested agent lifecycle management, tool routing, session state, and streaming event delivery via the AG-UI protocol.</p>
-		}
 	}
 }
 

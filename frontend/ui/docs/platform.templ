@@ -67,10 +67,9 @@ templ docsArchitecture() {
 			<li>• <strong>CQRS separation</strong> — Write side (commands) and read side (queries) are fully decoupled</li>
 			<li>• <strong>Optimistic concurrency</strong> — Stream version checking prevents conflicting updates</li>
 		</ul>
-		<h3>AG-UI Protocol & Real-Time Streaming</h3>
+		<h3>Real-Time Streaming</h3>
 		<p>
-			The chat interface uses the <strong>AG-UI protocol</strong> with Server-Sent Events (SSE) for
-			real-time streaming. This enables:
+			The chat interface streams responses over Server-Sent Events (SSE) for real-time delivery. This enables:
 		</p>
 		<ul class="space-y-2 my-4">
 			<li>• <strong>Token-by-token delivery</strong> — See AI responses appear in real-time</li>
@@ -78,12 +77,6 @@ templ docsArchitecture() {
 			<li>• <strong>Thought streaming</strong> — See AI reasoning in real-time via the Cognitive plugin</li>
 			<li>• <strong>Elicitation events</strong> — Interactive forms rendered mid-conversation</li>
 		</ul>
-		<h3>Agent Runtime</h3>
-		<p>
-			Compass.AI uses a <strong>framework-agnostic agent runtime</strong> with middleware chains
-			and a <strong>declarative requirements system</strong> for
-			human-in-the-loop authorization gates and conditional tool constraints.
-		</p>
 		<h3>Background Processing</h3>
 		<p>
 			Long-running tasks (AI agent execution, document processing, embedding generation) are handled by
@@ -108,7 +101,7 @@ templ docsArchitecture() {
 				<div><strong>Payments:</strong> Stripe (event-sourced)</div>
 				<div><strong>Embeddings:</strong> OpenAI / Gemini</div>
 				<div><strong>TTS:</strong> OpenAI Whisper-aligned</div>
-				<div><strong>Protocols:</strong> AG-UI, MCP, OAuth 2.1</div>
+				<div><strong>Protocols:</strong> MCP, A2A, OAuth 2.1</div>
 			</div>
 		}
 	}
