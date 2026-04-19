@@ -27,33 +27,29 @@ func newService(log *logger.Logger, repo AgentDefinitionRepository) *Service {
 	return &Service{log: log, repo: repo}
 }
 
-// create validates and persists a new agent definition.
-func (s *Service) create(ctx context.Context, agent *AgentDefinition) error {
+// validate runs the shared invariants for create and update: required
+// identifiers, model config/override shape, graph well-formedness,
+// coordinator sub-agent refs, and agent-tool refs. AgentTools are
+// orthogonal to SubAgents and Graph — any agent may expose other agents
+// as callable tools.
+func (s *Service) validate(ctx context.Context, agent *AgentDefinition) error {
 	if agent.Name == "" {
 		return fmt.Errorf("agent name is required")
 	}
 	if agent.UserID == "" {
 		return fmt.Errorf("user ID is required")
 	}
-
-	// Validate model config if present.
 	if err := agent.ModelConfig.Validate(); err != nil {
 		return fmt.Errorf("invalid model config: %w", err)
 	}
-
-	// Validate model override if present.
 	if err := agent.ModelOverride.Validate(); err != nil {
 		return fmt.Errorf("invalid model override: %w", err)
 	}
-
-	// Validate composition graph if present.
 	if agent.Graph != nil {
 		if err := s.validateGraph(ctx, agent.Graph, agent.UserID); err != nil {
 			return fmt.Errorf("invalid composition: %w", err)
 		}
 	}
-
-	// Validate coordinator sub-agents if present.
 	if len(agent.SubAgents) > 0 {
 		if agent.Graph != nil {
 			return fmt.Errorf("an agent cannot have both a composition graph and inline sub_agents")
@@ -64,10 +60,12 @@ func (s *Service) create(ctx context.Context, agent *AgentDefinition) error {
 			}
 		}
 	}
+	return s.validateAgentTools(ctx, agent)
+}
 
-	// Validate agent tools if present. AgentTools are orthogonal to SubAgents
-	// and Graph — any agent may expose other agents as callable tools.
-	if err := s.validateAgentTools(ctx, agent); err != nil {
+// create validates and persists a new agent definition.
+func (s *Service) create(ctx context.Context, agent *AgentDefinition) error {
+	if err := s.validate(ctx, agent); err != nil {
 		return err
 	}
 
@@ -195,44 +193,7 @@ func (s *Service) update(ctx context.Context, agent *AgentDefinition) error {
 	if agent.ID == "" {
 		return fmt.Errorf("agent ID is required")
 	}
-	if agent.UserID == "" {
-		return fmt.Errorf("user ID is required")
-	}
-	if agent.Name == "" {
-		return fmt.Errorf("agent name is required")
-	}
-
-	// Validate model config if present.
-	if err := agent.ModelConfig.Validate(); err != nil {
-		return fmt.Errorf("invalid model config: %w", err)
-	}
-
-	// Validate model override if present.
-	if err := agent.ModelOverride.Validate(); err != nil {
-		return fmt.Errorf("invalid model override: %w", err)
-	}
-
-	// Validate composition graph if present.
-	if agent.Graph != nil {
-		if err := s.validateGraph(ctx, agent.Graph, agent.UserID); err != nil {
-			return fmt.Errorf("invalid composition: %w", err)
-		}
-	}
-
-	// Validate coordinator sub-agents if present.
-	if len(agent.SubAgents) > 0 {
-		if agent.Graph != nil {
-			return fmt.Errorf("an agent cannot have both a composition graph and inline sub_agents")
-		}
-		for i, sa := range agent.SubAgents {
-			if sa.AgentID == "" {
-				return fmt.Errorf("sub_agents[%d]: agent_id is required", i)
-			}
-		}
-	}
-
-	// Validate agent tools if present.
-	if err := s.validateAgentTools(ctx, agent); err != nil {
+	if err := s.validate(ctx, agent); err != nil {
 		return err
 	}
 
