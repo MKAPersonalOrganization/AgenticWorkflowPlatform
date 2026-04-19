@@ -31,7 +31,7 @@
    - [M18. Streaming-mode toggle](#m18-streaming-mode-toggle)
    - [M19. Agent-card export (expose our agent as A2A)](#m19-agent-card-export)
    - [M20. Tool-confirmation hint UX](#m20-tool-confirmation-hint-ux)
-   - [M21. OpenAI Responses API migration (unlocks code interpreter, file search, web search, computer use)](#m21-openai-responses-api-migration)
+   - [M21. OpenAI Responses API migration (unlocks code interpreter, file search, web search, computer use)](#m21-openai-responses-api-migration) ✅ **done**
 4. [Custom patterns we should replace with ADK natives](#4-custom-vs-adk-native)
 5. [Cross-cutting UI cleanup](#5-cross-cutting-ui-cleanup)
 6. [Scope guards — things we deliberately are *not* building](#6-scope-guards)
@@ -718,6 +718,8 @@ Backend → maps to RequireConfirmation + RequireConfirmationProvider
 ---
 
 ### M21. OpenAI Responses API migration
+
+> **Status: ✅ Done.** OpenAI provider migrated off Chat Completions onto the Responses API (new `openAIResponsesModel` in `adapters/adkgo/openai_responses.go`). `applyCodeExecutionTool` gains an `openai` branch emitting the same provider-agnostic `genai.Tool.CodeExecution` marker, which the Responses adapter translates to OpenAI's native `code_interpreter` tool with an auto-provisioned container. Structured-output translation wired too (`Text.Format.JSONSchema` with strict mode). `ResponseCodeInterpreterToolCall` output items are unpacked into `genai.Part.ExecutableCode` + `genai.Part.CodeExecutionResult`, which `events.go:translateCodeExecution` already normalises into `CodeExecutionRan` domain events — same chat card renders for both providers. Anthropic stays on Chat Completions (its OpenAI-compatible endpoint doesn't implement Responses). Integration tests verify `87654321 × 98765432` round-trips on both Gemini and OpenAI with the exact product `8657216880231672` in the reply; all 14 userrequirements specs pass. File search / web search / computer_use / image_generation / remote MCP are now unlocked on the OpenAI path but not yet surfaced in the designer — each can follow as its own Mxx entry using the existing toggle pattern.
 
 **ADK / SDK.** OpenAI's `/v1/chat/completions` endpoint (what we use today) only supports **custom function tools**. Every built-in OpenAI tool — `code_interpreter`, `file_search`, `web_search`, `computer_use`, `image_generation`, remote MCP — lives exclusively on the **Responses API** (`/v1/responses`). The official `openai-go` SDK has full first-class support for it: `client.Responses.New(...)`, `client.Responses.NewStreaming(...)`, typed union `ToolUnionParam` with a `OfCodeInterpreter *ToolCodeInterpreterParam` case, typed streaming events (`ResponseCodeInterpreterCallCodeDeltaEvent`, `…CallCodeDoneEvent`, `…CallCompletedEvent`), and a typed `ResponseCodeInterpreterToolCall` response item with `Code`, `Outputs`, `ContainerID`, `Status`.
 

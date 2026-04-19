@@ -18,6 +18,14 @@ type AuthHandlers struct {
 	client   *Client
 	sessions *SessionStore
 	appURL   string
+
+	// Dev-login config is zero-valued unless EnableDevLogin was called.
+	// DevLoginHandler checks devLoginToken == "" and 404s if so — the
+	// route should not be mounted in that case either, but this is a
+	// second line of defence.
+	devLoginToken  string
+	devLoginUserID string
+	devLoginEmail  string
 }
 
 // NewAuthHandlers creates new authentication handlers.
@@ -28,6 +36,35 @@ func NewAuthHandlers(log *logger.Logger, client *Client, sessions *SessionStore,
 		sessions: sessions,
 		appURL:   appURL,
 	}
+}
+
+// EnableDevLogin configures the dev-login handler with the token integration
+// tests must present, plus the user id/email that bearer is mapped to.
+//
+// Call this exactly when the caller also mounts POST /auth/dev-login — the
+// expected pattern is:
+//
+//	if authHandlers.EnableDevLogin(token, userID, email) {
+//	    r.Post("/auth/dev-login", authHandlers.DevLoginHandler)
+//	}
+//
+// Leaving the handler without this call, or with an empty token, makes
+// DevLoginHandler refuse every request — defensive in case the route is
+// accidentally mounted unconditionally. EnableDevLogin returns true when
+// dev-login is now active (token non-empty), so callers can branch on the
+// return value to decide whether to mount the route.
+func (h *AuthHandlers) EnableDevLogin(token, userID, email string) bool {
+	h.devLoginToken = token
+	h.devLoginUserID = userID
+	h.devLoginEmail = email
+	return token != ""
+}
+
+// DevLoginEnabled reports whether EnableDevLogin was called with a
+// non-empty token. Route wiring uses this to decide whether to mount
+// POST /auth/dev-login.
+func (h *AuthHandlers) DevLoginEnabled() bool {
+	return h.devLoginToken != ""
 }
 
 // LoginPage handles GET /auth/login — redirects directly to Google OAuth.
@@ -137,6 +174,56 @@ func (h *AuthHandlers) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 	// Redirect to return_to or home (sanitized to prevent open redirect)
 	redirectURL := sanitizeReturnTo(returnTo)
 	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+}
+
+// DevLoginHandler handles POST /auth/dev-login — the test-only login path.
+//
+// It exists so integration tests can hit the public REST API exactly the
+// way the UI does (same middleware, same endpoints, same event stream)
+// without running the full Google OAuth flow. The caller presents the
+// token configured via APP_DEV_LOGIN_TOKEN in the X-Dev-Login-Token
+// header; on success the response carries a signed school_session cookie
+// for the fixed debug user (APP_DEV_LOGIN_USER_ID / APP_DEV_LOGIN_EMAIL).
+//
+// Safety: EnableDevLogin is only called when APP_DEV_LOGIN_TOKEN is set at
+// startup, and main.go only mounts this route in the same branch. When the
+// env var is unset the route is absent and this handler is unreachable —
+// the defensive `h.devLoginToken == ""` check below exists purely to
+// survive accidental unconditional mounting.
+func (h *AuthHandlers) DevLoginHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if h.devLoginToken == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	supplied := r.Header.Get("X-Dev-Login-Token")
+	if supplied == "" || supplied != h.devLoginToken {
+		http.Error(w, `{"error":"invalid dev-login token"}`, http.StatusUnauthorized)
+		return
+	}
+
+	user, err := h.client.UpsertDebugUser(ctx, h.devLoginUserID, h.devLoginEmail)
+	if err != nil {
+		h.log.Error(ctx, "dev-login: failed to upsert debug user", "error", err)
+		http.Error(w, `{"error":"failed to upsert debug user"}`, http.StatusInternalServerError)
+		return
+	}
+
+	if err := h.sessions.SetUserID(w, r, user.ID); err != nil {
+		h.log.Error(ctx, "dev-login: failed to save session", "error", err)
+		http.Error(w, `{"error":"failed to save session"}`, http.StatusInternalServerError)
+		return
+	}
+
+	h.log.Info(ctx, "dev-login: session established", "user_id", user.ID, "email", user.Email)
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"user_id": user.ID,
+		"email":   user.Email,
+	})
 }
 
 // LogoutHandler handles GET /auth/logout — clears the session and redirects.

@@ -1,39 +1,28 @@
 //go:build integration
 
-// memory_policy_test.go verifies the runtime promise behind the designer's
-// Memory card: when memory is enabled on an agent, the orchestration engine
-// indexes every completed session under the user's scope and later sessions
-// can recall content from earlier ones.
+// memory_policy_test.go verifies the runtime promise behind the
+// designer's Memory card: when memory is enabled on an agent, the
+// orchestration engine indexes every completed session under the user's
+// scope and later sessions can recall content from earlier ones. When
+// disabled, the agent's tool list has neither load_memory nor
+// preload_memory, so the LLM can't see anything from prior sessions.
 //
-// How the test works (two /debug/agent:run calls):
-//
-//  1. Seed call — fresh thread, same user, agent declares
-//     memory_policy.enabled=true + memory_policy.preload=true, prompt
-//     tells the agent a unique fact ("my favorite colour is teal").
-//     The runner indexes this session in the process-wide InMemoryService
-//     held by the debug handler (see modules/chat/handlers/debughandler/
-//     handler.go — Handler.memoryService).
-//
-//  2. Recall call — NEW thread, same user, same agent definition, prompt
-//     asks "what is my favorite colour?". preload_memory runs before
-//     the model is called, searches the persistent memory service for
-//     the user's current query, finds the seed session's text, and
-//     injects it into the system instruction. The model answers "teal"
-//     — observable proof the cross-session path works.
-//
-// If either preload_memory injection or AddSessionToMemory is broken, the
-// second call has no grounding and the model will either refuse or guess.
+// The tests run a seed → recall pair of messages, each on its own
+// thread (contextId="" opens a fresh thread). The debug user is shared
+// across tests, so markers carry a unique UUID suffix per run to avoid
+// cross-test contamination in the user's indexed memory.
 //
 // Specs exercised:
 //
-//	memory_policy with enabled=true + preload=true recalls facts across sessions
+//	memoryPolicy with enabled=true + preload=true recalls facts across sessions
 //	  → TestAgentWithMemoryPolicyRecallsFactsAcrossSessions
 //
-//	memory_policy with enabled=false isolates the agent from prior sessions
+//	memoryPolicy with enabled=false isolates the agent from prior sessions
 //	  → TestAgentWithoutMemoryPolicyDoesNotRecallPriorSessions
 package userrequirements
 
 import (
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -42,130 +31,103 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Shared agent definition — differs only in memory_policy between the two
-// specs. Deliberately generic system_prompt so any recall must come from
-// the injected memory context, not prompt engineering.
-const memoryEnabledAgentYAML = `
-name: Memory Agent
-slug: memory-agent
-description: "Agent with cross-session memory enabled for the user."
-system_prompt: "Answer the user concisely. If you know a prior fact about the user, use it."
-category: Tests
-icon: brain
-memory_policy:
-  enabled: true
-  preload: true
-`
+// memoryEnabledAgent creates a fresh agent with memoryPolicy.enabled=true
+// (plus preload=true so previously-indexed sessions are searched before
+// every turn). Returns the new agent's id.
+func memoryEnabledAgent(t *testing.T, client *http.Client, name, systemPrompt string) string {
+	t.Helper()
+	body := agentBody(name, systemPrompt, "openai", "gpt-4o-mini")
+	body["description"] = "Agent with cross-session memory enabled."
+	body["memoryPolicy"] = map[string]any{
+		"enabled": true,
+		"preload": true,
+	}
+	return createAgent(t, client, body)
+}
 
-const memoryDisabledAgentYAML = `
-name: No-Memory Agent
-slug: no-memory-agent
-description: "Agent with memory explicitly disabled."
-system_prompt: "Answer the user concisely. If you don't know, say so."
-category: Tests
-icon: brain
-memory_policy:
-  enabled: false
-`
+// memoryDisabledAgent creates a fresh agent with memoryPolicy.enabled=false.
+func memoryDisabledAgent(t *testing.T, client *http.Client, name, systemPrompt string) string {
+	t.Helper()
+	body := agentBody(name, systemPrompt, "openai", "gpt-4o-mini")
+	body["description"] = "Agent with memory explicitly disabled."
+	body["memoryPolicy"] = map[string]any{
+		"enabled": false,
+	}
+	return createAgent(t, client, body)
+}
 
 func TestAgentWithMemoryPolicyRecallsFactsAcrossSessions(t *testing.T) {
 	apiKey := requireOpenAIKey(t)
-	temperature := 0.0
 
-	// Unique per-test-run user so other runs don't pollute the memory
-	// service that the debug handler holds process-wide. Unique fact so
-	// cache-hit reasoning can't fake a pass.
-	userID := "mem-user-" + uuid.NewString()
-	fact := "papaya-violet"
+	client := authedClient(t)
+	upsertAISettings(t, client, "openai", apiKey)
 
-	seedThread := "mem-seed-" + uuid.NewString()
-	seed := postDebugRun(t, debugRequest{
-		Provider:    "openai",
-		Model:       "gpt-4o-mini",
-		APIKey:      apiKey,
-		Temperature: &temperature,
-		UserID:      userID,
-		ThreadID:    seedThread,
-		Prompt:      "Please remember this for later: my favorite colour is " + fact + ". Acknowledge briefly.",
-		AgentYAML:   memoryEnabledAgentYAML,
-	})
-	require.Empty(t, seed.Errors, "seed run reported errors: %v", seed.Errors)
-	require.NotEmpty(t, seed.Response, "seed run produced no response")
+	// Unique marker so repeated test runs under the same debug user
+	// can't fake a pass by hitting an old session in the index.
+	fact := "papaya-violet-" + uuid.NewString()[:8]
 
-	// Small gap so the seed session is fully indexed before the recall
-	// call. AddSessionToMemory is called at the end of the runner loop
-	// synchronously (see adapters/adkgo/runner.go around line 772), so
-	// this is strictly defensive, not required for correctness.
-	time.Sleep(200 * time.Millisecond)
+	agentID := memoryEnabledAgent(t, client,
+		"Memory Agent",
+		"Answer the user concisely. If you know a prior fact about the user, use it.",
+	)
 
-	recallThread := "mem-recall-" + uuid.NewString()
-	recall := postDebugRun(t, debugRequest{
-		Provider:    "openai",
-		Model:       "gpt-4o-mini",
-		APIKey:      apiKey,
-		Temperature: &temperature,
-		UserID:      userID,
-		ThreadID:    recallThread,
-		Prompt:      "What is my favorite colour?",
-		AgentYAML:   memoryEnabledAgentYAML,
-	})
-	require.Empty(t, recall.Errors, "recall run reported errors: %v", recall.Errors)
-	require.NotEmpty(t, recall.Response, "recall run produced no response")
+	// Seed session — a fresh thread (contextId left empty).
+	_, seedEvents := sendMessage(t, client, "", agentID,
+		"Please remember this for later: my favorite colour is "+fact+". Acknowledge briefly.")
+	require.Empty(t, runErrorMessage(seedEvents), "seed run should not error")
 
-	// Only preload_memory's retrieval of the seed session can ground the
-	// answer — the recall prompt itself contains no colour. If the
-	// marker shows up here, the full cycle worked: AddSessionToMemory
-	// indexed the seed session, SearchMemory found it, preload_memory
-	// injected it into the leaf's instruction, the model used it.
-	require.Contains(t, strings.ToLower(recall.Response), fact,
-		"agent with memory_policy enabled should recall %q from the prior session; got: %s",
-		fact, recall.Response)
+	// AddSessionToMemory runs at the end of the runner loop
+	// synchronously, but the new session needs a beat to be indexable.
+	time.Sleep(500 * time.Millisecond)
+
+	// Recall session — NEW thread, same agent, same user. The recall
+	// prompt itself carries no colour; only a memory lookup can ground
+	// the answer.
+	_, recallEvents := sendMessage(t, client, "", agentID, "What is my favorite colour?")
+	require.Empty(t, runErrorMessage(recallEvents), "recall run should not error")
+	reply := assistantFinalText(recallEvents)
+	require.NotEmpty(t, reply)
+
+	require.Contains(t, strings.ToLower(reply), fact,
+		"agent with memoryPolicy enabled should recall %q; got: %s", fact, reply)
 }
 
 func TestAgentWithoutMemoryPolicyDoesNotRecallPriorSessions(t *testing.T) {
 	apiKey := requireOpenAIKey(t)
-	temperature := 0.0
 
-	userID := "no-mem-user-" + uuid.NewString()
-	fact := "kumquat-indigo"
+	client := authedClient(t)
+	upsertAISettings(t, client, "openai", apiKey)
 
-	// Seed as though memory were on. This proves the NEGATIVE spec
-	// doesn't depend on the memory service being empty — even if
-	// something is in memory for this user, the second agent's
-	// enabled=false policy means its leaves don't get load_memory /
-	// preload_memory and can't see anything from before.
-	_ = postDebugRun(t, debugRequest{
-		Provider:    "openai",
-		Model:       "gpt-4o-mini",
-		APIKey:      apiKey,
-		Temperature: &temperature,
-		UserID:      userID,
-		ThreadID:    "seed-" + uuid.NewString(),
-		Prompt:      "Please remember: my favorite fruit is " + fact + ". Acknowledge briefly.",
-		AgentYAML:   memoryEnabledAgentYAML,
-	})
+	fact := "kumquat-indigo-" + uuid.NewString()[:8]
 
-	time.Sleep(200 * time.Millisecond)
+	// Seed uses the enabled agent so the fact lands in the user's
+	// memory index. This proves the negative spec doesn't rely on the
+	// memory store being empty — even with state there, the disabled
+	// agent can't see it.
+	seedAgentID := memoryEnabledAgent(t, client,
+		"Seed Agent",
+		"Answer the user concisely. If you know a prior fact about the user, use it.",
+	)
+	_, seedEvents := sendMessage(t, client, "", seedAgentID,
+		"Please remember: my favorite fruit is "+fact+". Acknowledge briefly.")
+	require.Empty(t, runErrorMessage(seedEvents), "seed run should not error")
 
-	recall := postDebugRun(t, debugRequest{
-		Provider:    "openai",
-		Model:       "gpt-4o-mini",
-		APIKey:      apiKey,
-		Temperature: &temperature,
-		UserID:      userID,
-		ThreadID:    "recall-" + uuid.NewString(),
-		Prompt:      "What is my favorite fruit?",
-		AgentYAML:   memoryDisabledAgentYAML,
-	})
-	require.Empty(t, recall.Errors, "recall run reported errors: %v", recall.Errors)
+	time.Sleep(500 * time.Millisecond)
 
-	// The unique marker only exists in the seed session's indexed
-	// memory. The disabled agent has no memory tools in its tool list,
-	// so the leaf's LLM call can't fetch it. Absence of the marker
-	// proves enabled=false actually withholds the tools — the model's
-	// natural answer to "what is my favorite fruit?" without grounding
-	// will not spontaneously hit "kumquat-indigo".
-	require.NotContains(t, strings.ToLower(recall.Response), fact,
-		"agent with memory_policy disabled should not see %q from prior sessions; got: %s",
-		fact, recall.Response)
+	// Recall with a DISABLED-memory agent. Its tool list has no
+	// load_memory / preload_memory, so the leaf's LLM call has no way
+	// to reach into the user's memory index.
+	disabledAgentID := memoryDisabledAgent(t, client,
+		"No-Memory Agent",
+		"Answer the user concisely. If you don't know, say so.",
+	)
+	_, recallEvents := sendMessage(t, client, "", disabledAgentID, "What is my favorite fruit?")
+	require.Empty(t, runErrorMessage(recallEvents), "recall run should not error")
+	reply := assistantFinalText(recallEvents)
+
+	// The marker only exists in the seed's indexed memory. Without
+	// memory tools, the model can't fetch it. Absence of the marker
+	// proves enabled=false actually withholds the tools.
+	require.NotContains(t, strings.ToLower(reply), fact,
+		"agent with memoryPolicy disabled should not recall %q; got: %s", fact, reply)
 }

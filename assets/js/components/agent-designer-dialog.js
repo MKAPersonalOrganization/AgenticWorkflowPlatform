@@ -373,13 +373,13 @@ export const agentDesigner = () => ({
 
     // Helper: is the currently selected model provider one where the
     // built-in code executor is actually wired? Used by the UI to show a
-    // "Gemini only today" hint when another provider is active, without
-    // hiding the toggle (the user can still save it — the adapter just
-    // won't do anything with non-Gemini providers right now).
+    // hint when another provider is active. Gemini + OpenAI are shipped;
+    // Anthropic (via OpenAI-compatible) and any other provider fall
+    // through to the default (no code execution wired yet).
     get codeExecutionSupportedByProvider() {
         const p = (this.form.modelOverride && this.form.modelOverride.provider || '').toLowerCase();
         if (!p) return true; // unknown / using global default — assume ok
-        return ['google', 'gemini', 'vertex', 'vertexai'].includes(p);
+        return ['google', 'gemini', 'vertex', 'vertexai', 'openai'].includes(p);
     },
 
     /**

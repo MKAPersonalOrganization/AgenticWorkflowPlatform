@@ -31,9 +31,16 @@ func NewModel(ctx context.Context, provider, modelName, apiKey string) (adkmodel
 			Backend: genai.BackendGeminiAPI,
 		})
 	case "openai":
-		return newOpenAIModel(modelName, apiKey, ""), nil
+		// Responses API path — unlocks built-in code_interpreter, file_search,
+		// web_search, computer_use, image_generation, remote MCP. The legacy
+		// Chat Completions adapter is kept for Anthropic (which exposes an
+		// OpenAI-compatible /v1/chat/completions but not /v1/responses).
+		return newOpenAIResponsesModel(modelName, apiKey), nil
 	case "anthropic":
-		// Anthropic exposes an OpenAI-compatible endpoint.
+		// Anthropic exposes an OpenAI-compatible endpoint for Chat Completions
+		// only. Stay on openAIModel (Chat Completions) for this provider —
+		// code interpreter and the rest of the built-in tools don't apply
+		// since Anthropic's OpenAI-compatible surface doesn't implement them.
 		return newOpenAIModel(modelName, apiKey, "https://api.anthropic.com/v1/"), nil
 	default:
 		return nil, fmt.Errorf("unsupported LLM provider: %s", provider)

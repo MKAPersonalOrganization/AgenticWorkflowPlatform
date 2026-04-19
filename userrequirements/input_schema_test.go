@@ -1,142 +1,119 @@
 //go:build integration
 
-// input_schema_test.go verifies the user-facing behavior of the
-// "Input Schema" feature. Each test reads as a spec sentence.
+// input_schema_test.go verifies the runtime promise behind the designer's
+// Agent-Tools section: a parent agent can expose a sub-agent as a callable
+// tool, and the tool's JSON schema controls the parameter shape the
+// orchestration engine announces to the LLM. Without a schema, the engine
+// synthesises a default "request" string parameter.
 //
 // Specs exercised:
 //
 //	A coordinator can call a sub-agent as a tool
-//	  → ACoordinatorCanCallASubAgentAsATool
+//	  → TestACoordinatorCanCallASubAgentAsATool
 //
 //	A callable without input schema receives plain text input
-//	  → ACallableWithoutSchemaReceivesPlainTextInput
+//	  → TestACallableWithoutSchemaReceivesPlainTextInput
 package userrequirements
 
 import (
-	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-// Root agent exposes a sub-agent as a tool with input_schema on the tool ref.
-const agentAsToolYAML = `
-name: Parent Agent
-slug: parent-agent
-description: Parent that calls sub-agent as tool.
-system_prompt: |
-  You are a weather assistant. Use the GetWeather tool to answer any weather question.
-category: Tests
-icon: cloud
-
-llm_agents:
-  - id: parent-agent
-    name: ParentAgent
-    description: Parent that orchestrates.
-    system_prompt: You are a parent agent. Use the GetWeather tool.
-
-  - id: weather-agent
-    name: GetWeather
-    description: Get weather for a city.
-    system_prompt: Return the weather for the given city in one sentence.
-
-agent_tools:
-  - agent_id: weather-agent
-    input_schema: |
-      {
-        "type": "object",
-        "properties": {
-          "city": { "type": "string", "description": "The city name" }
-        },
-        "required": ["city"]
-      }
-`
+const weatherInputSchema = `{
+  "type": "object",
+  "properties": {
+    "city": { "type": "string", "description": "The city name" }
+  },
+  "required": ["city"]
+}`
 
 func TestACoordinatorCanCallASubAgentAsATool(t *testing.T) {
 	apiKey := requireOpenAIKey(t)
-	temperature := 0.0
 
-	resp := postDebugRun(t, debugRequest{
-		Provider:    "openai",
-		Model:       "gpt-4o-mini",
-		APIKey:      apiKey,
-		Temperature: &temperature,
-		Prompt:      "What's the weather in Tokyo?",
-		AgentYAML:   agentAsToolYAML,
-	})
+	client := authedClient(t)
+	upsertAISettings(t, client, "openai", apiKey)
 
-	require.Empty(t, resp.Errors, "runner reported errors: %v", resp.Errors)
-	require.NotEmpty(t, resp.Response, "agent produced no response")
+	// Sub-agent first so we can reference its id from the parent. It
+	// lives as a standalone agent and is exposed as a tool via the
+	// parent's agentTools list (not subAgents — subAgents is ADK's
+	// coordinator pattern; agentTools is the agent-as-tool pattern).
+	subBody := agentBody(
+		"GetWeather",
+		"Return the weather for the given city in one sentence.",
+		"openai", "gpt-4o-mini",
+	)
+	subBody["description"] = "Get weather for a city."
+	subID := createAgent(t, client, subBody)
 
-	eventTypes := make([]string, 0, len(resp.EventsEmitted))
-	for _, e := range resp.EventsEmitted {
-		eventTypes = append(eventTypes, e.Type)
+	parentBody := agentBody(
+		"Parent Agent",
+		"You are a weather assistant. Use the GetWeather tool to answer any weather question.",
+		"openai", "gpt-4o-mini",
+	)
+	parentBody["agentTools"] = []map[string]any{
+		{
+			"agent_id":     subID,
+			"input_schema": weatherInputSchema,
+		},
 	}
+	parentID := createAgent(t, client, parentBody)
 
-	toolEvents := findEventsByType(resp.EventsEmitted, "ToolStart")
-	require.NotEmpty(t, toolEvents, "agent-as-tool pattern must emit ToolStart event, got: %v", eventTypes)
+	_, events := sendMessage(t, client, "", parentID, "What's the weather in Tokyo?")
 
-	// Verify the tool name matches the sub-agent name
-	var toolName string
-	if len(toolEvents) > 0 && len(toolEvents[0].Data) > 0 {
-		var toolData map[string]any
-		if err := json.Unmarshal(toolEvents[0].Data, &toolData); err == nil {
-			if name, ok := toolData["toolName"].(string); ok {
-				toolName = name
-			}
-		}
-	}
-	require.Equal(t, "GetWeather", toolName, "tool name should be the sub-agent name 'GetWeather'")
+	require.Empty(t, runErrorMessage(events), "run should not error")
+	reply := assistantFinalText(events)
+	require.NotEmpty(t, reply, "agent produced no text reply")
+
+	tools := findToolStarts(events)
+	require.NotEmpty(t, tools,
+		"agent-as-tool pattern must emit a TOOL_START frame; reply was: %s", reply)
+
+	// The tool name the engine announces to the model is the sub-agent's
+	// display name. The LLM calls it with that name, so the TOOL_START
+	// frame's toolName must match "GetWeather".
+	toolName, _ := tools[0]["toolName"].(string)
+	require.Equal(t, "GetWeather", toolName,
+		"tool name should be the sub-agent's name; got %q", toolName)
 }
-
-// Agent without input_schema but exposed as tool - should use "request" parameter.
-const defaultInputSchemaYAML = `
-name: Simple Agent
-slug: simple-agent
-description: Agent without input_schema, used as tool.
-system_prompt: Repeat the user's request back to them.
-category: Tests
-icon: echo
-
-llm_agents:
-  - id: echo-agent
-    name: EchoAgent
-    description: Echoes the request.
-    system_prompt: Repeat exactly what the user says.
-
-agent_tools:
-  - agent_id: echo-agent
-`
 
 func TestACallableWithoutSchemaReceivesPlainTextInput(t *testing.T) {
 	apiKey := requireOpenAIKey(t)
-	temperature := 0.0
 
-	resp := postDebugRun(t, debugRequest{
-		Provider:    "openai",
-		Model:       "gpt-4o-mini",
-		APIKey:      apiKey,
-		Temperature: &temperature,
-		Prompt:      "Say hello world",
-		AgentYAML:   defaultInputSchemaYAML,
-	})
+	client := authedClient(t)
+	upsertAISettings(t, client, "openai", apiKey)
 
-	require.Empty(t, resp.Errors, "runner reported errors: %v", resp.Errors)
-	require.NotEmpty(t, resp.Response, "agent produced no response")
+	subBody := agentBody(
+		"EchoAgent",
+		"Repeat exactly what the user says.",
+		"openai", "gpt-4o-mini",
+	)
+	subBody["description"] = "Echoes the request."
+	subID := createAgent(t, client, subBody)
 
-	toolEvents := findEventsByType(resp.EventsEmitted, "ToolStart")
-	require.NotEmpty(t, toolEvents, "must emit ToolStart event")
-
-	// Verify arguments contain "request" key (default parameter name)
-	var args string
-	if len(toolEvents) > 0 && len(toolEvents[0].Data) > 0 {
-		var toolData map[string]any
-		if err := json.Unmarshal(toolEvents[0].Data, &toolData); err == nil {
-			if a, ok := toolData["arguments"].(string); ok {
-				args = a
-			}
-		}
+	parentBody := agentBody(
+		"Simple Agent",
+		"Repeat the user's request back to them by calling the EchoAgent tool.",
+		"openai", "gpt-4o-mini",
+	)
+	// No input_schema → orchestration engine synthesises a default
+	// single-parameter "request" string input.
+	parentBody["agentTools"] = []map[string]any{
+		{"agent_id": subID},
 	}
-	require.True(t, strings.Contains(args, "request"), "default input schema should use 'request' parameter, got: %s", args)
+	parentID := createAgent(t, client, parentBody)
+
+	_, events := sendMessage(t, client, "", parentID, "Say hello world")
+
+	require.Empty(t, runErrorMessage(events), "run should not error")
+
+	tools := findToolStarts(events)
+	require.NotEmpty(t, tools, "must emit TOOL_START")
+
+	// The engine announced a single "request" parameter; the model's
+	// arguments field is a JSON string containing that key.
+	args, _ := tools[0]["arguments"].(string)
+	require.Contains(t, args, "request",
+		"default input schema should use 'request' parameter; got arguments=%s", args)
 }

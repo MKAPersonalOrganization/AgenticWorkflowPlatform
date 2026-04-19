@@ -82,8 +82,17 @@ func (e *ToolResultAdded) AggregateID() string       { return e.ThreadID }
 // adapter's event translator normalises each provider's native response
 // parts into this event.
 type CodeExecutionRan struct {
-	ThreadID  string    `json:"threadId"`
-	MessageID string    `json:"messageId"`
+	ThreadID string `json:"threadId"`
+	// MessageID is the session event that produced this block — one
+	// event can carry more than one code block, so MessageID is not
+	// unique across CodeExecutionRan instances.
+	MessageID string `json:"messageId"`
+	// BlockID uniquely identifies a single code block within a turn.
+	// Sourced from the provider's ExecutableCode.ID (Gemini) /
+	// code_interpreter_call.id (OpenAI), with a synthetic fallback when
+	// neither is set. The persistent projection uses (MessageID, BlockID)
+	// to dedupe on replay.
+	BlockID string `json:"blockId"`
 	// Language identifies the source syntax (e.g. "python"). Lower-cased
 	// for consistent rendering; empty when the provider doesn't say.
 	Language string `json:"language,omitempty"`

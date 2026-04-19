@@ -2,7 +2,7 @@
 
 An event-sourced, multi-agent AI chat platform built with Go, Templ, Tailwind CSS, and Alpine.js. Implements the AG-UI protocol for real-time agent interactions, with a modular plugin system for tools and MCP connector support for remote tool servers.
 
-[Changelog](CHANGELOG.md) · [Developer Onboarding Guide](ONBOARDING.md)
+[Changelog](CHANGELOG.md) · [Developer Onboarding Guide](ONBOARDING.md) · [Pitfalls](arch/guidelines/pitfalls.md) · [Feature-work Workflows](arch/guidelines/workflows.md)
 
 ## Repository Statistics
 
@@ -72,7 +72,7 @@ graph TB
 | Container | Technology | Description |
 | :--- | :--- | :--- |
 | **Web Browser** | Alpine.js, Tailwind CSS v4, Templ | Server-rendered HTML with client-side reactivity and SSE streaming. |
-| **Go Application** | Go, Chi, Templ | Event-sourced modular monolith. Single binary serving HTTP, background projection workers, and real-time SSE streaming. 16 bounded-context modules, 15 tool plugins, ADK-Go agent framework adapter. |
+| **Go Application** | Go, Chi, Templ | Event-sourced modular monolith. Single binary serving HTTP, background projection workers, and real-time SSE streaming. 16 bounded-context modules, 13 tool plugins, ADK-Go agent framework adapter. |
 | **PostgreSQL** | PostgreSQL 16 | Single database for both the append-only event log and all materialized read-model projections. |
 | **Redis** | Redis 7 | Triple-duty: cross-pod Pub/Sub for real-time SSE delivery, distributed permission cache (TTL-based), and distributed per-IP rate limiting. |
 | **MinIO** | MinIO (S3-compatible) | Private artifact storage for user uploads, audio recordings, images, and long-term memory files. Served via pre-signed URLs. |
@@ -195,7 +195,7 @@ graph TB
 | **Other Modules** | `modules/*` | `a2a` (Agent-to-Agent protocol), `aisettings` (per-user LLM config), `analytics` (usage stats + statistics projection), `evaluation` (hallucination, rubric, safety evals), `filesystem` (S3/GitHub file management), `pluginsettings` (plugin config UI), `resources` (user uploads), `templates` (agent catalog), `toolreqs` (tool requirement specs), `userprofile` (identity + preferences). |
 | **ADK-Go Adapter** | `adapters/adkgo` | Bridges the application to Google's ADK-Go agent framework. Builds workflow agents from composition graphs, translates ADK session events to thread domain events, resolves tools, and builds system prompts. 17 files. |
 | **Gemini Adapter** | `adapters/gemini` | Implements `websearch.GroundedSearchClient` using the Google Gemini API for grounded web search. |
-| **Plugin Layer** | `plugins/*` | 15 self-contained plugins each implementing `PluginProvider` from `foundation/toolregistry`. Each provides backend tool logic + optional Templ UI templates (ADR-008). |
+| **Plugin Layer** | `plugins/*` | 13 self-contained plugins each implementing `PluginProvider` from `foundation/toolregistry`. Each provides backend tool logic + optional Templ UI templates (ADR-008). |
 | **Agent Framework** | `foundation/agent` | Framework-agnostic interfaces: `Agent`, `Runner`, `ExecutableTool`, `StreamingExecutableTool`, `AgentProvider`, `Middleware`. Supports hierarchical agent composition and multimodal content (text, images, audio, files, tool calls). Includes `agent/io` sub-package for human-in-the-loop I/O (ADR-001, ADR-006). |
 | **Event Sourcing** | `foundation/eventsourcing` | Generic `Repository[T]` with optimistic concurrency, `BaseAggregate` with event queuing/replay, `SnapshotStore` (snapshots every 50 events), and typed `Deserializer` registry. |
 | **Event Router** | `foundation/event` | Type-safe dual-router event dispatch — persistence router (feeds projection subscriber) and transient router (feeds Redis broadcaster). |
@@ -262,3 +262,33 @@ By default, these are served on the debug server (port `4015` as per `.env`).
 **Query Parameters:**
 -   `format=svg` (default): Returns the graph as an SVG image.
 -   `format=dot` (or `text`): Returns the raw DOT graph text description.
+
+## Integration Testing
+
+Integration tests under `userrequirements/` drive the app through the same REST surface as the browser UI — no direct DB access, no special test-only endpoints beyond a single gated auth affordance.
+
+The one test affordance: `POST /auth/dev-login` is mounted **only** when `APP_AUTH_DEV_LOGIN_TOKEN` is non-empty at startup. Tests present that token in the `X-Dev-Login-Token` header and receive a real signed `school_session` cookie for the configured debug user. Unset the env var in production and the route is absent from the router.
+
+Environment variables (see `.env.example`):
+
+| Variable | Default | Purpose |
+| :--- | :--- | :--- |
+| `APP_AUTH_DEV_LOGIN_TOKEN` | _(empty)_ | Enables the endpoint. Leave unset in production. |
+| `APP_AUTH_DEV_LOGIN_USER_ID` | `debug-integration-user` | Stable UUID the dev-login upserts into `users`. |
+| `APP_AUTH_DEV_LOGIN_EMAIL` | `debug@local` | Email paired with the debug user row. |
+
+Test flow (identical to UI behaviour):
+
+1. `POST /auth/dev-login` — cookie.
+2. `PUT /api/ai-settings` — provider + API key for the debug user.
+3. `POST /v1/agent-definitions` — create agents (workflows created by building their leaves first then referencing the returned UUIDs in the parent's `graph.children[].agent_id`).
+4. `POST /v1/message:send` — SSE stream of AG-UI events; tests parse and assert.
+5. `GET /api/agui/threads/{id}/messages` — assert refresh-survival (same endpoint the UI calls on page reload, including the `codeExecutions` sidecar).
+6. `DELETE` agents + threads in `t.Cleanup`.
+
+Run with: `task integration` (after `task up:cluster`).
+
+Worth knowing:
+- The AG-UI projection is eventually consistent; helpers poll briefly (~5s) after the SSE stream closes before asserting sidecar state.
+- Agent-as-tool pattern uses `agentTools[]` on the parent; coordinator pattern uses `subAgents[]`. Both reference sub-agent **UUIDs**, so sub-agents are created first.
+- AI-settings upserts return the newly-generated UUID even on CONFLICT, which doesn't match the actual row. Tests clear all settings for the debug user before creating new ones so the insert path runs and auto-sets `is_default=true`.

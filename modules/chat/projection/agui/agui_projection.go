@@ -31,10 +31,27 @@ type AguiThreadState struct {
 	ToolStates         map[string]any                 `json:"toolStates,omitempty"`
 	TokenUsage         *TokenUsageInfo                `json:"tokenUsage,omitempty"`
 	MessageAttachments map[string][]thread.Attachment `json:"messageAttachments,omitempty"` // messageID -> attachment refs
-	CreatedAt          time.Time                      `json:"createdAt"`
-	UpdatedAt          time.Time                      `json:"updatedAt"`
-	Version            int64                          `json:"version"` // Event version
-	IsDeleted          bool                           `json:"isDeleted"`
+	// CodeExecutions is a sidecar map carrying the structured fields the
+	// code-execution chat card needs. Keyed by the row's message_id
+	// (synthesised as "codeexec_<msg>_<block>" by applyCodeExecutionRan).
+	// The primary message row already has the code in Content; this map
+	// forwards the secondary fields (language, output, outcome) the SDK's
+	// Message type has nowhere to put.
+	CodeExecutions map[string]CodeExecutionSummary `json:"codeExecutions,omitempty"`
+	CreatedAt      time.Time                       `json:"createdAt"`
+	UpdatedAt      time.Time                       `json:"updatedAt"`
+	Version        int64                           `json:"version"` // Event version
+	IsDeleted      bool                            `json:"isDeleted"`
+}
+
+// CodeExecutionSummary is the sidecar payload for a code-execution message
+// row. The code itself lives in the message Content column; these fields
+// describe what happened around it.
+type CodeExecutionSummary struct {
+	Language string `json:"language,omitempty"`
+	Output   string `json:"output,omitempty"`
+	Outcome  string `json:"outcome,omitempty"`
+	BlockID  string `json:"blockId,omitempty"`
 }
 
 // TokenUsageInfo represents token usage for a thread.

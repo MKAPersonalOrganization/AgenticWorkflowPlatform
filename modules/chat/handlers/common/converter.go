@@ -249,14 +249,16 @@ func toAguiEventsInternal(event any) []any {
 		)}
 
 	case *thread.CodeExecutionRan:
-		// Surfaces Gemini-executed (and future OpenAI / Anthropic)
-		// code snippets to the chat stream. Frontend renders a card
-		// with the source in a highlighted block and the sandbox
-		// output below. No user action — read-only.
+		// Surfaces Gemini-executed (and OpenAI code-interpreter)
+		// snippets to the chat stream. Frontend renders a card with
+		// the source in a highlighted block and the sandbox output
+		// below. BlockID uniquely identifies this block so the live
+		// stream and the persisted-history replay can reconcile.
 		return []any{aguievents.NewCustomEvent(
 			"CODE_EXECUTION_RAN",
 			aguievents.WithValue(map[string]any{
 				"messageId": evt.MessageID,
+				"blockId":   evt.BlockID,
 				"language":  evt.Language,
 				"code":      evt.Code,
 				"output":    evt.Output,

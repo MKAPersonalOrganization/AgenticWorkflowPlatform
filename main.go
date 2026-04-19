@@ -71,7 +71,6 @@ import (
 	billingmod "aicompass/modules/billing"
 	chatmod "aicompass/modules/chat"
 	"aicompass/modules/chat/handlers/common"
-	"aicompass/modules/chat/handlers/debughandler"
 	evalmod "aicompass/modules/evaluation"
 	evalhallucinationmod "aicompass/modules/evaluation/hallucination"
 	evalresponsemod "aicompass/modules/evaluation/response"
@@ -146,6 +145,16 @@ func run(ctx context.Context, log *logger.Logger) error {
 			GitHubClientID     string
 			GitHubClientSecret string
 			SessionSecret      string `conf:"default:change-me-in-production-32-chars!"`
+
+			// DevLoginToken, when non-empty, mounts POST /auth/dev-login on the
+			// main app router. Tests must present this value in the
+			// X-Dev-Login-Token header to obtain a real school_session cookie
+			// for the debug user (DevLoginUserID / DevLoginEmail). Leaving
+			// DevLoginToken empty disables the endpoint entirely — production
+			// deployments should never set it.
+			DevLoginToken  string `conf:"mask"`
+			DevLoginUserID string `conf:"default:debug-integration-user"`
+			DevLoginEmail  string `conf:"default:debug@local"`
 		}
 		DashboardAdmin struct {
 			User string `conf:"default:admin"`
@@ -627,16 +636,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	log.Info(ctx, "startup", "status", "chat module initialized")
 
-	// Internal debug endpoint: self-contained agent run for developer
-	// integration testing. Mounted on the debug mux (see below) so it is
-	// only reachable on cfg.Web.DebugHost — same posture as pprof/expvar.
-	debugAgentHandler := debughandler.New(
-		log,
-		chatModule.Orchestrator().GetThreadManagement(),
-		baseEventStore,
-	)
-	debugMux.HandleFunc("/debug/agent:run", debugAgentHandler.HandleRun)
-
 	// -------------------------------------------------------------------------
 	// Start Debug Service
 
@@ -681,6 +680,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}, db)
 	sessionStore := googleauth.NewSessionStore(cfg.Auth.SessionSecret)
 	authHandlers := googleauth.NewAuthHandlers(log, googleClient, sessionStore, cfg.Auth.AppURL)
+	if authHandlers.EnableDevLogin(cfg.Auth.DevLoginToken, cfg.Auth.DevLoginUserID, cfg.Auth.DevLoginEmail) {
+		log.Info(ctx, "startup", "status", "dev-login enabled", "user_id", cfg.Auth.DevLoginUserID)
+	}
 	authMiddleware := auth.NewMiddleware(googleClient, sessionStore, cfg.Auth.AppURL, ctx)
 
 	registerRoutes(appRouter, log, authHandlers, authMiddleware, healthHandler, routeModules{
@@ -879,6 +881,16 @@ func registerRoutes(
 	r.Get("/auth/login", authHandlers.LoginPage)
 	r.Get("/auth/callback", authHandlers.CallbackHandler)
 	r.Get("/auth/logout", authHandlers.LogoutHandler)
+
+	// Dev-login endpoint — mounted ONLY when APP_DEV_LOGIN_TOKEN is set
+	// (enabled via authHandlers.EnableDevLogin in main()). Integration
+	// tests call this with X-Dev-Login-Token to obtain a real
+	// school_session cookie for the debug user, then drive the public REST
+	// API identically to the browser UI. The env var is absent in
+	// production deployments, so the route doesn't exist there.
+	if authHandlers.DevLoginEnabled() {
+		r.Post("/auth/dev-login", authHandlers.DevLoginHandler)
+	}
 	r.Get("/auth/error", func(w http.ResponseWriter, r *http.Request) {
 		data := authHandlers.ErrorPageData(r)
 		component := authcomp.ErrorPage(authcomp.ErrorPageProps{

@@ -222,6 +222,33 @@ func (t *ThreadAggregate) Apply(event Event) {
 		// Remove the tool from active states when result is added
 		delete(t.ActiveToolStates, e.ToolCallID)
 
+	case *CodeExecutionRan:
+		// Each code block the LLM provider's sandbox ran becomes its own
+		// message row so the chat card survives a refresh. Structured
+		// context (language, output, outcome) travels in Metadata; the
+		// projection reads these back into the AguiThreadState sidecar.
+		//
+		// The synthesised ID matches applyCodeExecutionRan's key so the
+		// aggregate's view and the projection's view agree on message_id
+		// — important for ON CONFLICT dedup and for frontend lookups.
+		msg := Message{
+			ID:        "codeexec_" + e.MessageID + "_" + e.BlockID,
+			Role:      "code_execution",
+			Content:   e.Code,
+			AgentName: e.AgentName,
+			Timestamp: e.Timestamp,
+			Metadata: map[string]any{
+				"codeExecution": map[string]any{
+					"language": e.Language,
+					"output":   e.Output,
+					"outcome":  e.Outcome,
+					"blockId":  e.BlockID,
+				},
+			},
+		}
+		t.Messages = append(t.Messages, msg)
+		t.UpdatedAt = e.Timestamp
+
 	case *ThreadTitleUpdated:
 		t.Title = e.Title
 		t.UpdatedAt = e.Timestamp

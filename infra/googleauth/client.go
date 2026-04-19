@@ -123,6 +123,36 @@ func (c *Client) UpsertUser(ctx context.Context, info *GoogleUserInfo) (*auth.Us
 	return &user, nil
 }
 
+// UpsertDebugUser ensures a user with the given ID and email exists. It is
+// used by the dev-login path (POST /auth/dev-login) so integration tests can
+// obtain a real session cookie for a well-known user without going through
+// Google OAuth. Unlike UpsertUser, the caller chooses the ID up-front —
+// that's the whole point: tests want a stable, predictable debug user that
+// survives cluster restarts and can be referenced by env vars.
+//
+// On a fresh DB this row is inserted. On subsequent calls the row is left
+// intact except for updated_at, so test runs don't fight each other over
+// ownership of the user record.
+func (c *Client) UpsertDebugUser(ctx context.Context, userID, email string) (*auth.User, error) {
+	now := time.Now().UTC()
+
+	query := `
+		INSERT INTO users (id, email, google_sub, first_name, last_name, picture, role, created_at, updated_at)
+		VALUES ($1, $2, '', 'Debug', 'User', '', 'user', $3, $3)
+		ON CONFLICT (id) DO UPDATE SET
+			updated_at = EXCLUDED.updated_at
+		RETURNING id, email, google_sub, first_name, last_name, picture, role, created_at, updated_at
+	`
+
+	var user auth.User
+	err := c.db.QueryRowxContext(ctx, query, userID, email, now).StructScan(&user)
+	if err != nil {
+		return nil, fmt.Errorf("failed to upsert debug user: %w", err)
+	}
+
+	return &user, nil
+}
+
 // GetUserByID retrieves a user by their ID.
 func (c *Client) GetUserByID(ctx context.Context, userID string) (*auth.User, error) {
 	var user auth.User

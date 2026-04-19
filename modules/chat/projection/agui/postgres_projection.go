@@ -107,6 +107,11 @@ func (p *PostgresAguiProjection) RegisterHandlers(router interface {
 	router.Register(&thread.RunFinished{}, func(ctx context.Context, e thread.Event) error {
 		return p.applyRunFinished(ctx, e.(*thread.RunFinished))
 	})
+	// Code execution results persist as their own message row so the
+	// chat card survives page refreshes.
+	router.Register(&thread.CodeExecutionRan{}, func(ctx context.Context, e thread.Event) error {
+		return p.applyCodeExecutionRan(ctx, e.(*thread.CodeExecutionRan))
+	})
 }
 
 // applyThreadCreated creates a new thread record.
@@ -305,6 +310,63 @@ func (p *PostgresAguiProjection) applyToolResultAdded(ctx context.Context, event
 		// Non-fatal: the message row was inserted successfully
 	}
 
+	return nil
+}
+
+// applyCodeExecutionRan persists a code-execution block into agui_messages
+// so the chat card survives a page refresh.
+//
+// We write one row per block with role="code_execution"; the code goes
+// into the content column (same column the assistant text uses) and the
+// surrounding context (language, output, outcome) goes into metadata as
+// JSONB. The frontend's loader recognises the "code_execution" role and
+// reconstructs the UI message shape the live-stream handler already
+// produces — so reload vs. fresh rendering take the same code path.
+//
+// message_id is synthesised as "codeexec_<MessageID>_<BlockID>" so
+// multiple blocks in the same turn don't collide on the UNIQUE constraint.
+// Replay-safety: ON CONFLICT DO NOTHING — re-applying the same event is a
+// no-op, matching the idempotency contract the other handlers follow.
+func (p *PostgresAguiProjection) applyCodeExecutionRan(ctx context.Context, event *thread.CodeExecutionRan) error {
+	meta := map[string]any{
+		"codeExecution": map[string]any{
+			"language": event.Language,
+			"output":   event.Output,
+			"outcome":  event.Outcome,
+			"blockId":  event.BlockID,
+		},
+	}
+	metadataJSON, err := json.Marshal(meta)
+	if err != nil {
+		return fmt.Errorf("failed to marshal code-execution metadata: %w", err)
+	}
+
+	messageID := fmt.Sprintf("codeexec_%s_%s", event.MessageID, event.BlockID)
+
+	insertQuery := `
+		INSERT INTO agui_messages (message_id, thread_id, role, content, metadata, agent_name, created_at, sequence_num)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, (SELECT COUNT(*) FROM agui_messages WHERE thread_id = $2::varchar))
+		ON CONFLICT (message_id) DO NOTHING
+	`
+	if _, err := p.db.ExecContext(ctx, insertQuery,
+		messageID,
+		event.ThreadID,
+		"code_execution",
+		event.Code,
+		metadataJSON,
+		event.AgentName,
+		event.Timestamp,
+	); err != nil {
+		return fmt.Errorf("failed to insert code-execution message: %w", err)
+	}
+
+	_, err = p.db.ExecContext(ctx,
+		`UPDATE agui_threads SET updated_at = $1, version = version + 1 WHERE thread_id = $2`,
+		event.Timestamp, event.ThreadID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update thread timestamp: %w", err)
+	}
 	return nil
 }
 
@@ -591,6 +653,7 @@ func (p *PostgresAguiProjection) GetThreadState(ctx context.Context, threadID st
 	// Convert database messages to AGUI SDK format
 	aguiMessages := make([]aguievents.Message, 0, len(messages))
 	messageAttachments := make(map[string][]thread.Attachment)
+	codeExecutions := make(map[string]CodeExecutionSummary)
 	var tokenUsage *TokenUsageInfo
 
 	for _, msg := range messages {
@@ -650,6 +713,18 @@ func (p *PostgresAguiProjection) GetThreadState(ctx context.Context, threadID st
 						RejectedPredict: getIntFromMap(usage, "rejectedPredict"),
 						MessageID:       msg.MessageID,
 						ThreadID:        threadID,
+					}
+				}
+
+				// Extract code-execution payload. Keyed on message_id so
+				// the frontend can join it to the code_execution message
+				// row after parsing messages.
+				if ceRaw, ok := metadata["codeExecution"].(map[string]interface{}); ok {
+					codeExecutions[msg.MessageID] = CodeExecutionSummary{
+						Language: getStringFromMap(ceRaw, "language"),
+						Output:   getStringFromMap(ceRaw, "output"),
+						Outcome:  getStringFromMap(ceRaw, "outcome"),
+						BlockID:  getStringFromMap(ceRaw, "blockId"),
 					}
 				}
 
@@ -741,6 +816,7 @@ func (p *PostgresAguiProjection) GetThreadState(ctx context.Context, threadID st
 		ToolStates:         toolStatesMap,
 		TokenUsage:         tokenUsage,
 		MessageAttachments: messageAttachments,
+		CodeExecutions:     codeExecutions,
 		CreatedAt:          threadRow.CreatedAt,
 		UpdatedAt:          threadRow.UpdatedAt,
 		Version:            threadRow.Version,

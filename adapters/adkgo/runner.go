@@ -856,11 +856,22 @@ func (r *RunnerAdapter) applyCodeExecutionTool(agentCfg *fagent.Config, modelCfg
 		genCfg.Tools = append(genCfg.Tools, &genai.Tool{
 			CodeExecution: &genai.ToolCodeExecution{},
 		})
+	case "openai":
+		// The OpenAI Responses-API adapter looks for this same
+		// genai.Tool.CodeExecution marker on the request and maps it
+		// to &responses.ToolCodeInterpreterParam{Container: "auto"}
+		// (see openai_responses.go:toolsToResponsesParam). One
+		// provider-agnostic signal in, two provider-native wirings
+		// out.
+		genCfg.Tools = append(genCfg.Tools, &genai.Tool{
+			CodeExecution: &genai.ToolCodeExecution{},
+		})
 	default:
-		// TODO(M10-followups): wire OpenAI + Anthropic code interpreters
-		// here when their adapters grow native support. Keep the
-		// foundation AgentCodeExecutionPolicy shape unchanged; only
-		// this dispatch needs to learn each provider's invocation.
+		// Anthropic's OpenAI-compatible endpoint is on Chat Completions
+		// and doesn't support code interpreter. When we add a native
+		// Anthropic adapter (with Claude's code_execution tool), add a
+		// branch here — the foundation AgentCodeExecutionPolicy shape
+		// doesn't need to change.
 	}
 }
 

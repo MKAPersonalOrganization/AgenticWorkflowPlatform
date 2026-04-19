@@ -305,7 +305,7 @@ export function createMessagingMethods() {
                     const data = await response.json();
                     const state = this.__getThreadState(id);
                     const messages = Array.isArray(data) ? data : (data.messages || []);
-                    const uiMessages = this.__convertBackendMessagesToUI(messages, data.toolStates || {}, id, data.messageAttachments || {});
+                    const uiMessages = this.__convertBackendMessagesToUI(messages, data.toolStates || {}, id, data.messageAttachments || {}, data.codeExecutions || {});
                     state.messages = uiMessages;
 
                     // Side Effect Phase: Sync stateful components (XState)
@@ -336,7 +336,7 @@ export function createMessagingMethods() {
          * @param {Object} messageAttachments - Map of messageID → attachment refs from backend (optional)
          * @returns {Array} Converted messages for UI display
          */
-        __convertBackendMessagesToUI(backendMessages, toolStatesMap = {}, targetThreadId = null, messageAttachments = {}) {
+        __convertBackendMessagesToUI(backendMessages, toolStatesMap = {}, targetThreadId = null, messageAttachments = {}, codeExecutions = {}) {
             if (!Array.isArray(backendMessages)) {
                 console.warn('[Messaging] Invalid messages array:', backendMessages);
                 return [];
@@ -359,6 +359,10 @@ export function createMessagingMethods() {
 
                     case 'tool':
                         uiMessages.push(this.__handleToolMessage(msg));
+                        break;
+
+                    case 'code_execution':
+                        uiMessages.push(this.__handleCodeExecutionMessage(msg, codeExecutions[msg.id] || {}));
                         break;
 
                     case 'system':
@@ -506,6 +510,34 @@ export function createMessagingMethods() {
                 content: msg.content || '',
                 timestamp: msg.timestamp || new Date().toISOString(),
                 streaming: false
+            };
+        },
+
+        /**
+         * Handle a persisted code-execution message row.
+         *
+         * The live-stream counterpart (__handleCodeExecutionRan in
+         * chat-event-handlers.js) pushes the exact same message shape into
+         * state — {type: 'code_execution', code, output, language,
+         * outcome, ok, …} — so on refresh the CodeExecutionCard renders
+         * identically to how it rendered live.
+         *
+         * @private
+         */
+        __handleCodeExecutionMessage(msg, sidecar = {}) {
+            const outcome = sidecar.outcome || '';
+            const ok = !outcome || outcome === 'OUTCOME_OK';
+            return {
+                id: msg.id,
+                type: 'code_execution',
+                language: (sidecar.language || 'python').toLowerCase(),
+                code: msg.content || '',
+                output: sidecar.output || '',
+                outcome,
+                ok,
+                agentName: msg.name || '',
+                timestamp: msg.timestamp || new Date().toISOString(),
+                streaming: false,
             };
         },
 

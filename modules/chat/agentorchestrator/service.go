@@ -64,10 +64,17 @@ func New(
 		opt(s)
 	}
 
-	// Build thread repo after options so snapshot store is available.
-	sharedRepo := thread.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog), s.snapshotStore)
-	s.threadRepo = sharedRepo
-	s.threadMgmt = threadmgmt.New(log, sharedRepo)
+	// If the caller supplied a threadMgmt via WithThreadManagement, keep it —
+	// that lets the debug endpoint (and, in general, any caller that shares
+	// a threadMgmt with its runner) avoid having two independent
+	// ThreadRepository instances racing on the same DB stream. Otherwise
+	// build a fresh one backed by the event store (and snapshot store, if
+	// provided).
+	if s.threadMgmt == nil {
+		sharedRepo := thread.NewThreadRepository(threadmgmt.NewEventStoreAdapter(eventLog), s.snapshotStore)
+		s.threadRepo = sharedRepo
+		s.threadMgmt = threadmgmt.New(log, sharedRepo)
+	}
 
 	return s
 }
@@ -104,6 +111,23 @@ func WithSnapshotStore(store es.SnapshotStore) Option {
 func WithRunner(runner Runner) Option {
 	return func(s *Service) {
 		s.runner = runner
+	}
+}
+
+// WithThreadManagement lets the caller inject an existing threadmgmt.Manager
+// (and therefore an existing ThreadRepository) instead of having the
+// orchestrator build a fresh one. Use this when the runner you're about to
+// configure with WithRunner was itself built against a specific
+// threadmgmt.Manager — sharing it avoids two independent ThreadRepository
+// instances fighting over the same event stream via optimistic concurrency.
+// (Prior to this, the debug endpoint hit spurious 10× retry conflicts on
+// CodeExecutionRan because the runner persisted UserMessageAdded through one
+// ThreadRepository while the orchestrator persisted CodeExecutionRan through
+// another — the in-memory aggregate versions diverged even though the DB
+// advisory lock serialised the writes.)
+func WithThreadManagement(mgr *threadmgmt.Manager) Option {
+	return func(s *Service) {
+		s.threadMgmt = mgr
 	}
 }
 
@@ -193,7 +217,8 @@ func (s *Service) isDurable(event thread.Event) bool {
 		*thread.AuthGranted,
 		*thread.AuthDenied,
 		*thread.ToolCancelled,
-		*thread.StateChangeReported:
+		*thread.StateChangeReported,
+		*thread.CodeExecutionRan:
 		return true
 
 	// Agent Framework Events - Transient (NOT persisted)
@@ -243,7 +268,13 @@ func (s *Service) persistDurableEvent(ctx context.Context, event thread.Event) e
 		*thread.InputProvided,
 		*thread.AuthGranted,
 		*thread.AuthDenied,
-		*thread.ToolCancelled:
+		*thread.ToolCancelled,
+		*thread.CodeExecutionRan:
+		// Generic path: the aggregate's Apply method handles the
+		// event type directly (see thread_aggregate.go). This enqueues
+		// the event onto the aggregate, which means Save() writes it
+		// to the event store, which in turn triggers the AG-UI
+		// projection's applyCodeExecutionRan handler.
 		_, err := s.threadMgmt.RecordToolEvent(ctx, event.AggregateID(), event)
 		return err
 	case *thread.StateChangeReported:

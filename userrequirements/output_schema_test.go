@@ -1,15 +1,17 @@
 //go:build integration
 
-// output_schema_test.go verifies the user-facing behavior of the
-// "Output Schema" feature. Each test reads as a spec sentence.
+// output_schema_test.go verifies the "Output Schema" feature end-to-end:
+// an agent with an outputSchema returns JSON that conforms to the
+// schema, and — composed in a workflow — downstream agents can read that
+// structured result from session state via {outputKey} templates.
 //
 // Specs exercised:
 //
 //	An agent can return structured data matching a schema
-//	  → AnAgentCanReturnStructuredDataMatchingASchema
+//	  → TestAnAgentCanReturnStructuredDataMatchingASchema
 //
 //	A downstream agent can receive the output of an upstream agent
-//	  → ADownstreamAgentCanReceiveOutputFromAnUpstreamAgent
+//	  → TestADownstreamAgentCanReceiveOutputFromAnUpstreamAgent
 package userrequirements
 
 import (
@@ -33,35 +35,32 @@ const outputSchemaCityFacts = `{
   }
 }`
 
-// An agent with output_schema returns JSON that conforms to the schema in direct chat.
 func TestAnAgentCanReturnStructuredDataMatchingASchema(t *testing.T) {
 	apiKey := requireOpenAIKey(t)
-	temperature := 0.0
 
-	agent, err := json.Marshal(map[string]any{
-		"name": "city-facts",
-		"system_prompt": "Return facts about the given city. " +
-			"population_millions is the metro-area population in millions (a decimal). " +
+	client := authedClient(t)
+	upsertAISettings(t, client, "openai", apiKey)
+
+	body := agentBody(
+		"city-facts",
+		"Return facts about the given city. "+
+			"population_millions is the metro-area population in millions (a decimal). "+
 			"is_capital is true iff the city is the capital of its country.",
-		"output_schema": outputSchemaCityFacts,
-	})
-	require.NoError(t, err)
+		"openai", "gpt-4o-mini",
+	)
+	body["outputSchema"] = outputSchemaCityFacts
 
-	resp := postDebugRun(t, debugRequest{
-		Provider:    "openai",
-		Model:       "gpt-4o-mini",
-		APIKey:      apiKey,
-		Temperature: &temperature,
-		Prompt:      "Tokyo",
-		Agent:       agent,
-	})
+	agentID := createAgent(t, client, body)
 
-	require.Empty(t, resp.Errors, "runner reported errors: %v", resp.Errors)
-	require.NotEmpty(t, resp.Response, "agent produced no response")
+	_, events := sendMessage(t, client, "", agentID, "Tokyo")
+
+	require.Empty(t, runErrorMessage(events), "run should not error")
+	reply := assistantFinalText(events)
+	require.NotEmpty(t, reply, "agent produced no text reply")
 
 	var got map[string]any
-	require.NoError(t, json.Unmarshal([]byte(resp.Response), &got),
-		"response must be valid JSON; got:\n%s", resp.Response)
+	require.NoError(t, json.Unmarshal([]byte(reply), &got),
+		"response must be valid JSON; got:\n%s", reply)
 
 	validateAgainstSchema(t, outputSchemaCityFacts, got)
 
@@ -81,73 +80,70 @@ func TestAnAgentCanReturnStructuredDataMatchingASchema(t *testing.T) {
 	assert.True(t, isCapital, "Tokyo is the capital of Japan; is_capital must be true")
 }
 
-// A sequential workflow where the first agent has output_schema writes JSON
-// to state via output_key, and the second agent reads it via {key} template.
-const workflowLeafYAML = `
-name: Leaf Schema
-slug: leaf-schema
-description: Tests output_schema as a workflow leaf with downstream state passing.
-system_prompt: Orchestrates extraction then formatting.
-category: Tests
-icon: file-json
-
-workflow:
-  id: root
-  type: sequential
-  children:
-    - id: n1
-      type: agent
-      agent_id: sub-extractor
-    - id: n2
-      type: agent
-      agent_id: sub-formatter
-
-llm_agents:
-  - id: sub-extractor
-    name: CityExtractor
-    description: Extract city facts as JSON.
-    output_key: city_facts
-    system_prompt: |
-      Return facts about the city the user names as JSON.
-      population_millions is the metro-area population as a decimal number.
-      is_capital is true iff the city is the capital of its country.
-
-  - id: sub-formatter
-    name: CityFormatter
-    description: Render the extracted facts as a one-line sentence.
-    system_prompt: |
-      You are given structured city facts as JSON: {city_facts}
-      Produce exactly one English sentence of the form:
-      "<city> is the capital of <country>." if is_capital is true,
-      or "<city> is a city in <country>." if is_capital is false.
-      Output the sentence and nothing else.
-`
-
 func TestADownstreamAgentCanReceiveOutputFromAnUpstreamAgent(t *testing.T) {
 	apiKey := requireOpenAIKey(t)
-	temperature := 0.0
 
-	resp := postDebugRun(t, debugRequest{
-		Provider:    "openai",
-		Model:       "gpt-4o-mini",
-		APIKey:      apiKey,
-		Temperature: &temperature,
-		Prompt:      "Paris",
-		AgentYAML:   workflowLeafYAML,
-	})
+	client := authedClient(t)
+	upsertAISettings(t, client, "openai", apiKey)
 
-	require.Empty(t, resp.Errors, "runner reported errors: %v", resp.Errors)
-	require.NotEmpty(t, resp.Response, "workflow produced no final response")
+	// Extractor: emits city facts as JSON into session state under
+	// `city_facts` via outputKey. Downstream consumers read it via the
+	// {city_facts} template in their systemPrompt.
+	extractorBody := agentBody(
+		"CityExtractor",
+		"Return facts about the city the user names as JSON.\n"+
+			"population_millions is the metro-area population as a decimal number.\n"+
+			"is_capital is true iff the city is the capital of its country.",
+		"openai", "gpt-4o-mini",
+	)
+	extractorBody["description"] = "Extract city facts as JSON."
+	extractorBody["outputKey"] = "city_facts"
+	extractorID := createAgent(t, client, extractorBody)
 
-	final := strings.ToLower(strings.TrimSpace(resp.Response))
+	// Formatter: reads the structured city_facts from state and renders
+	// a single-sentence summary. Only state-template expansion can
+	// deliver the structured value into the prompt.
+	formatterBody := agentBody(
+		"CityFormatter",
+		"You are given structured city facts as JSON: {city_facts}\n"+
+			"Produce exactly one English sentence of the form:\n"+
+			`"<city> is the capital of <country>." if is_capital is true,`+"\n"+
+			`or "<city> is a city in <country>." if is_capital is false.`+"\n"+
+			"Output the sentence and nothing else.",
+		"openai", "gpt-4o-mini",
+	)
+	formatterBody["description"] = "Render the extracted facts as a one-line sentence."
+	formatterID := createAgent(t, client, formatterBody)
+
+	workflowBody := agentBody(
+		"Leaf Schema",
+		"Orchestrates extraction then formatting.",
+		"openai", "gpt-4o-mini",
+	)
+	workflowBody["description"] = "Tests outputSchema as a workflow leaf with downstream state passing."
+	workflowBody["icon"] = "file-json"
+	workflowBody["graph"] = map[string]any{
+		"id":   "root",
+		"type": "sequential",
+		"children": []map[string]any{
+			{"id": "n1", "type": "agent", "agent_id": extractorID},
+			{"id": "n2", "type": "agent", "agent_id": formatterID},
+		},
+	}
+	workflowID := createAgent(t, client, workflowBody)
+
+	_, events := sendMessage(t, client, "", workflowID, "Paris")
+
+	require.Empty(t, runErrorMessage(events), "run should not error")
+	reply := assistantFinalText(events)
+	require.NotEmpty(t, reply, "workflow produced no final reply")
+
+	final := strings.ToLower(strings.TrimSpace(reply))
 	assert.Contains(t, final, "paris",
-		"formatter output must reference the prompt subject — state was not passed: %q", final)
+		"formatter output must reference the prompt subject; state was not passed: %q", final)
 	assert.Contains(t, final, "france",
-		"formatter output must reference the country from the extractor — state was not passed: %q", final)
+		"formatter output must reference the country from the extractor; state was not passed: %q", final)
 	assert.True(t,
 		strings.Contains(final, "capital") || strings.Contains(final, "city"),
-		"formatter output must pick the is_capital branch — state was not passed: %q", final)
-
-	msgs := findEventsByType(resp.EventsEmitted, "AssistantMessageAdded")
-	require.NotEmpty(t, msgs, "no AssistantMessageAdded events were emitted")
+		"formatter output must pick the is_capital branch; state was not passed: %q", final)
 }

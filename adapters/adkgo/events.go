@@ -3,6 +3,7 @@ package adkgo
 import (
 	"aicompass/modules/chat/thread"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -490,11 +491,19 @@ func translateCodeExecution(evt *session.Event, ctx EventContext) []thread.Event
 	}
 
 	events := make([]thread.Event, 0, len(codes))
-	for _, id := range codeOrder {
+	for idx, id := range codeOrder {
 		c := codes[id]
+		blockID := id
+		if blockID == "" {
+			// Providers occasionally omit the part ID (the synthetic
+			// Outcome-only case). Fall back to a deterministic value so
+			// the persistent projection can still dedupe on replay.
+			blockID = fmt.Sprintf("%s-%d", evt.ID, idx)
+		}
 		evtOut := &thread.CodeExecutionRan{
 			ThreadID:  ctx.ThreadID,
 			MessageID: evt.ID,
+			BlockID:   blockID,
 			Language:  c.language,
 			Code:      c.code,
 			AgentName: ctx.AgentName,
