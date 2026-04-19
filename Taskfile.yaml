@@ -214,12 +214,21 @@ tasks:
         if [ -z "{{.CLI_ARGS}}" ]; then
           echo "Usage: task trends -- <path> [path...]"; exit 1
         fi
+        # Clear stale outputs so the viewer doesn't open a PNG from a
+        # previous run (e.g. trends:top's _summary.png).
+        mkdir -p .hotspots/complexity_trend
+        rm -f .hotspots/complexity_trend/*.png
         .hotspots/.venv/bin/python3 scripts/complexity_trend.py \
           --since "{{.SINCE}}" --samples {{.SAMPLES}} --summary \
           --out .hotspots/complexity_trend \
           {{.CLI_ARGS}}
       - echo "" && echo "Outputs saved to .hotspots/complexity_trend/"
-      - xdg-open .hotspots/complexity_trend/_summary.png 2>/dev/null || open .hotspots/complexity_trend/_summary.png 2>/dev/null || true
+      - |
+        # Open the summary if one was produced (multi-file runs); otherwise
+        # the per-file PNG.
+        F=".hotspots/complexity_trend/_summary.png"
+        [ -f "$F" ] || F=$(ls -t .hotspots/complexity_trend/*.png 2>/dev/null | head -1)
+        [ -n "$F" ] && { xdg-open "$F" 2>/dev/null || open "$F" 2>/dev/null; } || true
 
   trends:top:
     desc: "Rank + plot the top N deteriorating files repo-wide. Env: TOP (default 10), SINCE (default '6 months ago'), SAMPLES (default 20), MIN_COMMITS (default 8), MIN_LOC (default 150)."
@@ -232,13 +241,18 @@ tasks:
       MIN_LOC: '{{.MIN_LOC | default "150"}}'
     cmds:
       - |
+        mkdir -p .hotspots/complexity_trend
+        rm -f .hotspots/complexity_trend/*.png
         .hotspots/.venv/bin/python3 scripts/complexity_trend.py \
           --discover --top {{.TOP}} \
           --since "{{.SINCE}}" --samples {{.SAMPLES}} \
           --min-commits {{.MIN_COMMITS}} --min-loc {{.MIN_LOC}} \
           --out .hotspots/complexity_trend
       - echo "" && echo "Outputs saved to .hotspots/complexity_trend/"
-      - xdg-open .hotspots/complexity_trend/_summary.png 2>/dev/null || open .hotspots/complexity_trend/_summary.png 2>/dev/null || true
+      - |
+        F=".hotspots/complexity_trend/_summary.png"
+        [ -f "$F" ] || F=$(ls -t .hotspots/complexity_trend/*.png 2>/dev/null | head -1)
+        [ -n "$F" ] && { xdg-open "$F" 2>/dev/null || open "$F" 2>/dev/null; } || true
 
   ci:
     desc: Run CI checks (format, lint, test, arch tests, build)

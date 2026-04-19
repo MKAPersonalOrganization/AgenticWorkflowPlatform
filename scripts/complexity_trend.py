@@ -159,6 +159,42 @@ def sample_history(path: str, revs: list[tuple[str, int]], max_samples: int) -> 
     return samples
 
 
+def classify_segment(prev: Sample, curr: Sample) -> str:
+    """Classify the slope between two consecutive samples.
+
+    Uses tighter thresholds than `classify()` because segment-level deltas
+    are noisier than full-period deltas.
+    """
+    dt_pct = (curr.total - prev.total) / prev.total * 100 if prev.total else 0
+    dl_pct = (curr.n - prev.n) / prev.n * 100 if prev.n else 0
+    dmean = curr.mean - prev.mean
+    if dt_pct < -8:
+        return "REFACTORED"
+    if dmean > 0.03 or (dt_pct - dl_pct > 5 and dt_pct > 3):
+        return "DETERIORATING"
+    if abs(dt_pct) < 2 and abs(dl_pct) < 2:
+        return "STABLE"
+    return "GROWING"
+
+
+def compute_bands(samples: list[Sample]) -> list[tuple[int, int, str]]:
+    """Return [(start_idx, end_idx_inclusive, verdict), ...] with adjacent
+    same-verdict segments merged into a single band."""
+    if len(samples) < 2:
+        return []
+    bands: list[tuple[int, int, str]] = []
+    cur_verdict = classify_segment(samples[0], samples[1])
+    cur_start = 0
+    for i in range(1, len(samples) - 1):
+        v = classify_segment(samples[i], samples[i + 1])
+        if v != cur_verdict:
+            bands.append((cur_start, i, cur_verdict))
+            cur_start = i
+            cur_verdict = v
+    bands.append((cur_start, len(samples) - 1, cur_verdict))
+    return bands
+
+
 def classify(samples: list[Sample]) -> tuple[str, dict]:
     if len(samples) < 2:
         return "INSUFFICIENT", {}
@@ -205,7 +241,11 @@ def _try_import_mpl():
 
 
 def _sanitize(path: str) -> str:
-    return path.replace("/", "__").replace("\\", "__")
+    # Normalize so "./foo/bar.go" → "foo/bar.go" (otherwise the sanitized
+    # filename would start with "." and become hidden on Unix).
+    import os
+    normalized = os.path.normpath(path)
+    return normalized.replace("/", "__").replace("\\", "__")
 
 
 def _apply_style(plt) -> None:
@@ -280,12 +320,22 @@ def plot_file(path: str, samples: list[Sample], verdict: str, metrics: dict, out
     maxes = [s.maxi for s in samples]
 
     v_color = VERDICT_COLORS.get(verdict, "#444")
+    bands = compute_bands(samples)
 
     fig, (ax1, ax2) = plt.subplots(
         2, 1, figsize=(12, 7), sharex=True,
         gridspec_kw={"height_ratios": [3, 2], "hspace": 0.28},
     )
-    fig.subplots_adjust(top=0.88, bottom=0.09, left=0.07, right=0.93)
+    fig.subplots_adjust(top=0.86, bottom=0.09, left=0.07, right=0.93)
+
+    # Paint per-segment verdict bands as background shading on both panels.
+    # The last band extends to the right edge so the final sample's local
+    # slope is visible.
+    for start_i, end_i, seg_verdict in bands:
+        seg_color = VERDICT_COLORS.get(seg_verdict, "#888")
+        for ax in (ax1, ax2):
+            ax.axvspan(dates[start_i], dates[end_i],
+                       color=seg_color, alpha=0.11, zorder=0, linewidth=0)
 
     # ── Top panel: total indent vs LOC ─────────────────────────────────
     ax1.plot(dates, totals, color=v_color, linewidth=2.4,
@@ -341,8 +391,25 @@ def plot_file(path: str, samples: list[Sample], verdict: str, metrics: dict, out
 
     _format_date_axis(ax2, mdates)
 
-    # ── Figure-level title + footer ───────────────────────────────────
-    fig.suptitle(path, fontsize=13, fontweight="bold", y=0.965, x=0.07, ha="left")
+    # ── Figure-level title + verdict color key + footer ──────────────
+    fig.suptitle(path, fontsize=13, fontweight="bold", y=0.975, x=0.07, ha="left")
+
+    # Verdict color key — shows what the background shading means. Placed
+    # just below the title on the right so it mirrors the overall-verdict
+    # pill on the left.
+    _mpl = _try_import_mpl()
+    _, _, Patch, _ = _mpl
+    key_handles = [
+        Patch(facecolor=VERDICT_COLORS[v], alpha=0.55, edgecolor="none", label=v.title())
+        for v in ("DETERIORATING", "GROWING", "STABLE", "REFACTORED")
+    ]
+    fig.legend(
+        handles=key_handles, loc="upper right",
+        bbox_to_anchor=(0.935, 0.975), ncol=4, fontsize=8,
+        title="segment verdict", title_fontsize=8,
+        frameon=True, edgecolor="#cccccc",
+    )
+
     footer = (f"{len(samples)} samples · "
               f"{dates[0].strftime('%b %d, %Y')} → {dates[-1].strftime('%b %d, %Y')} · "
               f"indent metric: 1 tab or 4 spaces = 1 unit")
@@ -387,6 +454,13 @@ def plot_summary(results: list[tuple[str, list[Sample], str, dict]], out_dir: Pa
         locs = [s.n for s in samples]
         t0 = totals[0] or 1
         l0 = locs[0] or 1
+
+        # Per-segment verdict bands behind the lines.
+        for start_i, end_i, seg_verdict in compute_bands(samples):
+            ax.axvspan(dates[start_i], dates[end_i],
+                       color=VERDICT_COLORS.get(seg_verdict, "#888"),
+                       alpha=0.11, zorder=0, linewidth=0)
+
         ax.plot(dates, [t / t0 for t in totals], color=color,
                 linewidth=2.4, label="total indent (normalized)")
         ax.plot(dates, [l / l0 for l in locs], color=LOC_COLOR,
