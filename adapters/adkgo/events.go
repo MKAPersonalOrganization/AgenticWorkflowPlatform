@@ -236,16 +236,11 @@ func findKey(m map[string]any, keys ...string) (any, bool) {
 // extractConfirmationInfo parses the originalFunctionCall name, ID,
 // toolConfirmation hint, and optional custom input payload from an
 // adk_request_confirmation FunctionCall's JSON-encoded arguments.
-func extractConfirmationInfo(argsJSON string) confirmationInfo {
-	var raw map[string]any
-	if err := json.Unmarshal([]byte(argsJSON), &raw); err != nil {
-		return confirmationInfo{}
-	}
-
-	info := confirmationInfo{}
-
-	// 1. Extract original tool call info
-	// Try nested "originalFunctionCall" first
+// extractOriginalToolCall populates info.originalID / originalName from
+// the confirmation payload. It prefers the nested "originalFunctionCall"
+// object (current shape), falling back to the flat top-level fields used
+// by older ADK-Go versions.
+func extractOriginalToolCall(raw map[string]any, info *confirmationInfo) {
 	if ofcVal, ok := findKey(raw, "originalFunctionCall"); ok {
 		if ofc, ok := ofcVal.(map[string]any); ok {
 			if id, ok := findKey(ofc, "id"); ok {
@@ -256,7 +251,6 @@ func extractConfirmationInfo(argsJSON string) confirmationInfo {
 			}
 		}
 	}
-	// Fallback to top-level if not found
 	if info.originalID == "" {
 		if id, ok := findKey(raw, "originalToolCallId", "originalId", "id"); ok {
 			info.originalID, _ = id.(string)
@@ -267,9 +261,12 @@ func extractConfirmationInfo(argsJSON string) confirmationInfo {
 			info.originalName, _ = name.(string)
 		}
 	}
+}
 
-	// 2. Extract tool confirmation info
-	// Try nested "toolConfirmation" first
+// extractToolConfirmation populates info.hint and returns the payload
+// map (if any). Prefers the nested "toolConfirmation" shape, with
+// top-level hint/payload as a fallback for older payloads.
+func extractToolConfirmation(raw map[string]any, info *confirmationInfo) map[string]any {
 	var payload map[string]any
 	if tcVal, ok := findKey(raw, "toolConfirmation"); ok {
 		if tc, ok := tcVal.(map[string]any); ok {
@@ -281,7 +278,6 @@ func extractConfirmationInfo(argsJSON string) confirmationInfo {
 			}
 		}
 	}
-	// Fallback to top-level if not found
 	if info.hint == "" {
 		if hint, ok := findKey(raw, "hint"); ok {
 			info.hint, _ = hint.(string)
@@ -292,24 +288,40 @@ func extractConfirmationInfo(argsJSON string) confirmationInfo {
 			payload, _ = pVal.(map[string]any)
 		}
 	}
+	return payload
+}
 
-	// 3. Check for custom input payload
-	if payload != nil {
-		typeVal, _ := findKey(payload, "type")
-		if payloadType, _ := typeVal.(string); strings.EqualFold(payloadType, "custom_input") {
-			// Custom input request!
-			if sVal, ok := findKey(payload, "schema"); ok {
-				if schema, ok := sVal.(map[string]any); ok {
-					info.inputSchema = schema
-				}
-			}
-			// Fallback to ensure UI renders text input
-			if info.inputSchema == nil {
-				info.inputSchema = map[string]any{"type": "string"}
-			}
+// applyCustomInputPayload sets info.inputSchema when the payload carries
+// a custom-input request. The fallback schema ensures the UI still
+// renders a text input if the payload omits an explicit schema.
+func applyCustomInputPayload(payload map[string]any, info *confirmationInfo) {
+	typeVal, _ := findKey(payload, "type")
+	payloadType, _ := typeVal.(string)
+	if !strings.EqualFold(payloadType, "custom_input") {
+		return
+	}
+	if sVal, ok := findKey(payload, "schema"); ok {
+		if schema, ok := sVal.(map[string]any); ok {
+			info.inputSchema = schema
 		}
 	}
+	if info.inputSchema == nil {
+		info.inputSchema = map[string]any{"type": "string"}
+	}
+}
 
+func extractConfirmationInfo(argsJSON string) confirmationInfo {
+	var raw map[string]any
+	if err := json.Unmarshal([]byte(argsJSON), &raw); err != nil {
+		return confirmationInfo{}
+	}
+
+	info := confirmationInfo{}
+	extractOriginalToolCall(raw, &info)
+	payload := extractToolConfirmation(raw, &info)
+	if payload != nil {
+		applyCustomInputPayload(payload, &info)
+	}
 	return info
 }
 
