@@ -514,36 +514,26 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 		}
 
 		// 15. Run the agent and translate events.
-		evtCtx := EventContext{
-			ThreadID:  req.SessionID,
-			RunID:     messageIDFromRequest(req),
-			AgentName: agentName,
-			Provider:  modelCfg.Provider,
-			Model:     modelCfg.Model,
+		//
+		// Per-event translation + streaming-lifecycle bookkeeping lives in
+		// runner_loop.go. State that accumulates across iterations (current
+		// author, streaming/assistant message IDs, node start time, loop
+		// iteration counters) is held in runLoopState so the outer iterator
+		// stays flat.
+		loopState := &runLoopState{
+			evtCtx: EventContext{
+				ThreadID:  req.SessionID,
+				RunID:     messageIDFromRequest(req),
+				AgentName: agentName,
+				Provider:  modelCfg.Provider,
+				Model:     modelCfg.Model,
+			},
+			agentPositions: agentPositions,
+			currentAuthor:  agentName,
+			assistantMsgID: generateID(),
+			loopIterations: map[string]int{},
+			nodeStartedAt:  time.Now(),
 		}
-
-		// Track streaming lifecycle so we emit TEXT_MESSAGE_START / END.
-		// adk-go assigns a fresh UUID to every streaming delta event, but the
-		// frontend needs a single stable message ID across all deltas.
-		var streamingMsgID string
-		assistantMsgID := generateID()
-
-		// Track the current active agent so we can detect transitions.
-		// ADK-Go sets session.Event.Author to the name of the agent that
-		// produced the event. In workflow execution, this changes as control
-		// passes between sub-agents (e.g., from "researcher" to "fact-checker"
-		// in a sequential pipeline). We emit AgentTransferStarted when the
-		// author changes and update evtCtx.AgentName so all subsequent domain
-		// events carry the correct agent attribution.
-		currentAuthor := agentName
-
-		// Track loop iterations so we can report which iteration the UI
-		// should display. Key = parent loop agent name, value = current iteration.
-		loopIterations := map[string]int{}
-
-		// Track when the current workflow node started so we can report duration
-		// in WorkflowNodeCompleted events. Reset on every agent transition.
-		nodeStartedAt := time.Now()
 
 		// Build run options. WithStateDelta (ADK-Go v1.0.0) injects per-invocation
 		// state at run start using the "temp:" prefix so it is never persisted or
@@ -562,33 +552,12 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 		// text placeholders the model reads as "Uploaded file: …".
 		saveInputBlobs := artifactsEnabled && artAutoSaveBlobs
 		for adkEvt, adkErr := range adkRunner.Run(ctx, req.UserID, req.SessionID, userMsg, agent.RunConfig{
-			StreamingMode:              agent.StreamingModeSSE,
-			SaveInputBlobsAsArtifacts:  saveInputBlobs,
+			StreamingMode:             agent.StreamingModeSSE,
+			SaveInputBlobsAsArtifacts: saveInputBlobs,
 		}, runOpts...) {
 			if adkErr != nil {
-				// Emit node failure for the currently-active workflow sub-agent.
-				if _, isWorkflowNode := agentPositions[currentAuthor]; isWorkflowNode {
-					if !yield(&thread.WorkflowNodeCompleted{
-						ThreadID:   evtCtx.ThreadID,
-						AgentName:  currentAuthor,
-						DurationMs: time.Since(nodeStartedAt).Milliseconds(),
-						Outcome:    "error",
-						Timestamp:  time.Now(),
-					}, nil) {
-						return
-					}
-					nodeStartedAt = time.Now()
-				}
-				// Close the streaming message before surfacing the error.
-				if streamingMsgID != "" {
-					if !yield(&thread.AssistantMessageCompleted{
-						ThreadID:  evtCtx.ThreadID,
-						MessageID: streamingMsgID,
-						Timestamp: time.Now(),
-					}, nil) {
-						return
-					}
-					streamingMsgID = ""
+				if !yieldAll(yield, loopState.onAdkError()) {
+					return
 				}
 				if !yield(nil, adkErr) {
 					return
@@ -596,189 +565,32 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 				continue
 			}
 
-			// ── Agent transition detection ──
-			// ADK-Go sets Author to the name of the sub-agent that produced
-			// the event. When it differs from the last known author, we know
-			// control has transferred to a different agent in the workflow.
-			// We skip "user" authors (those are user-originated function
-			// responses, not agent transitions).
-			if adkEvt.Author != "" && adkEvt.Author != "user" && adkEvt.Author != currentAuthor {
-				// Close any in-progress streaming message before the transfer
-				// so the UI properly ends the previous agent's message.
-				if streamingMsgID != "" {
-					if !yield(&thread.AssistantMessageCompleted{
-						ThreadID:  evtCtx.ThreadID,
-						MessageID: streamingMsgID,
-						Timestamp: time.Now(),
-					}, nil) {
-						return
-					}
-					streamingMsgID = ""
-				}
-
-				// Always generate a fresh message ID for the new agent so
-				// each agent's response is a separate message bubble in
-				// the UI — even if the previous agent's stream already
-				// completed naturally before the transfer event arrived.
-				assistantMsgID = generateID()
-
-				fromAgent := currentAuthor
-				currentAuthor = adkEvt.Author
-				evtCtx.AgentName = currentAuthor
-
-				// Build the transfer event, enriched with workflow position
-				// context when available.
-				transferEvt := &thread.AgentTransferStarted{
-					ThreadID:  evtCtx.ThreadID,
-					FromAgent: fromAgent,
-					ToAgent:   currentAuthor,
-					Timestamp: time.Now(),
-				}
-				if pos, ok := agentPositions[currentAuthor]; ok {
-					transferEvt.WorkflowType = pos.WorkflowType
-					transferEvt.ParentAgent = pos.ParentName
-					transferEvt.StepIndex = pos.StepIndex
-					transferEvt.StepCount = pos.StepCount
-					transferEvt.MaxIterations = pos.MaxIterations
-
-					// Track loop iterations: when we see stepIndex==0 again
-					// within the same loop parent, a new iteration started.
-					if pos.WorkflowType == "loop" {
-						if _, seen := loopIterations[pos.ParentName]; !seen {
-							loopIterations[pos.ParentName] = 1
-						} else if pos.StepIndex == 0 {
-							loopIterations[pos.ParentName]++
-						}
-						transferEvt.Iteration = loopIterations[pos.ParentName]
-					}
-				}
-
-				// Emit WorkflowNodeCompleted for the agent that just handed off.
-				// Only for tracked sub-agents (agentPositions excludes the root orchestrator).
-				if _, isWorkflowNode := agentPositions[fromAgent]; isWorkflowNode {
-					if !yield(&thread.WorkflowNodeCompleted{
-						ThreadID:   evtCtx.ThreadID,
-						AgentName:  fromAgent,
-						DurationMs: time.Since(nodeStartedAt).Milliseconds(),
-						Outcome:    "success",
-						Timestamp:  time.Now(),
-					}, nil) {
-						return
-					}
-				}
-				nodeStartedAt = time.Now()
-
-				if !yield(transferEvt, nil) {
+			if isAgentTransition(adkEvt, loopState.currentAuthor) {
+				if !yieldAll(yield, loopState.onTransition(adkEvt.Author)) {
 					return
 				}
 			}
 
-			domainEvents := TranslateEvent(adkEvt, evtCtx)
-			for _, de := range domainEvents {
-				switch evt := de.(type) {
+			for _, de := range TranslateEvent(adkEvt, loopState.evtCtx) {
+				var events []thread.Event
+				switch e := de.(type) {
 				case *thread.AssistantContentStreamed:
-					// Replace the per-event UUID with a stable message ID.
-					evt.MessageID = assistantMsgID
-
-					// Emit AssistantMessageStarted before the first delta.
-					if streamingMsgID == "" {
-						streamingMsgID = assistantMsgID
-						if !yield(&thread.AssistantMessageStarted{
-							ThreadID:  evt.ThreadID,
-							MessageID: streamingMsgID,
-							Timestamp: evt.Timestamp,
-						}, nil) {
-							return
-						}
-					}
-					if !yield(de, nil) {
-						return
-					}
-
+					events = loopState.onAssistantContentStreamed(e)
 				case *thread.AssistantMessageAdded:
-					// Ensure a stable message ID — A2A-sourced events may arrive
-					// with an empty session.Event.ID, which would fail persistence.
-					if evt.MessageID == "" {
-						evt.MessageID = assistantMsgID
-					}
-					// When streaming, emit AssistantMessageCompleted first so the
-					// frontend receives TEXT_MESSAGE_END. AssistantMessageAdded is
-					// always yielded regardless — it is the durable persistence event
-					// and must reach ProcessEvents to be written to the event store.
-					if streamingMsgID != "" {
-						if !yield(&thread.AssistantMessageCompleted{
-							ThreadID:  evt.ThreadID,
-							MessageID: streamingMsgID,
-							Content:   evt.Content,
-							AgentName: evt.AgentName,
-							ToolCalls: evt.ToolCalls,
-							Timestamp: evt.Timestamp,
-						}, nil) {
-							return
-						}
-						streamingMsgID = ""
-					} else if evt.Content != "" {
-						// Non-streaming response (e.g. A2A remote agent): no
-						// AssistantContentStreamed deltas were emitted, so the
-						// frontend has nothing to show. Synthesize the full
-						// TEXT_MESSAGE lifecycle as transient events.
-						if !yield(&thread.AssistantMessageStarted{
-							ThreadID:  evt.ThreadID,
-							MessageID: evt.MessageID,
-							Timestamp: evt.Timestamp,
-						}, nil) {
-							return
-						}
-						if !yield(&thread.AssistantContentStreamed{
-							ThreadID:  evt.ThreadID,
-							MessageID: evt.MessageID,
-							Delta:     evt.Content,
-							Timestamp: evt.Timestamp,
-						}, nil) {
-							return
-						}
-						if !yield(&thread.AssistantMessageCompleted{
-							ThreadID:  evt.ThreadID,
-							MessageID: evt.MessageID,
-							Content:   evt.Content,
-							AgentName: evt.AgentName,
-							Timestamp: evt.Timestamp,
-						}, nil) {
-							return
-						}
-					}
-					if !yield(de, nil) {
-						return
-					}
-
+					events = loopState.onAssistantMessageAdded(e)
 				default:
-					if !yield(de, nil) {
-						return
-					}
+					events = []thread.Event{de}
+				}
+				if !yieldAll(yield, events) {
+					return
 				}
 			}
 		}
 
-		// Emit WorkflowNodeCompleted for the last agent if it's a workflow sub-agent.
-		if _, isWorkflowNode := agentPositions[currentAuthor]; isWorkflowNode {
-			yield(&thread.WorkflowNodeCompleted{
-				ThreadID:   evtCtx.ThreadID,
-				AgentName:  currentAuthor,
-				DurationMs: time.Since(nodeStartedAt).Milliseconds(),
-				Outcome:    "success",
-				Timestamp:  time.Now(),
-			}, nil)
-		}
-
-		// If the loop ended while still streaming (no final non-partial event),
-		// close the message so the frontend gets TEXT_MESSAGE_END.
-		if streamingMsgID != "" {
-			yield(&thread.AssistantMessageCompleted{
-				ThreadID:  evtCtx.ThreadID,
-				MessageID: streamingMsgID,
-				Timestamp: time.Now(),
-			}, nil)
-		}
+		// Terminal cleanup: close out the final tracked node and any dangling
+		// streaming message. yieldAll's cancel check is a no-op here — nothing
+		// runs after this — but we keep it for consistency.
+		_ = yieldAll(yield, loopState.onLoopEnd())
 
 		// 16. Persist session to memory for future cross-session recall.
 		// The session now contains all events from this run. Adding it to the
