@@ -1,0 +1,61 @@
+package agenteditor
+
+import (
+	"aicompass/frontend/components/icon"
+	"aicompass/frontend/components/textarea"
+	"aicompass/frontend/ui/i18n"
+)
+
+// formGlobalInstructionSection renders the root-only Global Instruction
+// card. Only the root agent's GlobalInstruction takes effect at runtime,
+// so the card hides itself when editing a sub-agent (parentId non-empty)
+// to prevent users from wasting time on a value that would be silently
+// ignored. Reference: .READ/adk-go/agent/llmagent/llmagent.go:232 and
+// .READ/adk-go/internal/llminternal/instruction_processor.go (the
+// processor walks to the root via parents.RootAgent and uses its value,
+// not the current agent's).
+templ formGlobalInstructionSection() {
+	<div x-show="isRootNode()" x-cloak class="rounded-xl border border-border bg-card overflow-hidden">
+		<button
+			type="button"
+			@click="showGlobalInstruction = !showGlobalInstruction"
+			class="flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent/30 transition-colors"
+			:class="showGlobalInstruction ? 'bg-gradient-to-r from-emerald-500/5 to-transparent border-b border-border/50' : ''"
+		>
+			<span class="flex items-center gap-2">
+				<div class="size-6 rounded-md bg-emerald-500/10 flex items-center justify-center">
+					@icon.Globe(icon.Props{Class: "size-3.5 text-emerald-600 dark:text-emerald-400"})
+				</div>
+				{ i18n.T(ctx, "Global Instruction") }
+				<span class="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
+					{ i18n.T(ctx, "Root only") }
+				</span>
+				<span x-show="form.globalInstruction && form.globalInstruction.trim().length > 0" class="text-[10px] text-muted-foreground">
+					{ i18n.T(ctx, "set") }
+				</span>
+			</span>
+			<span class="transition-transform duration-200" :class="showGlobalInstruction ? 'rotate-180' : ''">
+				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+			</span>
+		</button>
+		<div x-show="showGlobalInstruction" x-collapse>
+			<div class="p-4 space-y-3 border-t border-border/50">
+				<p class="text-xs text-muted-foreground leading-relaxed">
+					@icon.Info(icon.Props{Class: "size-3.5 inline me-1 text-emerald-500"})
+					{ i18n.T(ctx, "A shared directive applied to every agent in this workflow — coordinator and sub-agents alike. Use it for cross-cutting rules like tone, compliance, or output format that should hold no matter which agent is talking.") }
+				</p>
+				@textarea.Textarea(textarea.Props{
+					Placeholder: i18n.T(ctx, "e.g. Always respond in British English. Never cite sources you cannot link. Decline requests outside the customer's enrolled products."),
+					Class:       "min-h-[100px] resize-y text-sm leading-relaxed",
+					Rows:        4,
+					Attributes: templ.Attributes{
+						"x-model": "form.globalInstruction",
+					},
+				})
+				<p class="text-[10px] text-muted-foreground leading-relaxed">
+					{ i18n.T(ctx, "Only the root agent's global instruction takes effect — that's the agent you're editing when this section is visible. Leave empty if you don't need a workflow-wide rule.") }
+				</p>
+			</div>
+		</div>
+	</div>
+}
