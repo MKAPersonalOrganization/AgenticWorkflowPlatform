@@ -303,52 +303,27 @@ func (s *Service) ExecuteRun(
 ) iter.Seq2[thread.Event, error] {
 	return func(yield func(thread.Event, error) bool) {
 		// 1. Emit RunStarted
-		runStartedEvent := &thread.RunStarted{
+		if !s.emitLifecycleEvent(ctx, yield, "RunStarted", &thread.RunStarted{
 			ThreadID:    req.ThreadID,
 			RunID:       req.MessageID,
 			ParentRunID: req.ParentRunID,
 			Input:       req.Message,
 			Timestamp:   time.Now(),
-		}
-
-		runStartedIter := func(y func(thread.Event, error) bool) {
-			y(runStartedEvent, nil)
-		}
-		processedStart := s.ProcessEvents(ctx, runStartedIter)
-		for evt, err := range processedStart {
-			if err != nil {
-				yield(nil, fmt.Errorf("failed to emit RunStarted: %w", err))
-				return
-			}
-			if !yield(evt, nil) {
-				return
-			}
+		}) {
+			return
 		}
 
 		// 2. If this message is an answer to a tool elicitation, emit InputProvided
 		if req.ToolCallID != "" {
-			inputProvidedEvent := &thread.InputProvided{
+			if !s.emitLifecycleEvent(ctx, yield, "InputProvided", &thread.InputProvided{
 				ThreadID:   req.ThreadID,
 				MessageID:  req.MessageID,
 				ToolCallID: req.ToolCallID,
 				Input:      req.Message,
 				AgentName:  req.AgentName,
 				Timestamp:  time.Now(),
-
-			}
-
-			inputIter := func(y func(thread.Event, error) bool) {
-				y(inputProvidedEvent, nil)
-			}
-			processedInput := s.ProcessEvents(ctx, inputIter)
-			for evt, err := range processedInput {
-				if err != nil {
-					yield(nil, fmt.Errorf("failed to emit InputProvided: %w", err))
-					return
-				}
-				if !yield(evt, nil) {
-					return
-				}
+			}) {
+				return
 			}
 		}
 
@@ -361,9 +336,6 @@ func (s *Service) ExecuteRun(
 			return
 		}
 
-		// Save attachments to artifacts and build refs for event persistence
-		attachmentRefs := s.saveAttachments(ctx, req)
-
 		runnerReq := &agent.RunRequest{
 			SessionID: req.ThreadID,
 			UserID:    req.UserID,
@@ -373,99 +345,84 @@ func (s *Service) ExecuteRun(
 				Content: s.buildMessageContent(ctx, req),
 			},
 			Context: map[string]any{
-				"attachmentRefs": attachmentRefs,
+				"attachmentRefs": s.saveAttachments(ctx, req),
 				"toolCallId":     req.ToolCallID,
 				"userInput":      req.UserInput,
 			},
 		}
-		rawDomainEvents := runner.Run(ctx, runnerReq)
 
-		// 4. Process events for persistence and broadcasting
-		processedEvents := s.ProcessEvents(ctx, rawDomainEvents)
+		// 4. Yield orchestrated events to caller and detect terminal state.
+		executionError, awaitingInteraction := s.streamRunnerEvents(ctx, yield, runner.Run(ctx, runnerReq))
 
-		// 5. Yield orchestrated events to caller and check for errors
-		var executionError error
-		awaitingInteraction := false
-		for de, err := range processedEvents {
-			// Check if context was cancelled (client disconnected)
-			if ctx.Err() != nil {
-				s.log.Info(ctx, "Orchestrator: Context cancelled, stopping execution")
-				return
-			}
-			if err != nil {
-				executionError = err
-				break
-			}
-			// Detect if the run paused for user interaction (input or auth).
-			// When this happens we must NOT emit RunFinished — the run is
-			// suspended, not done.
-			switch de.(type) {
-			case *thread.ToolNeedsInput, *thread.ToolNeedsConfirmation, *thread.ToolNeedsAuth:
-				awaitingInteraction = true
-			}
-			if !yield(de, nil) {
-				return
-			}
-		}
-
-		// 6. Emit RunError if execution failed, otherwise emit RunFinished
-		if executionError != nil {
-			runErrorEvent := &thread.RunError{
+		// 5. Emit RunError or RunFinished (or neither, when suspended).
+		switch {
+		case executionError != nil:
+			s.emitLifecycleEvent(ctx, yield, "RunError", &thread.RunError{
 				ThreadID:  req.ThreadID,
 				RunID:     req.MessageID,
 				Message:   executionError.Error(),
 				Code:      "RUN_ERROR",
 				Timestamp: time.Now(),
-			}
-
-			runErrorIter := func(y func(thread.Event, error) bool) {
-				y(runErrorEvent, nil)
-			}
-			processedError := s.ProcessEvents(ctx, runErrorIter)
-			for evt, err := range processedError {
-				if err != nil {
-					yield(nil, fmt.Errorf("failed to emit RunError: %w", err))
-					return
-				}
-				if !yield(evt, nil) {
-					return
-				}
-			}
-
-			// Yield the original execution error
+			})
 			yield(nil, executionError)
-			return
-		}
-
-		// 7. If the run is paused awaiting user interaction, do NOT emit
-		// RunFinished. The SSE stream will end without a terminal lifecycle
-		// event, signalling to the frontend that the run is suspended.
-		if awaitingInteraction {
-			return
-		}
-
-		// 8. Emit RunFinished on success
-		runFinishedEvent := &thread.RunFinished{
-			ThreadID:  req.ThreadID,
-			RunID:     req.MessageID,
-			Result:    nil, // TODO: Capture result from framework events if available
-			Timestamp: time.Now(),
-		}
-
-		runFinishedIter := func(y func(thread.Event, error) bool) {
-			y(runFinishedEvent, nil)
-		}
-		processedFinish := s.ProcessEvents(ctx, runFinishedIter)
-		for evt, err := range processedFinish {
-			if err != nil {
-				yield(nil, fmt.Errorf("failed to emit RunFinished: %w", err))
-				return
-			}
-			if !yield(evt, nil) {
-				return
-			}
+		case awaitingInteraction:
+			// Run is suspended awaiting user interaction. The SSE stream ends
+			// without a terminal lifecycle event, signalling the frontend.
+		default:
+			s.emitLifecycleEvent(ctx, yield, "RunFinished", &thread.RunFinished{
+				ThreadID:  req.ThreadID,
+				RunID:     req.MessageID,
+				Result:    nil, // TODO: Capture result from framework events if available
+				Timestamp: time.Now(),
+			})
 		}
 	}
+}
+
+// emitLifecycleEvent pushes a single lifecycle event through ProcessEvents
+// and yields each processed result to the caller. Returns false when the
+// caller stopped consuming (so the outer iterator should return too).
+func (s *Service) emitLifecycleEvent(ctx context.Context, yield func(thread.Event, error) bool, name string, evt thread.Event) bool {
+	singleton := func(y func(thread.Event, error) bool) {
+		y(evt, nil)
+	}
+	for processed, err := range s.ProcessEvents(ctx, singleton) {
+		if err != nil {
+			yield(nil, fmt.Errorf("failed to emit %s: %w", name, err))
+			return false
+		}
+		if !yield(processed, nil) {
+			return false
+		}
+	}
+	return true
+}
+
+// streamRunnerEvents pipes raw runner events through ProcessEvents, yields
+// each to the caller, and returns (executionError, awaitingInteraction). The
+// run is "awaiting interaction" when any tool-HITL event is observed — in
+// that case the caller must NOT emit RunFinished.
+func (s *Service) streamRunnerEvents(ctx context.Context, yield func(thread.Event, error) bool, raw iter.Seq2[thread.Event, error]) (error, bool) {
+	var executionError error
+	awaitingInteraction := false
+	for de, err := range s.ProcessEvents(ctx, raw) {
+		if ctx.Err() != nil {
+			s.log.Info(ctx, "Orchestrator: Context cancelled, stopping execution")
+			return nil, awaitingInteraction
+		}
+		if err != nil {
+			executionError = err
+			break
+		}
+		switch de.(type) {
+		case *thread.ToolNeedsInput, *thread.ToolNeedsConfirmation, *thread.ToolNeedsAuth:
+			awaitingInteraction = true
+		}
+		if !yield(de, nil) {
+			return nil, awaitingInteraction
+		}
+	}
+	return executionError, awaitingInteraction
 }
 
 // saveAttachments saves attached files to the artifact store and returns
@@ -513,55 +470,8 @@ func (s *Service) buildMessageContent(ctx context.Context, req RunExecutionReque
 	}
 
 	for _, att := range attachments {
-		// Load the artifact from S3 and convert to a data URL for the LLM.
-		if att.URL == "" || s.artifactStore == nil {
-			continue
-		}
-
-		// Extract the actual S3 filename from the artifact URL.
-		// URL format: /v1/threads/{threadId}/artifacts/{uuid_originalName}
-		// att.FileName has the original name (e.g. "Logo.jpg") but S3
-		// stores the UUID-prefixed version (e.g. "65f313b5_Logo.jpg").
-		s3FileName := att.FileName
-		if parts := strings.Split(att.URL, "/"); len(parts) > 0 {
-			s3FileName = parts[len(parts)-1]
-		}
-		dataURL, err := s.loadArtifactAsDataURL(ctx, req.UserID, req.ThreadID, s3FileName, att.MimeType)
-		if err != nil {
-			s.log.Warn(ctx, "Failed to load pre-uploaded attachment for LLM, skipping",
-				"error", err, "fileName", s3FileName, "url", att.URL)
-			continue
-		}
-		if dataURL == "" {
-			continue
-		}
-
-		switch {
-		case strings.HasPrefix(att.MimeType, "image/"):
-			content = append(content, agent.Content{
-				Type: agent.ContentTypeImageURL,
-				ImageURL: &agent.ImageURL{
-					URL:    dataURL,
-					Detail: "auto",
-				},
-			})
-		case strings.HasPrefix(att.MimeType, "audio/"):
-			content = append(content, agent.Content{
-				Type: agent.ContentTypeInputAudio,
-				AudioInput: &agent.AudioInput{
-					Data:   stripDataURLPrefix(dataURL),
-					Format: audioFormat(att.MimeType),
-				},
-			})
-		default:
-			content = append(content, agent.Content{
-				Type: agent.ContentTypeFile,
-				FileInput: &agent.FileInput{
-					Data:     stripDataURLPrefix(dataURL),
-					FileName: att.FileName,
-					MimeType: att.MimeType,
-				},
-			})
+		if c, ok := s.attachmentToContent(ctx, req.UserID, req.ThreadID, att); ok {
+			content = append(content, c)
 		}
 	}
 
@@ -574,6 +484,60 @@ func (s *Service) buildMessageContent(ctx context.Context, req RunExecutionReque
 	}
 
 	return content
+}
+
+// attachmentToContent loads a single attachment from the artifact store and
+// converts it to an agent.Content part typed by MIME (image / audio / file).
+// Returns (_, false) when the store is absent, the URL is missing, the load
+// fails, or the data URL is empty — callers should skip the attachment.
+func (s *Service) attachmentToContent(ctx context.Context, userID, threadID string, att FileAttachment) (agent.Content, bool) {
+	if att.URL == "" || s.artifactStore == nil {
+		return agent.Content{}, false
+	}
+
+	// Extract the actual S3 filename from the artifact URL.
+	// URL format: /v1/threads/{threadId}/artifacts/{uuid_originalName}
+	// att.FileName has the original name (e.g. "Logo.jpg") but S3
+	// stores the UUID-prefixed version (e.g. "65f313b5_Logo.jpg").
+	s3FileName := att.FileName
+	if parts := strings.Split(att.URL, "/"); len(parts) > 0 {
+		s3FileName = parts[len(parts)-1]
+	}
+
+	dataURL, err := s.loadArtifactAsDataURL(ctx, userID, threadID, s3FileName, att.MimeType)
+	if err != nil {
+		s.log.Warn(ctx, "Failed to load pre-uploaded attachment for LLM, skipping",
+			"error", err, "fileName", s3FileName, "url", att.URL)
+		return agent.Content{}, false
+	}
+	if dataURL == "" {
+		return agent.Content{}, false
+	}
+
+	switch {
+	case strings.HasPrefix(att.MimeType, "image/"):
+		return agent.Content{
+			Type:     agent.ContentTypeImageURL,
+			ImageURL: &agent.ImageURL{URL: dataURL, Detail: "auto"},
+		}, true
+	case strings.HasPrefix(att.MimeType, "audio/"):
+		return agent.Content{
+			Type: agent.ContentTypeInputAudio,
+			AudioInput: &agent.AudioInput{
+				Data:   stripDataURLPrefix(dataURL),
+				Format: audioFormat(att.MimeType),
+			},
+		}, true
+	default:
+		return agent.Content{
+			Type: agent.ContentTypeFile,
+			FileInput: &agent.FileInput{
+				Data:     stripDataURLPrefix(dataURL),
+				FileName: att.FileName,
+				MimeType: att.MimeType,
+			},
+		}, true
+	}
 }
 
 // maxArtifactLoadSize caps how many bytes loadArtifactAsDataURL will read
