@@ -115,46 +115,64 @@ func (s *service) getModelConfigForUser(ctx context.Context, userID string) (*ag
 		APIKey:   settings.APIKey,
 	}
 
-	// Check for an LLM capability config — it may override the provider and specify model/temperature/max_tokens
 	capConfig, capErr := s.capRepo.GetByCapability(ctx, userID, CapabilityLLM)
-	if capErr == nil && capConfig != nil {
-		cfg.Model = capConfig.Model
-
-		// If the LLM capability points to a different provider, resolve its API key
-		if capConfig.Provider != settings.Provider {
-			allSettings, err := s.repo.GetByUserID(ctx, userID)
-			if err == nil {
-				for _, ps := range allSettings {
-					if ps.Provider == capConfig.Provider && ps.APIKey != "" {
-						cfg.Provider = string(capConfig.Provider)
-						cfg.APIKey = ps.APIKey
-						break
-					}
-				}
-			}
-		}
-
-		llmSettings := capConfig.GetLLMSettings()
-		if llmSettings.Temperature > 0 {
-			t := llmSettings.Temperature
-			cfg.Temperature = &t
-		}
-		if llmSettings.MaxIterations > 0 {
-			cfg.MaxIterations = llmSettings.MaxIterations
-		}
-		if llmSettings.MaxTokens > 0 {
-			maxTokens := llmSettings.MaxTokens
-			cfg.MaxTokens = &maxTokens
-		}
-	} else {
-		// No LLM capability configured — fall back to provider's first model
-		models := ProviderModels(settings.Provider)
-		if len(models) > 0 {
+	if capErr != nil || capConfig == nil {
+		if models := ProviderModels(settings.Provider); len(models) > 0 {
 			cfg.Model = models[0]
 		}
+		return cfg, nil
 	}
 
+	cfg.Model = capConfig.Model
+	if capConfig.Provider != settings.Provider {
+		s.remapToCapabilityProvider(ctx, userID, cfg, capConfig.Provider)
+	}
+	applyLLMSettings(cfg, capConfig.GetLLMSettings())
+
 	return cfg, nil
+}
+
+// remapToCapabilityProvider rewrites cfg.Provider / cfg.APIKey when the LLM
+// capability config targets a different provider than the user's default.
+// Any lookup failure leaves cfg pointing at the default provider — this is
+// a best-effort override, not a hard requirement.
+func (s *service) remapToCapabilityProvider(ctx context.Context, userID string, cfg *agent.ModelConfig, provider AIProvider) {
+	all, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return
+	}
+	if apiKey, ok := findAPIKeyForProvider(all, provider); ok {
+		cfg.Provider = string(provider)
+		cfg.APIKey = apiKey
+	}
+}
+
+// applyLLMSettings copies non-zero sampling/iteration/limit fields from the
+// capability config onto the ModelConfig. Zero-valued fields are left alone
+// so the provider's own defaults win downstream.
+func applyLLMSettings(cfg *agent.ModelConfig, llm LLMCapabilitySettings) {
+	if llm.Temperature > 0 {
+		t := llm.Temperature
+		cfg.Temperature = &t
+	}
+	if llm.MaxIterations > 0 {
+		cfg.MaxIterations = llm.MaxIterations
+	}
+	if llm.MaxTokens > 0 {
+		mt := llm.MaxTokens
+		cfg.MaxTokens = &mt
+	}
+}
+
+// findAPIKeyForProvider scans the user's provider settings for a matching
+// provider with a non-empty API key.
+func findAPIKeyForProvider(settings []AISettings, provider AIProvider) (string, bool) {
+	for _, st := range settings {
+		if st.Provider == provider && st.APIKey != "" {
+			return st.APIKey, true
+		}
+	}
+	return "", false
 }
 
 // getAPIKeyForProvider returns the stored API key for a specific provider.
@@ -201,73 +219,65 @@ type EmbeddingConfig struct {
 
 // getEmbeddingConfigForUser resolves the user's embedding config from the capability table.
 func (s *service) getEmbeddingConfigForUser(ctx context.Context, userID string) (*EmbeddingConfig, error) {
-	// Check capability config first
 	capConfig, err := s.capRepo.GetByCapability(ctx, userID, CapabilityEmbedding)
 	if err != nil {
 		return nil, fmt.Errorf("getting embedding capability config: %w", err)
 	}
 
-	if capConfig != nil {
-		// Resolve API key from the matching provider
-		settings, err := s.repo.GetByUserID(ctx, userID)
-		if err != nil {
-			return nil, fmt.Errorf("getting provider settings: %w", err)
-		}
-
-		var apiKey string
-		for _, setting := range settings {
-			if setting.Provider == capConfig.Provider && setting.APIKey != "" {
-				apiKey = setting.APIKey
-				break
-			}
-		}
-		if apiKey == "" {
-			return nil, fmt.Errorf("no API key for embedding provider %s", capConfig.Provider)
-		}
-
-		embSettings := capConfig.GetEmbeddingSettings()
-		return &EmbeddingConfig{
-			Provider:  string(capConfig.Provider),
-			Model:     capConfig.Model,
-			Dimension: embSettings.Dimensions,
-			APIKey:    apiKey,
-		}, nil
-	}
-
-	// Fallback: use the default provider's first available embedding model
 	settings, err := s.repo.GetByUserID(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("getting user ai settings: %w", err)
 	}
 
-	// First: default provider with embedding models
+	if capConfig != nil {
+		return embeddingConfigFromCapability(capConfig, settings)
+	}
+	return embeddingConfigFromProviderDefaults(settings), nil
+}
+
+// embeddingConfigFromCapability builds the EmbeddingConfig when the user has
+// a CapabilityEmbedding row set — the provider/model come from the capability,
+// and the API key is resolved by scanning the provider settings list.
+func embeddingConfigFromCapability(capConfig *AICapabilityConfig, settings []AISettings) (*EmbeddingConfig, error) {
+	apiKey, ok := findAPIKeyForProvider(settings, capConfig.Provider)
+	if !ok {
+		return nil, fmt.Errorf("no API key for embedding provider %s", capConfig.Provider)
+	}
+	emb := capConfig.GetEmbeddingSettings()
+	return &EmbeddingConfig{
+		Provider:  string(capConfig.Provider),
+		Model:     capConfig.Model,
+		Dimension: emb.Dimensions,
+		APIKey:    apiKey,
+	}, nil
+}
+
+// embeddingConfigFromProviderDefaults falls back to the first provider with
+// embedding models: default provider first, then any provider. Returns nil
+// when no provider exposes embedding models.
+func embeddingConfigFromProviderDefaults(settings []AISettings) *EmbeddingConfig {
+	if cfg := firstEmbeddingProviderMatching(settings, func(st AISettings) bool { return st.IsDefault }); cfg != nil {
+		return cfg
+	}
+	return firstEmbeddingProviderMatching(settings, func(AISettings) bool { return true })
+}
+
+func firstEmbeddingProviderMatching(settings []AISettings, match func(AISettings) bool) *EmbeddingConfig {
 	for _, st := range settings {
-		if !st.IsDefault {
+		if !match(st) {
 			continue
 		}
 		models := ProviderEmbeddingModels(st.Provider)
-		if len(models) > 0 {
-			return &EmbeddingConfig{
-				Provider: string(st.Provider),
-				Model:    models[0],
-				APIKey:   st.APIKey,
-			}, nil
+		if len(models) == 0 {
+			continue
+		}
+		return &EmbeddingConfig{
+			Provider: string(st.Provider),
+			Model:    models[0],
+			APIKey:   st.APIKey,
 		}
 	}
-
-	// Second: any provider with embedding models
-	for _, st := range settings {
-		models := ProviderEmbeddingModels(st.Provider)
-		if len(models) > 0 {
-			return &EmbeddingConfig{
-				Provider: string(st.Provider),
-				Model:    models[0],
-				APIKey:   st.APIKey,
-			}, nil
-		}
-	}
-
-	return nil, nil // No embedding config available
+	return nil
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
