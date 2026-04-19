@@ -1,17 +1,18 @@
 package agui
 
 import (
-	"aicompass/frontend/ui/i18n"
-	"aicompass/foundation/agent"
-	"aicompass/foundation/event"
-	"aicompass/foundation/logger"
-	"aicompass/modules/chat/thread"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
+
+	"aicompass/foundation/agent"
+	"aicompass/foundation/event"
+	"aicompass/foundation/logger"
+	"aicompass/frontend/ui/i18n"
+	"aicompass/modules/chat/thread"
 
 	aguievents "github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/events"
 	"github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/types"

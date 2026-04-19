@@ -1,11 +1,12 @@
 package agentdefinition
 
 import (
-	"aicompass/foundation/logger"
-	"aicompass/foundation/auth"
 	"encoding/json"
 	"net/http"
 	"strings"
+
+	"aicompass/foundation/auth"
+	"aicompass/foundation/logger"
 )
 
 // storeHandler encapsulates HTTP handlers for agent CRUD and sharing operations.
@@ -98,12 +99,12 @@ func (req *agentRequest) toAgentDefinition(userID, id, icon string) *AgentDefini
 }
 
 type agentResponse struct {
-	ID                       string                   `json:"id"`
-	Name                     string                   `json:"name"`
-	Description              string                   `json:"description"`
-	SystemPrompt             string                   `json:"systemPrompt"`
-	Icon                     string                   `json:"icon"`
-	SourceCatalogID          string                   `json:"sourceCatalogId,omitempty"`
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Description     string `json:"description"`
+	SystemPrompt    string `json:"systemPrompt"`
+	Icon            string `json:"icon"`
+	SourceCatalogID string `json:"sourceCatalogId,omitempty"`
 	// ParentID is the workflow that owns this agent. Empty for top-level
 	// agents. The designer UI uses this to gate root-only controls — the
 	// Global Instruction editor in particular. ADK enforces the same rule
@@ -111,29 +112,29 @@ type agentResponse struct {
 	// (see `.READ/adk-go/agent/llmagent/llmagent.go:232` — "ONLY the
 	// GlobalInstruction in the root agent will take effect"). Exposing
 	// it on children would silently do nothing, so we hide it there.
-	ParentID                 string                   `json:"parentId,omitempty"`
-	Graph                    *CompositionNode         `json:"graph,omitempty"`
-	IsComposed               bool                     `json:"isComposed"`
-	IsCoordinator            bool                     `json:"isCoordinator"`
-	SubAgents                []*SubAgentRef           `json:"subAgents,omitempty"`
-	AgentTools               []*AgentToolRef          `json:"agentTools,omitempty"`
-	DisallowTransferToParent bool                     `json:"disallowTransferToParent"`
-	DisallowTransferToPeers  bool                     `json:"disallowTransferToPeers"`
-	OutputKey                string                   `json:"outputKey,omitempty"`
-	IncludeContents          string                   `json:"includeContents,omitempty"`
-	GlobalInstruction        string                   `json:"globalInstruction,omitempty"`
-	InputSchema              string                   `json:"inputSchema,omitempty"`
-	OutputSchema             string                   `json:"outputSchema,omitempty"`
-	ModelConfig              *AgentModelConfig        `json:"modelConfig,omitempty"`
-	ModelOverride            *AgentModelOverride      `json:"modelOverride,omitempty"`
-	MemoryPolicy             *AgentMemoryPolicy       `json:"memoryPolicy,omitempty"`
-	ArtifactPolicy           *AgentArtifactPolicy     `json:"artifactPolicy,omitempty"`
+	ParentID                 string                    `json:"parentId,omitempty"`
+	Graph                    *CompositionNode          `json:"graph,omitempty"`
+	IsComposed               bool                      `json:"isComposed"`
+	IsCoordinator            bool                      `json:"isCoordinator"`
+	SubAgents                []*SubAgentRef            `json:"subAgents,omitempty"`
+	AgentTools               []*AgentToolRef           `json:"agentTools,omitempty"`
+	DisallowTransferToParent bool                      `json:"disallowTransferToParent"`
+	DisallowTransferToPeers  bool                      `json:"disallowTransferToPeers"`
+	OutputKey                string                    `json:"outputKey,omitempty"`
+	IncludeContents          string                    `json:"includeContents,omitempty"`
+	GlobalInstruction        string                    `json:"globalInstruction,omitempty"`
+	InputSchema              string                    `json:"inputSchema,omitempty"`
+	OutputSchema             string                    `json:"outputSchema,omitempty"`
+	ModelConfig              *AgentModelConfig         `json:"modelConfig,omitempty"`
+	ModelOverride            *AgentModelOverride       `json:"modelOverride,omitempty"`
+	MemoryPolicy             *AgentMemoryPolicy        `json:"memoryPolicy,omitempty"`
+	ArtifactPolicy           *AgentArtifactPolicy      `json:"artifactPolicy,omitempty"`
 	CodeExecutionPolicy      *AgentCodeExecutionPolicy `json:"codeExecutionPolicy,omitempty"`
-	StreamingPolicy          *AgentStreamingPolicy    `json:"streamingPolicy,omitempty"`
-	ShareToken               string                   `json:"shareToken,omitempty"`
-	Visibility               string                   `json:"visibility,omitempty"`
-	CreatedAt                string                   `json:"createdAt"`
-	UpdatedAt                string                   `json:"updatedAt"`
+	StreamingPolicy          *AgentStreamingPolicy     `json:"streamingPolicy,omitempty"`
+	ShareToken               string                    `json:"shareToken,omitempty"`
+	Visibility               string                    `json:"visibility,omitempty"`
+	CreatedAt                string                    `json:"createdAt"`
+	UpdatedAt                string                    `json:"updatedAt"`
 }
 
 type listResponse struct {
@@ -412,10 +413,10 @@ func (h *storeHandler) deleteAll(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":   "completed",
-		"deleted":  deleted,
-		"failed":   failed,
-		"total":    len(agents),
+		"status":  "completed",
+		"deleted": deleted,
+		"failed":  failed,
+		"total":   len(agents),
 	})
 }
 

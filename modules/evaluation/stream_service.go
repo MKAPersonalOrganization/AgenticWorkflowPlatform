@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-
 )
 
 // executeEvalStream returns an iterator that yields SSE events during evaluation.

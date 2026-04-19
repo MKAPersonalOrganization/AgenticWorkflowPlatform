@@ -1,7 +1,6 @@
 package evaluation
 
 import (
-	"aicompass/foundation/auth"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"aicompass/foundation/auth"
 
 	"github.com/google/uuid"
 )

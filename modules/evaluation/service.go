@@ -406,7 +406,6 @@ func buildImportedEvalCase(ec EvalCaseExport, evalSetID uuid.UUID, sortOrder int
 	}
 }
 
-
 // ImportEvalSet parses an ADK-compatible JSON EvalSet, validates it, and
 // atomically inserts the EvalSet with all its EvalCases in a single transaction.
 func (s *service) importEvalSet(ctx context.Context, userID string, data []byte) (EvalSet, error) {

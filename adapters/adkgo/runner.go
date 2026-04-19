@@ -1,16 +1,17 @@
 package adkgo
 
 import (
-	agentio "aicompass/foundation/agent/io"
-	"aicompass/foundation/logger"
-	"aicompass/modules/chat/thread"
-	"aicompass/foundation/auth"
 	"context"
 	"errors"
 	"fmt"
 	"iter"
 	"strings"
 	"time"
+
+	agentio "aicompass/foundation/agent/io"
+	"aicompass/foundation/auth"
+	"aicompass/foundation/logger"
+	"aicompass/modules/chat/thread"
 
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
@@ -481,8 +482,7 @@ func (r *RunnerAdapter) buildRegularLLMAgent(
 	// for the Gemini/OpenAI/Anthropic dispatch table.
 	r.applyCodeExecutionTool(agentCfg, modelCfg, genCfg)
 
-	beforeModelCBs, afterModelCBs, beforeToolCBs, afterToolCBs, onToolErrorCBs :=
-		r.buildAgentCallbacks(agentName, req)
+	beforeModelCBs, afterModelCBs, beforeToolCBs, afterToolCBs, onToolErrorCBs := r.buildAgentCallbacks(agentName, req)
 
 	adkSubAgents, err := r.buildCoordinatorSubAgents(agentCfg, llm, genCfg)
 	if err != nil {
@@ -545,7 +545,7 @@ func (r *RunnerAdapter) buildAgentCallbacks(agentName string, req *fagent.RunReq
 	if r.confirmChecker != nil {
 		beforeTool = append(beforeTool, buildConfirmationCallback(r.confirmChecker, agentName, req.UserID, ""))
 	}
-	return
+	return beforeModel, afterModel, beforeTool, afterTool, onToolError
 }
 
 // buildCoordinatorSubAgents builds ADK-Go sub-agents for the coordinator

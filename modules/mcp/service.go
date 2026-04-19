@@ -1,9 +1,6 @@
 package mcp
 
 import (
-	"aicompass/foundation/agent"
-	"aicompass/foundation/logger"
-	"aicompass/foundation/toolregistry"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -14,6 +11,10 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"aicompass/foundation/agent"
+	"aicompass/foundation/logger"
+	"aicompass/foundation/toolregistry"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )

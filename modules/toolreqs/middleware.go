@@ -1,9 +1,10 @@
 package toolreqs
 
 import (
-	"aicompass/foundation/agent"
 	"context"
 	"fmt"
+
+	"aicompass/foundation/agent"
 )
 
 // =============================================================================
