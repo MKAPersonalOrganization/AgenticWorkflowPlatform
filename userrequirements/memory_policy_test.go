@@ -57,10 +57,9 @@ func memoryDisabledAgent(t *testing.T, client *http.Client, name, systemPrompt s
 }
 
 func TestAgentWithMemoryPolicyRecallsFactsAcrossSessions(t *testing.T) {
-	apiKey := requireOpenAIKey(t)
-
+	t.Parallel()
+	requireOpenAIKey(t)
 	client := authedClient(t)
-	upsertAISettings(t, client, "openai", apiKey)
 
 	// Unique marker so repeated test runs under the same debug user
 	// can't fake a pass by hitting an old session in the index.
@@ -93,10 +92,9 @@ func TestAgentWithMemoryPolicyRecallsFactsAcrossSessions(t *testing.T) {
 }
 
 func TestAgentWithoutMemoryPolicyDoesNotRecallPriorSessions(t *testing.T) {
-	apiKey := requireOpenAIKey(t)
-
+	t.Parallel()
+	requireOpenAIKey(t)
 	client := authedClient(t)
-	upsertAISettings(t, client, "openai", apiKey)
 
 	fact := "kumquat-indigo-" + uuid.NewString()[:8]
 

@@ -30,12 +30,19 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/stretchr/testify/require"
 )
+
+// settingsOnce serializes the one-time AI-settings seed. Every test
+// calls ensureAISettingsSeeded via authedClient; sync.Once makes sure
+// exactly one goroutine performs the delete-all-then-insert dance, so
+// t.Parallel() is safe across the whole suite.
+var settingsOnce sync.Once
 
 // baseURL is the public app URL. Tests hit it exactly like the UI does.
 // Self-signed TLS in local clusters is accepted below via InsecureSkipVerify.
@@ -98,21 +105,60 @@ func authedClient(t *testing.T) *http.Client {
 		t.Fatalf("POST /auth/dev-login returned %d: %s", resp.StatusCode, string(body))
 	}
 
+	// Seed both providers' AI settings the first time any test runs.
+	// Subsequent parallel callers are no-ops thanks to sync.Once. This
+	// removes the per-test mutation that made t.Parallel unsafe.
+	ensureAISettingsSeeded(t, client)
+
 	return client
 }
 
-// upsertAISettings writes the provider + api_key for the debug user. The
-// runner picks the user's "default" provider row (is_default=true), and
-// the save endpoint only auto-sets default when there are ZERO prior rows
-// — which won't hold for the shared debug user across test runs. To keep
-// behaviour simple and deterministic, this helper first deletes every
-// existing AI-settings row for the debug user (via the same public API
-// the Settings pane calls), then creates the one this test needs. The
-// fresh insert auto-defaults.
-func upsertAISettings(t *testing.T, client *http.Client, provider, apiKey string) {
+// ensureAISettingsSeeded writes both providers' API keys to the debug
+// user's AI settings exactly once per test-binary invocation, no matter
+// how many tests call it concurrently. Every agent this suite creates
+// carries a modelOverride{provider, modelName} pair, and the API key
+// is looked up per-provider — so seeding BOTH providers up-front means
+// any test's agent can resolve its key regardless of which provider
+// row happens to be flagged is_default.
+//
+// OpenAI is seeded first so the "first row auto-defaults" rule in the
+// settings service picks it. Gemini is added second; it's callable but
+// not default. Either can be absent from the environment — tests that
+// actually need the missing key skip themselves via requireOpenAIKey /
+// requireGeminiKey.
+//
+// The sync.Once guard makes this safe to call from t.Parallel() tests.
+func ensureAISettingsSeeded(t *testing.T, client *http.Client) {
 	t.Helper()
+	settingsOnce.Do(func() {
+		deleteAllAISettings(t, client)
 
-	deleteAllAISettings(t, client)
+		if key := os.Getenv("OPENAI_API_KEY"); key != "" {
+			putAISettings(t, client, "openai", key)
+		}
+		if key := firstNonEmptyEnv("GEMINI_API_KEY", "GOOGLE_API_KEY"); key != "" {
+			putAISettings(t, client, "gemini", key)
+		}
+	})
+}
+
+// firstNonEmptyEnv returns the value of the first env var with a
+// non-empty string. Used to accept either GEMINI_API_KEY or
+// GOOGLE_API_KEY without caring which name the runner has set.
+func firstNonEmptyEnv(names ...string) string {
+	for _, n := range names {
+		if v := os.Getenv(n); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// putAISettings is the raw HTTP call used by ensureAISettingsSeeded. It
+// exists as its own helper so the setup routine can stay a straight
+// sequence of PUTs without re-checking the sync.Once.
+func putAISettings(t *testing.T, client *http.Client, provider, apiKey string) {
+	t.Helper()
 
 	body, err := json.Marshal(map[string]any{
 		"provider": provider,

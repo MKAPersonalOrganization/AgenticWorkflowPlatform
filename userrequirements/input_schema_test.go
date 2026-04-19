@@ -30,10 +30,9 @@ const weatherInputSchema = `{
 }`
 
 func TestACoordinatorCanCallASubAgentAsATool(t *testing.T) {
-	apiKey := requireOpenAIKey(t)
-
+	t.Parallel()
+	requireOpenAIKey(t)
 	client := authedClient(t)
-	upsertAISettings(t, client, "openai", apiKey)
 
 	// Sub-agent first so we can reference its id from the parent. It
 	// lives as a standalone agent and is exposed as a tool via the
@@ -79,10 +78,9 @@ func TestACoordinatorCanCallASubAgentAsATool(t *testing.T) {
 }
 
 func TestACallableWithoutSchemaReceivesPlainTextInput(t *testing.T) {
-	apiKey := requireOpenAIKey(t)
-
+	t.Parallel()
+	requireOpenAIKey(t)
 	client := authedClient(t)
-	upsertAISettings(t, client, "openai", apiKey)
 
 	subBody := agentBody(
 		"EchoAgent",

@@ -36,10 +36,9 @@ const outputSchemaCityFacts = `{
 }`
 
 func TestAnAgentCanReturnStructuredDataMatchingASchema(t *testing.T) {
-	apiKey := requireOpenAIKey(t)
-
+	t.Parallel()
+	requireOpenAIKey(t)
 	client := authedClient(t)
-	upsertAISettings(t, client, "openai", apiKey)
 
 	body := agentBody(
 		"city-facts",
@@ -81,10 +80,9 @@ func TestAnAgentCanReturnStructuredDataMatchingASchema(t *testing.T) {
 }
 
 func TestADownstreamAgentCanReceiveOutputFromAnUpstreamAgent(t *testing.T) {
-	apiKey := requireOpenAIKey(t)
-
+	t.Parallel()
+	requireOpenAIKey(t)
 	client := authedClient(t)
-	upsertAISettings(t, client, "openai", apiKey)
 
 	// Extractor: emits city facts as JSON into session state under
 	// `city_facts` via outputKey. Downstream consumers read it via the

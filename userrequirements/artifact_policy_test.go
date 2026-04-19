@@ -43,10 +43,9 @@ func hasLoadArtifacts(events []sseEvent, reply string) bool {
 }
 
 func TestAgentWithArtifactPolicyReceivesLoadArtifactsTool(t *testing.T) {
-	apiKey := requireOpenAIKey(t)
-
+	t.Parallel()
+	requireOpenAIKey(t)
 	client := authedClient(t)
-	upsertAISettings(t, client, "openai", apiKey)
 
 	body := agentBody(
 		"Artifact Agent",
@@ -69,10 +68,9 @@ func TestAgentWithArtifactPolicyReceivesLoadArtifactsTool(t *testing.T) {
 }
 
 func TestAgentWithoutArtifactPolicyDoesNotReceiveLoadArtifacts(t *testing.T) {
-	apiKey := requireOpenAIKey(t)
-
+	t.Parallel()
+	requireOpenAIKey(t)
 	client := authedClient(t)
-	upsertAISettings(t, client, "openai", apiKey)
 
 	body := agentBody(
 		"No-Artifact Agent",

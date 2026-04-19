@@ -31,10 +31,9 @@ import (
 )
 
 func TestAWorkflowPeerOutputKeyFlowsIntoDownstreamSiblingPrompt(t *testing.T) {
-	apiKey := requireOpenAIKey(t)
-
+	t.Parallel()
+	requireOpenAIKey(t)
 	client := authedClient(t)
-	upsertAISettings(t, client, "openai", apiKey)
 
 	// Producer: emits the word after SECRET= into session state under
 	// `extracted_secret`. The single-lowercase-word contract is tight so
@@ -98,10 +97,9 @@ func TestAWorkflowPeerOutputKeyFlowsIntoDownstreamSiblingPrompt(t *testing.T) {
 }
 
 func TestAnOptionalTemplateVariableIsSilentWhenMissing(t *testing.T) {
-	apiKey := requireOpenAIKey(t)
-
+	t.Parallel()
+	requireOpenAIKey(t)
 	client := authedClient(t)
-	upsertAISettings(t, client, "openai", apiKey)
 
 	// {nothing_here?} — the `?` suffix tells the orchestration engine's
 	// instruction processor to swallow missing-key errors and substitute
@@ -128,10 +126,9 @@ func TestAnOptionalTemplateVariableIsSilentWhenMissing(t *testing.T) {
 }
 
 func TestARequiredTemplateVariableFailsWhenMissing(t *testing.T) {
-	apiKey := requireOpenAIKey(t)
-
+	t.Parallel()
+	requireOpenAIKey(t)
 	client := authedClient(t)
-	upsertAISettings(t, client, "openai", apiKey)
 
 	// {this_does_not_exist} — no `?` suffix means the orchestration
 	// engine's instruction processor raises when the key is absent. The

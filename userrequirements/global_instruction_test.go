@@ -28,10 +28,9 @@ import (
 )
 
 func TestAGlobalInstructionSteersTheRootAgentsOwnReply(t *testing.T) {
-	apiKey := requireOpenAIKey(t)
-
+	t.Parallel()
+	requireOpenAIKey(t)
 	client := authedClient(t)
-	upsertAISettings(t, client, "openai", apiKey)
 
 	// Single LLM agent whose globalInstruction forces a marker into every
 	// reply. The agent's own systemPrompt is deliberately generic so the

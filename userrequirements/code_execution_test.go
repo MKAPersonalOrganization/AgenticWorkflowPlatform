@@ -61,9 +61,9 @@ func codeExecAgentBody(name, provider, model string) map[string]any {
 
 // TestAgentWithCodeExecutionPolicyRunsCodeOnGemini — Gemini built-in sandbox.
 func TestAgentWithCodeExecutionPolicyRunsCodeOnGemini(t *testing.T) {
-	apiKey := requireGeminiKey(t)
+	t.Parallel()
+	requireGeminiKey(t)
 	client := authedClient(t)
-	upsertAISettings(t, client, "gemini", apiKey)
 
 	agentID := createAgent(t, client, codeExecAgentBody("code-exec-gemini", "gemini", "gemini-2.5-flash"))
 
@@ -87,9 +87,9 @@ func TestAgentWithCodeExecutionPolicyRunsCodeOnGemini(t *testing.T) {
 // tool, the model will either guess-multiply (wrong digits) or refuse —
 // either way this test fails.
 func TestAgentWithCodeExecutionPolicyRunsCodeOnOpenAI(t *testing.T) {
-	apiKey := requireOpenAIKey(t)
+	t.Parallel()
+	requireOpenAIKey(t)
 	client := authedClient(t)
-	upsertAISettings(t, client, "openai", apiKey)
 
 	agentID := createAgent(t, client, codeExecAgentBody("code-exec-openai", "openai", "gpt-4o-mini"))
 
