@@ -588,242 +588,302 @@ func (p *PostgresAguiProjection) applyAuthGranted(ctx context.Context, event *th
 	return nil
 }
 
+// threadRow / messageRow / toolStateRow match the db:"..." tags on the
+// three agui_* tables GetThreadState hydrates from.
+type threadRow struct {
+	ThreadID  string    `db:"thread_id"`
+	UserID    string    `db:"user_id"`
+	Title     string    `db:"title"`
+	CreatedAt time.Time `db:"created_at"`
+	UpdatedAt time.Time `db:"updated_at"`
+	IsDeleted bool      `db:"is_deleted"`
+	Version   int64     `db:"version"`
+}
+
+type messageRow struct {
+	MessageID   string           `db:"message_id"`
+	Role        string           `db:"role"`
+	Content     string           `db:"content"`
+	ToolCalls   *json.RawMessage `db:"tool_calls"`
+	ToolCallID  *string          `db:"tool_call_id"`
+	AgentName   *string          `db:"agent_name"`
+	Metadata    *json.RawMessage `db:"metadata"`
+	CreatedAt   time.Time        `db:"created_at"`
+	SequenceNum int              `db:"sequence_num"`
+}
+
+type toolStateRow struct {
+	ToolCallID  string           `db:"tool_call_id"`
+	State       string           `db:"state"`
+	ToolName    *string          `db:"tool_name"`
+	AgentName   *string          `db:"agent_name"`
+	Elicitation *json.RawMessage `db:"elicitation"`
+	Input       *string          `db:"input"`
+	Result      *string          `db:"result"`
+	Error       *string          `db:"error"`
+}
+
+// messageExtras collects the side-channel data extracted from message
+// metadata during the messages pass. Keyed-by-message_id maps let the
+// frontend join them back without re-scanning the message list.
+type messageExtras struct {
+	attachments    map[string][]thread.Attachment
+	codeExecutions map[string]CodeExecutionSummary
+	tokenUsage     *TokenUsageInfo
+}
+
 // GetThreadState retrieves the complete UI state for a thread from PostgreSQL.
 func (p *PostgresAguiProjection) GetThreadState(ctx context.Context, threadID string) (*AguiThreadState, bool) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	// Get thread record
-	var threadRow struct {
-		ThreadID  string    `db:"thread_id"`
-		UserID    string    `db:"user_id"`
-		Title     string    `db:"title"`
-		CreatedAt time.Time `db:"created_at"`
-		UpdatedAt time.Time `db:"updated_at"`
-		IsDeleted bool      `db:"is_deleted"`
-		Version   int64     `db:"version"`
+	row, ok := p.loadThreadRow(ctx, threadID)
+	if !ok {
+		return nil, false
 	}
 
-	threadQuery := `
+	aguiMessages, extras, ok := p.loadThreadMessages(ctx, threadID)
+	if !ok {
+		return nil, false
+	}
+	toolStatesMap := p.loadToolStates(ctx, threadID)
+
+	return &AguiThreadState{
+		ThreadID:           row.ThreadID,
+		UserID:             row.UserID,
+		Title:              row.Title,
+		Messages:           aguiMessages,
+		ToolCalls:          []AguiToolCall{},
+		AgentActivity:      make(map[string]*AguiAgentActivity),
+		ToolStates:         toolStatesMap,
+		TokenUsage:         extras.tokenUsage,
+		MessageAttachments: extras.attachments,
+		CodeExecutions:     extras.codeExecutions,
+		CreatedAt:          row.CreatedAt,
+		UpdatedAt:          row.UpdatedAt,
+		Version:            row.Version,
+		IsDeleted:          row.IsDeleted,
+	}, true
+}
+
+// loadThreadRow fetches the agui_threads row for a thread. Returns
+// ok=false when the thread doesn't exist, is soft-deleted, or the query
+// fails (logged at Error so the caller doesn't need to).
+func (p *PostgresAguiProjection) loadThreadRow(ctx context.Context, threadID string) (threadRow, bool) {
+	var row threadRow
+	const q = `
 		SELECT thread_id, user_id, title, created_at, updated_at, is_deleted, version
 		FROM agui_threads
 		WHERE thread_id = $1
 	`
-
-	err := p.db.GetContext(ctx, &threadRow, threadQuery, threadID)
+	err := p.db.GetContext(ctx, &row, q, threadID)
 	if err == sql.ErrNoRows {
-		return nil, false
+		return threadRow{}, false
 	}
 	if err != nil {
 		p.log.Error(ctx, "failed to get thread", "threadID", threadID, "ERROR", err)
-		return nil, false
+		return threadRow{}, false
 	}
-
-	// Don't return deleted threads
-	if threadRow.IsDeleted {
-		return nil, false
+	if row.IsDeleted {
+		return threadRow{}, false
 	}
+	return row, true
+}
 
-	// Get messages
-	var messages []struct {
-		MessageID   string           `db:"message_id"`
-		Role        string           `db:"role"`
-		Content     string           `db:"content"`
-		ToolCalls   *json.RawMessage `db:"tool_calls"`
-		ToolCallID  *string          `db:"tool_call_id"`
-		AgentName   *string          `db:"agent_name"`
-		Metadata    *json.RawMessage `db:"metadata"` // Pointer to handle NULL
-		CreatedAt   time.Time        `db:"created_at"`
-		SequenceNum int              `db:"sequence_num"`
-	}
-
-	messagesQuery := `
+// loadThreadMessages fetches agui_messages rows in sequence order and
+// converts them into AGUI-format messages plus the extras derived from
+// each row's metadata (token usage, code executions, attachments).
+// Returns ok=false when the SELECT fails — callers should abandon the
+// projection since message history drives every other panel.
+func (p *PostgresAguiProjection) loadThreadMessages(ctx context.Context, threadID string) ([]aguievents.Message, messageExtras, bool) {
+	var rows []messageRow
+	const q = `
 		SELECT message_id, role, content, tool_calls, tool_call_id, agent_name, metadata, created_at, sequence_num
 		FROM agui_messages
 		WHERE thread_id = $1
 		ORDER BY sequence_num ASC
 	`
-
-	err = p.db.SelectContext(ctx, &messages, messagesQuery, threadID)
-	if err != nil && err != sql.ErrNoRows {
+	if err := p.db.SelectContext(ctx, &rows, q, threadID); err != nil && err != sql.ErrNoRows {
 		p.log.Error(ctx, "failed to get messages", "threadID", threadID, "ERROR", err)
-		return nil, false
+		return nil, messageExtras{}, false
 	}
 
-	// Convert database messages to AGUI SDK format
-	aguiMessages := make([]aguievents.Message, 0, len(messages))
-	messageAttachments := make(map[string][]thread.Attachment)
-	codeExecutions := make(map[string]CodeExecutionSummary)
-	var tokenUsage *TokenUsageInfo
-
-	for _, msg := range messages {
-		content := msg.Content
-		aguimsit := aguievents.Message{
-			ID:      msg.MessageID,
-			Role:    types.Role(msg.Role),
-			Content: &content,
-		}
-
-		if msg.ToolCallID != nil {
-			aguimsit.ToolCallID = *msg.ToolCallID
-		}
-
-		if msg.AgentName != nil {
-			aguimsit.Name = *msg.AgentName
-		}
-
-		if msg.ToolCalls != nil {
-			var agentToolCalls []agent.ToolCall
-			if err := json.Unmarshal([]byte(*msg.ToolCalls), &agentToolCalls); err == nil {
-				aguiToolCalls := make([]aguievents.ToolCall, 0, len(agentToolCalls))
-				for _, tc := range agentToolCalls {
-					aguiToolCalls = append(aguiToolCalls, aguievents.ToolCall{
-						ID:   tc.ID,
-						Type: "function",
-						Function: struct {
-							Name      string `json:"name"`
-							Arguments string `json:"arguments"`
-						}{
-							Name:      tc.Name,
-							Arguments: tc.Arguments,
-						},
-					})
-				}
-				aguimsit.ToolCalls = aguiToolCalls
-			}
-		}
-
-		// Extract metadata (token usage, images, etc.)
-		if msg.Metadata != nil {
-			var metadata map[string]interface{}
-			if err := json.Unmarshal([]byte(*msg.Metadata), &metadata); err == nil {
-				// Extract token usage
-				if usage, ok := metadata["usage"].(map[string]interface{}); ok {
-					tokenUsage = &TokenUsageInfo{
-						Provider:        getStringFromMap(usage, "provider"),
-						Model:           getStringFromMap(usage, "model"),
-						Prompt:          getIntFromMap(usage, "prompt"),
-						Completion:      getIntFromMap(usage, "completion"),
-						Total:           getIntFromMap(usage, "total"),
-						Cached:          getIntFromMap(usage, "cached"),
-						Reasoning:       getIntFromMap(usage, "reasoning"),
-						AudioInput:      getIntFromMap(usage, "audioInput"),
-						AudioOutput:     getIntFromMap(usage, "audioOutput"),
-						AcceptedPredict: getIntFromMap(usage, "acceptedPredict"),
-						RejectedPredict: getIntFromMap(usage, "rejectedPredict"),
-						MessageID:       msg.MessageID,
-						ThreadID:        threadID,
-					}
-				}
-
-				// Extract code-execution payload. Keyed on message_id so
-				// the frontend can join it to the code_execution message
-				// row after parsing messages.
-				if ceRaw, ok := metadata["codeExecution"].(map[string]interface{}); ok {
-					codeExecutions[msg.MessageID] = CodeExecutionSummary{
-						Language: getStringFromMap(ceRaw, "language"),
-						Output:   getStringFromMap(ceRaw, "output"),
-						Outcome:  getStringFromMap(ceRaw, "outcome"),
-						BlockID:  getStringFromMap(ceRaw, "blockId"),
-					}
-				}
-
-				// Extract attachment references for user messages
-				if attachmentsRaw, ok := metadata["attachments"]; ok {
-					if attachmentsArr, ok := attachmentsRaw.([]interface{}); ok {
-						var refs []thread.Attachment
-						for _, attRaw := range attachmentsArr {
-							if attMap, ok := attRaw.(map[string]interface{}); ok {
-								ref := thread.Attachment{
-									URL:      getStringFromMap(attMap, "url"),
-									MimeType: getStringFromMap(attMap, "mimeType"),
-									FileName: getStringFromMap(attMap, "fileName"),
-								}
-								if ref.URL != "" {
-									refs = append(refs, ref)
-								}
-							}
-						}
-						if len(refs) > 0 {
-							messageAttachments[msg.MessageID] = refs
-						}
-					}
-				}
-			}
-		}
-
-		aguiMessages = append(aguiMessages, aguimsit)
+	msgs := make([]aguievents.Message, 0, len(rows))
+	extras := messageExtras{
+		attachments:    make(map[string][]thread.Attachment),
+		codeExecutions: make(map[string]CodeExecutionSummary),
 	}
-
-	// Fetch tool states from the dedicated table (no merge logic needed)
-	var toolStateRows []struct {
-		ToolCallID  string           `db:"tool_call_id"`
-		State       string           `db:"state"`
-		ToolName    *string          `db:"tool_name"`
-		AgentName   *string          `db:"agent_name"`
-		Elicitation *json.RawMessage `db:"elicitation"`
-		Input       *string          `db:"input"`
-		Result      *string          `db:"result"`
-		Error       *string          `db:"error"`
+	for _, row := range rows {
+		msgs = append(msgs, rowToAguiMessage(row))
+		extractMessageMetadata(row, threadID, &extras)
 	}
+	return msgs, extras, true
+}
 
-	toolStatesQuery := `
+// rowToAguiMessage maps a raw DB message row onto the AGUI SDK message
+// shape, unwrapping the nullable string/JSON columns into their Go
+// equivalents. ToolCall JSON that fails to parse is silently dropped —
+// malformed legacy rows shouldn't break thread hydration.
+func rowToAguiMessage(row messageRow) aguievents.Message {
+	content := row.Content
+	msg := aguievents.Message{
+		ID:      row.MessageID,
+		Role:    types.Role(row.Role),
+		Content: &content,
+	}
+	if row.ToolCallID != nil {
+		msg.ToolCallID = *row.ToolCallID
+	}
+	if row.AgentName != nil {
+		msg.Name = *row.AgentName
+	}
+	if row.ToolCalls != nil {
+		msg.ToolCalls = parseAguiToolCalls(*row.ToolCalls)
+	}
+	return msg
+}
+
+func parseAguiToolCalls(raw json.RawMessage) []aguievents.ToolCall {
+	var agentToolCalls []agent.ToolCall
+	if err := json.Unmarshal([]byte(raw), &agentToolCalls); err != nil {
+		return nil
+	}
+	out := make([]aguievents.ToolCall, 0, len(agentToolCalls))
+	for _, tc := range agentToolCalls {
+		out = append(out, aguievents.ToolCall{
+			ID:   tc.ID,
+			Type: "function",
+			Function: struct {
+				Name      string `json:"name"`
+				Arguments string `json:"arguments"`
+			}{
+				Name:      tc.Name,
+				Arguments: tc.Arguments,
+			},
+		})
+	}
+	return out
+}
+
+// extractMessageMetadata pulls usage / codeExecution / attachments out
+// of a message's metadata blob and stashes them on the extras struct.
+// Malformed JSON or missing fields are silently skipped — metadata is
+// additive, never load-bearing for the message row itself.
+func extractMessageMetadata(row messageRow, threadID string, extras *messageExtras) {
+	if row.Metadata == nil {
+		return
+	}
+	var metadata map[string]interface{}
+	if err := json.Unmarshal([]byte(*row.Metadata), &metadata); err != nil {
+		return
+	}
+	if usage, ok := metadata["usage"].(map[string]interface{}); ok {
+		extras.tokenUsage = tokenUsageFromMap(usage, row.MessageID, threadID)
+	}
+	// Keyed on message_id so the frontend can join the code-execution
+	// payload to the code_execution message row after parsing messages.
+	if ceRaw, ok := metadata["codeExecution"].(map[string]interface{}); ok {
+		extras.codeExecutions[row.MessageID] = CodeExecutionSummary{
+			Language: getStringFromMap(ceRaw, "language"),
+			Output:   getStringFromMap(ceRaw, "output"),
+			Outcome:  getStringFromMap(ceRaw, "outcome"),
+			BlockID:  getStringFromMap(ceRaw, "blockId"),
+		}
+	}
+	if refs := parseAttachments(metadata["attachments"]); len(refs) > 0 {
+		extras.attachments[row.MessageID] = refs
+	}
+}
+
+func tokenUsageFromMap(usage map[string]interface{}, messageID, threadID string) *TokenUsageInfo {
+	return &TokenUsageInfo{
+		Provider:        getStringFromMap(usage, "provider"),
+		Model:           getStringFromMap(usage, "model"),
+		Prompt:          getIntFromMap(usage, "prompt"),
+		Completion:      getIntFromMap(usage, "completion"),
+		Total:           getIntFromMap(usage, "total"),
+		Cached:          getIntFromMap(usage, "cached"),
+		Reasoning:       getIntFromMap(usage, "reasoning"),
+		AudioInput:      getIntFromMap(usage, "audioInput"),
+		AudioOutput:     getIntFromMap(usage, "audioOutput"),
+		AcceptedPredict: getIntFromMap(usage, "acceptedPredict"),
+		RejectedPredict: getIntFromMap(usage, "rejectedPredict"),
+		MessageID:       messageID,
+		ThreadID:        threadID,
+	}
+}
+
+func parseAttachments(raw interface{}) []thread.Attachment {
+	arr, ok := raw.([]interface{})
+	if !ok {
+		return nil
+	}
+	var refs []thread.Attachment
+	for _, item := range arr {
+		attMap, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		ref := thread.Attachment{
+			URL:      getStringFromMap(attMap, "url"),
+			MimeType: getStringFromMap(attMap, "mimeType"),
+			FileName: getStringFromMap(attMap, "fileName"),
+		}
+		if ref.URL != "" {
+			refs = append(refs, ref)
+		}
+	}
+	return refs
+}
+
+// loadToolStates fetches agui_tool_states rows and builds the
+// frontend-facing tool-state map. Errors are logged and swallowed: a
+// missing tool-state table is less catastrophic than missing messages
+// and shouldn't hide the thread from the UI.
+func (p *PostgresAguiProjection) loadToolStates(ctx context.Context, threadID string) map[string]interface{} {
+	var rows []toolStateRow
+	const q = `
 		SELECT tool_call_id, state, tool_name, agent_name, elicitation, input, result, error
 		FROM agui_tool_states
 		WHERE thread_id = $1
 	`
-	if err := p.db.SelectContext(ctx, &toolStateRows, toolStatesQuery, threadID); err != nil && err != sql.ErrNoRows {
+	if err := p.db.SelectContext(ctx, &rows, q, threadID); err != nil && err != sql.ErrNoRows {
 		p.log.Error(ctx, "failed to get tool states", "threadID", threadID, "ERROR", err)
 	}
-
-	toolStatesMap := make(map[string]interface{}, len(toolStateRows))
-	for _, ts := range toolStateRows {
-		entry := map[string]interface{}{
-			"toolCallId": ts.ToolCallID,
-			"state":      ts.State,
-		}
-		if ts.ToolName != nil {
-			entry["toolName"] = *ts.ToolName
-		}
-		if ts.AgentName != nil {
-			entry["agentName"] = *ts.AgentName
-		}
-		if ts.Elicitation != nil {
-			var elicitation interface{}
-			if err := json.Unmarshal(*ts.Elicitation, &elicitation); err == nil {
-				entry["elicitation"] = elicitation
-			}
-		}
-		if ts.Input != nil {
-			entry["input"] = *ts.Input
-		}
-		if ts.Result != nil {
-			entry["result"] = *ts.Result
-		}
-		if ts.Error != nil {
-			entry["error"] = *ts.Error
-		}
-		toolStatesMap[ts.ToolCallID] = entry
+	out := make(map[string]interface{}, len(rows))
+	for _, ts := range rows {
+		out[ts.ToolCallID] = toolStateToMap(ts)
 	}
+	return out
+}
 
-	state := &AguiThreadState{
-		ThreadID:           threadRow.ThreadID,
-		UserID:             threadRow.UserID,
-		Title:              threadRow.Title,
-		Messages:           aguiMessages,
-		ToolCalls:          []AguiToolCall{},
-		AgentActivity:      make(map[string]*AguiAgentActivity),
-		ToolStates:         toolStatesMap,
-		TokenUsage:         tokenUsage,
-		MessageAttachments: messageAttachments,
-		CodeExecutions:     codeExecutions,
-		CreatedAt:          threadRow.CreatedAt,
-		UpdatedAt:          threadRow.UpdatedAt,
-		Version:            threadRow.Version,
-		IsDeleted:          threadRow.IsDeleted,
+func toolStateToMap(ts toolStateRow) map[string]interface{} {
+	entry := map[string]interface{}{
+		"toolCallId": ts.ToolCallID,
+		"state":      ts.State,
 	}
-
-	return state, true
+	if ts.ToolName != nil {
+		entry["toolName"] = *ts.ToolName
+	}
+	if ts.AgentName != nil {
+		entry["agentName"] = *ts.AgentName
+	}
+	if ts.Elicitation != nil {
+		var elicitation interface{}
+		if err := json.Unmarshal(*ts.Elicitation, &elicitation); err == nil {
+			entry["elicitation"] = elicitation
+		}
+	}
+	if ts.Input != nil {
+		entry["input"] = *ts.Input
+	}
+	if ts.Result != nil {
+		entry["result"] = *ts.Result
+	}
+	if ts.Error != nil {
+		entry["error"] = *ts.Error
+	}
+	return entry
 }
 
 // GetMessages retrieves all UI-formatted messages for a thread.
@@ -835,141 +895,154 @@ func (p *PostgresAguiProjection) GetMessages(ctx context.Context, threadID strin
 	return state.Messages
 }
 
+// threadListRow matches the SELECT projection in the four ListThreads
+// queries — narrow subset of agui_threads used for the sidebar list.
+type threadListRow struct {
+	ThreadID  string    `db:"thread_id"`
+	Title     *string   `db:"title"`
+	UpdatedAt time.Time `db:"updated_at"`
+}
+
 // ListThreads returns paginated threads for a user.
 func (p *PostgresAguiProjection) ListThreads(ctx context.Context, req ThreadListRequest) (*ThreadListResponse, error) {
-	// Apply defaults and limits
-	pageSize := req.Limit
-	if pageSize <= 0 {
-		pageSize = 20
-	}
-	if pageSize > 100 {
-		pageSize = 100
-	}
-
-	// Fetch one extra to determine if there are more pages
+	pageSize := clampPageSize(req.Limit)
+	// Fetch one extra row to determine if there's a next page without
+	// needing a COUNT(*) — classic keyset-pagination trick.
 	fetchLimit := pageSize + 1
 
-	var threads []struct {
-		ThreadID  string    `db:"thread_id"`
-		Title     *string   `db:"title"`
-		UpdatedAt time.Time `db:"updated_at"`
+	rows, err := p.fetchThreadListRows(ctx, req, fetchLimit)
+	if err != nil {
+		return nil, err
 	}
 
-	var err error
-	if req.Query != "" {
-		// Search mode - filter by title.
-		// Escape LIKE wildcards to prevent pattern injection (e.g. % or _).
-		escaped := strings.NewReplacer("%", "\\%", "_", "\\_").Replace(req.Query)
-		searchPattern := "%" + escaped + "%"
-		if req.Cursor == "" {
-			query := `
-				SELECT thread_id, title, updated_at
-				FROM agui_threads
-				WHERE user_id = $1 AND is_deleted = false AND title ILIKE $2
-				ORDER BY updated_at DESC
-				LIMIT $3
-			`
-			err = p.db.SelectContext(ctx, &threads, query, req.UserID, searchPattern, fetchLimit)
-		} else {
-			cursorTime, parseErr := time.Parse(time.RFC3339Nano, req.Cursor)
-			if parseErr != nil {
-				return nil, fmt.Errorf("invalid cursor format: %w", parseErr)
-			}
-			query := `
-				SELECT thread_id, title, updated_at
-				FROM agui_threads
-				WHERE user_id = $1 AND is_deleted = false AND title ILIKE $2 AND updated_at < $3
-				ORDER BY updated_at DESC
-				LIMIT $4
-			`
-			err = p.db.SelectContext(ctx, &threads, query, req.UserID, searchPattern, cursorTime, fetchLimit)
+	hasMore := len(rows) > pageSize
+	if hasMore {
+		rows = rows[:pageSize]
+	}
+
+	result := &ThreadListResponse{
+		Threads: make([]ThreadSummary, 0, len(rows)),
+		HasMore: hasMore,
+	}
+	now := time.Now()
+	for _, t := range rows {
+		title := ""
+		if t.Title != nil {
+			title = *t.Title
 		}
-	} else if req.Cursor == "" {
-		// First page - no cursor
-		query := `
-			SELECT thread_id, title, updated_at
-			FROM agui_threads
-			WHERE user_id = $1 AND is_deleted = false
-			ORDER BY updated_at DESC
-			LIMIT $2
-		`
-		err = p.db.SelectContext(ctx, &threads, query, req.UserID, fetchLimit)
-	} else {
-		// Subsequent pages - use cursor
+		result.Threads = append(result.Threads, ThreadSummary{
+			ID:         t.ThreadID,
+			Title:      title,
+			GroupTitle: threadGroupTitle(ctx, t.UpdatedAt, now),
+			UpdatedAt:  t.UpdatedAt,
+		})
+	}
+
+	if hasMore && len(result.Threads) > 0 {
+		lastThread := result.Threads[len(result.Threads)-1]
+		result.NextCursor = lastThread.UpdatedAt.Format(time.RFC3339Nano)
+	}
+	return result, nil
+}
+
+// clampPageSize applies the request's Limit with defaults (20 when
+// unset, 100 as the hard ceiling).
+func clampPageSize(limit int) int {
+	if limit <= 0 {
+		return 20
+	}
+	if limit > 100 {
+		return 100
+	}
+	return limit
+}
+
+// fetchThreadListRows dispatches to the four keyset query variants
+// (search × with-cursor) and returns the raw rows. Cursor parsing errors
+// are surfaced as 400-style wrapped errors so the handler can distinguish
+// client mistakes from server faults.
+func (p *PostgresAguiProjection) fetchThreadListRows(ctx context.Context, req ThreadListRequest, fetchLimit int) ([]threadListRow, error) {
+	var rows []threadListRow
+	var err error
+	switch {
+	case req.Query != "" && req.Cursor != "":
 		cursorTime, parseErr := time.Parse(time.RFC3339Nano, req.Cursor)
 		if parseErr != nil {
 			return nil, fmt.Errorf("invalid cursor format: %w", parseErr)
 		}
-
-		query := `
+		const q = `
+			SELECT thread_id, title, updated_at
+			FROM agui_threads
+			WHERE user_id = $1 AND is_deleted = false AND title ILIKE $2 AND updated_at < $3
+			ORDER BY updated_at DESC
+			LIMIT $4
+		`
+		err = p.db.SelectContext(ctx, &rows, q, req.UserID, likePattern(req.Query), cursorTime, fetchLimit)
+	case req.Query != "":
+		const q = `
+			SELECT thread_id, title, updated_at
+			FROM agui_threads
+			WHERE user_id = $1 AND is_deleted = false AND title ILIKE $2
+			ORDER BY updated_at DESC
+			LIMIT $3
+		`
+		err = p.db.SelectContext(ctx, &rows, q, req.UserID, likePattern(req.Query), fetchLimit)
+	case req.Cursor != "":
+		cursorTime, parseErr := time.Parse(time.RFC3339Nano, req.Cursor)
+		if parseErr != nil {
+			return nil, fmt.Errorf("invalid cursor format: %w", parseErr)
+		}
+		const q = `
 			SELECT thread_id, title, updated_at
 			FROM agui_threads
 			WHERE user_id = $1 AND is_deleted = false AND updated_at < $2
 			ORDER BY updated_at DESC
 			LIMIT $3
 		`
-		err = p.db.SelectContext(ctx, &threads, query, req.UserID, cursorTime, fetchLimit)
+		err = p.db.SelectContext(ctx, &rows, q, req.UserID, cursorTime, fetchLimit)
+	default:
+		const q = `
+			SELECT thread_id, title, updated_at
+			FROM agui_threads
+			WHERE user_id = $1 AND is_deleted = false
+			ORDER BY updated_at DESC
+			LIMIT $2
+		`
+		err = p.db.SelectContext(ctx, &rows, q, req.UserID, fetchLimit)
 	}
-
 	if err != nil {
 		p.log.Error(ctx, "failed to list threads", "userID", req.UserID, "ERROR", err)
 		return nil, fmt.Errorf("failed to list threads: %w", err)
 	}
+	return rows, nil
+}
 
-	// Determine if there are more pages
-	hasMore := len(threads) > pageSize
-	if hasMore {
-		threads = threads[:pageSize] // Trim the extra item
-	}
+// likePattern escapes user-supplied LIKE wildcards (% and _) so a search
+// for "50%" doesn't match every title, then wraps the query with % on
+// both sides for substring matching.
+func likePattern(query string) string {
+	escaped := strings.NewReplacer("%", "\\%", "_", "\\_").Replace(query)
+	return "%" + escaped + "%"
+}
 
-	// Convert to response format
-	result := &ThreadListResponse{
-		Threads: make([]ThreadSummary, 0, len(threads)),
-		HasMore: hasMore,
-	}
-
-	now := time.Now()
+// threadGroupTitle buckets an updated-at timestamp into the coarse
+// sidebar groups (Today / Yesterday / Previous 7 Days / Previous 30
+// Days / Older). Boundaries are midnight-aligned so a thread touched at
+// 23:59 doesn't flip groups when the user refreshes at 00:01.
+func threadGroupTitle(ctx context.Context, updatedAt, now time.Time) string {
 	today := now.Truncate(24 * time.Hour)
-	yesterday := today.Add(-24 * time.Hour)
-	sevenDaysAgo := today.Add(-7 * 24 * time.Hour)
-	thirtyDaysAgo := today.Add(-30 * 24 * time.Hour)
-
-	for _, t := range threads {
-		title := ""
-		if t.Title != nil {
-			title = *t.Title
-		}
-
-		// Calculate group title
-		var groupTitle string
-		switch {
-		case t.UpdatedAt.After(today):
-			groupTitle = i18n.T(ctx, "Today")
-		case t.UpdatedAt.After(yesterday):
-			groupTitle = i18n.T(ctx, "Yesterday")
-		case t.UpdatedAt.After(sevenDaysAgo):
-			groupTitle = i18n.T(ctx, "Previous 7 Days")
-		case t.UpdatedAt.After(thirtyDaysAgo):
-			groupTitle = i18n.T(ctx, "Previous 30 Days")
-		default:
-			groupTitle = i18n.T(ctx, "Older")
-		}
-
-		result.Threads = append(result.Threads, ThreadSummary{
-			ID:         t.ThreadID,
-			Title:      title,
-			GroupTitle: groupTitle,
-			UpdatedAt:  t.UpdatedAt,
-		})
+	switch {
+	case updatedAt.After(today):
+		return i18n.T(ctx, "Today")
+	case updatedAt.After(today.Add(-24 * time.Hour)):
+		return i18n.T(ctx, "Yesterday")
+	case updatedAt.After(today.Add(-7 * 24 * time.Hour)):
+		return i18n.T(ctx, "Previous 7 Days")
+	case updatedAt.After(today.Add(-30 * 24 * time.Hour)):
+		return i18n.T(ctx, "Previous 30 Days")
+	default:
+		return i18n.T(ctx, "Older")
 	}
-
-	// Set next cursor if there are more pages
-	if hasMore && len(result.Threads) > 0 {
-		lastThread := result.Threads[len(result.Threads)-1]
-		result.NextCursor = lastThread.UpdatedAt.Format(time.RFC3339Nano)
-	}
-
-	return result, nil
 }
 
 // applyRunStarted handles run start events by updating the thread metadata.
