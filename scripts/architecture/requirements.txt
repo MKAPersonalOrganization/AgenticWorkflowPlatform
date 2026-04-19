@@ -29,3 +29,7 @@ numpy>=1.24,<3.0
 
 # CSV-driven Code-Maat dashboard (maat_visualize.py).
 pandas>=2.0,<3.0
+
+# Per-function cyclomatic complexity + NLOC (cyclomatic.py).
+# Language-agnostic single-binary analyser — Go, JS, TS, Python, C++…
+lizard>=1.17,<2.0

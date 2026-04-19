@@ -9,7 +9,8 @@ reader. Scripts here are standalone — no cross-imports.
 | Signal              | Script                    | Answers                                                          |
 |---                  |---                        |---                                                               |
 | **Hotspots**        | `go_hotspots.py`          | Which Go packages/functions are both large and most-changed?     |
-| **Complexity**      | `complexity_trend.py`     | Is whitespace-indent complexity (proxy for nesting) deteriorating? |
+| **Complexity (trend)** | `complexity_trend.py`  | Is whitespace-indent complexity (proxy for nesting) deteriorating? |
+| **Complexity (cyclomatic)** | `cyclomatic.py`   | Which functions branch too much (McCabe CCN via [lizard](https://github.com/terryyin/lizard))? Multi-language. |
 | **Cohesion**        | `cohesion.py`             | Do Go types juggle disjoint responsibilities (LCOM4 ≥ 2)?         |
 | **Coupling**        | `file_coupling.py`        | Which files co-change at unexpected rates (temporal coupling)?   |
 | **Bug density**     | `bugfix_density.py`       | Which files absorb a disproportionate share of fix commits?      |
@@ -45,6 +46,7 @@ python3 scripts/architecture/refactor_priority.py \
   --coupling out/coupling.json \
   --bugfix out/bugfix.json \
   --lcom4 out/cohesion.json \
+  --cyclomatic out/cyclomatic.json \
   --out-md out/refactor_priority.md \
   --out-plots out/plots
 ```
