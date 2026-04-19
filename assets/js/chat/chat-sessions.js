@@ -41,60 +41,12 @@ export function createSessionMethods() {
                     this.sessionsNextCursor = data.nextCursor || null;
                     this.sessionsHasMore = data.hasMore || false;
 
-                    // Get or create current thread ID
-                    const savedThreadId = localStorage.getItem('currentThreadId');
-                    if (!savedThreadId) {
-                        // No saved thread — pick first or create new
-                        if (this.sessions.length > 0) {
-                            this.switchSession(this.sessions[0].id);
-                        } else {
-                            this.createNewSession();
-                        }
-                    } else if (this.sessions.find(s => s.id === savedThreadId)) {
-                        // Saved thread is in the loaded page — restore it
-                        this.__currentThreadId = savedThreadId;
-                        this.__currentState = this.__getThreadState(savedThreadId);
-                        await this.__loadMessages(savedThreadId);
+                    // Pick the most recent thread (server returns threads most-recent-first),
+                    // or create a new one if the list is empty.
+                    if (this.sessions.length > 0) {
+                        this.switchSession(this.sessions[0].id);
                     } else {
-                        // Saved thread not in first page — try loading it directly
-                        try {
-                            const msgResp = await fetch(`/api/agui/threads/${savedThreadId}/messages`);
-                            if (msgResp.ok) {
-                                // Thread exists on server — restore it and prepend to session list
-                                this.sessions.unshift({
-                                    id: savedThreadId,
-                                    title: window.i18n.t('New Chat'),
-                                    groupTitle: null,
-                                    lastMessage: new Date().toISOString()
-                                });
-                                this.__currentThreadId = savedThreadId;
-                                this.__currentState = this.__getThreadState(savedThreadId);
-                                const data = await msgResp.json();
-                                const state = this.__getThreadState(savedThreadId);
-                                const messages = Array.isArray(data) ? data : (data.messages || []);
-                                state.messages = this.__convertBackendMessagesToUI(messages, data.toolStates || {}, savedThreadId, data.messageAttachments || {});
-                                this.__syncThreadToolStates(state.messages, data.toolStates || {}, savedThreadId);
-                                if (data.tokenUsage) {
-                                    state.tokenUsage = this.__mapTokenUsage ? this.__mapTokenUsage(data.tokenUsage) : data.tokenUsage;
-                                }
-                                this.$nextTick(() => this.__scrollToBottom({ behavior: 'auto', force: true }));
-                            } else {
-                                // Thread no longer exists — pick first or create new
-                                localStorage.removeItem('currentThreadId');
-                                if (this.sessions.length > 0) {
-                                    this.switchSession(this.sessions[0].id);
-                                } else {
-                                    this.createNewSession();
-                                }
-                            }
-                        } catch (_e) {
-                            // Network error — fall back to first session
-                            if (this.sessions.length > 0) {
-                                this.switchSession(this.sessions[0].id);
-                            } else {
-                                this.createNewSession();
-                            }
-                        }
+                        this.createNewSession();
                     }
 
                 } else {
@@ -222,7 +174,6 @@ export function createSessionMethods() {
             this.__threadStates[newSessionId] = newState;
             this.__currentThreadId = newSessionId;
             this.__currentState = newState;
-            localStorage.setItem('currentThreadId', newSessionId);
 
             // Announce to screen readers
             this.__announce(window.i18n.t('New chat session created'));
@@ -234,7 +185,6 @@ export function createSessionMethods() {
          */
         switchSession(sessionId) {
             this.__currentThreadId = sessionId;
-            localStorage.setItem('currentThreadId', sessionId);
 
             // Note: __currentState is updated automatically via $watch
             const state = this.__getThreadState(sessionId);
