@@ -39,30 +39,11 @@ type agentModelOverrideRequest struct {
 	ModelName string `json:"modelName"`
 }
 
-type createRequest struct {
-	Name                     string                     `json:"name"`
-	Description              string                     `json:"description"`
-	SystemPrompt             string                     `json:"systemPrompt"`
-	Icon                     string                     `json:"icon"`
-	Graph                    *CompositionNode           `json:"graph,omitempty"`
-	SubAgents                []*SubAgentRef             `json:"subAgents,omitempty"`
-	AgentTools               []*AgentToolRef            `json:"agentTools,omitempty"`
-	DisallowTransferToParent bool                       `json:"disallowTransferToParent"`
-	DisallowTransferToPeers  bool                       `json:"disallowTransferToPeers"`
-	OutputKey                string                     `json:"outputKey"`
-	IncludeContents          string                     `json:"includeContents"`
-	GlobalInstruction        string                     `json:"globalInstruction"`
-	InputSchema              string                     `json:"inputSchema"`
-	OutputSchema             string                     `json:"outputSchema"`
-	ModelConfig              *agentModelConfigRequest   `json:"modelConfig,omitempty"`
-	ModelOverride            *agentModelOverrideRequest `json:"modelOverride,omitempty"`
-	MemoryPolicy             *AgentMemoryPolicy         `json:"memoryPolicy,omitempty"`
-	ArtifactPolicy           *AgentArtifactPolicy       `json:"artifactPolicy,omitempty"`
-	CodeExecutionPolicy      *AgentCodeExecutionPolicy  `json:"codeExecutionPolicy,omitempty"`
-	StreamingPolicy          *AgentStreamingPolicy      `json:"streamingPolicy,omitempty"`
-}
-
-type updateRequest struct {
+// agentRequest is the shared JSON shape for POST /v1/agent-definitions and
+// PUT /v1/agent-definitions/{id}. Both endpoints accept the same field set —
+// the path variable supplies ID on update; icon is resolved per-endpoint
+// (default-filled on create, preserved-when-empty on update).
+type agentRequest struct {
 	Name                     string                     `json:"name"`
 	Description              string                     `json:"description"`
 	SystemPrompt             string                     `json:"systemPrompt"`
@@ -83,6 +64,37 @@ type updateRequest struct {
 	ArtifactPolicy           *AgentArtifactPolicy       `json:"artifactPolicy,omitempty"`
 	CodeExecutionPolicy      *AgentCodeExecutionPolicy  `json:"codeExecutionPolicy,omitempty"`
 	StreamingPolicy          *AgentStreamingPolicy      `json:"streamingPolicy,omitempty"`
+}
+
+// toAgentDefinition assembles an AgentDefinition from the request, with
+// explicit id/icon so the create and update paths can supply their own
+// resolution (create generates no ID and default-fills the icon; update
+// uses the path ID and preserves the existing icon when req.Icon is empty).
+func (req *agentRequest) toAgentDefinition(userID, id, icon string) *AgentDefinition {
+	return &AgentDefinition{
+		ID:                       id,
+		UserID:                   userID,
+		Name:                     req.Name,
+		Description:              req.Description,
+		SystemPrompt:             req.SystemPrompt,
+		Icon:                     icon,
+		Graph:                    req.Graph,
+		SubAgents:                req.SubAgents,
+		AgentTools:               req.AgentTools,
+		DisallowTransferToParent: req.DisallowTransferToParent,
+		DisallowTransferToPeers:  req.DisallowTransferToPeers,
+		OutputKey:                req.OutputKey,
+		IncludeContents:          req.IncludeContents,
+		GlobalInstruction:        req.GlobalInstruction,
+		InputSchemaJSON:          req.InputSchema,
+		OutputSchemaJSON:         req.OutputSchema,
+		ModelConfig:              toModelConfig(req.ModelConfig),
+		ModelOverride:            toModelOverride(req.ModelOverride),
+		MemoryPolicy:             req.MemoryPolicy,
+		ArtifactPolicy:           req.ArtifactPolicy,
+		CodeExecutionPolicy:      req.CodeExecutionPolicy,
+		StreamingPolicy:          req.StreamingPolicy,
+	}
 }
 
 type agentResponse struct {
@@ -209,7 +221,7 @@ func (h *storeHandler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req createRequest
+	var req agentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -220,29 +232,7 @@ func (h *storeHandler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	agent := &AgentDefinition{
-		UserID:                   user.ID,
-		Name:                     req.Name,
-		Description:              req.Description,
-		SystemPrompt:             req.SystemPrompt,
-		Icon:                     agentIconOrDefault(req.Icon),
-		Graph:                    req.Graph,
-		SubAgents:                req.SubAgents,
-		AgentTools:               req.AgentTools,
-		DisallowTransferToParent: req.DisallowTransferToParent,
-		DisallowTransferToPeers:  req.DisallowTransferToPeers,
-		OutputKey:                req.OutputKey,
-		IncludeContents:          req.IncludeContents,
-		GlobalInstruction:        req.GlobalInstruction,
-		InputSchemaJSON:          req.InputSchema,
-		OutputSchemaJSON:         req.OutputSchema,
-		ModelConfig:              toModelConfig(req.ModelConfig),
-		ModelOverride:            toModelOverride(req.ModelOverride),
-		MemoryPolicy:             req.MemoryPolicy,
-		ArtifactPolicy:           req.ArtifactPolicy,
-		CodeExecutionPolicy:      req.CodeExecutionPolicy,
-		StreamingPolicy:          req.StreamingPolicy,
-	}
+	agent := req.toAgentDefinition(user.ID, "", agentIconOrDefault(req.Icon))
 
 	if err := h.svc.create(r.Context(), agent); err != nil {
 		h.log.Error(r.Context(), "failed to create agent", "error", err)
@@ -325,7 +315,7 @@ func (h *storeHandler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req updateRequest
+	var req agentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -349,30 +339,7 @@ func (h *storeHandler) update(w http.ResponseWriter, r *http.Request) {
 		iconValue = req.Icon
 	}
 
-	agent := &AgentDefinition{
-		ID:                       agentID,
-		UserID:                   user.ID,
-		Name:                     req.Name,
-		Description:              req.Description,
-		SystemPrompt:             req.SystemPrompt,
-		Icon:                     iconValue,
-		Graph:                    req.Graph,
-		SubAgents:                req.SubAgents,
-		AgentTools:               req.AgentTools,
-		DisallowTransferToParent: req.DisallowTransferToParent,
-		DisallowTransferToPeers:  req.DisallowTransferToPeers,
-		OutputKey:                req.OutputKey,
-		IncludeContents:          req.IncludeContents,
-		GlobalInstruction:        req.GlobalInstruction,
-		InputSchemaJSON:          req.InputSchema,
-		OutputSchemaJSON:         req.OutputSchema,
-		ModelConfig:              toModelConfig(req.ModelConfig),
-		ModelOverride:            toModelOverride(req.ModelOverride),
-		MemoryPolicy:             req.MemoryPolicy,
-		ArtifactPolicy:           req.ArtifactPolicy,
-		CodeExecutionPolicy:      req.CodeExecutionPolicy,
-		StreamingPolicy:          req.StreamingPolicy,
-	}
+	agent := req.toAgentDefinition(user.ID, agentID, iconValue)
 
 	if err := h.svc.update(r.Context(), agent); err != nil {
 		h.log.Error(r.Context(), "failed to update agent", "error", err)
