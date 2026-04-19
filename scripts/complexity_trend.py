@@ -21,13 +21,27 @@ Classifies evolution as:
 from __future__ import annotations
 
 import argparse
+import json
 import math
+import re
 import statistics
 import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+
+SCHEMA_VERSION = "complexity-trend/1"
+
+# Regex covering the usual test-file conventions: Go (_test.go), JS
+# (.test.js/.spec.js/.test.ts), Python (test_*.py, *_test.py).
+_TEST_PATTERN = re.compile(
+    r"(_test\.go$|(?:\.test|\.spec)\.(?:jsx?|tsx?)$|(?:^|/)test_[^/]+\.py$|_test\.py$)"
+)
+
+
+def is_test_file(path: str) -> bool:
+    return bool(_TEST_PATTERN.search(path))
 
 
 VERDICT_COLORS = {
@@ -205,6 +219,15 @@ def classify(samples: list[Sample]) -> tuple[str, dict]:
     mean_delta = last.mean - first.mean
     refactor_dip_pct = (peak_total - last.total) / peak_total * 100 if peak_total else 0
 
+    # Recent-window deltas — answers "is this rotting right now?" as distinct
+    # from "did this rot at some point in the last 6 months?". Use the last
+    # ~30% of samples as the "recent" window, with a floor of 2 samples.
+    window = max(2, len(samples) // 3)
+    recent_first = samples[-window]
+    recent_loc_pct = (last.n - recent_first.n) / recent_first.n * 100 if recent_first.n else 0
+    recent_total_pct = (last.total - recent_first.total) / recent_first.total * 100 if recent_first.total else 0
+    recent_mean_delta = last.mean - recent_first.mean
+
     metrics = {
         "loc_delta_pct": round(loc_delta_pct, 1),
         "total_delta_pct": round(total_delta_pct, 1),
@@ -215,6 +238,11 @@ def classify(samples: list[Sample]) -> tuple[str, dict]:
         "first_max": first.maxi,
         "last_max": last.maxi,
         "samples": len(samples),
+        # Recent-window (last ~30% of samples) — measures active decay.
+        "recent_window": window,
+        "recent_loc_delta_pct": round(recent_loc_pct, 1),
+        "recent_total_delta_pct": round(recent_total_pct, 1),
+        "recent_mean_delta": round(recent_mean_delta, 3),
     }
     if refactor_dip_pct > 12:
         return "REFACTORED", metrics
@@ -578,7 +606,7 @@ def discover_candidates(since: str, min_commits: int, min_loc: int,
 
 
 def deterioration_score(metrics: dict) -> float:
-    """Rank how badly a file is deteriorating. Higher = worse.
+    """Rank how badly a file is deteriorating over the full period.
 
     Signals are size-normalized and gap is capped so a rewrite (tiny first
     blob → huge deltas) doesn't dominate. Mean-indent growth is the cleanest
@@ -592,6 +620,33 @@ def deterioration_score(metrics: dict) -> float:
     max_jump = 80.0 * max(0.0, metrics["last_max"] - metrics["first_max"])
     absolute_depth = 10.0 * metrics["last_mean"]        # already-deep matters
     return gap + mean_signal + max_jump + absolute_depth
+
+
+def recent_score(metrics: dict) -> float:
+    """Score deterioration *in the recent window only* — answers "is this
+    rotting right now?" as opposed to "did this rot at some point?".
+
+    Files that were deteriorating 4 months ago but have stabilized will
+    score low here. Files that look calm on the full-period view but are
+    actively decaying this week will score high.
+    """
+    if not metrics or metrics.get("recent_window", 0) < 2:
+        return 0.0
+    raw_gap = max(0.0, metrics["recent_total_delta_pct"] - metrics["recent_loc_delta_pct"])
+    gap = min(raw_gap, 80.0)
+    mean_signal = 200.0 * max(0.0, metrics["recent_mean_delta"])  # recent mean moves are stronger signal
+    return gap + mean_signal
+
+
+def is_active_decay(metrics: dict) -> bool:
+    """Pragmatic flag: the file is actively decaying in the recent window."""
+    if not metrics:
+        return False
+    return (
+        metrics.get("recent_mean_delta", 0) > 0.03
+        or (metrics.get("recent_total_delta_pct", 0) > metrics.get("recent_loc_delta_pct", 0) + 5
+            and metrics.get("recent_total_delta_pct", 0) > 3)
+    )
 
 
 # --- driver ---------------------------------------------------------------
@@ -620,19 +675,74 @@ def run(path: str, since: str, max_samples: int, quiet: bool = False) -> tuple[l
     return samples, verdict, metrics
 
 
+def _build_entry(
+    path: str, n_commits: int, loc: int,
+    samples: list[Sample], verdict: str, metrics: dict,
+) -> dict:
+    """Assemble a JSON-serializable entry describing one file's trend."""
+    bands = compute_bands(samples)
+    score = deterioration_score(metrics)
+    rscore = recent_score(metrics)
+    return {
+        "path": path,
+        "is_test": is_test_file(path),
+        "verdict": verdict,
+        "score": round(score, 1),
+        "recent_score": round(rscore, 1),
+        "active_decay": is_active_decay(metrics),
+        "commits": n_commits,
+        "loc": loc,
+        "samples": len(samples),
+        "metrics": metrics,
+        "first": {
+            "rev": samples[0].rev, "ts": samples[0].ts,
+            "n": samples[0].n, "total": samples[0].total,
+            "mean": samples[0].mean, "max": samples[0].maxi,
+        },
+        "last": {
+            "rev": samples[-1].rev, "ts": samples[-1].ts,
+            "n": samples[-1].n, "total": samples[-1].total,
+            "mean": samples[-1].mean, "max": samples[-1].maxi,
+        },
+        "segments": [
+            {
+                "from_ts": samples[s].ts, "to_ts": samples[e].ts,
+                "verdict": v,
+            }
+            for s, e, v in bands
+        ],
+    }
+
+
 def discover_mode(args) -> int:
-    """Scan the repo, rank files by deterioration, plot the top N."""
+    """Scan the repo, rank files by deterioration, plot the top N.
+
+    Now emits a structured JSON report covering every screened file (not
+    only the top N) so downstream tools (refactor_priority.py, CI gates)
+    can filter and diff without re-running the analysis.
+    """
     print(f"Discovering candidates touched since {args.since!r} "
           f"(≥{args.min_commits} commits, ≥{args.min_loc} LOC)...")
     candidates = discover_candidates(args.since, args.min_commits, args.min_loc,
                                      args.max_candidates)
-    print(f"  → {len(candidates)} candidates to screen.")
+
+    # Test-file filter — default exclude; tests rot differently (a 1000-line
+    # test file is usually fine, deep nesting in table-driven setup is fine).
+    if not args.include_tests:
+        before = len(candidates)
+        candidates = [c for c in candidates if not is_test_file(c[0])]
+        print(f"  → {len(candidates)} candidates to screen "
+              f"({before - len(candidates)} test files excluded; use --include-tests to keep).")
+    else:
+        print(f"  → {len(candidates)} candidates to screen.")
+
     if not candidates:
         print("  no candidates found.", file=sys.stderr)
         return 1
 
     print(f"Screening with {args.screen_samples} samples per file...")
-    screened: list[tuple[str, list[Sample], str, dict, float]] = []
+    all_entries: list[dict] = []
+    deteriorating: list[dict] = []
     for i, (path, n_commits, loc) in enumerate(candidates, 1):
         try:
             r = run(path, args.since, args.screen_samples, quiet=True)
@@ -641,45 +751,77 @@ def discover_mode(args) -> int:
         if r is None:
             continue
         samples, verdict, metrics = r
+        entry = _build_entry(path, n_commits, loc, samples, verdict, metrics)
+        all_entries.append(entry)
+
         if verdict != "DETERIORATING":
             continue
         # Skip files whose first sample was essentially empty — usually a
         # rewrite or brand-new file, not a deterioration.
         if samples[0].n < 100 or samples[0].total < 80:
             continue
-        score = deterioration_score(metrics)
-        screened.append((path, samples, verdict, metrics, score))
+        deteriorating.append(entry)
         print(f"  [{i:3d}/{len(candidates)}] {path}  "
-              f"commits={n_commits}  LOC={loc}  score={score:.1f}")
+              f"commits={n_commits}  LOC={loc}  score={entry['score']:.1f}  "
+              f"recent={entry['recent_score']:.1f}"
+              + ("  🔥" if entry["active_decay"] else ""))
 
-    screened.sort(key=lambda r: -r[4])
-    top = screened[:args.top]
+    # Rank by combined score: full-period + 1.5× recent (privileges current
+    # decay without ignoring long-term rot).
+    for e in deteriorating:
+        e["combined_score"] = round(e["score"] + 1.5 * e["recent_score"], 1)
+    deteriorating.sort(key=lambda e: -e["combined_score"])
+    top = deteriorating[:args.top]
+
     if not top:
         print("\nNo deteriorating files found. 🎉")
+    else:
+        print(f"\nTop {len(top)} deteriorating files (score = full + 1.5·recent):")
+        for rank, e in enumerate(top, 1):
+            flag = " 🔥 active" if e["active_decay"] else ""
+            print(f"  {rank:2d}. {e['path']:<60}  "
+                  f"total={e['combined_score']:6.1f}  "
+                  f"(full={e['score']:5.1f}  recent={e['recent_score']:5.1f}){flag}  "
+                  f"Δmean={e['metrics']['mean_delta']:+.2f}  "
+                  f"max={e['metrics']['last_max']:.0f}")
+
+    # JSON export — always on if --json path provided.
+    if args.json:
+        report = {
+            "schema": SCHEMA_VERSION,
+            "tool": "complexity_trend",
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "filters": {
+                "since": args.since,
+                "min_commits": args.min_commits,
+                "min_loc": args.min_loc,
+                "max_candidates": args.max_candidates,
+                "screen_samples": args.screen_samples,
+                "include_tests": args.include_tests,
+            },
+            "stats": {
+                "candidates_screened": len(all_entries),
+                "deteriorating_found": len(deteriorating),
+            },
+            "ranked": top,
+            "all": all_entries,
+        }
+        Path(args.json).write_text(json.dumps(report, indent=2))
+        print(f"\nJSON report: {args.json}")
+
+    if args.no_plot or not top:
         return 0
 
-    print(f"\nTop {len(top)} deteriorating files:")
-    for rank, (path, _, _, metrics, score) in enumerate(top, 1):
-        print(f"  {rank:2d}. {path:<70} score={score:6.1f}  "
-              f"Δt {metrics['total_delta_pct']:+.0f}%  "
-              f"ΔL {metrics['loc_delta_pct']:+.0f}%  "
-              f"Δmean {metrics['mean_delta']:+.2f}  "
-              f"last-max {metrics['last_max']:.0f}")
-
-    if args.no_plot:
-        return 0
-
-    # Re-run the top N at full sample count for prettier plots.
     out_dir = Path(args.out)
     print(f"\nRendering {len(top)} plots at {args.samples} samples each...")
     final: list[tuple[str, list[Sample], str, dict]] = []
-    for path, _, _, _, _ in top:
-        r = run(path, args.since, args.samples, quiet=True)
+    for e in top:
+        r = run(e["path"], args.since, args.samples, quiet=True)
         if r is None:
             continue
         samples, verdict, metrics = r
-        final.append((path, samples, verdict, metrics))
-        img = plot_file(path, samples, verdict, metrics, out_dir)
+        final.append((e["path"], samples, verdict, metrics))
+        img = plot_file(e["path"], samples, verdict, metrics, out_dir)
         if img:
             print(f"  wrote {img}")
 
@@ -716,6 +858,10 @@ def main() -> int:
                     help="cap on candidates to screen (default 120)")
     ap.add_argument("--screen-samples", type=int, default=6,
                     help="cheap-screening samples per file (default 6)")
+    ap.add_argument("--include-tests", action="store_true",
+                    help="keep test files in --discover results (default: exclude)")
+    ap.add_argument("--json", type=str,
+                    help="write a full structured report (all screened files) to this path")
     args = ap.parse_args()
 
     if args.discover:

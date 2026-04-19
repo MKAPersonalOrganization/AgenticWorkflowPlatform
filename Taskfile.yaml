@@ -254,6 +254,72 @@ tasks:
         [ -f "$F" ] || F=$(ls -t .hotspots/complexity_trend/*.png 2>/dev/null | head -1)
         [ -n "$F" ] && { xdg-open "$F" 2>/dev/null || open "$F" 2>/dev/null; } || true
 
+  # ─── Cross-signal refactor plan ───────────────────────────────────────
+  # scripts/refactor_priority.py synthesizes hotspot + trend + coupling
+  # signals into a prioritized plan. Files in ≥2 signals are Tier 1.
+  # Writes REFACTORING_PLAN.md at repo root.
+
+  refactor:plan:
+    desc: "Generate an evidence-based refactoring plan from all three analyzers. Env: SINCE (default '6 months ago'), TOP_PACKAGES (default 4)."
+    deps: [hotspots:setup]
+    vars:
+      SINCE: '{{.SINCE | default "6 months ago"}}'
+      TOP_PACKAGES: '{{.TOP_PACKAGES | default "4"}}'
+    cmds:
+      - mkdir -p .hotspots
+      - |
+        echo "▶ 1/4  Repo-wide package hotspots..."
+        .hotspots/.venv/bin/python3 scripts/go_hotspots.py . \
+          --since "{{.SINCE}}" --exclude '^frontend/' \
+          --json .hotspots/hotspots_repo.json \
+          --top-n 20 --no-image --quiet
+      - |
+        echo "▶ 2/4  Function-level drill-in for top {{.TOP_PACKAGES}} packages..."
+        TOP_PKGS=$(.hotspots/.venv/bin/python3 -c "
+        import json
+        d = json.load(open('.hotspots/hotspots_repo.json'))
+        for h in d['hotspots']:
+            if h['kind'] == 'package' and h.get('import_path') != 'aicompass':
+                # strip 'aicompass/' prefix for the path
+                ip = h['import_path']
+                if ip.startswith('aicompass/'):
+                    print(ip[len('aicompass/'):])
+        " | head -{{.TOP_PACKAGES}})
+        HS_ARGS=""
+        for pkg in $TOP_PKGS; do
+          if [ -d "$pkg" ]; then
+            out=".hotspots/hotspots_$(echo $pkg | tr '/' '_').json"
+            echo "  drilling $pkg"
+            .hotspots/.venv/bin/python3 scripts/go_hotspots.py "$pkg" \
+              --since "{{.SINCE}}" \
+              --json "$out" --top-n 10 --no-image --quiet || true
+          fi
+        done
+      - |
+        echo "▶ 3/4  Deterioration ranking..."
+        .hotspots/.venv/bin/python3 scripts/complexity_trend.py \
+          --discover --top 15 --since "{{.SINCE}}" --samples 15 --no-plot \
+          --json .hotspots/trends.json
+      - |
+        echo "▶ 4/4  File coupling..."
+        .hotspots/.venv/bin/python3 scripts/file_coupling.py . \
+          --since "{{.SINCE}}" -n 40 --min-cooc 6 -o .hotspots/coupling.json
+      - |
+        echo "▶ synthesize..."
+        HS_FLAGS="--hotspots .hotspots/hotspots_repo.json"
+        for f in .hotspots/hotspots_*.json; do
+          [ "$f" = ".hotspots/hotspots_repo.json" ] && continue
+          HS_FLAGS="$HS_FLAGS --hotspots $f"
+        done
+        .hotspots/.venv/bin/python3 scripts/refactor_priority.py \
+          $HS_FLAGS \
+          --trends .hotspots/trends.json \
+          --coupling .hotspots/coupling.json \
+          --out-md REFACTORING_PLAN.md \
+          --out-json .hotspots/refactor_plan.json \
+          --window "{{.SINCE}}"
+      - echo "" && echo "✓ Plan written to REFACTORING_PLAN.md"
+
   ci:
     desc: Run CI checks (format, lint, test, arch tests, build)
     cmds:
