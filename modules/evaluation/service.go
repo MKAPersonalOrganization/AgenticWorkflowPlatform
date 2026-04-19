@@ -37,16 +37,8 @@ func (s *service) createEvalSet(ctx context.Context, userID string, req EvalSetC
 	if err := validateEvalSetName(req.Name); err != nil {
 		return EvalSet{}, fmt.Errorf("%w: %w", ErrValidation, err)
 	}
-
-	// Check uniqueness
-	sets, err := s.repo.ListEvalSets(ctx, userID)
-	if err != nil {
-		return EvalSet{}, fmt.Errorf("checking name uniqueness: %w", err)
-	}
-	for _, es := range sets {
-		if strings.EqualFold(es.Name, req.Name) {
-			return EvalSet{}, fmt.Errorf("%w: an EvalSet named %q already exists", ErrDuplicateName, req.Name)
-		}
+	if err := s.checkEvalSetNameUnique(ctx, userID, req.Name); err != nil {
+		return EvalSet{}, err
 	}
 
 	es := EvalSet{
@@ -337,6 +329,84 @@ func validateExpectedTrajectory(data json.RawMessage) error {
 
 // ─── Import / Export ─────────────────────────────────────────────────────────
 
+// checkEvalSetNameUnique rejects a name already taken by another EvalSet
+// belonging to the same user. Returns ErrDuplicateName on conflict.
+func (s *service) checkEvalSetNameUnique(ctx context.Context, userID, name string) error {
+	sets, err := s.repo.ListEvalSets(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("checking name uniqueness: %w", err)
+	}
+	for _, es := range sets {
+		if strings.EqualFold(es.Name, name) {
+			return fmt.Errorf("%w: an EvalSet named %q already exists", ErrDuplicateName, name)
+		}
+	}
+	return nil
+}
+
+// validateImportedEvalCase runs every shape check required for a case
+// pulled from an EvalSet export envelope. Error messages already include
+// the eval_cases[i] prefix so callers can just return them.
+func validateImportedEvalCase(ec EvalCaseExport, i int) error {
+	if strings.TrimSpace(ec.Input) == "" {
+		return fmt.Errorf("%w: eval_cases[%d]: input is required", ErrValidation, i)
+	}
+	if len(ec.Input) > 10000 {
+		return fmt.Errorf("%w: eval_cases[%d]: input must be at most 10000 characters", ErrValidation, i)
+	}
+	if ec.ExpectedTrajectory != nil {
+		raw, err := json.Marshal(ec.ExpectedTrajectory)
+		if err != nil {
+			return fmt.Errorf("%w: eval_cases[%d]: invalid expected_trajectory: %w", ErrValidation, i, err)
+		}
+		if err := validateExpectedTrajectory(raw); err != nil {
+			return fmt.Errorf("%w: eval_cases[%d]: %w", ErrValidation, i, err)
+		}
+	}
+	if ec.Rubrics != nil {
+		if raw, err := json.Marshal(ec.Rubrics); err != nil || !json.Valid(raw) {
+			return fmt.Errorf("%w: eval_cases[%d]: rubrics must be valid JSON", ErrValidation, i)
+		}
+	}
+	if ec.UserMessages != nil {
+		if raw, err := json.Marshal(ec.UserMessages); err != nil || !json.Valid(raw) {
+			return fmt.Errorf("%w: eval_cases[%d]: user_messages must be valid JSON", ErrValidation, i)
+		}
+	}
+	return nil
+}
+
+// buildImportedEvalCase converts an export envelope entry into the
+// persistent EvalCase shape. JSON fields have already passed validation
+// in validateImportedEvalCase, so the Marshal calls here cannot fail in
+// practice — errors are swallowed to keep the call site linear.
+func buildImportedEvalCase(ec EvalCaseExport, evalSetID uuid.UUID, sortOrder int, now time.Time) EvalCase {
+	var trajRaw, rubricsRaw, userMsgsRaw json.RawMessage
+	if ec.ExpectedTrajectory != nil {
+		trajRaw, _ = json.Marshal(ec.ExpectedTrajectory)
+	}
+	if ec.Rubrics != nil {
+		rubricsRaw, _ = json.Marshal(ec.Rubrics)
+	}
+	if ec.UserMessages != nil {
+		userMsgsRaw, _ = json.Marshal(ec.UserMessages)
+	}
+	return EvalCase{
+		ID:                 uuid.New(),
+		EvalSetID:          evalSetID,
+		Name:               ec.Name,
+		Input:              strings.TrimSpace(ec.Input),
+		ExpectedTrajectory: trajRaw,
+		ExpectedResponse:   ec.ExpectedResponse,
+		Rubrics:            rubricsRaw,
+		UserMessages:       userMsgsRaw,
+		SortOrder:          sortOrder,
+		CreatedAt:          now,
+		UpdatedAt:          now,
+	}
+}
+
+
 // ImportEvalSet parses an ADK-compatible JSON EvalSet, validates it, and
 // atomically inserts the EvalSet with all its EvalCases in a single transaction.
 func (s *service) importEvalSet(ctx context.Context, userID string, data []byte) (EvalSet, error) {
@@ -345,97 +415,35 @@ func (s *service) importEvalSet(ctx context.Context, userID string, data []byte)
 		return EvalSet{}, fmt.Errorf("%w: invalid JSON: %w", ErrValidation, err)
 	}
 
-	// Validate EvalSet
 	if err := validateEvalSetName(export.Name); err != nil {
 		return EvalSet{}, fmt.Errorf("%w: %w", ErrValidation, err)
 	}
-
-	// Check name uniqueness
-	sets, err := s.repo.ListEvalSets(ctx, userID)
-	if err != nil {
-		return EvalSet{}, fmt.Errorf("checking name uniqueness: %w", err)
+	if err := s.checkEvalSetNameUnique(ctx, userID, export.Name); err != nil {
+		return EvalSet{}, err
 	}
-	for _, es := range sets {
-		if strings.EqualFold(es.Name, export.Name) {
-			return EvalSet{}, fmt.Errorf("%w: an EvalSet named %q already exists", ErrDuplicateName, export.Name)
-		}
-	}
-
 	if len(export.Cases) == 0 {
 		return EvalSet{}, fmt.Errorf("%w: eval_cases cannot be empty", ErrValidation)
 	}
-
-	// Validate each EvalCase
 	for i, ec := range export.Cases {
-		if strings.TrimSpace(ec.Input) == "" {
-			return EvalSet{}, fmt.Errorf("%w: eval_cases[%d]: input is required", ErrValidation, i)
-		}
-		if len(ec.Input) > 10000 {
-			return EvalSet{}, fmt.Errorf("%w: eval_cases[%d]: input must be at most 10000 characters", ErrValidation, i)
-		}
-		// Validate trajectory if provided
-		if ec.ExpectedTrajectory != nil {
-			raw, err := json.Marshal(ec.ExpectedTrajectory)
-			if err != nil {
-				return EvalSet{}, fmt.Errorf("%w: eval_cases[%d]: invalid expected_trajectory: %w", ErrValidation, i, err)
-			}
-			if err := validateExpectedTrajectory(raw); err != nil {
-				return EvalSet{}, fmt.Errorf("%w: eval_cases[%d]: %w", ErrValidation, i, err)
-			}
-		}
-		// Validate rubrics if provided (must be valid JSON)
-		if ec.Rubrics != nil {
-			raw, err := json.Marshal(ec.Rubrics)
-			if err != nil || !json.Valid(raw) {
-				return EvalSet{}, fmt.Errorf("%w: eval_cases[%d]: rubrics must be valid JSON", ErrValidation, i)
-			}
-		}
-		// Validate user_messages if provided
-		if ec.UserMessages != nil {
-			raw, err := json.Marshal(ec.UserMessages)
-			if err != nil || !json.Valid(raw) {
-				return EvalSet{}, fmt.Errorf("%w: eval_cases[%d]: user_messages must be valid JSON", ErrValidation, i)
-			}
+		if err := validateImportedEvalCase(ec, i); err != nil {
+			return EvalSet{}, err
 		}
 	}
 
-	// Build EvalSet and EvalCases for atomic insert
 	evalSetID := uuid.New()
+	now := time.Now()
 	es := EvalSet{
 		ID:          evalSetID,
 		UserID:      userID,
 		Name:        strings.TrimSpace(export.Name),
 		Description: export.Desc,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 
 	cases := make([]EvalCase, 0, len(export.Cases))
 	for i, ec := range export.Cases {
-		var trajRaw, rubricsRaw, userMsgsRaw json.RawMessage
-		if ec.ExpectedTrajectory != nil {
-			trajRaw, _ = json.Marshal(ec.ExpectedTrajectory)
-		}
-		if ec.Rubrics != nil {
-			rubricsRaw, _ = json.Marshal(ec.Rubrics)
-		}
-		if ec.UserMessages != nil {
-			userMsgsRaw, _ = json.Marshal(ec.UserMessages)
-		}
-
-		cases = append(cases, EvalCase{
-			ID:                 uuid.New(),
-			EvalSetID:          evalSetID,
-			Name:               ec.Name,
-			Input:              strings.TrimSpace(ec.Input),
-			ExpectedTrajectory: trajRaw,
-			ExpectedResponse:   ec.ExpectedResponse,
-			Rubrics:            rubricsRaw,
-			UserMessages:       userMsgsRaw,
-			SortOrder:          i,
-			CreatedAt:          time.Now(),
-			UpdatedAt:          time.Now(),
-		})
+		cases = append(cases, buildImportedEvalCase(ec, evalSetID, i, now))
 	}
 
 	if err := s.repo.CreateEvalSetWithCases(ctx, es, cases); err != nil {
