@@ -26,3 +26,5 @@ tls/
 # Hotspot analysis output
 .hotspots/
 .venv-scripts/
+scripts/out/
+scripts/__pycache__/
