@@ -2,7 +2,10 @@ module aicompass
 
 go 1.25.0
 
-tool github.com/a-h/templ/cmd/templ
+tool (
+	github.com/a-h/templ/cmd/templ
+	github.com/templui/templui/cmd/templui
+)
 
 require (
 	github.com/Oudwins/tailwind-merge-go v0.2.1
@@ -91,6 +94,7 @@ require (
 	github.com/segmentio/asm v1.2.1 // indirect
 	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
+	github.com/templui/templui v1.9.6 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.2.0 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
