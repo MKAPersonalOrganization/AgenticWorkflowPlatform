@@ -142,36 +142,8 @@ func (s *Service) Confirmation() *ConfirmationRequirement {
 // Returns (needsConfirmation, hint). Used by the adapter layer to build
 // ADK-native BeforeToolCallbacks that call ctx.RequestConfirmation().
 func (s *Service) CheckConfirmation(ctx context.Context, userID, agentID, toolSetID, toolName string, args map[string]any) (bool, string) {
-	s.log.Info(ctx, "CheckConfirmation called",
-		"user_id", userID,
-		"agent_id", agentID,
-		"tool_set_id", toolSetID,
-		"tool_name", toolName,
-	)
-
-	// For debug-level visibility into which tool-sets the user has flagged
-	// with require_confirmation before we fan out the per-tool checks.
-	confirmSets, err := s.store.ToolSetsWithConfirmation(ctx, userID, agentID)
-	if err == nil {
-		s.log.Info(ctx, "Tool sets with require_confirmation",
-			"user_id", userID,
-			"agent_id", agentID,
-			"tool_sets", confirmSets,
-		)
-	}
-
-	needsConfirm, hint := CheckConfirmation(ctx, s.store, s, s.confirmReq,
+	return CheckConfirmation(ctx, s.store, s, s.confirmReq,
 		userID, agentID, toolSetID, toolName, args)
-
-	s.log.Info(ctx, "CheckConfirmation result",
-		"user_id", userID,
-		"agent_id", agentID,
-		"tool_name", toolName,
-		"needs_confirmation", needsConfirm,
-		"hint", hint,
-	)
-
-	return needsConfirm, hint
 }
 
 // RequiresConfirmation checks if a specific tool call requires user
@@ -195,14 +167,12 @@ func (s *Service) BlockMiddleware(agentID string) agent.Middleware {
 }
 
 // IsToolInToolSet checks if a tool belongs to a specific toolset, looking
-// the membership up through the registry. The userID/agentID parameters
-// are unused today but kept for forward compatibility — per-user toolset
-// membership is on the roadmap.
+// the membership up through the registry.
 //
 // Lives on Service (not the store) because it consults the tool registry,
 // which is an evaluation-time dependency distinct from the permission
 // database.
-func (s *Service) IsToolInToolSet(ctx context.Context, userID, agentID, toolSetID, toolName string) (bool, error) {
+func (s *Service) IsToolInToolSet(ctx context.Context, toolSetID, toolName string) (bool, error) {
 	if s.toolRegistry == nil {
 		return false, nil
 	}

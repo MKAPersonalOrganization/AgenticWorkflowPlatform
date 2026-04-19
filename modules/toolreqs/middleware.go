@@ -79,7 +79,7 @@ func BlockMiddleware(checker blockChecker, agentID string) agent.Middleware {
 // toolMembershipChecker answers "is tool X a member of tool set Y?".
 // Implemented by [Service] via the tool registry.
 type toolMembershipChecker interface {
-	IsToolInToolSet(ctx context.Context, userID, agentID, toolSetID, toolName string) (bool, error)
+	IsToolInToolSet(ctx context.Context, toolSetID, toolName string) (bool, error)
 }
 
 // CheckConfirmation determines whether a tool call needs user
@@ -121,7 +121,7 @@ func CheckConfirmation(
 				for _, tsID := range confToolSets {
 					tsCfg, err := store.GetToolSetRequirementConfig(ctx, userID, agentID, tsID)
 					if err == nil && (tsCfg.Action == RequirementActionRequireConfirmation || tsCfg.RequireConfirmation) {
-						toolInSet, lookupErr := membership.IsToolInToolSet(ctx, userID, agentID, tsID, toolName)
+						toolInSet, lookupErr := membership.IsToolInToolSet(ctx, tsID, toolName)
 						if lookupErr == nil && toolInSet {
 							return true, tsCfg.ConfirmationHint
 						}
