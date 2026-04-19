@@ -338,59 +338,76 @@ func translateStateDelta(evt *session.Event, ctx EventContext) []thread.Event {
 		return nil
 	}
 
-	// Check for A2A artifact marker embedded by buildRemoteAgentNode in workflow.go.
-	// When a remote A2A agent yields an artifact chunk, the workflow node encodes
-	// the artifact metadata into StateDelta["__a2a_artifact__"] and emits a
-	// content-less session event so artifacts reach the frontend as a separate
-	// thread.A2AArtifactReceived event — distinct from the streaming text bubble.
-	// Check for file attachment marker.
+	// A2A sub-agents encode file / artifact metadata as "__a2a_*" markers
+	// in the state delta (see buildRemoteAgentNode in workflow.go). These
+	// short-circuit the normal state-change emission path so the frontend
+	// sees them as dedicated events, not as opaque state writes.
 	if fileRaw, ok := evt.Actions.StateDelta["__a2a_file__"]; ok {
-		if fileJSON, ok := fileRaw.(string); ok && fileJSON != "" {
-			var info struct {
-				FileURL  string `json:"fileURL"`
-				FileName string `json:"fileName"`
-				MimeType string `json:"mimeType"`
-			}
-			if err := json.Unmarshal([]byte(fileJSON), &info); err == nil && info.FileURL != "" {
-				return []thread.Event{&thread.FileAttachmentReceived{
-					ThreadID:  ctx.ThreadID,
-					MessageID: evt.ID,
-					AgentName: ctx.AgentName,
-					FileURL:   info.FileURL,
-					FileName:  info.FileName,
-					MimeType:  info.MimeType,
-					Timestamp: coalesceTime(evt.Timestamp),
-				}}
-			}
-		}
-		return nil
+		return a2aFileEvent(fileRaw, evt, ctx)
 	}
-
 	if artifactRaw, ok := evt.Actions.StateDelta["__a2a_artifact__"]; ok {
-		if artifactJSON, ok := artifactRaw.(string); ok && artifactJSON != "" {
-			var info struct {
-				ArtifactID string `json:"artifactId"`
-				Title      string `json:"title"`
-				Content    string `json:"content"`
-			}
-			if err := json.Unmarshal([]byte(artifactJSON), &info); err == nil && info.Content != "" {
-				return []thread.Event{&thread.A2AArtifactReceived{
-					ThreadID:   ctx.ThreadID,
-					MessageID:  evt.ID,
-					AgentName:  ctx.AgentName,
-					ArtifactID: info.ArtifactID,
-					Title:      info.Title,
-					Content:    info.Content,
-					Timestamp:  coalesceTime(evt.Timestamp),
-				}}
-			}
-		}
+		return a2aArtifactEvent(artifactRaw, evt, ctx)
+	}
+	return stateChangeEvents(evt, ctx)
+}
+
+// a2aFileEvent decodes an "__a2a_file__" marker into a
+// FileAttachmentReceived event, or returns nil when the marker is
+// malformed or empty (never promoted into a regular state change).
+func a2aFileEvent(raw any, evt *session.Event, ctx EventContext) []thread.Event {
+	fileJSON, ok := raw.(string)
+	if !ok || fileJSON == "" {
 		return nil
 	}
+	var info struct {
+		FileURL  string `json:"fileURL"`
+		FileName string `json:"fileName"`
+		MimeType string `json:"mimeType"`
+	}
+	if err := json.Unmarshal([]byte(fileJSON), &info); err != nil || info.FileURL == "" {
+		return nil
+	}
+	return []thread.Event{&thread.FileAttachmentReceived{
+		ThreadID:  ctx.ThreadID,
+		MessageID: evt.ID,
+		AgentName: ctx.AgentName,
+		FileURL:   info.FileURL,
+		FileName:  info.FileName,
+		MimeType:  info.MimeType,
+		Timestamp: coalesceTime(evt.Timestamp),
+	}}
+}
 
-	// Emit StateChangeReported for user-visible state mutations.
-	// Suppressed: internal markers ("__" prefix) and ADK-Go ephemeral scope ("temp:" prefix).
-	// Reported: session-scoped, app-scoped ("app:"), and user-scoped ("user:") keys.
+// a2aArtifactEvent decodes an "__a2a_artifact__" marker into an
+// A2AArtifactReceived event, or returns nil when malformed.
+func a2aArtifactEvent(raw any, evt *session.Event, ctx EventContext) []thread.Event {
+	artifactJSON, ok := raw.(string)
+	if !ok || artifactJSON == "" {
+		return nil
+	}
+	var info struct {
+		ArtifactID string `json:"artifactId"`
+		Title      string `json:"title"`
+		Content    string `json:"content"`
+	}
+	if err := json.Unmarshal([]byte(artifactJSON), &info); err != nil || info.Content == "" {
+		return nil
+	}
+	return []thread.Event{&thread.A2AArtifactReceived{
+		ThreadID:   ctx.ThreadID,
+		MessageID:  evt.ID,
+		AgentName:  ctx.AgentName,
+		ArtifactID: info.ArtifactID,
+		Title:      info.Title,
+		Content:    info.Content,
+		Timestamp:  coalesceTime(evt.Timestamp),
+	}}
+}
+
+// stateChangeEvents emits one StateChangeReported per user-visible key.
+// Internal markers ("__" prefix) and ephemeral ADK scope ("temp:" prefix)
+// are suppressed; session- / app: / user:-scoped keys are reported.
+func stateChangeEvents(evt *session.Event, ctx EventContext) []thread.Event {
 	var events []thread.Event
 	now := coalesceTime(evt.Timestamp)
 	for k, v := range evt.Actions.StateDelta {
