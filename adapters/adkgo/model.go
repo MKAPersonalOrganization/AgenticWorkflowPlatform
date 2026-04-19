@@ -287,74 +287,78 @@ func contentsToOpenAI(contents []*genai.Content) []openai.ChatCompletionMessageP
 // contentToOpenAI converts a single genai.Content to one or more OpenAI messages.
 // Internal ADK tools (starting with "adk_") and their responses are filtered out.
 func contentToOpenAI(c *genai.Content) []openai.ChatCompletionMessageParamUnion {
-	var msgs []openai.ChatCompletionMessageParamUnion
-
 	switch c.Role {
 	case "user":
-		text := extractText(c)
-		if text != "" {
-			msgs = append(msgs, openai.UserMessage(text))
-		}
-		// Also handle function responses from user role (tool results).
-		for _, p := range c.Parts {
-			if p.FunctionResponse != nil {
-				// Filter out internal tool responses (e.g. adk_request_confirmation).
-				if strings.HasPrefix(p.FunctionResponse.Name, "adk_") {
-					continue
-				}
-				resultJSON, _ := json.Marshal(p.FunctionResponse.Response)
-				msgs = append(msgs, openai.ToolMessage(string(resultJSON), p.FunctionResponse.ID))
-			}
-		}
-
+		return userContentToOpenAI(c)
 	case "model":
-		var textParts []string
-		var toolCalls []openai.ChatCompletionMessageToolCallUnionParam
-
-		for _, p := range c.Parts {
-			if p.Text != "" {
-				textParts = append(textParts, p.Text)
-			}
-			if p.FunctionCall != nil {
-				// Filter out internal tool calls (e.g. adk_request_confirmation).
-				if strings.HasPrefix(p.FunctionCall.Name, "adk_") {
-					continue
-				}
-				argsJSON, _ := json.Marshal(p.FunctionCall.Args)
-				toolCalls = append(toolCalls, openai.ChatCompletionMessageToolCallUnionParam{
-					OfFunction: &openai.ChatCompletionMessageFunctionToolCallParam{
-						ID: p.FunctionCall.ID,
-						Function: openai.ChatCompletionMessageFunctionToolCallFunctionParam{
-							Name:      p.FunctionCall.Name,
-							Arguments: string(argsJSON),
-						},
-					},
-				})
-			}
-		}
-
-		text := strings.Join(textParts, "")
-		if len(toolCalls) > 0 {
-			var asst openai.ChatCompletionAssistantMessageParam
-			if text != "" {
-				asst.Content.OfString = openai.String(text)
-			}
-			asst.Role = "assistant"
-			asst.ToolCalls = toolCalls
-			msgs = append(msgs, openai.ChatCompletionMessageParamUnion{OfAssistant: &asst})
-		} else if text != "" {
-			msgs = append(msgs, openai.AssistantMessage(text))
-		}
-
+		return modelContentToOpenAI(c)
 	default:
 		// Treat unknown roles as user.
-		text := extractText(c)
-		if text != "" {
-			msgs = append(msgs, openai.UserMessage(text))
+		if text := extractText(c); text != "" {
+			return []openai.ChatCompletionMessageParamUnion{openai.UserMessage(text)}
+		}
+		return nil
+	}
+}
+
+// userContentToOpenAI emits one UserMessage for any text plus one
+// ToolMessage per FunctionResponse. Internal ADK responses (adk_* names)
+// are filtered — the host side of the ADK HITL protocol never crosses
+// the provider boundary.
+func userContentToOpenAI(c *genai.Content) []openai.ChatCompletionMessageParamUnion {
+	var msgs []openai.ChatCompletionMessageParamUnion
+	if text := extractText(c); text != "" {
+		msgs = append(msgs, openai.UserMessage(text))
+	}
+	for _, p := range c.Parts {
+		if p.FunctionResponse == nil || strings.HasPrefix(p.FunctionResponse.Name, "adk_") {
+			continue
+		}
+		resultJSON, _ := json.Marshal(p.FunctionResponse.Response)
+		msgs = append(msgs, openai.ToolMessage(string(resultJSON), p.FunctionResponse.ID))
+	}
+	return msgs
+}
+
+// modelContentToOpenAI emits either an AssistantMessage (text-only) or an
+// AssistantMessageParam that carries text + tool calls. Internal adk_*
+// function calls are filtered for the same reason as in
+// userContentToOpenAI.
+func modelContentToOpenAI(c *genai.Content) []openai.ChatCompletionMessageParamUnion {
+	var textParts []string
+	var toolCalls []openai.ChatCompletionMessageToolCallUnionParam
+	for _, p := range c.Parts {
+		if p.Text != "" {
+			textParts = append(textParts, p.Text)
+		}
+		if p.FunctionCall != nil && !strings.HasPrefix(p.FunctionCall.Name, "adk_") {
+			argsJSON, _ := json.Marshal(p.FunctionCall.Args)
+			toolCalls = append(toolCalls, openai.ChatCompletionMessageToolCallUnionParam{
+				OfFunction: &openai.ChatCompletionMessageFunctionToolCallParam{
+					ID: p.FunctionCall.ID,
+					Function: openai.ChatCompletionMessageFunctionToolCallFunctionParam{
+						Name:      p.FunctionCall.Name,
+						Arguments: string(argsJSON),
+					},
+				},
+			})
 		}
 	}
-
-	return msgs
+	text := strings.Join(textParts, "")
+	if len(toolCalls) > 0 {
+		asst := openai.ChatCompletionAssistantMessageParam{
+			Role:      "assistant",
+			ToolCalls: toolCalls,
+		}
+		if text != "" {
+			asst.Content.OfString = openai.String(text)
+		}
+		return []openai.ChatCompletionMessageParamUnion{{OfAssistant: &asst}}
+	}
+	if text != "" {
+		return []openai.ChatCompletionMessageParamUnion{openai.AssistantMessage(text)}
+	}
+	return nil
 }
 
 // extractText concatenates all text parts from a genai.Content.
