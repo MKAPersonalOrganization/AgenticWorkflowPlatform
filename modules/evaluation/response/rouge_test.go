@@ -212,11 +212,17 @@ func TestFinalResponseMatchV2Evaluator_PartialSimilarity(t *testing.T) {
 
 func TestEvaluators_Registered(t *testing.T) {
 	t.Parallel()
+	// Use a local registrar — see hallucination/evaluator_test.go for why.
+	registry := map[string]evaluation.Evaluator{}
+	RegisterEvaluators(func(e evaluation.Evaluator) {
+		registry[e.MetricID()] = e
+	})
 	ids := []string{"response_match_score", "response_evaluation_score", "final_response_match_v2"}
 	for _, id := range ids {
-		eval := evaluation.GetEvaluator(id)
-		if eval == nil {
-			t.Errorf("evaluator %q not registered", id)
+		eval, ok := registry[id]
+		if !ok {
+			t.Errorf("evaluator %q not registered by RegisterEvaluators", id)
+			continue
 		}
 		if eval.MetricID() != id {
 			t.Errorf("expected metric ID %q, got %q", id, eval.MetricID())

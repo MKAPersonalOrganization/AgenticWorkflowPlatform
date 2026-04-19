@@ -3,11 +3,41 @@ package adkgo
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"testing"
 
 	fagent "aicompass/foundation/agent"
 	"aicompass/modules/evaluation"
 )
+
+// requireRealGeminiKey skips the test unless a real Gemini API key is
+// available in the environment. These EvalRunner tests drive the ADK
+// runner end-to-end — they need a live model to produce a response,
+// otherwise the assertions (non-empty FinalResponse, captured ToolCalls)
+// can't be satisfied. Mirrors the gating pattern in userrequirements/.
+func requireRealGeminiKey(t *testing.T) {
+	t.Helper()
+	for _, name := range []string{"GEMINI_API_KEY", "GOOGLE_API_KEY"} {
+		if key := os.Getenv(name); key != "" {
+			return
+		}
+	}
+	t.Skip("GEMINI_API_KEY / GOOGLE_API_KEY not set — skipping live-LLM EvalRunner test")
+}
+
+// geminiModelConfig returns a config using the real key from the
+// environment, for tests that actually need to call Gemini.
+func geminiModelConfig() *fagent.ModelConfig {
+	key := os.Getenv("GEMINI_API_KEY")
+	if key == "" {
+		key = os.Getenv("GOOGLE_API_KEY")
+	}
+	return &fagent.ModelConfig{
+		Provider: "gemini",
+		Model:    "gemini-2.5-flash",
+		APIKey:   key,
+	}
+}
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Test helpers: mock agent evaluator provider
@@ -54,6 +84,7 @@ func TestEvalRunner_SimpleAgent(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
+	requireRealGeminiKey(t)
 
 	t.Parallel()
 
@@ -75,7 +106,7 @@ func TestEvalRunner_SimpleAgent(t *testing.T) {
 		},
 	}
 
-	runner := NewEvalRunner(provider, &mockEvalConfigResolver{}, &mockAPIKeyResolver{})
+	runner := NewEvalRunner(provider, &mockEvalConfigResolver{cfg: geminiModelConfig()}, &mockAPIKeyResolver{})
 
 	ctx := context.Background()
 	req := evaluation.EvalInvokeRequest{
@@ -131,6 +162,9 @@ func TestEvalRunner_WithModelOverride(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
+	if os.Getenv("OPENAI_API_KEY") == "" {
+		t.Skip("OPENAI_API_KEY not set — skipping live-LLM model-override test")
+	}
 
 	t.Parallel()
 
@@ -179,6 +213,7 @@ func TestEvalRunner_CapturesToolCalls(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
+	requireRealGeminiKey(t)
 
 	t.Parallel()
 
@@ -200,7 +235,7 @@ func TestEvalRunner_CapturesToolCalls(t *testing.T) {
 		},
 	}
 
-	runner := NewEvalRunner(provider, &mockEvalConfigResolver{}, &mockAPIKeyResolver{})
+	runner := NewEvalRunner(provider, &mockEvalConfigResolver{cfg: geminiModelConfig()}, &mockAPIKeyResolver{})
 
 	ctx := context.Background()
 	req := evaluation.EvalInvokeRequest{

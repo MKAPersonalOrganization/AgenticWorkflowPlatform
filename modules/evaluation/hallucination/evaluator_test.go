@@ -295,12 +295,25 @@ func TestHallucinationEvaluator_NoExpectedResponse(t *testing.T) {
 
 func TestEvaluators_Registered(t *testing.T) {
 	t.Parallel()
-	eval := evaluation.GetEvaluator("hallucinations_v1")
-	if eval == nil {
-		t.Fatal("hallucinations_v1 evaluator not registered")
+	// Registration is driven by main.go in production. Test the contract
+	// directly with a local registrar so we don't depend on global state
+	// (which would otherwise require a TestMain hook just to populate it).
+	var registered []evaluation.Evaluator
+	RegisterEvaluators(func(e evaluation.Evaluator) {
+		registered = append(registered, e)
+	})
+	var got evaluation.Evaluator
+	for _, e := range registered {
+		if e.MetricID() == "hallucinations_v1" {
+			got = e
+			break
+		}
 	}
-	if eval.MetricID() != "hallucinations_v1" {
-		t.Errorf("expected metric ID hallucinations_v1, got %s", eval.MetricID())
+	if got == nil {
+		t.Fatal("hallucinations_v1 evaluator not registered by RegisterEvaluators")
+	}
+	if got.MetricID() != "hallucinations_v1" {
+		t.Errorf("expected metric ID hallucinations_v1, got %s", got.MetricID())
 	}
 }
 

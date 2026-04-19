@@ -137,14 +137,20 @@ func TestToolUseQualityEvaluator_CorrectTools(t *testing.T) {
 
 func TestEvaluators_Registered(t *testing.T) {
 	t.Parallel()
+	// Use a local registrar — see hallucination/evaluator_test.go for why.
+	registry := map[string]evaluation.Evaluator{}
+	RegisterEvaluators(func(e evaluation.Evaluator) {
+		registry[e.MetricID()] = e
+	})
 	ids := []string{
 		"rubric_based_final_response_quality_v1",
 		"rubric_based_tool_use_quality_v1",
 	}
 	for _, id := range ids {
-		eval := evaluation.GetEvaluator(id)
-		if eval == nil {
-			t.Errorf("evaluator %q not registered", id)
+		eval, ok := registry[id]
+		if !ok {
+			t.Errorf("evaluator %q not registered by RegisterEvaluators", id)
+			continue
 		}
 		if eval.MetricID() != id {
 			t.Errorf("expected metric ID %q, got %q", id, eval.MetricID())

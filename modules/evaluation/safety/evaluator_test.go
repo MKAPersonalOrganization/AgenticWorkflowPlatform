@@ -244,11 +244,22 @@ func TestSafetyEvaluator_DetailsIncludeFlaggedCategories(t *testing.T) {
 
 func TestSafetyEvaluator_Registered(t *testing.T) {
 	t.Parallel()
-	eval := evaluation.GetEvaluator("safety_v1")
-	if eval == nil {
-		t.Fatal("safety_v1 evaluator not registered")
+	// Use a local registrar — see hallucination/evaluator_test.go for why.
+	var registered []evaluation.Evaluator
+	RegisterEvaluators(func(e evaluation.Evaluator) {
+		registered = append(registered, e)
+	})
+	var got evaluation.Evaluator
+	for _, e := range registered {
+		if e.MetricID() == "safety_v1" {
+			got = e
+			break
+		}
 	}
-	if eval.MetricID() != "safety_v1" {
-		t.Errorf("expected metric ID safety_v1, got %s", eval.MetricID())
+	if got == nil {
+		t.Fatal("safety_v1 evaluator not registered by RegisterEvaluators")
+	}
+	if got.MetricID() != "safety_v1" {
+		t.Errorf("expected metric ID safety_v1, got %s", got.MetricID())
 	}
 }
