@@ -183,7 +183,21 @@
   }
 
   /* ========================================
-   * Glassmorphism Utilities
+   * Glassmorphism Utilities — system tier
+   * ----------------------------------------
+   * bg/border/blur are all driven by themed --glass-* tokens in
+   * themes.css, so every surface adapts to light and dark without per-
+   * theme overrides at the callsite.
+   *
+   *   .glass-heavy → dialogs, sheets, command palette
+   *                  (strongest optical separation — 24px + saturate)
+   *   .glass       → dropdowns, popovers, context menus, tooltips
+   *                  (general floating surface — themed blur)
+   *   .glass-subtle → toasts, inline hints
+   *                  (gentle 8px blur, no border)
+   *
+   * Pick the tier by role, not by look; we keep three so the decision
+   * is always obvious.
    * ======================================== */
   .glass {
     background: var(--glass-bg);

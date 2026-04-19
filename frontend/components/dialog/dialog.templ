@@ -128,8 +128,11 @@ templ Content(props ...ContentProps) {
 			utils.TwMerge(
 				// Positioning & sizing
 				"fixed left-[50%] top-[50%] z-50 m-0 w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-hidden outline-none sm:max-w-lg",
-				// Surface — elevated card with subtle border
-				"bg-card text-card-foreground border border-border/60 p-0",
+				// Surface — glass-heavy is the system default for dialogs (see
+				// assets/css/input.css: glass tier documentation). bg/border/blur
+				// are driven by themed --glass-* tokens so this adapts to light
+				// and dark without per-theme overrides at each callsite.
+				"glass-heavy text-foreground p-0",
 				// Premium radius + layered shadow from the theme's modern shadow system
 				"rounded-xl shadow-modern-xl",
 				// Visibility (templui state-driven)

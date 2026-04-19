@@ -3,19 +3,28 @@ package threads
 import (
 	"aicompass/frontend/components/button"
 	"aicompass/frontend/components/dialog"
-	"aicompass/frontend/ui/i18n"
 	"aicompass/frontend/components/icon"
-	"aicompass/frontend/components/input"
-	"aicompass/frontend/ui/message"
+	"aicompass/frontend/ui/i18n"
 )
 
-// ThreadsDialog renders the thread history as a wide split-pane dialog.
-// Left pane: search + thread list. Right pane: conversation preview on hover.
-// NOTE: This must be rendered inside the x-data="chat" scope so it can access
-// session data (getGroupedSessions, switchSession, etc.) directly.
+// ThreadsDialog renders the thread history as a VS Code-style command
+// palette: a translucent, top-aligned sheet with a prominent search input
+// and a scrollable list of chats in temporal order.
+//
+// Per-row actions (rename, share, duplicate, archive, delete) are surfaced
+// through a shared context menu reached two ways: right-click on a row, or
+// click a hover-revealed three-dot button. The menu is a single DOM node
+// rendered once at the panel level and positioned with `fixed` + viewport
+// coordinates — the same proven pattern used by
+// frontend/ui/filesystem/filesystem.templ (which lives in the same kind of
+// templui <dialog>).
+//
+// NOTE: Must render inside the x-data="chat" scope to access session
+// helpers (getGroupedSessions, switchSession, createNewSession,
+// __loadMoreSessions, __onSidebarScroll, shareSession, duplicateSession,
+// archiveSession, startRename, deleteSession).
 templ ThreadsDialog() {
 	<div
-		x-data="{ expanded: false, toggleExpand() { this.expanded = !this.expanded } }"
 		@open-threads-dialog.window="$nextTick(() => {
 			$refs.threadSearchInput?.focus();
 			setTimeout(() => {
@@ -31,306 +40,250 @@ templ ThreadsDialog() {
 		}) {
 			@dialog.Content(dialog.ContentProps{
 				HideCloseButton: true,
-				Class:           "sm:max-w-[920px] max-h-[85vh] h-[620px] overflow-hidden rounded-2xl border-border/50 shadow-[0_25px_60px_-12px_rgba(0,0,0,0.25)] transition-all duration-300 ease-in-out",
-				PanelClass:      "p-0 gap-0",
-				Attributes: templ.Attributes{
-					":class": "expanded ? '!max-w-[calc(100vw-2rem)] !max-h-[calc(100vh-2rem)] !w-[calc(100vw-2rem)] !h-[calc(100vh-2rem)] !h-full !rounded-none' : ''",
-				},
+				// Palette-specific overrides only: top-aligned, wide.
+				// The translucent glass surface comes from the system default
+				// (dialog.Content → .glass-heavy). No bg/border/blur overrides
+				// here — they would fight the themed --glass-* tokens.
+				Class:      "sm:max-w-2xl max-h-[65vh] h-auto top-[12vh] -translate-y-0",
+				PanelClass: "p-0 gap-0",
 			}) {
-				<!-- Floating window controls (top-right of the whole dialog) -->
-				<div class="absolute top-3 right-3 z-20 flex items-center gap-1">
-					@button.Button(button.Props{
-						Size:    button.SizeIcon,
-						Variant: button.VariantGhost,
-						Class:   "size-8 rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-accent",
-						Attributes: templ.Attributes{
-							"@click": "toggleExpand()",
-							"title":  i18n.T(ctx, "Toggle fullscreen"),
-						},
-					}) {
-						<span x-show="!expanded">
-							@icon.Maximize2(icon.Props{Class: "size-4"})
-						</span>
-						<span x-show="expanded">
-							@icon.Minimize2(icon.Props{Class: "size-4"})
-						</span>
-					}
-					@dialog.Close(dialog.CloseProps{For: "threads-dialog"}) {
-						@button.Button(button.Props{
-							Size:    button.SizeIcon,
-							Variant: button.VariantGhost,
-							Class:   "size-8 rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-accent",
-							Attributes: templ.Attributes{
-								"title": i18n.T(ctx, "Close"),
-							},
-						}) {
-							@icon.X(icon.Props{Class: "size-4"})
-						}
-					}
-				</div>
-				<!-- Split Layout: left thread list + right preview -->
-				<div class="flex flex-1 overflow-hidden h-full">
-					<!-- ═══════ LEFT PANE: Thread List ═══════ -->
-					<div class="w-[320px] shrink-0 flex flex-col border-e border-border/40 bg-background">
-						<!-- Header -->
-						<div class="px-5 pt-5 pb-4">
-							<div class="flex items-center justify-between">
-								<div class="flex items-center gap-3">
-									<div class="size-9 rounded-xl bg-gradient-to-br from-primary/20 via-primary/10 to-transparent flex items-center justify-center ring-1 ring-primary/[0.08]">
-										@icon.MessageCircle(icon.Props{Class: "size-[18px] text-primary"})
-									</div>
-									<div>
-										<h2 class="text-[15px] font-semibold tracking-tight text-foreground leading-none">
-											{ i18n.T(ctx, "Chats") }
-										</h2>
-										<p class="text-[11px] text-muted-foreground/70 mt-1 leading-none">
-											{ i18n.T(ctx, "Browse your conversations") }
-										</p>
-									</div>
-								</div>
-								<div class="flex items-center gap-1">
-									@button.Button(button.Props{
-										Size:    button.SizeSm,
-										Variant: button.VariantDefault,
-										Class:   "gap-1.5 shrink-0 h-8 rounded-lg text-xs font-medium",
-										Attributes: templ.Attributes{
-											"@click": "createNewSession(); document.querySelector('[data-tui-dialog-close=\"threads-dialog\"]')?.click()",
-										},
-									}) {
-										@icon.Plus(icon.Props{Class: "size-3.5"})
-										{ i18n.T(ctx, "New") }
-									}
-								</div>
-							</div>
-						</div>
-						<!-- Search Input -->
-						<div class="px-4 pb-3">
-							@input.Input(input.Props{
-								Type:        input.TypeSearch,
-								Placeholder: i18n.T(ctx, "Search chats..."),
-								Class:       "h-9 text-sm bg-muted/25 border-border/30 rounded-xl placeholder:text-muted-foreground/50 focus-within:bg-background focus-within:border-primary/25 focus-within:ring-2 focus-within:ring-primary/[0.08] transition-all duration-200",
-								Attributes: templ.Attributes{
-									"x-ref":   "threadSearchInput",
-									"x-model": "threadSearchQuery",
-								},
-							})
-						</div>
-						<!-- Subtle separator -->
-						<div class="mx-4 border-t border-border/30"></div>
-						<!-- Thread List -->
-						<div
-							x-ref="threadListScroll"
-							class="flex-1 overflow-y-auto px-3 pt-2 pb-3 scrollbar-thin"
-							@scroll="__onSidebarScroll($event)"
-						>
-							<!-- Empty State -->
-							<template x-if="sessions.length === 0 && !sessionsLoading">
-								<div class="flex flex-col items-center justify-center py-16 gap-4 text-muted-foreground">
-									<div class="size-14 rounded-2xl bg-muted/30 flex items-center justify-center ring-1 ring-border/20">
-										@icon.MessageCircle(icon.Props{Class: "size-6 opacity-25"})
-									</div>
-									<div class="text-center space-y-1">
-										<p class="text-sm font-medium text-foreground/70">{ i18n.T(ctx, "No conversations yet") }</p>
-										<p class="text-xs text-muted-foreground/50">{ i18n.T(ctx, "Start a new chat to get going.") }</p>
-									</div>
-								</div>
-							</template>
-							<!-- Grouped Sessions -->
-							<template x-for="(group, groupIndex) in getGroupedSessions()" :key="group.title">
-								<div>
-									<h2
-										class="px-2.5 pb-1.5 text-muted-foreground/60 text-[10px] font-semibold uppercase tracking-[0.1em]"
-										:class="groupIndex === 0 ? 'pt-1' : 'pt-4'"
-										x-text="group.title"
-									></h2>
-									<div class="flex flex-col gap-px">
-										<template x-for="session in group.sessions" :key="session.id">
-											<div class="group/item relative">
-												<!-- Inline Rename Overlay -->
-												<div
-													x-show="renamingSessionId === session.id"
-													x-cloak
-													class="absolute inset-0 z-20 flex w-full items-center rounded-xl bg-accent/90 backdrop-blur-sm p-2"
-												>
-													<input
-														type="text"
-														x-model="renameTitle"
-														x-effect="if (renamingSessionId === session.id) { $nextTick(() => { $el.focus(); $el.select(); }) }"
-														@keydown.enter.prevent="submitRename()"
-														@keydown.escape.prevent="cancelRename()"
-														@click.stop
-														maxlength="100"
-														class="flex-1 rounded-lg bg-background px-2.5 py-1 text-sm leading-tight text-foreground outline-none ring-1 ring-border/40 focus:ring-primary/30 transition-shadow"
-													/>
-													<div class="flex gap-0.5 ms-1.5">
-														<button @click.stop="cancelRename()" class="rounded-lg p-1.5 hover:bg-muted/80 transition-colors">
-															@icon.X(icon.Props{Class: "size-3.5 text-muted-foreground"})
-														</button>
-														<button @click.stop="submitRename()" class="rounded-lg p-1.5 hover:bg-primary/10 transition-colors">
-															@icon.Check(icon.Props{Class: "size-3.5 text-primary"})
-														</button>
-													</div>
-												</div>
-												<!-- Conversation Row -->
-												<div
-													role="button"
-													tabindex="0"
-													class="relative flex w-full cursor-pointer select-none items-center gap-2.5 rounded-xl py-2 px-2.5 text-sm outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-ring text-start"
-													:class="(() => {
-														const isActive = threadId === session.id;
-														const isHovered = __previewSessionId === session.id;
-														if (isActive) return 'bg-accent/80 text-foreground font-medium ring-1 ring-border/40';
-														if (isHovered) return 'bg-accent/50 text-foreground';
-														return 'hover:bg-accent/30 text-foreground';
-													})()"
-													@click="switchSession(session.id); document.querySelector('[data-tui-dialog-close=\'threads-dialog\']')?.click()"
-													@keydown.enter="switchSession(session.id); document.querySelector('[data-tui-dialog-close=\'threads-dialog\']')?.click()"
-													@mouseenter="previewSession(session.id)"
-												>
-													<!-- Active indicator bar -->
-													<div
-														class="absolute inset-y-1.5 start-0 w-[3px] rounded-full transition-all duration-300"
-														:class="threadId === session.id ? 'bg-primary scale-y-100' : 'bg-transparent scale-y-0'"
-													></div>
-													<div
-														class="size-8 rounded-lg flex items-center justify-center shrink-0 transition-all duration-200"
-														:class="threadId === session.id
-															? 'bg-primary/15 text-primary'
-															: __previewSessionId === session.id ? 'bg-accent text-accent-foreground' : 'bg-muted/40 text-muted-foreground/70'"
-													>
-														@icon.MessageCircle(icon.Props{Class: "size-3.5"})
-													</div>
-													<div class="flex flex-col items-start flex-1 min-w-0">
-														<span
-															class="truncate w-full text-[13px] leading-snug"
-															x-text="session.title || window.i18n.t('New Chat')"
-														></span>
-													</div>
-													<!-- Options Button -->
-													<div
-														class="flex items-center opacity-0 group-hover/item:opacity-100 transition-all duration-150 shrink-0"
-														:class="threadId === session.id ? '!opacity-100' : ''"
-														@click.stop
-													>
-														@ContextMenu(ContextMenuProps{
-															ThreadID: "session.id",
-														})
-													</div>
-												</div>
-											</div>
-										</template>
-									</div>
-								</div>
-							</template>
-							<!-- Loading / Infinite Scroll -->
-							<div x-show="sessionsHasMore" x-intersect="__loadMoreSessions()" class="flex justify-center py-4 h-10 w-full">
-								<span x-show="sessionsLoading" class="animate-spin size-4 border-2 border-primary/30 border-t-primary rounded-full"></span>
-							</div>
-						</div>
-						<!-- Footer -->
-						<div class="px-4 py-2.5 border-t border-border/30">
-							<div class="flex items-center justify-between">
-								<span class="text-[11px] text-muted-foreground/50 font-medium tabular-nums" x-text="sessions.length > 0 ? sessions.length + ' ' + (sessions.length === 1 ? window.i18n.t('conversation') : window.i18n.t('conversations')) : ''"></span>
-								@dialog.Close() {
-									@button.Button(button.Props{Variant: button.VariantGhost, Class: "h-7 px-3 text-xs rounded-lg text-muted-foreground/70 hover:text-foreground"}) {
-										{ i18n.T(ctx, "Close") }
-									}
+				<div
+					class="flex flex-col max-h-[65vh] min-h-0"
+					x-data="{
+						rowMenu: { x: 0, y: 0, session: null },
+						positionAndShow(x, y, session) {
+							this.rowMenu = { x, y, session };
+							this.$nextTick(() => {
+								const m = this.$refs.rowMenu;
+								if (!m) return;
+								// Native popover API: browser moves m into the top
+								// layer, whose containing block is the initial
+								// containing block (viewport). That's the ONLY
+								// way fixed coords stay viewport-relative when
+								// the dialog ancestor uses transform +
+								// backdrop-filter (both establish containing
+								// blocks for fixed descendants otherwise).
+								m.style.left = x + 'px';
+								m.style.top = y + 'px';
+								if (!m.matches(':popover-open')) {
+									try { m.showPopover(); } catch (e) { /* already open / not supported */ }
 								}
+							});
+						},
+						openRowMenuAtCursor(ev, session) {
+							ev.preventDefault();
+							this.positionAndShow(ev.clientX, ev.clientY, session);
+						},
+						openRowMenuAtButton(btn, session) {
+							const r = btn.getBoundingClientRect();
+							this.positionAndShow(r.left, r.bottom + 4, session);
+						},
+						closeRowMenu() {
+							const m = this.$refs.rowMenu;
+							if (m && m.matches(':popover-open')) {
+								try { m.hidePopover(); } catch (e) { /* noop */ }
+							}
+							this.rowMenu = { x: 0, y: 0, session: null };
+						}
+					}"
+					@keydown.escape.window="if ($refs.rowMenu && $refs.rowMenu.matches(':popover-open')) { closeRowMenu(); $event.stopPropagation(); }"
+				>
+					<!-- Search -->
+					<div class="flex items-center gap-3 px-4 h-12 shrink-0 border-b border-border/30">
+						@icon.Search(icon.Props{Class: "size-4 text-muted-foreground/70 shrink-0"})
+						<input
+							type="search"
+							x-ref="threadSearchInput"
+							x-model="threadSearchQuery"
+							placeholder={ i18n.T(ctx, "Search your chats or start a new one…") }
+							class="flex-1 bg-transparent border-0 outline-none text-sm text-foreground placeholder:text-muted-foreground/60 focus:ring-0 focus:outline-none"
+							aria-label={ i18n.T(ctx, "Search conversations") }
+						/>
+						<template x-if="threadSearchQuery">
+							<button
+								type="button"
+								@click="threadSearchQuery = ''; $refs.threadSearchInput?.focus()"
+								class="size-6 rounded-md hover:bg-accent/60 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+								title={ i18n.T(ctx, "Clear") }
+							>
+								@icon.X(icon.Props{Class: "size-3.5"})
+							</button>
+						</template>
+						<kbd
+							class="hidden sm:inline-flex items-center h-5 px-1.5 rounded border border-border/30 text-[10px] text-muted-foreground/70 bg-muted/20 font-medium"
+							title={ i18n.T(ctx, "Close") }
+						>esc</kbd>
+					</div>
+					<!-- Results -->
+					<div
+						x-ref="threadListScroll"
+						class="flex-1 overflow-y-auto scrollbar-thin min-h-0 py-1"
+						@scroll="__onSidebarScroll($event)"
+					>
+						<!-- New conversation: shown only when no query -->
+						<template x-if="!threadSearchQuery">
+							<button
+								type="button"
+								@click="createNewSession(); document.querySelector('[data-tui-dialog-close=\'threads-dialog\']')?.click()"
+								class="group flex w-full items-center gap-3 px-4 py-2 text-sm outline-none hover:bg-accent/40 focus-visible:bg-accent/40 transition-colors text-start"
+							>
+								@icon.Plus(icon.Props{Class: "size-4 text-muted-foreground/80 group-hover:text-foreground shrink-0"})
+								<span class="text-foreground/90 group-hover:text-foreground flex-1">{ i18n.T(ctx, "New conversation") }</span>
+							</button>
+						</template>
+						<!-- Empty state -->
+						<template x-if="sessions.length === 0 && !sessionsLoading && !threadSearchQuery">
+							<div class="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground/70">
+								@icon.MessagesSquare(icon.Props{Class: "size-8 opacity-40"})
+								<p class="text-xs">{ i18n.T(ctx, "No conversations yet") }</p>
 							</div>
+						</template>
+						<!-- No search matches -->
+						<template x-if="sessions.length > 0 && getGroupedSessions().length === 0">
+							<div class="flex flex-col items-center justify-center gap-2 py-10 text-muted-foreground/70">
+								<p class="text-xs">{ i18n.T(ctx, "No matches") }</p>
+							</div>
+						</template>
+						<!-- Grouped sessions -->
+						<template x-for="group in getGroupedSessions()" :key="group.title">
+							<div>
+								<div class="px-4 pt-3 pb-0.5">
+									<span
+										class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60"
+										x-text="group.title"
+									></span>
+								</div>
+								<template x-for="session in group.sessions" :key="session.id">
+									<div class="group/item relative">
+										<!--
+											Inline rename overlay. startRename() sets
+											renamingSessionId to this row's id; the
+											overlay covers the row so row clicks can't
+											interfere while the input is active.
+										-->
+										<div
+											x-show="renamingSessionId === session.id"
+											x-cloak
+											class="absolute inset-x-2 inset-y-0 z-10 flex items-center gap-1 rounded-md bg-background/80 backdrop-blur-xl ring-1 ring-ring px-2"
+										>
+											<input
+												type="text"
+												x-model="renameTitle"
+												x-effect="if (renamingSessionId === session.id) { $nextTick(() => { $el.focus(); $el.select(); }) }"
+												@keydown.enter.prevent="submitRename()"
+												@keydown.escape.prevent="cancelRename()"
+												@click.stop
+												maxlength="100"
+												class="flex-1 bg-transparent border-0 outline-none text-sm text-foreground focus:ring-0"
+											/>
+											<button @click.stop="cancelRename()" type="button" class="size-6 rounded-md hover:bg-accent/60 flex items-center justify-center text-muted-foreground">
+												@icon.X(icon.Props{Class: "size-3.5"})
+											</button>
+											<button @click.stop="submitRename()" type="button" class="size-6 rounded-md hover:bg-accent/60 flex items-center justify-center text-primary">
+												@icon.Check(icon.Props{Class: "size-3.5"})
+											</button>
+										</div>
+										<!-- Row -->
+										<div
+											role="button"
+											tabindex="0"
+											class="relative flex w-full cursor-pointer select-none items-center gap-3 px-4 py-1.5 text-sm outline-none transition-colors"
+											:class="threadId === session.id ? 'bg-accent/50 text-foreground' : 'hover:bg-accent/30 focus-visible:bg-accent/30 text-foreground/90'"
+											@click="switchSession(session.id); document.querySelector('[data-tui-dialog-close=\'threads-dialog\']')?.click()"
+											@keydown.enter="switchSession(session.id); document.querySelector('[data-tui-dialog-close=\'threads-dialog\']')?.click()"
+											@contextmenu="openRowMenuAtCursor($event, session)"
+										>
+											<!-- Active bar -->
+											<div
+												class="absolute inset-y-1 start-0 w-0.5 rounded-full transition-all"
+												:class="threadId === session.id ? 'bg-primary' : 'bg-transparent'"
+											></div>
+											@icon.MessageCircle(icon.Props{Class: "size-3.5 text-muted-foreground/70 shrink-0"})
+											<span
+												class="truncate flex-1 min-w-0"
+												x-text="session.title || window.i18n.t('New Chat')"
+											></span>
+											<!-- Three-dot: reveals on hover, opens the shared row menu -->
+											<button
+												type="button"
+												@click.stop="openRowMenuAtButton($el, session)"
+												class="size-6 inline-flex items-center justify-center rounded-md text-muted-foreground/70 hover:bg-accent/60 hover:text-foreground opacity-0 group-hover/item:opacity-100 focus-visible:opacity-100 transition-opacity shrink-0"
+												:class="threadId === session.id ? 'opacity-100' : ''"
+												:title="window.i18n.t('More')"
+												aria-label={ i18n.T(ctx, "Thread actions") }
+											>
+												@icon.Ellipsis(icon.Props{Class: "size-3.5"})
+											</button>
+										</div>
+									</div>
+								</template>
+							</div>
+						</template>
+						<!-- Infinite scroll sentinel -->
+						<div x-show="sessionsHasMore" x-intersect="__loadMoreSessions()" class="flex justify-center py-3 h-8 w-full">
+							<span x-show="sessionsLoading" class="animate-spin size-3.5 border-2 border-muted-foreground/30 border-t-primary rounded-full"></span>
 						</div>
 					</div>
-					<!-- ═══════ RIGHT PANE: Conversation Preview ═══════ -->
+					<!--
+						Shared row context menu. Uses the native popover API so
+						the browser moves it into the top layer when opened —
+						that's the only way `fixed` stays viewport-relative
+						inside a dialog whose ancestors have transform +
+						backdrop-filter (both otherwise establish containing
+						blocks for fixed descendants).
+
+						inset-auto + m-0 defeat the browser's popover default
+						styles (inset:0 + margin:auto otherwise centers it).
+						Outside-click dismissal is wired via a document
+						mousedown listener in x-init; we don't use
+						popover="auto" because its light-dismiss races with
+						trigger clicks and flickers the menu closed on open.
+					-->
 					<div
-						class="flex-1 flex flex-col overflow-hidden bg-muted/[0.04]"
-						@mouseleave="clearPreview()"
+						x-ref="rowMenu"
+						popover="manual"
+						@contextmenu.prevent=""
+						@toggle="if ($event.newState === 'closed') rowMenu.session = null"
+						x-init="
+							document.addEventListener('mousedown', (ev) => {
+								if (!$el.matches(':popover-open')) return;
+								if ($el.contains(ev.target)) return;
+								closeRowMenu();
+							}, true);
+						"
+						class="glass fixed inset-auto m-0 z-[100] min-w-[180px] rounded-lg shadow-xl p-1"
+						role="menu"
 					>
-						<!-- Preview: Empty / No hover state -->
-						<template x-if="!__previewSessionId">
-							<div class="flex-1 flex flex-col items-center justify-center gap-5 p-8">
-								<div class="relative">
-									<div class="absolute -inset-8 rounded-full bg-gradient-to-b from-primary/[0.03] to-transparent blur-2xl"></div>
-									<div class="relative size-16 rounded-2xl bg-gradient-to-br from-muted/50 to-muted/20 flex items-center justify-center ring-1 ring-border/20">
-										@icon.Eye(icon.Props{Class: "size-7 text-muted-foreground/20"})
-									</div>
-								</div>
-								<div class="text-center space-y-2">
-									<p class="text-[13px] font-medium text-foreground/50">{ i18n.T(ctx, "Quick Preview") }</p>
-									<p class="text-xs text-muted-foreground/40 max-w-[200px] leading-relaxed">{ i18n.T(ctx, "Hover over a conversation to preview it here") }</p>
-								</div>
-							</div>
-						</template>
-						<!-- Preview: Loading -->
-						<template x-if="__previewSessionId && __previewLoading">
-							<div class="flex-1 flex flex-col">
-								<!-- Skeleton header -->
-								<div class="flex items-center gap-3 px-5 py-3.5 border-b border-border/30">
-									<div class="size-8 rounded-lg bg-muted/60 animate-pulse"></div>
-									<div class="space-y-2 flex-1">
-										<div class="h-3.5 bg-muted/60 rounded-lg w-2/5 animate-pulse"></div>
-										<div class="h-2.5 bg-muted/30 rounded-lg w-1/4 animate-pulse"></div>
-									</div>
-								</div>
-								<!-- Skeleton messages -->
-								<div class="flex-1 p-5 space-y-5">
-									<div class="flex justify-end">
-										<div class="h-10 bg-muted/40 rounded-2xl rounded-br-md w-52 animate-pulse"></div>
-									</div>
-									<div class="flex">
-										<div class="h-24 bg-muted/25 rounded-2xl rounded-bl-md w-3/4 animate-pulse"></div>
-									</div>
-									<div class="flex justify-end">
-										<div class="h-8 bg-muted/40 rounded-2xl rounded-br-md w-40 animate-pulse"></div>
-									</div>
-									<div class="flex">
-										<div class="h-16 bg-muted/25 rounded-2xl rounded-bl-md w-2/3 animate-pulse"></div>
-									</div>
-								</div>
-							</div>
-						</template>
-						<!-- Preview: Loaded with messages -->
-						<template x-if="__previewSessionId && !__previewLoading && __previewMessages.length > 0">
-							<div class="flex-1 flex flex-col overflow-hidden">
-								<!-- Preview Header (right-padding clears the floating window controls) -->
-								<div class="flex items-center gap-3 ps-5 pe-24 py-3 border-b border-border/30 shrink-0">
-									<div class="size-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-primary/15 via-primary/10 to-transparent ring-1 ring-primary/[0.08]">
-										@icon.MessageCircle(icon.Props{Class: "size-4 text-primary"})
-									</div>
-									<div class="flex-1 min-w-0">
-										<span
-											class="text-[13px] font-semibold text-foreground truncate block leading-tight"
-											x-text="(() => { const s = sessions.find(s => s.id === __previewSessionId); return s?.title || window.i18n.t('New Chat'); })()"
-										></span>
-										<span
-											class="text-[10px] text-muted-foreground/50 tabular-nums leading-tight"
-											x-text="__previewMessages.length + ' ' + (__previewMessages.length === 1 ? window.i18n.t('message') : window.i18n.t('messages'))"
-										></span>
-									</div>
-								</div>
-								<!-- Messages (reuses the same UserMessage / AssistantMessage components as the real chat) -->
-								<div class="flex-1 overflow-y-auto px-5 py-4 scrollbar-thin">
-									<div class="space-y-4">
-										<template x-for="(message, index) in __previewMessages" :key="message.id">
-											<div>
-												@message.UserMessage()
-												@message.AssistantMessage()
-											</div>
-										</template>
-									</div>
-								</div>
-							</div>
-						</template>
-						<!-- Preview: Empty conversation -->
-						<template x-if="__previewSessionId && !__previewLoading && __previewMessages.length === 0">
-							<div class="flex-1 flex flex-col items-center justify-center gap-4 p-8">
-								<div class="size-14 rounded-2xl bg-muted/20 flex items-center justify-center ring-1 ring-border/15">
-									@icon.MessageSquareDashed(icon.Props{Class: "size-6 text-muted-foreground/20"})
-								</div>
-								<div class="text-center space-y-1.5">
-									<p class="text-[13px] font-medium text-foreground/50">{ i18n.T(ctx, "Empty conversation") }</p>
-									<p class="text-xs text-muted-foreground/40">{ i18n.T(ctx, "This chat has no messages yet.") }</p>
-								</div>
-							</div>
-						</template>
+						<!--
+							Only the actions that actually exist on the chat
+							Alpine component (see assets/js/chat/chat-sessions.js).
+							startRename / deleteSession are method calls, so we
+							invoke them as Alpine expressions — that keeps the
+							chat component as `this`. Passing a bare function
+							reference through a wrapper strips the binding.
+							Share / Duplicate / Archive aren't implemented on
+							the chat component yet; reintroduce them here once
+							the methods land.
+						-->
+						<button
+							type="button"
+							role="menuitem"
+							@click="const id = rowMenu.session?.id; closeRowMenu(); if (id) startRename(id)"
+							class="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-sm rounded-md hover:bg-accent/50 text-foreground/90 hover:text-foreground text-start transition-colors"
+						>
+							@icon.Pencil(icon.Props{Class: "size-3.5 text-muted-foreground"})
+							<span>{ i18n.T(ctx, "Rename") }</span>
+						</button>
+						<div class="h-px bg-border/40 my-1 -mx-1"></div>
+						<button
+							type="button"
+							role="menuitem"
+							@click="const id = rowMenu.session?.id; closeRowMenu(); if (id) deleteSession(id)"
+							class="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-sm rounded-md hover:bg-destructive/10 text-destructive/90 hover:text-destructive text-start transition-colors"
+						>
+							@icon.Trash2(icon.Props{Class: "size-3.5"})
+							<span>{ i18n.T(ctx, "Delete") }</span>
+						</button>
 					</div>
 				</div>
 			}
