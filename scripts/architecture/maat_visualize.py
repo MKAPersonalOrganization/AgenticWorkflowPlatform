@@ -5,7 +5,7 @@ Code-Maat Visualization Dashboard
 Reads CSV reports from .maat/ and generates visual charts.
 
 Usage:
-    python3 scripts/maat-visualize.py [--maat-dir .maat] [--output .maat/dashboard.png]
+    python3 scripts/architecture/maat_visualize.py [--maat-dir .maat] [--output .maat/dashboard.png]
 
 Charts generated:
     1. Hotspot Treemap — files sized by revision frequency

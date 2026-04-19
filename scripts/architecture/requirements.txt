@@ -1,5 +1,6 @@
-# Pinned dependencies for scripts/go_hotspots.py and scripts/file_coupling.py.
-# Install with: pip install -r scripts/requirements-hotspots.txt
+# Pinned dependencies for the architectural-analysis scripts
+# (scripts/architecture/*.py). Install with:
+#   pip install -r scripts/architecture/requirements.txt
 # Python 3.10+ required.
 
 # Git access (replaces raw subprocess parsing).
@@ -25,3 +26,6 @@ plotly>=5.18,<7.0
 # Temporal coupling graph (file_coupling.py).
 networkx>=3.0,<4.0
 numpy>=1.24,<3.0
+
+# CSV-driven Code-Maat dashboard (maat_visualize.py).
+pandas>=2.0,<3.0

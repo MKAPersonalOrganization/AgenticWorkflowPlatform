@@ -45,25 +45,25 @@ Five invocations cover ~95% of day-to-day use.
 #    zz_generated, bindata.go) are auto-excluded. Dead files are
 #    auto-ignored. HTML is written alongside the PNG when plotly is
 #    installed.
-python3 scripts/go_hotspots.py . --since "2 months ago" \
+python3 scripts/architecture/go_hotspots.py . --since "2 months ago" \
   --exclude '^frontend/'
 
 # B. Zoom into the hottest package (function-level view).
-python3 scripts/go_hotspots.py modules/evaluation --since "2 months ago"
+python3 scripts/architecture/go_hotspots.py modules/evaluation --since "2 months ago"
 
 # C. Zoom into a single file (function-level view inside the file).
-python3 scripts/go_hotspots.py modules/evaluation/service.go \
+python3 scripts/architecture/go_hotspots.py modules/evaluation/service.go \
   --since "2 months ago"
 
 # D. CI gate — emit JSON, compare to baseline, fail on regression.
-python3 scripts/go_hotspots.py . --since "3 months ago" \
+python3 scripts/architecture/go_hotspots.py . --since "3 months ago" \
   --exclude '^frontend/' \
   --json hotspots.json --baseline .ci/hotspots-baseline.json \
   --fail-on-worsening-pct 25 --fail-on-new-hotspot \
   --no-image --quiet
 
 # E. Feed an AI refactoring agent.
-python3 scripts/go_hotspots.py . --since "1 month ago" \
+python3 scripts/architecture/go_hotspots.py . --since "1 month ago" \
   --exclude '^frontend/' \
   --json hotspots.json --top-n 5 --no-image --quiet
 # Then point your agent at hotspots.json; each top hotspot carries
@@ -366,7 +366,7 @@ soft dependencies.
 ## 7. CLI reference
 
 ```
-python3 scripts/go_hotspots.py PATH [options]
+python3 scripts/architecture/go_hotspots.py PATH [options]
 ```
 
 `PATH` is a directory or a `.go` file. Must be inside a git checkout.
@@ -464,12 +464,12 @@ in a spreadsheet:
 
 ```bash
 # Top packages to look at
-python3 scripts/go_hotspots.py . --since "since last sprint start" \
+python3 scripts/architecture/go_hotspots.py . --since "since last sprint start" \
   --exclude '^frontend/' --exclude '_templ\.go$' \
   --json sprint-pkg.json --out sprint-pkg.png
 
 # Pick the top hotspot (e.g. modules/evaluation) and zoom in
-python3 scripts/go_hotspots.py modules/evaluation \
+python3 scripts/architecture/go_hotspots.py modules/evaluation \
   --since "since last sprint start" \
   --json sprint-fn.json --out sprint-fn.png
 ```
@@ -486,7 +486,7 @@ deserves extra scrutiny.
 
 ```bash
 BASE=$(git merge-base HEAD main)
-python3 scripts/go_hotspots.py . --since "$(git show -s --format=%ci "$BASE")" \
+python3 scripts/architecture/go_hotspots.py . --since "$(git show -s --format=%ci "$BASE")" \
   --json pr-hotspots.json --no-image --quiet
 ```
 
@@ -495,14 +495,14 @@ python3 scripts/go_hotspots.py . --since "$(git show -s --format=%ci "$BASE")" \
 ```bash
 # One-time: record the baseline after an agreed-good state
 git checkout main
-python3 scripts/go_hotspots.py . --since "3 months ago" \
+python3 scripts/architecture/go_hotspots.py . --since "3 months ago" \
   --exclude '^frontend/' \
   --json .ci/hotspots-baseline.json --no-image --quiet
 git add .ci/hotspots-baseline.json
 git commit -m "ci: record hotspot baseline"
 
 # On every PR: diff against it
-python3 scripts/go_hotspots.py . --since "3 months ago" \
+python3 scripts/architecture/go_hotspots.py . --since "3 months ago" \
   --exclude '^frontend/' \
   --json hotspots.json --baseline .ci/hotspots-baseline.json \
   --fail-on-worsening-pct 25 --fail-on-new-hotspot \
@@ -514,7 +514,7 @@ Refresh the baseline after a planned refactor cycle.
 ### D. AI refactoring agent
 
 ```bash
-python3 scripts/go_hotspots.py . --since "1 month ago" \
+python3 scripts/architecture/go_hotspots.py . --since "1 month ago" \
   --exclude '^frontend/' \
   --json hotspots.json --top-n 5 --no-image --quiet
 ```
@@ -532,13 +532,13 @@ pointing at the pre-refactor JSON. Confirm the hotspot cooled.
 
 ```bash
 # Save before
-python3 scripts/go_hotspots.py modules/evaluation --since "2 months ago" \
+python3 scripts/architecture/go_hotspots.py modules/evaluation --since "2 months ago" \
   --json before.json --out before.png
 
 # ... refactor ships ...
 
 # Compare after
-python3 scripts/go_hotspots.py modules/evaluation --since "2 months ago" \
+python3 scripts/architecture/go_hotspots.py modules/evaluation --since "2 months ago" \
   --json after.json --baseline before.json --out after.png
 # Check baseline_delta.cooler — the hotspot should be there.
 ```
@@ -575,7 +575,7 @@ jobs:
 
       - name: Hotspot regression check
         run: |
-          python3 scripts/go_hotspots.py . \
+          python3 scripts/architecture/go_hotspots.py . \
             --since "3 months ago" \
             --exclude '^frontend/' \
             --json hotspots.json \
@@ -597,7 +597,7 @@ hotspot-gate:
   image: python:3.11
   script:
     - pip install matplotlib
-    - python3 scripts/go_hotspots.py .
+    - python3 scripts/architecture/go_hotspots.py .
         --since "3 months ago"
         --exclude '^frontend/'
         --json hotspots.json
@@ -614,7 +614,7 @@ hotspot-gate:
 ```bash
 #!/usr/bin/env bash
 # .git/hooks/pre-push
-python3 scripts/go_hotspots.py . --since "1 month ago" \
+python3 scripts/architecture/go_hotspots.py . --since "1 month ago" \
   --exclude '^frontend/' \
   --json /tmp/hotspots.json \
   --baseline .ci/hotspots-baseline.json \

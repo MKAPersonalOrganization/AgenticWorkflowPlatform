@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-lcom4_trend.py — Chapter 6 of Your Code as a Crime Scene.
-LCOM4 (Lack of Cohesion in Methods, v4) for Go files, over git history.
+cohesion.py — architectural cohesion analysis for Go types (Chapter 6
+of *Your Code as a Crime Scene*). Computes LCOM4 (Lack of Cohesion in
+Methods, v4) per type, optionally over git history.
 
 LCOM4 counts how many disjoint groups of methods a struct type has.
 Two methods share a group if they reference the same receiver member
@@ -20,10 +21,10 @@ Requires:
     pip install tree-sitter tree-sitter-go matplotlib
 
 Usage:
-    lcom4_trend.py <path>...                       # trend over git history
-    lcom4_trend.py --snapshot <path>...            # current state only
-    lcom4_trend.py --discover                      # scan repo, rank worst
-    lcom4_trend.py --discover --json out.json
+    scripts/architecture/cohesion.py <path>...                       # trend over git history
+    scripts/architecture/cohesion.py --snapshot <path>...            # current state only
+    scripts/architecture/cohesion.py --discover                      # scan repo, rank worst
+    scripts/architecture/cohesion.py --discover --json out.json
 
 Classifies evolution as:
     DETERIORATING — LCOM4 grew (type is fracturing)

@@ -51,14 +51,14 @@ log = logging.getLogger("go_hotspots")
 # --------------------------------------------------------------------------
 # Dependency imports — fail with actionable messages if anything is missing.
 # The tool has five hard dependencies; they are all pip-installable and
-# pinned in scripts/requirements-hotspots.txt.
+# pinned in scripts/architecture/requirements.txt.
 # --------------------------------------------------------------------------
 
 def _missing_dep(name: str, pip_name: str) -> "None":
     sys.stderr.write(
         f"error: go_hotspots requires the '{name}' package.\n"
         f"  install with:  pip install {pip_name}\n"
-        f"  or install all deps: pip install -r scripts/requirements-hotspots.txt\n"
+        f"  or install all deps: pip install -r scripts/architecture/requirements.txt\n"
     )
     sys.exit(2)
 
