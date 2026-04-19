@@ -45,70 +45,88 @@ func (s *service) getAccountStatus(ctx context.Context, userID string) (*account
 		return status, nil
 	}
 
-	// Lazy expiration
-	if status.Status == "cancelled" && status.CancelsOn != nil && !time.Now().Before(*status.CancelsOn) {
-		acct, loadErr := s.repo.Load(ctx, userID)
-		if loadErr != nil {
-			s.log.Info(ctx, "billing: lazy-expire skipped, aggregate load failed", "user_id", userID, "error", loadErr)
-			return status, nil
-		}
-		if err := acct.ExpireSubscription(); err != nil {
-			s.log.Error(ctx, "billing: lazy-expire command failed", "user_id", userID, "error", err)
-			return status, nil
-		}
-		if err := s.repo.Save(ctx, acct); err != nil {
-			s.log.Error(ctx, "billing: lazy-expire save failed", "user_id", userID, "error", err)
-			return status, nil
-		}
-		s.log.Info(ctx, "billing: lazy-expire completed", "user_id", userID, "cancels_on", status.CancelsOn)
-		status.Status = "none"
-		status.PaidAt = nil
-		status.CancelledAt = nil
-		status.CancelsOn = nil
-		return status, nil
-	}
-
 	if status.Status == "cancelled" {
+		if cancelExpired(status) {
+			s.lazilyExpireCancelledSubscription(ctx, userID, status)
+		}
 		return status, nil
 	}
 
-	// Lazy verification
-	acct, loadErr := s.repo.Load(ctx, userID)
-	if loadErr != nil {
-		s.log.Info(ctx, "billing: lazy-verify skipped, aggregate load failed", "user_id", userID, "error", loadErr)
-		return status, nil
+	s.lazilyVerifyPendingPayment(ctx, userID, status)
+	return status, nil
+}
+
+// cancelExpired reports whether a cancelled subscription has reached its
+// CancelsOn date and should be converted to "none" on next read.
+func cancelExpired(status *accountStatus) bool {
+	return status.CancelsOn != nil && !time.Now().Before(*status.CancelsOn)
+}
+
+// lazilyExpireCancelledSubscription mutates status in place to reflect expiry
+// when a "cancelled" account has passed its CancelsOn date. Any failure along
+// the way (aggregate load / ExpireSubscription / save) is logged and the
+// function returns silently — callers still get the pre-expiry projection.
+func (s *service) lazilyExpireCancelledSubscription(ctx context.Context, userID string, status *accountStatus) {
+	acct, err := s.repo.Load(ctx, userID)
+	if err != nil {
+		s.log.Info(ctx, "billing: lazy-expire skipped, aggregate load failed", "user_id", userID, "error", err)
+		return
+	}
+	if err := acct.ExpireSubscription(); err != nil {
+		s.log.Error(ctx, "billing: lazy-expire command failed", "user_id", userID, "error", err)
+		return
+	}
+	if err := s.repo.Save(ctx, acct); err != nil {
+		s.log.Error(ctx, "billing: lazy-expire save failed", "user_id", userID, "error", err)
+		return
+	}
+	s.log.Info(ctx, "billing: lazy-expire completed", "user_id", userID, "cancels_on", status.CancelsOn)
+	status.Status = "none"
+	status.PaidAt = nil
+	status.CancelledAt = nil
+	status.CancelsOn = nil
+}
+
+// lazilyVerifyPendingPayment checks Stripe for any PI the aggregate is waiting
+// on and confirms the payment locally if Stripe reports success. Mirrors the
+// error policy of lazilyExpireCancelledSubscription: all failures are logged
+// and swallowed; status is only promoted to "active" on a fully successful path.
+func (s *service) lazilyVerifyPendingPayment(ctx context.Context, userID string, status *accountStatus) {
+	acct, err := s.repo.Load(ctx, userID)
+	if err != nil {
+		s.log.Info(ctx, "billing: lazy-verify skipped, aggregate load failed", "user_id", userID, "error", err)
+		return
 	}
 	if acct.IsActivated() {
 		status.Status = "active"
-		return status, nil
+		return
 	}
 
 	pendingPI := acct.PendingStripePaymentID()
 	if pendingPI == "" {
-		return status, nil
+		return
 	}
 
-	pi, getErr := paymentintent.Get(pendingPI, piGetParams(ctx))
-	if getErr != nil {
-		s.log.Info(ctx, "billing: lazy-verify stripe get failed", "user_id", userID, "stripe_pi", pendingPI, "error", getErr)
-		return status, nil
+	pi, err := paymentintent.Get(pendingPI, piGetParams(ctx))
+	if err != nil {
+		s.log.Info(ctx, "billing: lazy-verify stripe get failed", "user_id", userID, "stripe_pi", pendingPI, "error", err)
+		return
 	}
 	if pi.Status != stripe.PaymentIntentStatusSucceeded {
-		return status, nil
+		return
 	}
 
 	chargeID, cardBrand, cardLast4, receiptURL := extractChargeDetails(pi)
 	if err := acct.ConfirmPaymentWithDetails(pi.ID, chargeID, "", pi.Amount, string(pi.Currency), cardBrand, cardLast4, receiptURL); err != nil {
 		s.log.Error(ctx, "billing: lazy-verify confirm failed", "user_id", userID, "stripe_pi", pi.ID, "error", err)
-		return status, nil
+		return
 	}
 	if err := s.repo.Save(ctx, acct); err != nil {
 		s.log.Error(ctx, "billing: lazy-verify save failed", "user_id", userID, "stripe_pi", pi.ID, "error", err)
-		return status, nil
+		return
 	}
 	s.log.Info(ctx, "billing: lazy-verify confirmed payment", "user_id", userID, "stripe_pi", pi.ID)
 	status.Status = "active"
-	return status, nil
 }
 
 func (s *service) createPaymentIntent(ctx context.Context, userID, email string) (clientSecret string, err error) {

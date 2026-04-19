@@ -51,73 +51,97 @@ var mcpForwardHeaders = []string{
 //   - Browser-based MCP clients to connect through the proxy
 //   - No server-side session state for proxy traffic
 func (s *Service) MCPProxy(ctx context.Context, connectorID, userID string, w http.ResponseWriter, r *http.Request) error {
-	connector, err := s.getOwnedConnector(ctx, connectorID, userID)
+	connector, cb, release, err := s.acquireProxySlot(ctx, connectorID, userID)
 	if err != nil {
 		return err
 	}
-	if connector.Status != ConnectorStatusConnected {
-		return ErrConnectorNotConnected
-	}
+	defer release()
 
-	// Check circuit breaker before proxying.
-	cb := s.circuits.Get(connector.ServerURL)
-	if !cb.Allow() {
-		return ErrCircuitOpen
-	}
-
-	// Per-user concurrency cap.
-	if err := s.userSessions.Acquire(ctx, userID); err != nil {
-		return err
-	}
-	defer s.userSessions.Release(userID)
-
-	// Acquire global concurrency slot.
-	if err := s.sessions.Acquire(ctx); err != nil {
-		return err
-	}
-	defer s.sessions.Release()
-
-	// Build upstream request.
-	upstreamURL := connector.ServerURL
-	// Preserve any sub-path after the proxy mount point.
-	// e.g., /v1/mcp/connectors/{id}/mcp/some/path → serverURL/some/path
-	// The handler strips the prefix before calling this method.
-
-	body := http.MaxBytesReader(w, r.Body, maxProxyRequestBytes)
-	upstreamReq, err := http.NewRequestWithContext(ctx, r.Method, upstreamURL, body)
+	upstreamReq, err := s.buildUpstreamRequest(ctx, w, r, connector.ServerURL)
 	if err != nil {
-		return fmt.Errorf("creating upstream request: %w", err)
+		return err
 	}
 
-	// Forward only MCP-relevant headers (whitelist pattern from agentstack).
-	// This prevents leaking cookies, internal auth tokens, and other
-	// request headers to external MCP servers.
-	for _, key := range mcpForwardHeaders {
-		if values := r.Header.Values(key); len(values) > 0 {
-			for _, v := range values {
-				upstreamReq.Header.Add(key, v)
-			}
-		}
-	}
-
-	// Inject the connector's OAuth token (if available).
-	httpClient := s.buildHTTPClient(connector)
-
-	resp, err := httpClient.Do(upstreamReq)
+	resp, err := s.buildHTTPClient(connector).Do(upstreamReq)
 	if err != nil {
 		cb.RecordFailure()
 		return fmt.Errorf("proxying to MCP server: %w", err)
 	}
 	defer resp.Body.Close()
 
-	// Record success/failure for circuit breaker.
 	if resp.StatusCode >= 500 {
 		cb.RecordFailure()
 	} else {
 		cb.RecordSuccess()
 	}
 
-	// Copy response headers.
+	copyResponseHeaders(w, resp)
+	w.WriteHeader(resp.StatusCode)
+	// Mark that we've started writing the response — prevents the handler
+	// from attempting to write a JSON error after streaming has begun.
+	w.Header().Set("X-MCP-Proxy-Streamed", "1")
+
+	streamResponseBody(w, resp)
+	return nil
+}
+
+// acquireProxySlot performs the pre-flight checks (ownership, connector
+// status, circuit breaker, per-user + global concurrency) and returns the
+// connector, its circuit breaker, and a release func that must be called
+// to free the acquired concurrency slots.
+func (s *Service) acquireProxySlot(ctx context.Context, connectorID, userID string) (*MCPConnector, *circuitBreaker, func(), error) {
+	connector, err := s.getOwnedConnector(ctx, connectorID, userID)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if connector.Status != ConnectorStatusConnected {
+		return nil, nil, nil, ErrConnectorNotConnected
+	}
+
+	cb := s.circuits.Get(connector.ServerURL)
+	if !cb.Allow() {
+		return nil, nil, nil, ErrCircuitOpen
+	}
+
+	if err := s.userSessions.Acquire(ctx, userID); err != nil {
+		return nil, nil, nil, err
+	}
+	if err := s.sessions.Acquire(ctx); err != nil {
+		s.userSessions.Release(userID)
+		return nil, nil, nil, err
+	}
+
+	release := func() {
+		s.sessions.Release()
+		s.userSessions.Release(userID)
+	}
+	return connector, cb, release, nil
+}
+
+// buildUpstreamRequest materialises the outbound request for the upstream MCP
+// server. The body is wrapped with MaxBytesReader and only whitelisted headers
+// are forwarded (see mcpForwardHeaders) so cookies / internal auth tokens
+// don't leak.
+func (s *Service) buildUpstreamRequest(ctx context.Context, w http.ResponseWriter, r *http.Request, upstreamURL string) (*http.Request, error) {
+	body := http.MaxBytesReader(w, r.Body, maxProxyRequestBytes)
+	// Preserve any sub-path after the proxy mount point:
+	//   /v1/mcp/connectors/{id}/mcp/some/path → serverURL/some/path
+	// The handler strips the prefix before calling this method.
+	req, err := http.NewRequestWithContext(ctx, r.Method, upstreamURL, body)
+	if err != nil {
+		return nil, fmt.Errorf("creating upstream request: %w", err)
+	}
+	for _, key := range mcpForwardHeaders {
+		for _, v := range r.Header.Values(key) {
+			req.Header.Add(key, v)
+		}
+	}
+	return req, nil
+}
+
+// copyResponseHeaders copies upstream response headers onto the downstream
+// ResponseWriter, dropping hop-by-hop headers (RFC 7230 §6.1).
+func copyResponseHeaders(w http.ResponseWriter, resp *http.Response) {
 	for key, values := range resp.Header {
 		if hopByHopHeaders[key] {
 			continue
@@ -126,40 +150,32 @@ func (s *Service) MCPProxy(ctx context.Context, connectorID, userID string, w ht
 			w.Header().Add(key, v)
 		}
 	}
+}
 
-	w.WriteHeader(resp.StatusCode)
-
-	// Mark that we've started writing the response — prevents the handler
-	// from attempting to write a JSON error after streaming has begun.
-	w.Header().Set("X-MCP-Proxy-Streamed", "1")
-
-	// Stream the response body.
-	// For SSE/streaming responses, we copy without buffering.
-	if isStreamingResponse(resp) {
-		// Flush-aware copy for SSE streams.
-		flusher, ok := w.(http.Flusher)
-		buf := make([]byte, 32*1024) // 32 KiB buffer
-		for {
-			n, readErr := resp.Body.Read(buf)
-			if n > 0 {
-				_, writeErr := w.Write(buf[:n])
-				if writeErr != nil {
-					break
-				}
-				if ok {
-					flusher.Flush()
-				}
+// streamResponseBody copies the upstream response body. SSE / streaming
+// responses are relayed through a flush-aware chunked copy; non-streaming
+// bodies are capped at maxProxyResponseBytes to prevent OOM.
+func streamResponseBody(w http.ResponseWriter, resp *http.Response) {
+	if !isStreamingResponse(resp) {
+		io.Copy(w, io.LimitReader(resp.Body, maxProxyResponseBytes))
+		return
+	}
+	flusher, _ := w.(http.Flusher)
+	buf := make([]byte, 32*1024) // 32 KiB buffer
+	for {
+		n, readErr := resp.Body.Read(buf)
+		if n > 0 {
+			if _, writeErr := w.Write(buf[:n]); writeErr != nil {
+				return
 			}
-			if readErr != nil {
-				break
+			if flusher != nil {
+				flusher.Flush()
 			}
 		}
-	} else {
-		// Non-streaming: enforce size limit to prevent OOM.
-		io.Copy(w, io.LimitReader(resp.Body, maxProxyResponseBytes))
+		if readErr != nil {
+			return
+		}
 	}
-
-	return nil
 }
 
 // isStreamingResponse checks if the response uses Server-Sent Events,
