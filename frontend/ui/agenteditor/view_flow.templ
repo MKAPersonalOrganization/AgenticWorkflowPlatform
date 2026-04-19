@@ -815,9 +815,9 @@ templ flowView() {
                                                         <div x-show="!bottomPanelCollapsed" class="flex-1 overflow-hidden min-h-0">
                                                                 <!-- Terminal Tab -->
                                                                 <template x-if="activeBottomTab === 'terminal'">
-                                                                        <div x-ref="terminalPanel" class="h-full overflow-y-auto p-3 font-mono text-[10px] space-y-0.5 bg-zinc-950 text-zinc-100">
+                                                                        <div x-ref="terminalPanel" class="h-full overflow-y-auto p-3 font-mono text-[10px] space-y-0.5 bg-muted/40 text-foreground">
                                                                                 <template x-if="evalLogs.length === 0">
-                                                                                        <div class="flex flex-col items-center justify-center h-full text-zinc-500">
+                                                                                        <div class="flex flex-col items-center justify-center h-full text-muted-foreground">
                                                                                                 @icon.Terminal(icon.Props{Class: "size-8 opacity-30 mb-2"})
                                                                                                 <span class="text-xs">No terminal output yet</span>
                                                                                                 <span class="text-[10px]">Run an evaluation to see logs here</span>
