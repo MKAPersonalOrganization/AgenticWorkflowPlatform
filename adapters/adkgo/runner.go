@@ -16,6 +16,7 @@ import (
 	"google.golang.org/adk/agent/llmagent"
 	"google.golang.org/adk/artifact"
 	"google.golang.org/adk/memory"
+	adkmodel "google.golang.org/adk/model"
 	"google.golang.org/adk/plugin"
 	"google.golang.org/adk/plugin/retryandreflect"
 	adkrunner "google.golang.org/adk/runner"
@@ -139,59 +140,10 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 		}
 
 		// 1. Persist user message and get thread aggregate.
-		var agg *thread.ThreadAggregate
-		var initialEvents []thread.Event
-
-		userContent := extractUserText(req.Message)
-
-		// Extract tool call ID and artifact attachment refs from orchestrator context.
-		var toolCallID string
-		var attachmentRefs []thread.Attachment
-		if req.Context != nil {
-			if refs, ok := req.Context["attachmentRefs"].([]thread.Attachment); ok {
-				attachmentRefs = refs
-			}
-			if id, ok := req.Context["toolCallId"].(string); ok {
-				toolCallID = id
-			}
-		}
-
-		if toolCallID != "" {
-			// Confirmation/elicitation resume: the user's response is already
-			// captured in the InputProvided event (emitted by the orchestrator
-			// before calling Run). Skip persisting a duplicate UserMessageAdded
-			// to avoid polluting the session with a plain-text user event that
-			// would cause ADK's RequestConfirmationRequestProcessor to bail.
-			var lErr error
-			agg, lErr = r.threadMgr.Load(ctx, req.SessionID)
-			if lErr != nil {
-				yield(nil, fmt.Errorf("failed to load thread for tool response: %w", lErr))
-				return
-			}
-		} else if req.Message != nil {
-			messageID := req.Message.ID
-			if messageID == "" {
-				messageID = generateID()
-			}
-			var uEvent *thread.UserMessageAdded
-			var sideEffects []thread.Event
-			var pErr error
-			agg, uEvent, sideEffects, pErr = r.threadMgr.AddUserMessage(ctx, req.SessionID, messageID, userContent, req.UserID, attachmentRefs...)
-			if pErr != nil {
-				yield(nil, fmt.Errorf("failed to persist user message: %w", pErr))
-				return
-			}
-			if uEvent != nil {
-				initialEvents = append(initialEvents, uEvent)
-			}
-			initialEvents = append(initialEvents, sideEffects...)
-		} else {
-			var lErr error
-			agg, lErr = r.threadMgr.Load(ctx, req.SessionID)
-			if lErr != nil && !errors.Is(lErr, thread.ErrThreadNotFound) {
-				yield(nil, fmt.Errorf("failed to load thread: %w", lErr))
-				return
-			}
+		agg, toolCallID, initialEvents, err := r.loadOrSeedThread(ctx, req)
+		if err != nil {
+			yield(nil, err)
+			return
 		}
 
 		// 2. Resolve agent.
@@ -300,129 +252,11 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			}
 		} else {
 			// ── Regular LLM Agent Path ──
-			// 5. Evaluate requirements once and reuse rules for tool filtering
-			// and LLM guidance injection.
-			precomputedRules := evaluateRequirements(ctx, agentCfg, inv)
-
-			// 6. Build tools from agent config + enabled tool sets + MCP.
-			adkTools := r.resolveTools(ctx, req.UserID, agentName, modelCfg, req.SessionID, agentCfg, req, precomputedRules)
-
-			// 6b. Inject ADK-native memory tools when the agent's MemoryPolicy
-			// says so (or the legacy toolset permission is set on pre-M8
-			// agents). load_memory is injected whenever memory is enabled;
-			// preload_memory is only injected when Preload is requested,
-			// matching ADK's two-tool memory model.
-			if memoryEnabled {
-				adkTools = append(adkTools, loadmemorytool.New())
-				if memPreload {
-					adkTools = append(adkTools, preloadmemorytool.New())
-				}
-			}
-			if artifactsEnabled {
-				adkTools = append(adkTools, loadartifactstool.New())
-			}
-
-			// 6c. Wrap each AgentToolRef via ADK-Go's tool/agenttool so the
-			// parent can call another user-owned agent as a plain function.
-			adkTools = append(adkTools, r.resolveAgentTools(ctx, req.UserID, modelCfg, req.SessionID, agentCfg, req)...)
-
-			// 7. Build system prompt (agent config + requirements + workspace KB + skills + profile).
-			systemPrompt := r.buildSystemPrompt(ctx, foundAgent, req.UserID, agentName, req.SessionID, agentCfg, inv)
-
-			var agentModelCfg *fagent.AgentModelConfig
-			if agentCfg != nil {
-				agentModelCfg = agentCfg.ModelConfig
-			}
-			genCfg := buildGenerateContentConfig(modelCfg, agentModelCfg, req.Config)
-			// Built-in code execution — provider-dispatched. Appends the
-			// provider's native code-interpreter Tool to genCfg.Tools
-			// when the agent's policy is enabled and the provider supports
-			// it. The ADK flow clones this Tools slice into each LLM
-			// request (see basicRequestProcessor in the vendored
-			// internal/llminternal/basic_processor.go) so the model sees
-			// the capability alongside whatever other tools are attached.
-			r.applyCodeExecutionTool(agentCfg, modelCfg, genCfg)
-
-			// Build native ADK tool and model callbacks: logging + enforcement.
-			var beforeModelCBs []llmagent.BeforeModelCallback
-			var afterModelCBs []llmagent.AfterModelCallback
-			var beforeToolCBs []llmagent.BeforeToolCallback
-			var afterToolCBs []llmagent.AfterToolCallback
-
-			// 1. Tool + model logging — native Before/After callbacks.
-			var onToolErrorCBs []llmagent.OnToolErrorCallback
-			if r.log != nil {
-				logBefore, logAfter := toolLoggingCallbacks(r.log, agentName, req.SessionID, req.UserID)
-				beforeToolCBs = append(beforeToolCBs, logBefore)
-				afterToolCBs = append(afterToolCBs, logAfter)
-				// OnToolErrorCallback handles ErrConfirmationRequired/ErrConfirmationRejected
-				// (ADK-Go v1.0.0 sentinels) and logs unexpected native tool errors.
-				onToolErrorCBs = append(onToolErrorCBs, toolErrorCallback(r.log, agentName, req.SessionID))
-				// Model logging — records timing and token usage at the model level.
-				modelBefore, modelAfter := modelLoggingCallbacks(r.log, agentName, req.SessionID)
-				beforeModelCBs = append(beforeModelCBs, modelBefore)
-				afterModelCBs = append(afterModelCBs, modelAfter)
-			}
-
-			// 2. Block enforcement — before-only foundation
-			//    middleware converted to a native BeforeToolCallback.
-			var enforcerMWs []fagent.Middleware
-			if r.blockEnforcer != nil {
-				enforcerMWs = append(enforcerMWs, r.blockEnforcer.BlockMiddleware(agentName))
-			}
-			beforeToolCBs = append(beforeToolCBs, buildBeforeOnlyCallbacks(agentName, req.SessionID, req.UserID, enforcerMWs...)...)
-
-			// 2b. Confirmation enforcement — ADK-native HITL protocol.
-			//    Uses ctx.RequestConfirmation() instead of legacy io.Confirm().
-			if r.confirmChecker != nil {
-				beforeToolCBs = append(beforeToolCBs, buildConfirmationCallback(r.confirmChecker, agentName, req.UserID, ""))
-			}
-
-			// Build ADK-Go sub-agents for coordinator pattern (LLM agent with SubAgents).
-			var adkSubAgents []agent.Agent
-			if agentCfg != nil && len(agentCfg.SubAgents) > 0 {
-				for _, subA := range agentCfg.SubAgents {
-					cfgurable, ok := subA.(fagent.Configurable)
-					if !ok {
-						continue
-					}
-					subCfg := cfgurable.Config()
-					subAdk, sErr := buildLLMAgent(llmAgentParams{
-						name:       subCfg.Name,
-						foundAgent: subA,
-						agentCfg:   extractAgentConfig(subA),
-						llm:        llm,
-						genCfg:     genCfg,
-						tools:      nil,
-						prompt:     subCfg.SystemPrompt,
-					})
-					if sErr != nil {
-						yield(nil, fmt.Errorf("building coordinator sub-agent %q: %w", subCfg.Name, sErr))
-						return
-					}
-					adkSubAgents = append(adkSubAgents, subAdk)
-				}
-			}
-
 			var aErr error
-			adkAgent, aErr = buildLLMAgent(llmAgentParams{
-				name:                 agentName,
-				foundAgent:           foundAgent,
-				agentCfg:             agentCfg,
-				llm:                  llm,
-				genCfg:               genCfg,
-				tools:                adkTools,
-				prompt:               systemPrompt,
-				beforeAgentCallbacks: buildBeforeRunHooks(precomputedRules),
-				beforeModelCallbacks: beforeModelCBs,
-				afterModelCallbacks:  afterModelCBs,
-				beforeToolCallbacks:  beforeToolCBs,
-				afterToolCallbacks:   afterToolCBs,
-				onToolErrorCallbacks: onToolErrorCBs,
-				subAgents:            adkSubAgents,
-			})
+			adkAgent, aErr = r.buildRegularLLMAgent(ctx, req, agentName, foundAgent, agentCfg, modelCfg, llm, inv,
+				memoryEnabled, memPreload, artifactsEnabled)
 			if aErr != nil {
-				yield(nil, fmt.Errorf("creating adk-go agent: %w", aErr))
+				yield(nil, aErr)
 				return
 			}
 		}
@@ -460,25 +294,8 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 			return
 		}
 
-		// 12. Inject user into context.
-		if req.UserID != "" {
-			ctx = context.WithValue(ctx, auth.UserContextKey, &auth.User{ID: req.UserID})
-		}
-
-		// 12b. Inject IO handler for tools that use io.Read() / io.Confirm().
-		//
-		// Default: PauseHandler for all runs (fresh + confirmation resume).
-		// This ensures tools that call io.Read() can properly pause and emit
-		// TOOL_NEEDS_INPUT events, even when resuming from a regular confirmation.
-		//
-		// Override: CachedReadHandler when resuming with custom input from the
-		// user (toolCallID is set AND userInput is provided).
-		ctx = agentio.WithHandler(ctx, agentio.NewPauseHandler())
-		if toolCallID != "" {
-			if userInput, _ := req.Context["userInput"].(string); userInput != "" {
-				ctx = agentio.WithHandler(ctx, agentio.NewCachedReadHandler(userInput))
-			}
-		}
+		// 12. Inject user + IO handler into context.
+		ctx = r.injectRunContext(ctx, req, toolCallID)
 
 		// 13. Yield initial events.
 		for _, ie := range initialEvents {
@@ -488,30 +305,7 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 		}
 
 		// 14. Build user content for adk-go.
-		//
-		// Two types of user content can be sent:
-		// 1. Confirmation Response: User answered Allow/Deny to a tool confirmation
-		//    - toolCallID is set in the request
-		//    - We send a FunctionResponse with Name="adk_request_confirmation" and the user's choice
-		//
-		// 2. Normal Message: User typed a regular message
-		//    - toolCallID is empty
-		//    - We send the text content as a user message
-		var userMsg *genai.Content
-		if toolCallID != "" {
-			// ── Path 1: Confirmation Response ──────────────────────────────────
-			// The frontend sends the original tool call ID (not the wrapper ID).
-			// We need to look up the confirmation wrapper ID from thread history.
-			wrapperID := GetConfirmationWrapperID(agg.Messages, toolCallID)
-			if wrapperID == "" {
-				// Fallback: shouldn't happen in normal flow, but safer than silently failing
-				wrapperID = toolCallID
-			}
-			userMsg = buildConfirmationResponse(wrapperID, toolCallID)
-		} else {
-			// ── Path 2: Normal User Message ───────────────────────────────────
-			userMsg = buildUserContent(req.Message)
-		}
+		userMsg := buildRunUserMessage(req, agg, toolCallID)
 
 		// 15. Run the agent and translate events.
 		//
@@ -594,23 +388,275 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 		_ = yieldAll(yield, loopState.onLoopEnd())
 
 		// 16. Persist session to memory for future cross-session recall.
-		// The session now contains all events from this run. Adding it to the
-		// memory service indexes its content for keyword-based search, so the
-		// preload_memory tool can retrieve relevant context in future runs.
 		if memoryEnabled {
-			getResp, getErr := sessionSvc.Get(ctx, &session.GetRequest{
-				AppName:   appName,
-				UserID:    req.UserID,
-				SessionID: req.SessionID,
-			})
-			if getErr == nil && getResp != nil {
-				if addErr := r.memoryService.AddSessionToMemory(ctx, getResp.Session); addErr != nil {
-					if r.log != nil {
-						r.log.Error(ctx, "failed to persist session to memory", "error", addErr, "userID", req.UserID, "sessionID", req.SessionID)
-					}
-				}
-			}
+			r.persistSessionToMemory(ctx, sessionSvc, req)
 		}
+	}
+}
+
+// injectRunContext covers step 12: wires the authenticated user into
+// context so downstream tools that reach for auth.GetUserFromContext
+// (DB-writing tools etc.) see the caller, and attaches the IO handler
+// for tools that use io.Read() / io.Confirm(). Default is PauseHandler
+// so io.Read() can emit TOOL_NEEDS_INPUT events; when resuming with
+// custom user input, the CachedReadHandler short-circuits the pause.
+func (r *RunnerAdapter) injectRunContext(ctx context.Context, req *fagent.RunRequest, toolCallID string) context.Context {
+	if req.UserID != "" {
+		ctx = context.WithValue(ctx, auth.UserContextKey, &auth.User{ID: req.UserID})
+	}
+	ctx = agentio.WithHandler(ctx, agentio.NewPauseHandler())
+	if toolCallID != "" {
+		if userInput, _ := req.Context["userInput"].(string); userInput != "" {
+			ctx = agentio.WithHandler(ctx, agentio.NewCachedReadHandler(userInput))
+		}
+	}
+	return ctx
+}
+
+// buildRunUserMessage covers step 14: pick between the confirmation-response
+// shape (when resuming a HITL tool call) and the plain user-message shape.
+// On resume, the frontend sends the original tool-call ID but ADK expects
+// the confirmation-wrapper ID — look it up from thread history, falling
+// back to the original ID if the wrapper can't be found (shouldn't happen
+// in a healthy flow, but fails safely).
+func buildRunUserMessage(req *fagent.RunRequest, agg *thread.ThreadAggregate, toolCallID string) *genai.Content {
+	if toolCallID == "" {
+		return buildUserContent(req.Message)
+	}
+	wrapperID := GetConfirmationWrapperID(agg.Messages, toolCallID)
+	if wrapperID == "" {
+		wrapperID = toolCallID
+	}
+	return buildConfirmationResponse(wrapperID, toolCallID)
+}
+
+// buildRegularLLMAgent covers the non-workflow branch of Run: resolve
+// tools + memory/artifact/agent-tool injections, assemble the system
+// prompt, wire logging + enforcement + confirmation callbacks, build any
+// coordinator sub-agents, and finally build the top-level LLM agent.
+// Error is already wrapped for the yield caller.
+func (r *RunnerAdapter) buildRegularLLMAgent(
+	ctx context.Context,
+	req *fagent.RunRequest,
+	agentName string,
+	foundAgent fagent.Agent,
+	agentCfg *fagent.Config,
+	modelCfg *fagent.ModelConfig,
+	llm adkmodel.LLM,
+	inv *fagent.Invocation,
+	memoryEnabled, memPreload, artifactsEnabled bool,
+) (agent.Agent, error) {
+	// Evaluate requirements once and reuse rules for tool filtering
+	// and LLM guidance injection.
+	precomputedRules := evaluateRequirements(ctx, agentCfg, inv)
+
+	// Build tools from agent config + enabled tool sets + MCP.
+	adkTools := r.resolveTools(ctx, req.UserID, agentName, modelCfg, req.SessionID, agentCfg, req, precomputedRules)
+
+	// Inject ADK-native memory tools when the agent's MemoryPolicy says
+	// so. load_memory is injected whenever memory is enabled; preload_memory
+	// is only injected when Preload is requested — ADK's two-tool model.
+	if memoryEnabled {
+		adkTools = append(adkTools, loadmemorytool.New())
+		if memPreload {
+			adkTools = append(adkTools, preloadmemorytool.New())
+		}
+	}
+	if artifactsEnabled {
+		adkTools = append(adkTools, loadartifactstool.New())
+	}
+
+	// Wrap each AgentToolRef so the parent can call another user-owned
+	// agent as a plain function.
+	adkTools = append(adkTools, r.resolveAgentTools(ctx, req.UserID, modelCfg, req.SessionID, agentCfg, req)...)
+
+	systemPrompt := r.buildSystemPrompt(ctx, foundAgent, req.UserID, agentName, req.SessionID, agentCfg, inv)
+
+	var agentModelCfg *fagent.AgentModelConfig
+	if agentCfg != nil {
+		agentModelCfg = agentCfg.ModelConfig
+	}
+	genCfg := buildGenerateContentConfig(modelCfg, agentModelCfg, req.Config)
+	// Built-in code execution — provider-dispatched. See applyCodeExecutionTool
+	// for the Gemini/OpenAI/Anthropic dispatch table.
+	r.applyCodeExecutionTool(agentCfg, modelCfg, genCfg)
+
+	beforeModelCBs, afterModelCBs, beforeToolCBs, afterToolCBs, onToolErrorCBs :=
+		r.buildAgentCallbacks(agentName, req)
+
+	adkSubAgents, err := r.buildCoordinatorSubAgents(agentCfg, llm, genCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	adkAgent, aErr := buildLLMAgent(llmAgentParams{
+		name:                 agentName,
+		foundAgent:           foundAgent,
+		agentCfg:             agentCfg,
+		llm:                  llm,
+		genCfg:               genCfg,
+		tools:                adkTools,
+		prompt:               systemPrompt,
+		beforeAgentCallbacks: buildBeforeRunHooks(precomputedRules),
+		beforeModelCallbacks: beforeModelCBs,
+		afterModelCallbacks:  afterModelCBs,
+		beforeToolCallbacks:  beforeToolCBs,
+		afterToolCallbacks:   afterToolCBs,
+		onToolErrorCallbacks: onToolErrorCBs,
+		subAgents:            adkSubAgents,
+	})
+	if aErr != nil {
+		return nil, fmt.Errorf("creating adk-go agent: %w", aErr)
+	}
+	return adkAgent, nil
+}
+
+// buildAgentCallbacks wires logging, block enforcement, and confirmation
+// handlers into ADK's native Before/After callback slots.
+func (r *RunnerAdapter) buildAgentCallbacks(agentName string, req *fagent.RunRequest) (
+	beforeModel []llmagent.BeforeModelCallback,
+	afterModel []llmagent.AfterModelCallback,
+	beforeTool []llmagent.BeforeToolCallback,
+	afterTool []llmagent.AfterToolCallback,
+	onToolError []llmagent.OnToolErrorCallback,
+) {
+	if r.log != nil {
+		logBefore, logAfter := toolLoggingCallbacks(r.log, agentName, req.SessionID, req.UserID)
+		beforeTool = append(beforeTool, logBefore)
+		afterTool = append(afterTool, logAfter)
+		// OnToolErrorCallback handles ErrConfirmationRequired/ErrConfirmationRejected
+		// (ADK-Go v1.0.0 sentinels) and logs unexpected native tool errors.
+		onToolError = append(onToolError, toolErrorCallback(r.log, agentName, req.SessionID))
+		modelBefore, modelAfter := modelLoggingCallbacks(r.log, agentName, req.SessionID)
+		beforeModel = append(beforeModel, modelBefore)
+		afterModel = append(afterModel, modelAfter)
+	}
+
+	// Block enforcement — before-only foundation middleware converted to
+	// a native BeforeToolCallback.
+	var enforcerMWs []fagent.Middleware
+	if r.blockEnforcer != nil {
+		enforcerMWs = append(enforcerMWs, r.blockEnforcer.BlockMiddleware(agentName))
+	}
+	beforeTool = append(beforeTool, buildBeforeOnlyCallbacks(agentName, req.SessionID, req.UserID, enforcerMWs...)...)
+
+	// Confirmation enforcement — ADK-native HITL protocol. Uses
+	// ctx.RequestConfirmation() instead of legacy io.Confirm().
+	if r.confirmChecker != nil {
+		beforeTool = append(beforeTool, buildConfirmationCallback(r.confirmChecker, agentName, req.UserID, ""))
+	}
+	return
+}
+
+// buildCoordinatorSubAgents builds ADK-Go sub-agents for the coordinator
+// pattern (LLM agent whose SubAgents are populated from agentCfg.SubAgents).
+// Non-Configurable sub-agents are skipped — they can still be invoked via
+// the agent-tool path.
+func (r *RunnerAdapter) buildCoordinatorSubAgents(
+	agentCfg *fagent.Config,
+	llm adkmodel.LLM,
+	genCfg *genai.GenerateContentConfig,
+) ([]agent.Agent, error) {
+	if agentCfg == nil || len(agentCfg.SubAgents) == 0 {
+		return nil, nil
+	}
+	var subs []agent.Agent
+	for _, subA := range agentCfg.SubAgents {
+		cfgurable, ok := subA.(fagent.Configurable)
+		if !ok {
+			continue
+		}
+		subCfg := cfgurable.Config()
+		subAdk, sErr := buildLLMAgent(llmAgentParams{
+			name:       subCfg.Name,
+			foundAgent: subA,
+			agentCfg:   extractAgentConfig(subA),
+			llm:        llm,
+			genCfg:     genCfg,
+			tools:      nil,
+			prompt:     subCfg.SystemPrompt,
+		})
+		if sErr != nil {
+			return nil, fmt.Errorf("building coordinator sub-agent %q: %w", subCfg.Name, sErr)
+		}
+		subs = append(subs, subAdk)
+	}
+	return subs, nil
+}
+
+// loadOrSeedThread covers step 1 of Run: inspect req.Context for a
+// pending tool-call ID and attachment refs, then either (a) reload the
+// existing thread aggregate (confirmation/elicitation resume path), (b)
+// append the user's message and return its side-effects (normal path),
+// or (c) load an optional existing thread (no message, no tool-call).
+// Returns the aggregate, the extracted toolCallID (empty when not a
+// resume), the events that should be yielded before the agent runs, and
+// any persistence error.
+func (r *RunnerAdapter) loadOrSeedThread(ctx context.Context, req *fagent.RunRequest) (*thread.ThreadAggregate, string, []thread.Event, error) {
+	var toolCallID string
+	var attachmentRefs []thread.Attachment
+	if req.Context != nil {
+		if refs, ok := req.Context["attachmentRefs"].([]thread.Attachment); ok {
+			attachmentRefs = refs
+		}
+		if id, ok := req.Context["toolCallId"].(string); ok {
+			toolCallID = id
+		}
+	}
+
+	if toolCallID != "" {
+		// Confirmation/elicitation resume: the user's response is already
+		// captured in the InputProvided event (emitted by the orchestrator
+		// before calling Run). Skip persisting a duplicate UserMessageAdded
+		// to avoid polluting the session with a plain-text user event that
+		// would cause ADK's RequestConfirmationRequestProcessor to bail.
+		agg, lErr := r.threadMgr.Load(ctx, req.SessionID)
+		if lErr != nil {
+			return nil, "", nil, fmt.Errorf("failed to load thread for tool response: %w", lErr)
+		}
+		return agg, toolCallID, nil, nil
+	}
+
+	if req.Message != nil {
+		messageID := req.Message.ID
+		if messageID == "" {
+			messageID = generateID()
+		}
+		userContent := extractUserText(req.Message)
+		agg, uEvent, sideEffects, pErr := r.threadMgr.AddUserMessage(ctx, req.SessionID, messageID, userContent, req.UserID, attachmentRefs...)
+		if pErr != nil {
+			return nil, "", nil, fmt.Errorf("failed to persist user message: %w", pErr)
+		}
+		var initial []thread.Event
+		if uEvent != nil {
+			initial = append(initial, uEvent)
+		}
+		initial = append(initial, sideEffects...)
+		return agg, "", initial, nil
+	}
+
+	agg, lErr := r.threadMgr.Load(ctx, req.SessionID)
+	if lErr != nil && !errors.Is(lErr, thread.ErrThreadNotFound) {
+		return nil, "", nil, fmt.Errorf("failed to load thread: %w", lErr)
+	}
+	return agg, "", nil, nil
+}
+
+// persistSessionToMemory indexes the just-finished session for keyword
+// search so the preload_memory tool can retrieve relevant context in
+// future runs. Best-effort: any failure is logged, never returned.
+func (r *RunnerAdapter) persistSessionToMemory(ctx context.Context, sessionSvc session.Service, req *fagent.RunRequest) {
+	getResp, getErr := sessionSvc.Get(ctx, &session.GetRequest{
+		AppName:   appName,
+		UserID:    req.UserID,
+		SessionID: req.SessionID,
+	})
+	if getErr != nil || getResp == nil {
+		return
+	}
+	if addErr := r.memoryService.AddSessionToMemory(ctx, getResp.Session); addErr != nil && r.log != nil {
+		r.log.Error(ctx, "failed to persist session to memory",
+			"error", addErr, "userID", req.UserID, "sessionID", req.SessionID)
 	}
 }
 
