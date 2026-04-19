@@ -148,8 +148,9 @@ def load_cyclomatic(path: str | None, min_verdict: str = "LOW") -> dict[str, dic
     Keeps files whose verdict is at least as severe as ``min_verdict``
     — FINE files (every function under the threshold) aren't a signal
     worth counting, matching how the other loaders filter. Preserves
-    the top-offender list so detail blocks can name-and-line the
-    specific complex functions.
+    the top-offender list plus the schema-v2 extension fields
+    (modified_ccn, NS, exit_count, duplicate_blocks) when present
+    so detail blocks can surface them.
     """
     if not path:
         return {}
@@ -179,6 +180,15 @@ def load_cyclomatic(path: str | None, min_verdict: str = "LOW") -> dict[str, dic
             "function_count": e.get("function_count", 0),
             "total_nloc": e.get("total_nloc", 0),
             "top_functions": e.get("top_functions", []),
+            # v2 extension fields — present only when
+            # cyclomatic.py ran with the extensions / duplicates pass.
+            "max_modified_ccn": e.get("max_modified_ccn", 0),
+            "max_ns": e.get("max_ns", 0),
+            "max_exit_count": e.get("max_exit_count", 0),
+            "ccn_switch_gap": e.get("ccn_switch_gap", 0),
+            "duplicate_blocks": e.get("duplicate_blocks", []),
+            "duplicate_block_count": e.get("duplicate_block_count", 0),
+            "duplicate_line_span": e.get("duplicate_line_span", 0),
         }
     return out
 
@@ -360,7 +370,8 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
     lines.append("| fix-pct | `bugfix_density.py` | Fraction of this file's commits whose subject line matched fix keywords (`fix`, `bug`, `hotfix`, `regression`, `crash`, `revert`, `typo`, etc., word-bounded) |")
     lines.append("| coupling count | `file_coupling.py` | Number of partner files that co-change with this one at cooccurrence ≥ 6 |")
     lines.append("| LCOM4 | `cohesion.py` | Max number of disjoint method groups across any Go type in the file. 1 = cohesive. ≥ 2 = the type could be split into that many types with no shared state or calls. Go-only; ignores receiverless functions; known false-positives on types that delegate to an embedded interface. |")
-    lines.append("| Max CCN / High CCN | `cyclomatic.py` | Max per-function cyclomatic complexity in the file and how many functions in the file are ≥ threshold (default 10). McCabe's complexity counts decision points (if/for/switch/&&/||) — at CCN ≥ 10 a function becomes hard to test exhaustively; ≥ 25 is usually a split candidate. Multi-language (Go, JS, TS, Python, …); skips templ. |")
+    lines.append("| CCN / Mod / High | `cyclomatic.py` | Max per-function cyclomatic complexity / max *modified* CCN (switch counts as 1) / count of functions ≥ threshold. A large gap between CCN and Mod means the file's complexity is switch-driven (a dispatcher), not tangled logic — refactor-by-splitting won't help. Multi-language (Go, JS, TS, Python, …); skips templ. |")
+    lines.append("| Dups | `cyclomatic.py` | Number of duplicate (cloned) code blocks touching this file. Only populated when cyclomatic.py is run with `--duplicates`. Clones of ≥ 6 lines across files or within a file. |")
     lines.append("")
 
     # Top packages — orientation.
@@ -419,8 +430,8 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
         lines.append(f"\n![signal matrix]({_img_src(plot_paths['matrix'])})\n")
 
     lines.append(f"## File overview ({len(visible)} files)\n")
-    lines.append("| File | Signals | Commits | Fix count | Fix % | Trend verdict | Δmean | Max indent | Hotspot score | Coupling partners | LCOM4 (Δ) | Max CCN / High |")
-    lines.append("|---|:-:|---:|---:|---:|:-:|---:|---:|---:|---:|:-:|:-:|")
+    lines.append("| File | Signals | Commits | Fix count | Fix % | Trend verdict | Δmean | Max indent | Hotspot score | Coupling partners | LCOM4 (Δ) | CCN / Mod / High | Dups |")
+    lines.append("|---|:-:|---:|---:|---:|:-:|---:|---:|---:|---:|:-:|:-:|:-:|")
     for r in visible:
         commits = (r["bugfix"]["total_commits"] if r["bugfix"]
                    else (r["trend"]["commits"] if r["trend"] else ""))
@@ -439,11 +450,21 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
         else:
             lcom4_cell = ""
         cy = r["cyclomatic"]
-        ccn_cell = f"{cy['max_ccn']} / {cy['high_ccn_count']}" if cy else ""
+        if cy:
+            mod = cy.get("max_modified_ccn", 0)
+            mod_part = f" / {mod}" if mod else " / —"
+            ccn_cell = f"{cy['max_ccn']}{mod_part} / {cy['high_ccn_count']}"
+            dup_cell = (
+                str(cy.get("duplicate_block_count", 0))
+                if cy.get("duplicate_block_count", 0) else ""
+            )
+        else:
+            ccn_cell = ""
+            dup_cell = ""
         lines.append(
             f"| `{r['path']}` | {r['signal_count']} | "
             f"{commits} | {fix_n} | {fix_p} | {verdict} | "
-            f"{dmean} | {maxi} | {hs_score} | {cpl} | {lcom4_cell} | {ccn_cell} |"
+            f"{dmean} | {maxi} | {hs_score} | {cpl} | {lcom4_cell} | {ccn_cell} | {dup_cell} |"
         )
     lines.append("")
 
@@ -601,21 +622,72 @@ def _detail_block(r: dict) -> list[str]:
 
     if r["cyclomatic"]:
         cy = r["cyclomatic"]
-        out.append(
+        summary = (
             f"**cyclomatic** — verdict **{cy.get('verdict', 'n/a')}** "
             f"(max CCN {cy['max_ccn']}, mean {cy['mean_ccn']:.1f}, "
             f"{cy['high_ccn_count']} function(s) ≥ threshold; "
             f"{cy['function_count']} total, {cy['total_nloc']} NLOC)."
         )
+        out.append(summary)
+
+        # Modified CCN + switch gap. A big ``ccn_switch_gap`` says the
+        # raw CCN is inflated by a switch/case dispatcher rather than
+        # by genuinely tangled branching — refactor-by-splitting won't
+        # help, consolidate the dispatch table instead.
+        if cy.get("max_modified_ccn"):
+            gap = cy.get("ccn_switch_gap", 0)
+            gap_hint = ""
+            if gap >= 10:
+                gap_hint = "  ·  switch-driven (large gap — a dispatcher, not tangled logic)"
+            elif gap >= 3:
+                gap_hint = "  ·  mixed (some switch, some branching)"
+            elif cy["max_ccn"] >= 15:
+                gap_hint = "  ·  tangled (raw CCN ≈ modified CCN — real branch count)"
+            out.append(
+                f"- modified CCN max = {cy['max_modified_ccn']}  ·  "
+                f"gap = {gap}  ·  max NS = {cy.get('max_ns', 0)}  ·  "
+                f"max exits = {cy.get('max_exit_count', 0)}"
+                + gap_hint
+            )
+
+        # Duplicate-block surface. List the first few clone locations
+        # with sibling references so the reader can jump straight to
+        # the twinned sites.
+        dups = cy.get("duplicate_blocks") or []
+        if dups:
+            out.append(
+                f"- duplicate blocks: {cy['duplicate_block_count']} "
+                f"(≈ {cy['duplicate_line_span']} lines of copy-paste)"
+            )
+            for b in dups[:5]:
+                siblings_preview = (
+                    f" — twins: {', '.join(b.get('siblings', [])[:2])}"
+                    if b.get("siblings") else ""
+                )
+                out.append(
+                    f"  - L{b['start']}–{b['end']} "
+                    f"({b['span']} lines × {b['occurrences']} copies)"
+                    + siblings_preview
+                )
+
         # Name-and-line the top complex functions so the reader knows
         # exactly where to look rather than reading the whole file.
         top = cy.get("top_functions", [])
+        if top:
+            out.append(f"- top functions by CCN:")
         for fn in top[:5]:
             params = fn.get("parameters", 0)
             param_hint = f", params={params}" if params else ""
+            mod_hint = (
+                f", mod={fn['modified_ccn']}" if fn.get("modified_ccn") is not None else ""
+            )
+            exits_hint = (
+                f", exits={fn['exit_count']}" if fn.get("exit_count") is not None else ""
+            )
             out.append(
-                f"- `{fn.get('name', fn.get('long_name', '?'))}` (L{fn['line']}) "
-                f"— CCN={fn['ccn']}, NLOC={fn['nloc']}{param_hint}"
+                f"  - `{fn.get('name', fn.get('long_name', '?'))}` (L{fn['line']}) "
+                f"— CCN={fn['ccn']}{mod_hint}{exits_hint}"
+                f", NLOC={fn['nloc']}{param_hint}"
             )
         out.append("")
 

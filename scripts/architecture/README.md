@@ -12,7 +12,8 @@ reader. Scripts here are standalone — no cross-imports.
 | **Complexity (trend)** | `complexity_trend.py`  | Is whitespace-indent complexity (proxy for nesting) deteriorating? |
 | **Complexity (cyclomatic)** | `cyclomatic.py`   | Which functions branch too much (McCabe CCN via [lizard](https://github.com/terryyin/lizard))? Multi-language. |
 | **Cohesion**        | `cohesion.py`             | Do Go types juggle disjoint responsibilities (LCOM4 ≥ 2)?         |
-| **Coupling**        | `file_coupling.py`        | Which files co-change at unexpected rates (temporal coupling)?   |
+| **Coupling (temporal)** | `file_coupling.py`    | Which files co-change at unexpected rates?                       |
+| **Coupling (structural)** | `package_deps.py`   | Which Go packages concentrate fan-in/fan-out/cut-through ([goda](https://github.com/loov/goda))? |
 | **Bug density**     | `bugfix_density.py`       | Which files absorb a disproportionate share of fix commits?      |
 | **Code-Maat dashboard** | `maat_visualize.py`   | CSV-driven visualization of an external Code-Maat report set.    |
 
@@ -29,6 +30,14 @@ reader. Scripts here are standalone — no cross-imports.
 - `go_grouping.txt` — package-grouping rules used by some signals to
   roll sub-packages up to module-level views.
 - `go_hotspots.md` — in-depth reference for `go_hotspots.py`.
+
+## External binaries
+
+Two signals shell out to Go tools installed via `go install`:
+
+- `cyclomatic.py` — uses [lizard](https://github.com/terryyin/lizard) (Python dep, in `requirements.txt`).
+- `package_deps.py` — requires the `goda` binary on `$PATH`:
+  `go install github.com/loov/goda@latest`.
 
 ## Running
 
