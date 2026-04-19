@@ -70,34 +70,14 @@ func (c *SearchClient) Search(ctx context.Context, query string) (*websearch.Web
 // parseGroundedResponse converts a Gemini GenerateContentResponse into a
 // websearch.WebSearchResult with sources and inline citation markers.
 func parseGroundedResponse(query string, resp *genai.GenerateContentResponse) (*websearch.WebSearchResult, error) {
-	const maxSourcesReturned = 10
-
 	if resp == nil || len(resp.Candidates) == 0 {
-		return &websearch.WebSearchResult{
-			Status:  "no_results",
-			Query:   query,
-			Summary: "No results found for this query.",
-		}, nil
+		return noResultsResult(query, "No results found for this query."), nil
 	}
 
 	candidate := resp.Candidates[0]
-
-	var answerText strings.Builder
-	if candidate.Content != nil {
-		for _, part := range candidate.Content.Parts {
-			if part.Text != "" {
-				answerText.WriteString(part.Text)
-			}
-		}
-	}
-
-	summary := answerText.String()
+	summary := extractAnswerText(candidate)
 	if summary == "" {
-		return &websearch.WebSearchResult{
-			Status:  "no_results",
-			Query:   query,
-			Summary: "The search returned no useful content.",
-		}, nil
+		return noResultsResult(query, "The search returned no useful content."), nil
 	}
 
 	result := &websearch.WebSearchResult{
@@ -113,72 +93,115 @@ func parseGroundedResponse(query string, resp *genai.GenerateContentResponse) (*
 	}
 
 	result.SearchQueries = gm.WebSearchQueries
-
 	if gm.SearchEntryPoint != nil {
 		result.SearchWidgetHTML = gm.SearchEntryPoint.RenderedContent
 	}
 
-	seenURLs := make(map[string]bool)
-	for i, chunk := range gm.GroundingChunks {
-		if i >= maxSourcesReturned {
-			break
-		}
-		if chunk.Web != nil && chunk.Web.URI != "" && !seenURLs[chunk.Web.URI] {
-			seenURLs[chunk.Web.URI] = true
-			result.Sources = append(result.Sources, websearch.Source{
-				Index:  len(result.Sources) + 1,
-				Title:  chunk.Web.Title,
-				URL:    chunk.Web.URI,
-				Domain: extractDomain(chunk.Web.URI),
-			})
-		}
-	}
+	result.Sources = collectSources(gm.GroundingChunks)
 	result.SourceCount = len(result.Sources)
 	result.HasCitations = len(result.Sources) > 0
 
+	result.Citations = collectCitations(gm.GroundingSupports, gm.GroundingChunks, result.Sources)
+	result.Summary = websearch.InsertCitationMarkers(summary, result.Citations)
+
+	return result, nil
+}
+
+func noResultsResult(query, summary string) *websearch.WebSearchResult {
+	return &websearch.WebSearchResult{Status: "no_results", Query: query, Summary: summary}
+}
+
+func extractAnswerText(candidate *genai.Candidate) string {
+	if candidate.Content == nil {
+		return ""
+	}
+	var sb strings.Builder
+	for _, part := range candidate.Content.Parts {
+		if part.Text != "" {
+			sb.WriteString(part.Text)
+		}
+	}
+	return sb.String()
+}
+
+// collectSources dedupes grounding chunks by URI and caps at maxSourcesReturned.
+func collectSources(chunks []*genai.GroundingChunk) []websearch.Source {
+	const maxSourcesReturned = 10
+	sources := make([]websearch.Source, 0)
+	seen := make(map[string]bool)
+	for _, chunk := range chunks {
+		if len(sources) >= maxSourcesReturned {
+			break
+		}
+		if chunk.Web == nil || chunk.Web.URI == "" || seen[chunk.Web.URI] {
+			continue
+		}
+		seen[chunk.Web.URI] = true
+		sources = append(sources, websearch.Source{
+			Index:  len(sources) + 1,
+			Title:  chunk.Web.Title,
+			URL:    chunk.Web.URI,
+			Domain: extractDomain(chunk.Web.URI),
+		})
+	}
+	return sources
+}
+
+func collectCitations(supports []*genai.GroundingSupport, chunks []*genai.GroundingChunk, sources []websearch.Source) []websearch.Citation {
 	var citations []websearch.Citation
-	for _, support := range gm.GroundingSupports {
+	for _, support := range supports {
 		if support.Segment == nil || support.Segment.Text == "" {
 			continue
 		}
-
-		sourceIndices := make([]int, 0, len(support.GroundingChunkIndices))
-		var confidenceSum float32
-		for i, chunkIdx := range support.GroundingChunkIndices {
-			if int(chunkIdx) < len(gm.GroundingChunks) {
-				chunk := gm.GroundingChunks[chunkIdx]
-				if chunk.Web != nil {
-					for _, s := range result.Sources {
-						if s.URL == chunk.Web.URI {
-							sourceIndices = append(sourceIndices, s.Index)
-							break
-						}
-					}
-				}
-			}
-			if i < len(support.ConfidenceScores) {
-				confidenceSum += support.ConfidenceScores[i]
-			}
-		}
-
-		var avgConfidence float32
-		if len(sourceIndices) > 0 {
-			avgConfidence = confidenceSum / float32(len(sourceIndices))
-		}
-
+		indices, avgConfidence := citationSourceIndices(support, chunks, sources)
 		citations = append(citations, websearch.Citation{
 			Text:          support.Segment.Text,
-			SourceIndices: sourceIndices,
+			SourceIndices: indices,
 			StartIndex:    int(support.Segment.StartIndex),
 			EndIndex:      int(support.Segment.EndIndex),
 			ConfidenceAvg: avgConfidence,
 		})
 	}
+	return citations
+}
 
-	result.Citations = citations
-	result.Summary = websearch.InsertCitationMarkers(summary, citations)
+// citationSourceIndices resolves a support's chunk references into result-space
+// source indices and returns the mean confidence across the referenced chunks.
+func citationSourceIndices(support *genai.GroundingSupport, chunks []*genai.GroundingChunk, sources []websearch.Source) ([]int, float32) {
+	indices := make([]int, 0, len(support.GroundingChunkIndices))
+	var confidenceSum float32
+	for i, chunkIdx := range support.GroundingChunkIndices {
+		if idx, ok := sourceIndexForChunk(int(chunkIdx), chunks, sources); ok {
+			indices = append(indices, idx)
+		}
+		if i < len(support.ConfidenceScores) {
+			confidenceSum += support.ConfidenceScores[i]
+		}
+	}
+	var avg float32
+	if len(indices) > 0 {
+		avg = confidenceSum / float32(len(indices))
+	}
+	return indices, avg
+}
 
-	return result, nil
+// sourceIndexForChunk maps a grounding-chunk index to its result-space source
+// index via URL equality. Returns (0, false) if the chunk is out of range,
+// missing Web metadata, or no matching source was collected.
+func sourceIndexForChunk(chunkIdx int, chunks []*genai.GroundingChunk, sources []websearch.Source) (int, bool) {
+	if chunkIdx < 0 || chunkIdx >= len(chunks) {
+		return 0, false
+	}
+	chunk := chunks[chunkIdx]
+	if chunk.Web == nil {
+		return 0, false
+	}
+	for _, s := range sources {
+		if s.URL == chunk.Web.URI {
+			return s.Index, true
+		}
+	}
+	return 0, false
 }
 
 // extractDomain extracts the hostname from a URL string.
