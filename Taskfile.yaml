@@ -301,9 +301,14 @@ tasks:
           --discover --top 15 --since "{{.SINCE}}" --samples 15 --no-plot \
           --json .hotspots/trends.json
       - |
-        echo "▶ 4/4  File coupling..."
+        echo "▶ 4/5  File coupling..."
         .hotspots/.venv/bin/python3 scripts/file_coupling.py . \
           --since "{{.SINCE}}" -n 40 --min-cooc 6 -o .hotspots/coupling.json
+      - |
+        echo "▶ 5/5  Bug/fix density (ground-truth rot signal)..."
+        .hotspots/.venv/bin/python3 scripts/bugfix_density.py \
+          --since "{{.SINCE}}" --min-commits 3 --top 20 \
+          -o .hotspots/bugfix.json
       - |
         echo "▶ synthesize..."
         HS_FLAGS="--hotspots .hotspots/hotspots_repo.json"
@@ -315,6 +320,7 @@ tasks:
           $HS_FLAGS \
           --trends .hotspots/trends.json \
           --coupling .hotspots/coupling.json \
+          --bugfix .hotspots/bugfix.json \
           --out-md REFACTORING_PLAN.md \
           --out-json .hotspots/refactor_plan.json \
           --window "{{.SINCE}}"

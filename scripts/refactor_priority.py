@@ -1,34 +1,27 @@
 #!/usr/bin/env python3
 """
-refactor_priority.py — cross-signal refactor ranker.
+refactor_priority.py — cross-signal data report.
 
-Takes JSON output from the three analyzers and synthesizes a prioritized
-refactor plan. The key insight: one signal is opinion, two is a hypothesis,
-three is a diagnosis. Files that appear in multiple signals are the
-highest-value targets.
+Collects per-file measurements from four analyses and presents them in one
+document. Makes NO judgments: no scores, no tiers, no effort estimates, no
+priority rankings, no suggested actions.
 
-Inputs (all JSON from the sibling tools):
-  --hotspots      go_hotspots.py --json
+Inputs (all JSON from sibling tools):
+  --hotspots      go_hotspots.py --json (repeatable)
   --trends        complexity_trend.py --discover --json
   --coupling      file_coupling.py -o
+  --bugfix        bugfix_density.py -o (optional)
 
 Outputs:
-  stdout          ranked summary table
-  --out-md FILE   full markdown plan with evidence citations
-  --out-json FILE machine-readable ranked report
+  stdout          compact table of files with ≥1 signal, sorted by number
+                  of signals they appear in, then alphabetical
+  --out-md FILE   markdown report with raw per-file data + detail blocks
+  --out-json FILE machine-readable merged data
 
-Signal contributions (per-file score):
-  hotspot      up to 100 — scaled by (score / top_score)
-  deteriorating  0–100 — scaled by (combined_score / top_combined_score)
-  active_decay   +40 bonus — currently rotting, not historically
-  coupling       +25 per high-coupling partner (cooccur ≥ 8)
-  depth_extreme  +20 when max indent ≥ 9
-  is_test        ×0.3 multiplier — tests rot differently
-
-Tiers:
-  Tier 1 — score ≥ 80 AND ≥2 independent signals (cross-signal)
-  Tier 2 — score ≥ 60 with 1 strong signal
-  Tier 3 — score ≥ 30 (monitor)
+Philosophy: the tool's job is to surface evidence. The human reads the
+evidence and decides what to refactor, in what order. Any prioritization
+inherited from the tool would inherit its author's opinion about weights
+and thresholds.
 """
 from __future__ import annotations
 
@@ -44,104 +37,71 @@ from pathlib import Path
 
 def load_hotspots(paths: list[str]) -> tuple[dict[str, dict], list[dict]]:
     """Return (by_file, packages). Accepts multiple JSON files so callers can
-    merge a package-mode repo scan with function-mode drill-ins. Hotspots can
-    be at package or function granularity; we key functions by file path and
-    aggregate."""
+    merge a package-mode repo scan with function-mode drill-ins."""
     by_file: dict[str, dict] = {}
     packages: list[dict] = []
     all_hs: list[dict] = []
     for path in paths:
         d = json.loads(Path(path).read_text())
         all_hs.extend(d.get("hotspots", []))
-    if not all_hs:
-        return by_file, packages
-    # Compute top_score over the *function* entries only — package scores are
-    # orders of magnitude larger and would crush normalization.
-    fn_scores = [h["metrics"]["score"] for h in all_hs if h.get("kind") != "package"]
-    top_score = max(fn_scores, default=1) or 1
+
     for h in all_hs:
-        score = h["metrics"]["score"]
-        normalized = 100.0 * score / top_score
         kind = h.get("kind")
         path = h.get("file_path")
         if kind == "package":
             packages.append({
                 "name": h.get("import_path") or h.get("name"),
-                "score": score,
+                "score": h["metrics"]["score"],
                 "revisions": h["metrics"]["revisions"],
                 "loc": h["metrics"]["loc"],
-                "normalized": normalized,
-                "signals": h.get("signals", []),
-                "suggested_actions": h.get("suggested_actions", []),
             })
             continue
         if not path:
             continue
-        # Function-level hit — aggregate into its containing file.
         entry = by_file.setdefault(path, {
             "path": path,
             "total_score": 0,
-            "top_function_score": 0,
             "functions": [],
             "signals": set(),
-            "suggested_actions": set(),
+            "max_bug_fix_pct": 0.0,
         })
-        entry["total_score"] += score
-        if score > entry["top_function_score"]:
-            entry["top_function_score"] = score
+        entry["total_score"] += h["metrics"]["score"]
+        bf_pct = h.get("bug_fix_pct") or 0.0
+        if bf_pct > entry["max_bug_fix_pct"]:
+            entry["max_bug_fix_pct"] = bf_pct
         entry["functions"].append({
             "name": h.get("name"),
             "lines": f"L{h.get('start_line')}-{h.get('end_line')}",
             "loc": h["metrics"]["loc"],
             "revisions": h["metrics"]["revisions"],
-            "score": score,
+            "score": h["metrics"]["score"],
+            "bug_fix_pct": bf_pct,
         })
         for s in h.get("signals") or []:
             entry["signals"].add(s.get("kind"))
-        for a in h.get("suggested_actions") or []:
-            entry["suggested_actions"].add(a)
 
-    # Normalize file-aggregate scores.
-    if by_file:
-        max_total = max(e["total_score"] for e in by_file.values())
-        for e in by_file.values():
-            e["hotspot_normalized"] = 100.0 * e["total_score"] / max_total if max_total else 0
-            e["signals"] = sorted(e["signals"])
-            e["suggested_actions"] = sorted(e["suggested_actions"])
+    for e in by_file.values():
+        e["signals"] = sorted(e["signals"])
     return by_file, packages
 
 
 def load_trends(path: str) -> dict[str, dict]:
-    """Return by-file map of deteriorating files from complexity_trend JSON."""
+    """Return by-file map. Uses the `all` field which includes every screened
+    file, not just those classified DETERIORATING."""
     d = json.loads(Path(path).read_text())
-    ranked = d.get("ranked") or []
-    if not ranked:
+    entries = d.get("all") or d.get("ranked") or []
+    return {e["path"]: e for e in entries}
+
+
+def load_bugfix(path: str | None) -> dict[str, dict]:
+    if not path:
         return {}
-    top = ranked[0].get("combined_score") or ranked[0]["score"]
-    out: dict[str, dict] = {}
-    for e in ranked:
-        combined = e.get("combined_score") or e["score"]
-        out[e["path"]] = {
-            "path": e["path"],
-            "is_test": e["is_test"],
-            "verdict": e["verdict"],
-            "score": e["score"],
-            "recent_score": e.get("recent_score", 0),
-            "combined_score": combined,
-            "trend_normalized": 100.0 * combined / top if top else 0,
-            "active_decay": e.get("active_decay", False),
-            "commits": e["commits"],
-            "loc": e["loc"],
-            "mean_delta": e["metrics"]["mean_delta"],
-            "last_max": e["metrics"]["last_max"],
-            "total_delta_pct": e["metrics"]["total_delta_pct"],
-            "loc_delta_pct": e["metrics"]["loc_delta_pct"],
-        }
-    return out
+    d = json.loads(Path(path).read_text())
+    return {f["path"]: f for f in d.get("files", [])}
 
 
-def load_coupling(path: str, cooc_floor: int = 8) -> dict[str, list[dict]]:
-    """Return by-file map of high-coupling partners."""
+def load_coupling(path: str, cooc_floor: int = 6) -> dict[str, list[dict]]:
+    """Return by-file map of coupling partners."""
     d = json.loads(Path(path).read_text())
     pairs = d.get("top_pairs_normalized") or d.get("top_pairs") or []
     by_file: dict[str, list[dict]] = defaultdict(list)
@@ -152,184 +112,199 @@ def load_coupling(path: str, cooc_floor: int = 8) -> dict[str, list[dict]]:
         f1, f2 = p.get("file1"), p.get("file2")
         if not (f1 and f2):
             continue
-        jaccard = p.get("jaccard", 0)
         for src, dst in ((f1, f2), (f2, f1)):
             by_file[src].append({
                 "partner": dst,
                 "cooccur": cooc,
-                "jaccard": jaccard,
+                "jaccard": p.get("jaccard", 0),
                 "structural": p.get("structural", False),
             })
     return by_file
 
 
-# Synthesis ----------------------------------------------------------------
+# Collation ----------------------------------------------------------------
 
-def synthesize(
+def collate(
     hotspots_by_file: dict[str, dict],
     trends_by_file: dict[str, dict],
     coupling_by_file: dict[str, list[dict]],
+    bugfix_by_file: dict[str, dict],
 ) -> list[dict]:
-    """Merge signals into a single per-file ranking."""
+    """Merge per-file data from every signal. No ranking, no scoring — just
+    a record listing which analyses touched each file and what they measured.
+    """
     all_paths = (
         set(hotspots_by_file) | set(trends_by_file) | set(coupling_by_file)
+        | set(bugfix_by_file)
     )
-
-    results = []
+    records: list[dict] = []
     for path in all_paths:
         hs = hotspots_by_file.get(path)
         tr = trends_by_file.get(path)
         cp = coupling_by_file.get(path) or []
+        bf = bugfix_by_file.get(path)
 
-        # Base contributions.
-        hotspot_contrib = hs["hotspot_normalized"] if hs else 0
-        trend_contrib = tr["trend_normalized"] if tr else 0
-        coupling_contrib = min(100, 25 * len(cp))
+        present_in: list[str] = []
+        if hs: present_in.append("hotspot")
+        if tr: present_in.append("trend")
+        if cp: present_in.append("coupling")
+        if bf: present_in.append("bugfix")
 
-        # Bonuses.
-        active_bonus = 40 if (tr and tr["active_decay"]) else 0
-        depth_bonus = 20 if (tr and tr["last_max"] >= 9) else 0
-
-        # Base score — weighted sum. hotspot×1.0, trend×0.9, coupling×0.6.
-        score = (
-            1.0 * hotspot_contrib +
-            0.9 * trend_contrib +
-            0.6 * coupling_contrib +
-            active_bonus + depth_bonus
-        )
-
-        is_test = (tr and tr["is_test"]) or "_test" in path
-        if is_test:
-            score *= 0.3
-
-        sources: list[str] = []
-        if hs:
-            sources.append("hotspot")
-        if tr:
-            sources.append(f"trend:{tr['verdict']}")
-        if cp:
-            sources.append(f"coupling×{len(cp)}")
-
-        results.append({
+        records.append({
             "path": path,
-            "score": round(score, 1),
-            "is_test": is_test,
-            "sources": sources,
+            "present_in": present_in,
+            "signal_count": len(present_in),
             "hotspot": hs,
             "trend": tr,
             "coupling": cp,
+            "bugfix": bf,
         })
 
-    results.sort(key=lambda r: -r["score"])
-    return results
-
-
-def tier(entry: dict) -> int:
-    """1 (top) / 2 / 3 / 0 (filler)."""
-    s = entry["score"]
-    n_sources = len(entry["sources"])
-    if s >= 80 and n_sources >= 2:
-        return 1
-    if s >= 60:
-        return 2
-    if s >= 30:
-        return 3
-    return 0
+    # Order: files present in more analyses first (a factual count, not a
+    # rank), then alphabetical within each group for a neutral presentation.
+    records.sort(key=lambda r: (-r["signal_count"], r["path"]))
+    return records
 
 
 # Reporting ----------------------------------------------------------------
 
-def print_stdout(results: list[dict], packages: list[dict]) -> None:
-    print("\n═══ Top package hotspots (for orientation) ═══")
-    for p in packages[:8]:
-        print(f"  score={p['score']:7.0f}  revs={p['revisions']:3d}  loc={p['loc']:5d}  {p['name']}")
+def _trunc(s: str, n: int) -> str:
+    return s if len(s) <= n else s[: n - 1] + "…"
 
-    print("\n═══ Cross-signal refactor ranking ═══")
-    print(f"{'Tier':<4} {'Score':>6}  {'Sources':<30}  Path")
-    for r in results:
-        t = tier(r)
-        if t == 0:
+
+def print_stdout(records: list[dict], packages: list[dict]) -> None:
+    print("\n── Top package hotspots (raw score, revs, LOC) ──")
+    for p in packages[:10]:
+        print(f"  score={p['score']:>7}  revs={p['revisions']:>3}  loc={p['loc']:>5}  {p['name']}")
+
+    print(f"\n── Files with ≥1 signal ({len(records)} total) ──")
+    hdr = (f"{'Sig':<3}  {'Commits':>7}  {'Fix%':>5}  "
+           f"{'Trend':<12}  {'Δmean':>6}  {'MaxI':>4}  "
+           f"{'Cpl':>3}  Path")
+    print(hdr)
+    print("-" * len(hdr))
+    for r in records:
+        if r["signal_count"] == 0:
             continue
-        tag = f"T{t}" + (" 🔥" if r["trend"] and r["trend"]["active_decay"] else "")
-        sources = ", ".join(r["sources"])
-        print(f"{tag:<5} {r['score']:6.1f}  {sources:<30}  {r['path']}")
+        commits = (r["bugfix"]["total_commits"] if r["bugfix"]
+                   else (r["trend"]["commits"] if r["trend"] else ""))
+        fix_pct = f"{r['bugfix']['fix_pct']:.0f}" if r["bugfix"] else ""
+        trend_verdict = r["trend"]["verdict"] if r["trend"] else ""
+        tm = (r["trend"] or {}).get("metrics") or {}
+        dmean = f"{tm['mean_delta']:+.2f}" if "mean_delta" in tm else ""
+        maxi = f"{tm['last_max']:.0f}" if "last_max" in tm else ""
+        cpl = len(r["coupling"]) if r["coupling"] else ""
+        print(f"{r['signal_count']:<3}  {str(commits):>7}  {fix_pct:>5}  "
+              f"{_trunc(trend_verdict, 12):<12}  {dmean:>6}  {maxi:>4}  "
+              f"{str(cpl):>3}  {r['path']}")
 
 
-def to_markdown(
-    results: list[dict],
-    packages: list[dict],
-    meta: dict,
-) -> str:
-    tiers: dict[int, list[dict]] = defaultdict(list)
-    for r in results:
-        tiers[tier(r)].append(r)
-
-    lines = []
-    lines.append("# Refactoring Plan — Evidence-Based\n")
+def to_markdown(records: list[dict], packages: list[dict], meta: dict,
+                md_min_signals: int = 2, md_min_commits: int = 3) -> str:
+    lines: list[str] = []
+    lines.append("# Code Signals — Data Report\n")
     lines.append(f"**Generated:** {meta['generated_at']}  **Window:** {meta['window']}\n")
-    lines.append("Three independent signals cross-referenced to pick targets:\n")
-    lines.append("| Tool | What it measures |")
-    lines.append("|---|---|")
-    lines.append("| `go_hotspots.py` | Change frequency × effective LOC |")
-    lines.append("| `complexity_trend.py` | Whitespace-indent complexity per revision |")
-    lines.append("| `file_coupling.py` | Temporal co-change (Jaccard of commit sets) |")
-    lines.append("\nFiles appearing in **multiple** signals are prioritized — one signal is opinion, two is a hypothesis, three is a diagnosis.\n")
+    lines.append(
+        "This document **collects measurements**. It does not rank, prioritize, "
+        "or recommend. Files are grouped by how many analyses mentioned them "
+        "(an objective count), and within each group listed alphabetically."
+    )
+    lines.append("")
+    lines.append(
+        f"**Markdown scope.** To keep this document readable, files shown "
+        f"here must appear in ≥ {md_min_signals} analyses AND have ≥ {md_min_commits} "
+        f"commits in the window. The JSON report emitted alongside this file "
+        f"contains the full, unfiltered dataset."
+    )
+    lines.append("")
 
-    lines.append("## Top package hotspots\n")
+    lines.append("## What each column means\n")
+    lines.append("| Column | Source | What it is |")
+    lines.append("|---|---|---|")
+    lines.append("| hotspot-score | `go_hotspots.py` | Revisions × effective LOC for Go packages/functions |")
+    lines.append("| trend-verdict | `complexity_trend.py` | Classification by threshold rules: DETERIORATING (Δmean > 0.08 or Δtotal > ΔLOC+15%), REFACTORED (peak-dip > 12%), STABLE (|Δtotal| < 5% & |Δmean| < 0.05), GROWING (otherwise) |")
+    lines.append("| Δmean | `complexity_trend.py` | Last sample mean indent minus first sample mean indent (whole window) |")
+    lines.append("| max-indent | `complexity_trend.py` | Deepest whitespace-indent in the last sampled revision |")
+    lines.append("| fix-pct | `bugfix_density.py` | Fraction of this file's commits whose subject line matched fix keywords (`fix`, `bug`, `hotfix`, `regression`, `crash`, `revert`, `typo`, etc., word-bounded) |")
+    lines.append("| coupling count | `file_coupling.py` | Number of partner files that co-change with this one at cooccurrence ≥ 6 |")
+    lines.append("")
+
+    # Top packages — orientation.
+    lines.append("## Top package hotspots (orientation)\n")
     lines.append("| Score | Revs | LOC | Package |")
     lines.append("|---:|---:|---:|---|")
     for p in packages[:10]:
         lines.append(f"| {p['score']:,} | {p['revisions']} | {p['loc']:,} | `{p['name']}` |")
     lines.append("")
 
-    def _entry_block(r: dict) -> list[str]:
-        out = []
-        flag = " 🔥 actively decaying" if r["trend"] and r["trend"]["active_decay"] else ""
-        out.append(f"### `{r['path']}`{flag}\n")
-        out.append("**Evidence**\n")
-        if r["hotspot"]:
-            hs = r["hotspot"]
-            out.append(
-                f"- `go_hotspots`: file-aggregate score **{hs['total_score']:,}** "
-                f"({len(hs['functions'])} hot functions)."
-            )
-            for f in sorted(hs["functions"], key=lambda x: -x["score"])[:3]:
-                out.append(f"  - `{f['name']}` {f['lines']} — score {f['score']}, {f['revisions']} revs, {f['loc']} LOC")
-            if hs["signals"]:
-                out.append(f"  - Signals: {', '.join(hs['signals'])}.")
+    def _visible(r: dict) -> bool:
+        if r["signal_count"] < md_min_signals:
+            return False
+        # Use the highest commit count from any signal as the filter metric.
+        c = 0
+        if r["bugfix"]:
+            c = max(c, r["bugfix"]["total_commits"])
         if r["trend"]:
-            tr = r["trend"]
-            out.append(
-                f"- `complexity_trend`: **{tr['verdict']}** — score {tr['combined_score']:.0f} "
-                f"(full {tr['score']:.0f}, recent {tr['recent_score']:.0f}), "
-                f"Δmean {tr['mean_delta']:+.2f}, Δtotal {tr['total_delta_pct']:+.0f}% vs ΔLOC {tr['loc_delta_pct']:+.0f}%, "
-                f"max indent {tr['last_max']:.0f}, {tr['commits']} commits."
-            )
-        if r["coupling"]:
-            top_partners = sorted(r["coupling"], key=lambda p: -p["cooccur"])[:3]
-            out.append("- `file_coupling`: high-coupling partners —")
-            for p in top_partners:
-                marker = " (structural)" if p["structural"] else ""
-                out.append(f"  - `{p['partner']}` — {p['cooccur']:.0f} co-changes, J={p['jaccard']:.0f}{marker}")
-        if r["hotspot"] and r["hotspot"]["suggested_actions"]:
-            out.append("\n**Suggested actions (from hotspot analyzer)**\n")
-            for a in r["hotspot"]["suggested_actions"]:
-                out.append(f"- {a}")
-        out.append("")
-        return out
+            c = max(c, r["trend"].get("commits", 0))
+        if r["hotspot"]:
+            c = max(c, max((f["revisions"] for f in r["hotspot"]["functions"]), default=0))
+        return c >= md_min_commits
 
-    for t_num, title, blurb in [
-        (1, "Tier 1 — cross-signal targets", "Appear in ≥ 2 independent signals. Highest leverage."),
-        (2, "Tier 2 — single-signal, high magnitude", "One strong signal. Refactor when you're already in the area."),
-        (3, "Tier 3 — monitor", "Scored but not urgent. Re-run quarterly."),
-    ]:
-        entries = tiers.get(t_num, [])
-        if not entries:
-            continue
-        lines.append(f"## {title}\n")
-        lines.append(f"_{blurb}_\n")
-        for r in entries:
-            lines.extend(_entry_block(r))
+    visible = [r for r in records if _visible(r)]
+
+    lines.append(f"## File overview ({len(visible)} files)\n")
+    lines.append("| File | Signals | Commits | Fix count | Fix % | Trend verdict | Δmean | Max indent | Hotspot score | Coupling partners |")
+    lines.append("|---|:-:|---:|---:|---:|:-:|---:|---:|---:|---:|")
+    for r in visible:
+        commits = (r["bugfix"]["total_commits"] if r["bugfix"]
+                   else (r["trend"]["commits"] if r["trend"] else ""))
+        fix_n = r["bugfix"]["fix_commits"] if r["bugfix"] else ""
+        fix_p = f"{r['bugfix']['fix_pct']:.0f}" if r["bugfix"] else ""
+        verdict = r["trend"]["verdict"] if r["trend"] else ""
+        tm = (r["trend"] or {}).get("metrics") or {}
+        dmean = f"{tm['mean_delta']:+.2f}" if "mean_delta" in tm else ""
+        maxi = f"{tm['last_max']:.0f}" if "last_max" in tm else ""
+        hs_score = f"{r['hotspot']['total_score']:,}" if r["hotspot"] else ""
+        cpl = len(r["coupling"]) if r["coupling"] else ""
+        lines.append(
+            f"| `{r['path']}` | {r['signal_count']} | "
+            f"{commits} | {fix_n} | {fix_p} | {verdict} | "
+            f"{dmean} | {maxi} | {hs_score} | {cpl} |"
+        )
+    lines.append("")
+
+    # Per-file detail blocks — grouped by signal count, over the same
+    # visibility filter as the overview table.
+    groups: dict[int, list[dict]] = defaultdict(list)
+    for r in visible:
+        groups[r["signal_count"]].append(r)
+
+    for n in sorted(groups, reverse=True):
+        lines.append(f"## Detail — files in {n} {'analyses' if n > 1 else 'analysis'}\n")
+        for r in groups[n]:
+            lines.extend(_detail_block(r))
+
+    lines.append("## Notes on the data\n")
+    lines.append(
+        "- Whitespace-indent is a proxy for McCabe/Halstead complexity "
+        "(Hindle–Godfrey–Holt, 2008); it correlates with but does not equal "
+        "semantic complexity."
+    )
+    lines.append(
+        "- `complexity_trend` only observes files currently on disk. Files "
+        "deleted or rewritten do not appear — absence from this report is not "
+        "evidence of health."
+    )
+    lines.append(
+        "- `bugfix_density` classifies commits by keyword matches on the "
+        "subject line. A commit whose subject lies (e.g. `feat:` for a fix) "
+        "is not counted."
+    )
+    lines.append(
+        "- `file_coupling` measures temporal co-change — it does not decide "
+        "whether that coupling is intended or accidental."
+    )
+    lines.append("")
 
     lines.append("## Reproduce\n")
     lines.append("```bash")
@@ -338,18 +313,100 @@ def to_markdown(
     return "\n".join(lines)
 
 
+def _detail_block(r: dict) -> list[str]:
+    out: list[str] = []
+    out.append(f"### `{r['path']}`  (signals: {', '.join(r['present_in'])})\n")
+
+    if r["hotspot"]:
+        hs = r["hotspot"]
+        out.append(
+            f"**go_hotspots** — file-aggregate score {hs['total_score']:,} "
+            f"across {len(hs['functions'])} hot function(s):"
+        )
+        for f in sorted(hs["functions"], key=lambda x: -x["score"]):
+            bf = f" · bug-fix {f['bug_fix_pct']:.0f}%" if f.get("bug_fix_pct") else ""
+            out.append(f"- `{f['name']}` {f['lines']} — score {f['score']:,}, "
+                       f"{f['revisions']} revs, {f['loc']} LOC{bf}")
+        if hs["signals"]:
+            out.append(f"\nHotspot signals: {', '.join(hs['signals'])}.")
+        out.append("")
+
+    if r["trend"]:
+        tr = r["trend"]
+        m = tr.get("metrics") or {}
+        out.append(
+            f"**complexity_trend** — classified **{tr['verdict']}** by "
+            f"threshold rules (see column legend above)."
+        )
+        out.append(f"- samples: {tr.get('samples', 'n/a')}  ·  commits observed: {tr.get('commits', 'n/a')}  ·  LOC: {tr.get('loc', 'n/a')}")
+        first = tr.get("first") or {}
+        last = tr.get("last") or {}
+        if first:
+            out.append(
+                f"- first sample: n={first.get('n', 'n/a')}  total={first.get('total', 'n/a')}  "
+                f"mean={first.get('mean', 0):.2f}  max={first.get('max', 0):.0f}"
+            )
+        if last:
+            out.append(
+                f"- last sample:  n={last.get('n', 'n/a')}  total={last.get('total', 'n/a')}  "
+                f"mean={last.get('mean', 0):.2f}  max={last.get('max', 0):.0f}"
+            )
+        if m:
+            out.append(
+                f"- Δtotal {m.get('total_delta_pct', 0):+.0f}%  ·  ΔLOC {m.get('loc_delta_pct', 0):+.0f}%  "
+                f"·  Δmean indent {m.get('mean_delta', 0):+.2f}  ·  peak-dip {m.get('refactor_dip_pct', 0):.0f}%"
+            )
+            out.append(
+                f"- recent window (last {m.get('recent_window', 0)} samples): "
+                f"Δtotal {m.get('recent_total_delta_pct', 0):+.0f}%  ·  "
+                f"Δmean {m.get('recent_mean_delta', 0):+.2f}"
+            )
+        out.append("")
+
+    if r["bugfix"]:
+        bf = r["bugfix"]
+        out.append(
+            f"**bugfix_density** — {bf['fix_commits']} fix-flavored commits "
+            f"out of {bf['total_commits']} touches "
+            f"({bf['fix_pct']:.0f}%). Last fix: {bf.get('last_fix_date') or 'n/a'}."
+        )
+        for s in bf.get("recent_fix_subjects", [])[:5]:
+            subj = s["subject"]
+            if len(subj) > 100:
+                subj = subj[:97] + "..."
+            out.append(f"- `{s['hash']}` ({s['date']}): {subj}")
+        out.append("")
+
+    if r["coupling"]:
+        out.append(
+            f"**file_coupling** — {len(r['coupling'])} partner(s) "
+            f"co-changing at cooccurrence ≥ 6:"
+        )
+        for p in sorted(r["coupling"], key=lambda p: -p["cooccur"]):
+            marker = " (structural Go import)" if p["structural"] else ""
+            out.append(f"- `{p['partner']}` — {p['cooccur']:.0f} co-changes, J={p['jaccard']:.0f}{marker}")
+        out.append("")
+
+    return out
+
+
 # Driver -------------------------------------------------------------------
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--hotspots", required=True, action="append",
-                    help="go_hotspots.py --json output (repeatable; e.g. one repo-wide + one per hot package)")
+                    help="go_hotspots.py --json output (repeatable)")
     ap.add_argument("--trends", required=True, help="complexity_trend.py --json output")
     ap.add_argument("--coupling", required=True, help="file_coupling.py -o output")
-    ap.add_argument("--out-md", type=str, help="write markdown plan to this path")
-    ap.add_argument("--out-json", type=str, help="write synthesized JSON ranking to this path")
-    ap.add_argument("--cooccur-floor", type=int, default=8,
-                    help="coupling co-occurrence threshold (default 8)")
+    ap.add_argument("--bugfix", help="bugfix_density.py -o output (optional)")
+    ap.add_argument("--out-md", type=str, help="write markdown data report to this path")
+    ap.add_argument("--out-json", type=str, help="write merged data JSON to this path")
+    ap.add_argument("--cooccur-floor", type=int, default=6,
+                    help="coupling co-occurrence threshold (default 6)")
+    ap.add_argument("--md-min-signals", type=int, default=2,
+                    help="in markdown, only show files present in ≥ N analyses (default 2); JSON always has the full dataset")
+    ap.add_argument("--md-min-commits", type=int, default=3,
+                    help="in markdown, only show files with ≥ N commits (default 3); JSON always has the full dataset")
     ap.add_argument("--window", default="6 months",
                     help="description for the markdown header (default '6 months')")
     args = ap.parse_args()
@@ -358,12 +415,13 @@ def main() -> int:
         hotspots_by_file, packages = load_hotspots(args.hotspots)
         trends_by_file = load_trends(args.trends)
         coupling_by_file = load_coupling(args.coupling, args.cooccur_floor)
+        bugfix_by_file = load_bugfix(args.bugfix)
     except FileNotFoundError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
 
-    results = synthesize(hotspots_by_file, trends_by_file, coupling_by_file)
-    print_stdout(results, packages)
+    records = collate(hotspots_by_file, trends_by_file, coupling_by_file, bugfix_by_file)
+    print_stdout(records, packages)
 
     meta = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -372,15 +430,19 @@ def main() -> int:
 
     if args.out_json:
         Path(args.out_json).write_text(json.dumps({
-            "schema": "refactor-priority/1",
+            "schema": "code-signals/1",
             "meta": meta,
             "packages": packages,
-            "ranked": results,
-        }, indent=2))
+            "records": records,
+        }, indent=2, default=str))
         print(f"\nJSON: {args.out_json}")
 
     if args.out_md:
-        Path(args.out_md).write_text(to_markdown(results, packages, meta))
+        Path(args.out_md).write_text(to_markdown(
+            records, packages, meta,
+            md_min_signals=args.md_min_signals,
+            md_min_commits=args.md_min_commits,
+        ))
         print(f"Markdown: {args.out_md}")
 
     return 0

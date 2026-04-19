@@ -191,9 +191,37 @@ def classify_segment(prev: Sample, curr: Sample) -> str:
     return "GROWING"
 
 
+def _is_strong_flip(prev_verdict: str, new_verdict: str,
+                    prev_sample: Sample, curr_sample: Sample) -> bool:
+    """Hysteresis: only flip to a new verdict when the slope clearly
+    exceeds the new verdict's own threshold. Otherwise small wobbles
+    around the threshold produce an alternating stripe pattern that
+    misrepresents the underlying stability.
+    """
+    if prev_verdict == new_verdict:
+        return False
+    dt_pct = ((curr_sample.total - prev_sample.total) / prev_sample.total * 100
+              if prev_sample.total else 0)
+    dmean = curr_sample.mean - prev_sample.mean
+    # Stronger-than-threshold gates for each direction.
+    if new_verdict == "DETERIORATING":
+        return dmean > 0.05 or dt_pct > 5
+    if new_verdict == "REFACTORED":
+        return dt_pct < -12
+    if new_verdict == "STABLE":
+        # Require both deltas to be very small before declaring stable,
+        # so we don't label an active file stable after one quiet commit.
+        return abs(dt_pct) < 1 and abs(dmean) < 0.02
+    return True  # GROWING — default fall-through is fine
+
+
 def compute_bands(samples: list[Sample]) -> list[tuple[int, int, str]]:
     """Return [(start_idx, end_idx_inclusive, verdict), ...] with adjacent
-    same-verdict segments merged into a single band."""
+    same-verdict segments merged into a single band.
+
+    Uses hysteresis so a two-sample wobble doesn't spawn a short STABLE or
+    GROWING band between two DETERIORATING stretches.
+    """
     if len(samples) < 2:
         return []
     bands: list[tuple[int, int, str]] = []
@@ -201,7 +229,7 @@ def compute_bands(samples: list[Sample]) -> list[tuple[int, int, str]]:
     cur_start = 0
     for i in range(1, len(samples) - 1):
         v = classify_segment(samples[i], samples[i + 1])
-        if v != cur_verdict:
+        if v != cur_verdict and _is_strong_flip(cur_verdict, v, samples[i], samples[i + 1]):
             bands.append((cur_start, i, cur_verdict))
             cur_start = i
             cur_verdict = v
@@ -675,6 +703,65 @@ def run(path: str, since: str, max_samples: int, quiet: bool = False) -> tuple[l
     return samples, verdict, metrics
 
 
+def _compute_confidence(samples: list[Sample], metrics: dict) -> tuple[str, list[str]]:
+    """Return (level, caveats). Confidence captures how much trust the reader
+    should place in the verdict — based on data volume, recency-window size,
+    and detection of rewrites that would distort full-period deltas.
+
+    We'd rather say "medium confidence with caveats" than silently present a
+    low-signal verdict as decisive.
+    """
+    caveats: list[str] = []
+    level = "high"
+
+    n = len(samples)
+    if n < 4:
+        level = "low"
+        caveats.append(f"only {n} samples — trend direction is speculative")
+    elif n < 8:
+        level = "medium" if level == "high" else level
+        caveats.append(f"{n} samples is borderline — treat the slope as indicative, not definitive")
+
+    win = metrics.get("recent_window", 0)
+    if win < 3:
+        caveats.append(
+            f"recent window is {win} samples — the active_decay flag is "
+            f"low-confidence (a single noisy commit can flip it)"
+        )
+        if level == "high":
+            level = "medium"
+
+    # Rewrite detection — if any consecutive sample pair shows >70% LOC
+    # change, the "file" likely isn't the same code across the whole window
+    # and the first/last delta compares apples to oranges.
+    for i in range(1, len(samples)):
+        prev, curr = samples[i - 1], samples[i]
+        if prev.n == 0:
+            continue
+        if abs(curr.n - prev.n) / prev.n > 0.7:
+            caveats.append(
+                f"possible rewrite between {prev.rev} and {curr.rev} "
+                f"(LOC jumped {prev.n}→{curr.n}) — full-period deltas may not "
+                f"reflect continuous code evolution"
+            )
+            level = "low"
+            break
+
+    # Verdict-threshold proximity: deterioration that only barely crosses the
+    # threshold deserves a caveat so it isn't read with the same force as a
+    # clear-cut case.
+    mean_delta = metrics.get("mean_delta", 0)
+    if 0.08 <= mean_delta < 0.12:
+        caveats.append(
+            f"Δmean {mean_delta:+.2f} is close to the deterioration threshold (0.08); "
+            f"consider this a soft signal"
+        )
+        if level == "high":
+            level = "medium"
+
+    return level, caveats
+
+
 def _build_entry(
     path: str, n_commits: int, loc: int,
     samples: list[Sample], verdict: str, metrics: dict,
@@ -683,10 +770,13 @@ def _build_entry(
     bands = compute_bands(samples)
     score = deterioration_score(metrics)
     rscore = recent_score(metrics)
+    confidence, caveats = _compute_confidence(samples, metrics)
     return {
         "path": path,
         "is_test": is_test_file(path),
         "verdict": verdict,
+        "confidence": confidence,
+        "caveats": caveats,
         "score": round(score, 1),
         "recent_score": round(rscore, 1),
         "active_decay": is_active_decay(metrics),
