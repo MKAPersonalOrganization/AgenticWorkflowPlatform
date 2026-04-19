@@ -94,39 +94,61 @@ func CheckConfirmation(
 		return false, ""
 	}
 
-	cfg, err := store.GetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolName)
-	if err == nil && (cfg.Action == RequirementActionRequireConfirmation || cfg.RequireConfirmation) {
-		return true, cfg.ConfirmationHint
+	if ok, hint := toolLevelConfirmation(ctx, store, userID, agentID, toolSetID, toolName); ok {
+		return true, hint
 	}
 
 	if toolSetID != "" {
-		tsCfg, err := store.GetToolSetRequirementConfig(ctx, userID, agentID, toolSetID)
-		if err == nil && (tsCfg.Action == RequirementActionRequireConfirmation || tsCfg.RequireConfirmation) {
-			return true, tsCfg.ConfirmationHint
-		}
-		return false, ""
+		return toolSetLevelConfirmation(ctx, store, userID, agentID, toolSetID)
 	}
 
+	return fallbackToolSetScan(ctx, store, membership, userID, agentID, toolName)
+}
+
+// requiresConfirmation is true when the config's action or legacy flag asks
+// for user approval. Captures the dual-signal invariant in one place.
+func requiresConfirmation(cfg ToolRequirementConfig) bool {
+	return cfg.Action == RequirementActionRequireConfirmation || cfg.RequireConfirmation
+}
+
+func toolLevelConfirmation(ctx context.Context, store *PermissionStore, userID, agentID, toolSetID, toolName string) (bool, string) {
+	cfg, err := store.GetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolName)
+	if err != nil || !requiresConfirmation(cfg) {
+		return false, ""
+	}
+	return true, cfg.ConfirmationHint
+}
+
+func toolSetLevelConfirmation(ctx context.Context, store *PermissionStore, userID, agentID, toolSetID string) (bool, string) {
+	cfg, err := store.GetToolSetRequirementConfig(ctx, userID, agentID, toolSetID)
+	if err != nil || !requiresConfirmation(cfg) {
+		return false, ""
+	}
+	return true, cfg.ConfirmationHint
+}
+
+// fallbackToolSetScan walks every confirmation-flagged tool set the user owns
+// and asks the membership checker whether the tool belongs there. Used only
+// when the caller could not identify the tool set up-front.
+func fallbackToolSetScan(ctx context.Context, store *PermissionStore, membership toolMembershipChecker, userID, agentID, toolName string) (bool, string) {
 	if membership == nil {
 		return false, ""
 	}
-
 	confToolSets, err := store.ToolSetsWithConfirmation(ctx, userID, agentID)
 	if err != nil || len(confToolSets) == 0 {
 		return false, ""
 	}
 	for _, tsID := range confToolSets {
-		tsCfg, err := store.GetToolSetRequirementConfig(ctx, userID, agentID, tsID)
-		if err != nil || (tsCfg.Action != RequirementActionRequireConfirmation && !tsCfg.RequireConfirmation) {
+		cfg, err := store.GetToolSetRequirementConfig(ctx, userID, agentID, tsID)
+		if err != nil || !requiresConfirmation(cfg) {
 			continue
 		}
-		toolInSet, lookupErr := membership.IsToolInToolSet(ctx, tsID, toolName)
-		if lookupErr == nil && toolInSet {
-			return true, tsCfg.ConfirmationHint
+		inSet, lookupErr := membership.IsToolInToolSet(ctx, tsID, toolName)
+		if lookupErr == nil && inSet {
+			return true, cfg.ConfirmationHint
 		}
 		// Membership lookup failed or returned false — fail-open so unknown
 		// custom tools don't gratuitously prompt.
 	}
-
 	return false, ""
 }
