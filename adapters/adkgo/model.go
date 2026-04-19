@@ -194,55 +194,19 @@ func (m *openAIModel) generateStream(ctx context.Context, params openai.ChatComp
 
 	for streamer.Next() {
 		chunk := streamer.Current()
-
-		// Stream usage metadata.
 		if chunk.Usage.TotalTokens > 0 {
-			finalUsage = &genai.GenerateContentResponseUsageMetadata{
-				PromptTokenCount:     int32(chunk.Usage.PromptTokens),
-				CandidatesTokenCount: int32(chunk.Usage.CompletionTokens),
-				TotalTokenCount:      int32(chunk.Usage.TotalTokens),
-			}
+			finalUsage = openAIUsageToGenAI(chunk.Usage)
 		}
-
 		for _, choice := range chunk.Choices {
 			delta := choice.Delta
-
-			// Text content delta.
 			if delta.Content != "" {
 				accText.WriteString(delta.Content)
-				if !yield(&adkmodel.LLMResponse{
-					Content: &genai.Content{
-						Role:  "model",
-						Parts: []*genai.Part{{Text: delta.Content}},
-					},
-					Partial: true,
-				}, nil) {
+				if !yieldTextDelta(yield, delta.Content) {
 					return
 				}
 			}
-
-			// Tool call deltas.
 			for _, tc := range delta.ToolCalls {
-				idx := int(tc.Index)
-				if tc.ID != "" {
-					accToolIDs[idx] = tc.ID
-				}
-				existing, ok := accToolCalls[idx]
-				if !ok {
-					existing = &genai.FunctionCall{Name: tc.Function.Name}
-					accToolCalls[idx] = existing
-				}
-				if tc.Function.Name != "" {
-					existing.Name = tc.Function.Name
-				}
-				if tc.Function.Arguments != "" {
-					// Accumulate JSON arguments.
-					if existing.Args == nil {
-						existing.Args = map[string]any{"__raw": tc.Function.Arguments}
-					} else {
-						existing.Args["__raw"] = existing.Args["__raw"].(string) + tc.Function.Arguments
-					}
-				}
+				accumulateToolCallDelta(tc, accToolCalls, accToolIDs)
 			}
 		}
 	}
@@ -252,34 +216,87 @@ func (m *openAIModel) generateStream(ctx context.Context, params openai.ChatComp
 		return
 	}
 
-	// Build final response with accumulated content.
-	var parts []*genai.Part
+	yield(&adkmodel.LLMResponse{
+		Content: &genai.Content{
+			Role:  "model",
+			Parts: finalizeStreamParts(&accText, accToolCalls, accToolIDs),
+		},
+		UsageMetadata: finalUsage,
+		TurnComplete:  true,
+	}, nil)
+}
 
-	if accText.Len() > 0 {
-		parts = append(parts, &genai.Part{Text: accText.String()})
+// openAIUsageToGenAI maps the OpenAI usage struct onto the genai
+// equivalent that ADK downstream consumers expect.
+func openAIUsageToGenAI(u openai.CompletionUsage) *genai.GenerateContentResponseUsageMetadata {
+	return &genai.GenerateContentResponseUsageMetadata{
+		PromptTokenCount:     int32(u.PromptTokens),
+		CandidatesTokenCount: int32(u.CompletionTokens),
+		TotalTokenCount:      int32(u.TotalTokens),
 	}
+}
 
-	// Finalize tool calls.
-	for i := 0; i < len(accToolCalls); i++ {
-		fc := accToolCalls[i]
+// yieldTextDelta emits a partial LLMResponse carrying one content chunk.
+// Returns false when the caller signalled cancel so the stream loop can
+// bail out.
+func yieldTextDelta(yield func(*adkmodel.LLMResponse, error) bool, text string) bool {
+	return yield(&adkmodel.LLMResponse{
+		Content: &genai.Content{
+			Role:  "model",
+			Parts: []*genai.Part{{Text: text}},
+		},
+		Partial: true,
+	}, nil)
+}
+
+// accumulateToolCallDelta merges one tool-call chunk into the running
+// FunctionCall by index. OpenAI streams function-call arguments as raw
+// JSON string chunks; we concatenate them under the "__raw" key so the
+// final parse in finalizeStreamParts sees the full JSON blob.
+func accumulateToolCallDelta(tc openai.ChatCompletionChunkChoiceDeltaToolCall, calls map[int]*genai.FunctionCall, ids map[int]string) {
+	idx := int(tc.Index)
+	if tc.ID != "" {
+		ids[idx] = tc.ID
+	}
+	existing, ok := calls[idx]
+	if !ok {
+		existing = &genai.FunctionCall{Name: tc.Function.Name}
+		calls[idx] = existing
+	}
+	if tc.Function.Name != "" {
+		existing.Name = tc.Function.Name
+	}
+	if tc.Function.Arguments == "" {
+		return
+	}
+	if existing.Args == nil {
+		existing.Args = map[string]any{"__raw": tc.Function.Arguments}
+	} else {
+		existing.Args["__raw"] = existing.Args["__raw"].(string) + tc.Function.Arguments
+	}
+}
+
+// finalizeStreamParts produces the final Parts slice for the
+// end-of-stream LLMResponse: one text part (if any) plus one
+// FunctionCall part per accumulated tool call, with its "__raw" JSON
+// arguments parsed into a map.
+func finalizeStreamParts(text *strings.Builder, calls map[int]*genai.FunctionCall, ids map[int]string) []*genai.Part {
+	var parts []*genai.Part
+	if text.Len() > 0 {
+		parts = append(parts, &genai.Part{Text: text.String()})
+	}
+	for i := 0; i < len(calls); i++ {
+		fc := calls[i]
 		if raw, ok := fc.Args["__raw"]; ok {
 			var parsed map[string]any
 			if err := json.Unmarshal([]byte(raw.(string)), &parsed); err == nil {
 				fc.Args = parsed
 			}
 		}
-		fc.ID = accToolIDs[i]
+		fc.ID = ids[i]
 		parts = append(parts, &genai.Part{FunctionCall: fc})
 	}
-
-	yield(&adkmodel.LLMResponse{
-		Content: &genai.Content{
-			Role:  "model",
-			Parts: parts,
-		},
-		UsageMetadata: finalUsage,
-		TurnComplete:  true,
-	}, nil)
+	return parts
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
