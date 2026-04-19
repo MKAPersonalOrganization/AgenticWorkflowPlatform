@@ -311,10 +311,22 @@ def _trunc(s: str, n: int) -> str:
     return s if len(s) <= n else s[: n - 1] + "…"
 
 
-def print_stdout(records: list[dict], packages: list[dict]) -> None:
+def print_stdout(records: list[dict], packages: list[dict],
+                 summary: bool = False) -> None:
     print("\n── Top package hotspots (raw score, revs, LOC) ──")
     for p in packages[:10]:
         print(f"  score={p['score']:>7}  revs={p['revisions']:>3}  loc={p['loc']:>5}  {p['name']}")
+
+    if summary:
+        lit = sum(1 for r in records if r["signal_count"] >= 1)
+        by_count: dict[int, int] = defaultdict(int)
+        for r in records:
+            if r["signal_count"] >= 1:
+                by_count[r["signal_count"]] += 1
+        dist = ", ".join(f"{n}×sig={by_count[n]}"
+                         for n in sorted(by_count, reverse=True))
+        print(f"\n── Summary ── {lit} files with ≥1 signal ({dist})")
+        return
 
     print(f"\n── Files with ≥1 signal ({len(records)} total) ──")
     hdr = (f"{'Sig':<3}  {'Commits':>7}  {'Fix%':>5}  "
@@ -352,7 +364,8 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
                 md_min_signals: int = 2, md_min_commits: int = 3,
                 plot_paths: dict[str, Path] | None = None,
                 md_dir: Path | None = None,
-                package_deps: dict | None = None) -> str:
+                package_deps: dict | None = None,
+                summary: bool = False) -> str:
     """Render the markdown data report.
 
     If ``plot_paths`` is given, each entry (keyed by diagram id) is
@@ -603,49 +616,51 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
     lines.append("")
 
     # Per-file detail blocks — grouped by signal count, over the same
-    # visibility filter as the overview table.
-    groups: dict[int, list[dict]] = defaultdict(list)
-    for r in visible:
-        groups[r["signal_count"]].append(r)
+    # visibility filter as the overview table. Skipped in summary mode
+    # (the overview table + JSON already carry the per-file numbers).
+    if not summary:
+        groups: dict[int, list[dict]] = defaultdict(list)
+        for r in visible:
+            groups[r["signal_count"]].append(r)
 
-    for n in sorted(groups, reverse=True):
-        lines.append(f"## Detail — files in {n} {'analyses' if n > 1 else 'analysis'}\n")
-        for r in groups[n]:
-            lines.extend(_detail_block(r))
+        for n in sorted(groups, reverse=True):
+            lines.append(f"## Detail — files in {n} {'analyses' if n > 1 else 'analysis'}\n")
+            for r in groups[n]:
+                lines.extend(_detail_block(r))
 
-    lines.append("## Notes on the data\n")
-    lines.append(
-        "- Whitespace-indent is a proxy for McCabe/Halstead complexity "
-        "(Hindle–Godfrey–Holt, 2008); it correlates with but does not equal "
-        "semantic complexity."
-    )
-    lines.append(
-        "- `complexity_trend` only observes files currently on disk. Files "
-        "deleted or rewritten do not appear — absence from this report is not "
-        "evidence of health."
-    )
-    lines.append(
-        "- `bugfix_density` classifies commits by keyword matches on the "
-        "subject line. A commit whose subject lies (e.g. `feat:` for a fix) "
-        "is not counted."
-    )
-    lines.append(
-        "- `file_coupling` measures temporal co-change — it does not decide "
-        "whether that coupling is intended or accidental."
-    )
-    lines.append(
-        "- `cyclomatic` (lizard) counts control-flow branches per "
-        "function. It cannot see semantic complexity (a single "
-        "40-line switch counts the same as 40 split-out handlers); "
-        "it also doesn't understand Go's generics or templ syntax, so "
-        "some files will be absent."
-    )
-    lines.append("")
+        lines.append("## Notes on the data\n")
+        lines.append(
+            "- Whitespace-indent is a proxy for McCabe/Halstead complexity "
+            "(Hindle–Godfrey–Holt, 2008); it correlates with but does not equal "
+            "semantic complexity."
+        )
+        lines.append(
+            "- `complexity_trend` only observes files currently on disk. Files "
+            "deleted or rewritten do not appear — absence from this report is not "
+            "evidence of health."
+        )
+        lines.append(
+            "- `bugfix_density` classifies commits by keyword matches on the "
+            "subject line. A commit whose subject lies (e.g. `feat:` for a fix) "
+            "is not counted."
+        )
+        lines.append(
+            "- `file_coupling` measures temporal co-change — it does not decide "
+            "whether that coupling is intended or accidental."
+        )
+        lines.append(
+            "- `cyclomatic` (lizard) counts control-flow branches per "
+            "function. It cannot see semantic complexity (a single "
+            "40-line switch counts the same as 40 split-out handlers); "
+            "it also doesn't understand Go's generics or templ syntax, so "
+            "some files will be absent."
+        )
+        lines.append("")
 
-    lines.append("## Reproduce\n")
-    lines.append("```bash")
-    lines.append("task refactor:plan")
-    lines.append("```\n")
+        lines.append("## Reproduce\n")
+        lines.append("```bash")
+        lines.append("task refactor:plan")
+        lines.append("```\n")
     return "\n".join(lines)
 
 
@@ -1194,6 +1209,12 @@ def main() -> int:
                          "inline in the markdown report.")
     ap.add_argument("--matrix-top-n", type=int, default=30,
                     help="max rows in the signal matrix heatmap (default 30)")
+    ap.add_argument("--summary", action="store_true",
+                    help="emit summary only: stdout prints top-package "
+                         "hotspots + a signal-count distribution; markdown "
+                         "keeps orientation tables and plots but drops the "
+                         "per-file Detail sections, 'Notes on the data', "
+                         "and 'Reproduce'. JSON output is unaffected.")
     args = ap.parse_args()
 
     try:
@@ -1210,7 +1231,7 @@ def main() -> int:
 
     records = collate(hotspots_by_file, trends_by_file, coupling_by_file,
                       bugfix_by_file, lcom4_by_file, cyclomatic_by_file)
-    print_stdout(records, packages)
+    print_stdout(records, packages, summary=args.summary)
 
     meta = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -1264,6 +1285,7 @@ def main() -> int:
             plot_paths=plot_paths,
             md_dir=md_path.parent.resolve(),
             package_deps=package_deps,
+            summary=args.summary,
         ))
         print(f"Markdown: {args.out_md}")
 

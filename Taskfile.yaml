@@ -153,7 +153,7 @@ tasks:
       - xdg-open .github/images/repo_statistics.png 2>/dev/null || open .github/images/repo_statistics.png 2>/dev/null || echo "Graph saved at .github/images/repo_statistics.png"
 
   # ─── Hotspot analysis ─────────────────────────────────────────────────
-  # scripts/go_hotspots.py ranks Go packages / functions by change frequency
+  # scripts/architecture/go_hotspots.py ranks Go packages / functions by change frequency
   # × complexity (Tornhill, Your Code as a Crime Scene, ch. 3) and emits a
   # PNG, interactive HTML, JSON, and CSV to .hotspots/.
   #
@@ -185,7 +185,7 @@ tasks:
       - |
         UNTIL_ARG=""
         if [ -n "{{.UNTIL}}" ]; then UNTIL_ARG="--until={{.UNTIL}}"; fi
-        .hotspots/.venv/bin/python3 scripts/go_hotspots.py "{{.HOTSPOTS_PATH}}" \
+        .hotspots/.venv/bin/python3 scripts/architecture/go_hotspots.py "{{.HOTSPOTS_PATH}}" \
           --since "{{.SINCE}}" $UNTIL_ARG \
           --exclude '^frontend/' \
           --out .hotspots/go_hotspots.png \
@@ -196,7 +196,7 @@ tasks:
       - xdg-open .hotspots/go_hotspots.png 2>/dev/null || open .hotspots/go_hotspots.png 2>/dev/null || true
 
   # ─── Complexity-trend analysis ────────────────────────────────────────
-  # scripts/complexity_trend.py visualises whitespace-indentation complexity
+  # scripts/architecture/complexity_trend.py visualises whitespace-indentation complexity
   # per revision (Tornhill, Your Code as a Crime Scene, ch. 5) to spot
   # structures that are deteriorating faster than they're growing.
   #
@@ -218,7 +218,7 @@ tasks:
         # previous run (e.g. trends:top's _summary.png).
         mkdir -p .hotspots/complexity_trend
         rm -f .hotspots/complexity_trend/*.png
-        .hotspots/.venv/bin/python3 scripts/complexity_trend.py \
+        .hotspots/.venv/bin/python3 scripts/architecture/complexity_trend.py \
           --since "{{.SINCE}}" --samples {{.SAMPLES}} --summary \
           --out .hotspots/complexity_trend \
           {{.CLI_ARGS}}
@@ -243,7 +243,7 @@ tasks:
       - |
         mkdir -p .hotspots/complexity_trend
         rm -f .hotspots/complexity_trend/*.png
-        .hotspots/.venv/bin/python3 scripts/complexity_trend.py \
+        .hotspots/.venv/bin/python3 scripts/architecture/complexity_trend.py \
           --discover --top {{.TOP}} \
           --since "{{.SINCE}}" --samples {{.SAMPLES}} \
           --min-commits {{.MIN_COMMITS}} --min-loc {{.MIN_LOC}} \
@@ -255,21 +255,22 @@ tasks:
         [ -n "$F" ] && { xdg-open "$F" 2>/dev/null || open "$F" 2>/dev/null; } || true
 
   # ─── Cross-signal refactor plan ───────────────────────────────────────
-  # scripts/refactor_priority.py synthesizes hotspot + trend + coupling
+  # scripts/architecture/refactor_priority.py synthesizes hotspot + trend + coupling
   # signals into a prioritized plan. Files in ≥2 signals are Tier 1.
   # Writes REFACTORING_PLAN.md at repo root.
 
   refactor:plan:
-    desc: "Generate an evidence-based refactoring plan from all three analyzers. Env: SINCE (default '6 months ago'), TOP_PACKAGES (default 4)."
+    desc: "Generate an evidence-based refactoring plan from all three analyzers. Env: SINCE (default '6 months ago'), TOP_PACKAGES (default 4), FULL=1 to include per-file Detail blocks (default: summary only)."
     deps: [hotspots:setup]
     vars:
       SINCE: '{{.SINCE | default "6 months ago"}}'
       TOP_PACKAGES: '{{.TOP_PACKAGES | default "4"}}'
+      SUMMARY_FLAG: '{{if .FULL}}{{else}}--summary{{end}}'
     cmds:
       - mkdir -p .hotspots
       - |
         echo "▶ 1/4  Repo-wide package hotspots..."
-        .hotspots/.venv/bin/python3 scripts/go_hotspots.py . \
+        .hotspots/.venv/bin/python3 scripts/architecture/go_hotspots.py . \
           --since "{{.SINCE}}" --exclude '^frontend/' \
           --json .hotspots/hotspots_repo.json \
           --top-n 20 --no-image --quiet
@@ -290,23 +291,23 @@ tasks:
           if [ -d "$pkg" ]; then
             out=".hotspots/hotspots_$(echo $pkg | tr '/' '_').json"
             echo "  drilling $pkg"
-            .hotspots/.venv/bin/python3 scripts/go_hotspots.py "$pkg" \
+            .hotspots/.venv/bin/python3 scripts/architecture/go_hotspots.py "$pkg" \
               --since "{{.SINCE}}" \
               --json "$out" --top-n 10 --no-image --quiet || true
           fi
         done
       - |
         echo "▶ 3/4  Deterioration ranking..."
-        .hotspots/.venv/bin/python3 scripts/complexity_trend.py \
+        .hotspots/.venv/bin/python3 scripts/architecture/complexity_trend.py \
           --discover --top 15 --since "{{.SINCE}}" --samples 15 --no-plot \
           --json .hotspots/trends.json
       - |
         echo "▶ 4/5  File coupling..."
-        .hotspots/.venv/bin/python3 scripts/file_coupling.py . \
+        .hotspots/.venv/bin/python3 scripts/architecture/file_coupling.py . \
           --since "{{.SINCE}}" -n 40 --min-cooc 6 -o .hotspots/coupling.json
       - |
         echo "▶ 5/5  Bug/fix density (ground-truth rot signal)..."
-        .hotspots/.venv/bin/python3 scripts/bugfix_density.py \
+        .hotspots/.venv/bin/python3 scripts/architecture/bugfix_density.py \
           --since "{{.SINCE}}" --min-commits 3 --top 20 \
           -o .hotspots/bugfix.json
       - |
@@ -316,14 +317,15 @@ tasks:
           [ "$f" = ".hotspots/hotspots_repo.json" ] && continue
           HS_FLAGS="$HS_FLAGS --hotspots $f"
         done
-        .hotspots/.venv/bin/python3 scripts/refactor_priority.py \
+        .hotspots/.venv/bin/python3 scripts/architecture/refactor_priority.py \
           $HS_FLAGS \
           --trends .hotspots/trends.json \
           --coupling .hotspots/coupling.json \
           --bugfix .hotspots/bugfix.json \
           --out-md REFACTORING_PLAN.md \
           --out-json .hotspots/refactor_plan.json \
-          --window "{{.SINCE}}"
+          --window "{{.SINCE}}" \
+          {{.SUMMARY_FLAG}}
       - echo "" && echo "✓ Plan written to REFACTORING_PLAN.md"
 
   ci:
