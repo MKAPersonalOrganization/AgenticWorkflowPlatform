@@ -64,18 +64,6 @@ func BlockMiddleware(checker blockChecker, agentID string) agent.Middleware {
 // =============================================================================
 // Confirmation — per-user runtime check for ADK native HITL
 // =============================================================================
-//
-// Two narrow collaborators (instead of one kitchen-sink
-// ConfirmationConfigResolver) so the CheckConfirmation flow states its
-// dependencies plainly:
-//
-//   - a *PermissionStore for DB-backed per-user config reads
-//   - a toolMembershipChecker for "is this tool in that set?" lookups
-//
-// The store is a concrete type because there's only one real
-// implementation; the membership lookup is a small interface so that
-// tests and other checkers (e.g. per-user membership in the future)
-// can substitute without dragging in the persistence layer.
 
 // toolMembershipChecker answers "is tool X a member of tool set Y?".
 // Implemented by [Service] via the tool registry.
@@ -84,59 +72,60 @@ type toolMembershipChecker interface {
 }
 
 // CheckConfirmation determines whether a tool call needs user
-// confirmation, consulting both per-user DB config (the store) and
-// admin-level global policies (the ConfirmationRequirement). Returns
-// (needsConfirmation, hint).
+// confirmation, consulting per-user DB config in three layers:
 //
-// Callers inside the package can pass a nil store to test only the
-// global-policy path; production callers go through
-// [Service.CheckConfirmation] which wires both collaborators.
+//  1. Individual tool config for (user, agent, toolSetID, toolName).
+//  2. Tool-set level config for (user, agent, toolSetID) when known.
+//  3. Fallback scan: when toolSetID is unknown, walk every tool-set that
+//     the user flagged require_confirmation and ask the membership checker
+//     whether this tool belongs to it.
+//
+// Returns (needsConfirmation, hint). Callers can pass a nil store to
+// short-circuit to "no confirmation" — useful for tests that don't wire
+// persistence.
 func CheckConfirmation(
 	ctx context.Context,
 	store *PermissionStore,
 	membership toolMembershipChecker,
-	cr *ConfirmationRequirement,
 	userID, agentID, toolSetID, toolName string,
-	args map[string]any,
+	_ map[string]any,
 ) (bool, string) {
-	// 1. Check per-user individual tool config from DB (primary source).
-	if userID != "" && store != nil {
-		cfg, err := store.GetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolName)
-		if err == nil && (cfg.Action == RequirementActionRequireConfirmation || cfg.RequireConfirmation) {
-			return true, cfg.ConfirmationHint
-		}
-
-		// 1b. Check tool-set level config if we know the tool-set ID.
-		if toolSetID != "" {
-			tsCfg, err := store.GetToolSetRequirementConfig(ctx, userID, agentID, toolSetID)
-			if err == nil && (tsCfg.Action == RequirementActionRequireConfirmation || tsCfg.RequireConfirmation) {
-				return true, tsCfg.ConfirmationHint
-			}
-		} else if membership != nil {
-			// 1c. No tool-set ID provided — scan every tool-set flagged with
-			// require_confirmation and ask the membership checker whether
-			// the tool belongs. Preferred path is 1b (toolSetID known); this
-			// branch is the fallback for custom-tool invocations.
-			confToolSets, err := store.ToolSetsWithConfirmation(ctx, userID, agentID)
-			if err == nil && len(confToolSets) > 0 {
-				for _, tsID := range confToolSets {
-					tsCfg, err := store.GetToolSetRequirementConfig(ctx, userID, agentID, tsID)
-					if err == nil && (tsCfg.Action == RequirementActionRequireConfirmation || tsCfg.RequireConfirmation) {
-						toolInSet, lookupErr := membership.IsToolInToolSet(ctx, tsID, toolName)
-						if lookupErr == nil && toolInSet {
-							return true, tsCfg.ConfirmationHint
-						}
-						// Membership lookup failed / returned false — fail-open
-						// so unknown custom tools don't gratuitously prompt.
-					}
-				}
-			}
-		}
+	if userID == "" || store == nil {
+		return false, ""
 	}
 
-	// 2. Check global/admin in-memory policies (override layer).
-	if cr != nil && cr.RequiresConfirmation(agentID, toolName, args) {
-		return true, cr.getHint(agentID, toolName)
+	cfg, err := store.GetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolName)
+	if err == nil && (cfg.Action == RequirementActionRequireConfirmation || cfg.RequireConfirmation) {
+		return true, cfg.ConfirmationHint
+	}
+
+	if toolSetID != "" {
+		tsCfg, err := store.GetToolSetRequirementConfig(ctx, userID, agentID, toolSetID)
+		if err == nil && (tsCfg.Action == RequirementActionRequireConfirmation || tsCfg.RequireConfirmation) {
+			return true, tsCfg.ConfirmationHint
+		}
+		return false, ""
+	}
+
+	if membership == nil {
+		return false, ""
+	}
+
+	confToolSets, err := store.ToolSetsWithConfirmation(ctx, userID, agentID)
+	if err != nil || len(confToolSets) == 0 {
+		return false, ""
+	}
+	for _, tsID := range confToolSets {
+		tsCfg, err := store.GetToolSetRequirementConfig(ctx, userID, agentID, tsID)
+		if err != nil || (tsCfg.Action != RequirementActionRequireConfirmation && !tsCfg.RequireConfirmation) {
+			continue
+		}
+		toolInSet, lookupErr := membership.IsToolInToolSet(ctx, tsID, toolName)
+		if lookupErr == nil && toolInSet {
+			return true, tsCfg.ConfirmationHint
+		}
+		// Membership lookup failed or returned false — fail-open so unknown
+		// custom tools don't gratuitously prompt.
 	}
 
 	return false, ""

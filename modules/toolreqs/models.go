@@ -10,10 +10,8 @@ import (
 // =============================================================================
 
 // RequirementAction controls whether a tool is allowed, blocked, or requires
-// user confirmation before execution. This is stored per-user, per-agent,
-// per-tool (or per-tool-set) and evaluated at runtime by the [Evaluator].
-//
-// Inspired by ADK-Go's RequireConfirmation and AgentStack's approval flow.
+// user confirmation before execution. Stored per-user, per-agent,
+// per-tool (or per-tool-set) and consulted at runtime by [Service].
 type RequirementAction string
 
 const (

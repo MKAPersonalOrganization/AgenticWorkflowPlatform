@@ -244,7 +244,7 @@ func (s *PermissionStore) ListToolRequirementConfigsJSON(ctx context.Context, us
 }
 
 // =============================================================================
-// Evaluation support — consumed by PermissionRequirement + Service's evaluator
+// Evaluation support — consumed by Service at runtime
 // =============================================================================
 
 // IsToolSetAllowed reports whether a tool set is enabled for this user/agent.
@@ -325,28 +325,3 @@ func (s *PermissionStore) ToolSetsWithConfirmation(ctx context.Context, userID, 
 	return confirmToolSets, nil
 }
 
-// =============================================================================
-// permissionChecker adapter
-// =============================================================================
-//
-// PermissionRequirement expects the lowercase internal permissionChecker
-// interface. PermissionStore exposes the checks with exported names (so
-// they can be called from outside the package), but the evaluator wires
-// against the private contract. `asChecker` adapts the public surface
-// to the private one without duplicating logic.
-
-type permissionCheckerAdapter struct {
-	store *PermissionStore
-}
-
-func (a permissionCheckerAdapter) isToolSetAllowed(ctx context.Context, userID, agentID, toolSetID string) bool {
-	return a.store.IsToolSetAllowed(ctx, userID, agentID, toolSetID)
-}
-
-func (a permissionCheckerAdapter) isToolAllowed(ctx context.Context, userID, agentID, toolSetID, toolID string) bool {
-	return a.store.IsToolAllowed(ctx, userID, agentID, toolSetID, toolID)
-}
-
-func (a permissionCheckerAdapter) getAllowedToolSets(ctx context.Context, userID, agentID string) ([]string, error) {
-	return a.store.AllowedToolSets(ctx, userID, agentID)
-}

@@ -30,20 +30,12 @@ func newTestPair(t *testing.T) (*toolreqs.Service, *toolreqs.PermissionStore) {
 	return svc, store
 }
 
-// newTestService is retained for tests that only care about the service
-// surface (eval / registration). Constructs a throwaway store alongside.
-func newTestService(t *testing.T) *toolreqs.Service {
-	t.Helper()
-	svc, _ := newTestPair(t)
-	return svc
-}
-
 // =============================================================================
 // Service tests
 // =============================================================================
 
 func TestService_GetEnabledToolSets_Empty(t *testing.T) {
-	svc := newTestService(t)
+	svc, _ := newTestPair(t)
 	sets, err := svc.GetEnabledToolSets(context.Background(), "user1", "agent1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -138,122 +130,10 @@ func TestService_HasToolSetPermission(t *testing.T) {
 	}
 }
 
-func TestService_EvaluateTool_WithConfirmation(t *testing.T) {
-	svc, store := newTestPair(t)
-	ctx := context.Background()
-
-	// Allow permissions via requirement config so we can test confirmation.
-	store.SetToolSetRequirementConfig(ctx, "user1", "agent1", "tools", toolreqs.ToolRequirementConfig{
-		Action: toolreqs.RequirementActionAllow,
-	})
-	store.SetToolRequirementConfig(ctx, "user1", "agent1", "tools", "dangerous_tool", toolreqs.ToolRequirementConfig{
-		Action: toolreqs.RequirementActionAllow,
-	})
-
-	// Configure confirmation for the tool.
-	svc.Confirmation().SetGlobalPolicy("dangerous_tool", &toolreqs.ConfirmationPolicy{
-		AlwaysConfirm: true,
-		Hint:          "This is dangerous!",
-	})
-
-	decision, err := svc.EvaluateTool(ctx, &toolreqs.ToolEvalRequest{
-		UserID:    "user1",
-		AgentID:   "agent1",
-		ToolSetID: "tools",
-		ToolID:    "dangerous_tool",
-		ToolName:  "dangerous_tool",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !decision.Allowed {
-		t.Error("tool should be allowed (confirmation doesn't block)")
-	}
-	if !decision.NeedsConfirm {
-		t.Error("tool should need confirmation")
-	}
-	if decision.Confirmation == nil {
-		t.Fatal("expected confirmation request")
-	}
-	if decision.Confirmation.Hint != "This is dangerous!" {
-		t.Errorf("expected hint 'This is dangerous!', got %q", decision.Confirmation.Hint)
-	}
-}
-
-func TestService_EvaluateTool_PermissionBlockOverridesConfirm(t *testing.T) {
-	svc, store := newTestPair(t)
-	ctx := context.Background()
-
-	// Tool set blocked via requirement config.
-	store.SetToolSetRequirementConfig(ctx, "user1", "agent1", "set1", toolreqs.ToolRequirementConfig{
-		Action: toolreqs.RequirementActionBlock,
-	})
-
-	svc.Confirmation().SetGlobalPolicy("tool_x", &toolreqs.ConfirmationPolicy{
-		AlwaysConfirm: true,
-	})
-
-	decision, err := svc.EvaluateTool(ctx, &toolreqs.ToolEvalRequest{
-		UserID:    "user1",
-		AgentID:   "agent1",
-		ToolSetID: "set1",
-		ToolID:    "tool_x",
-		ToolName:  "tool_x",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if decision.Allowed {
-		t.Error("tool should be blocked by permission")
-	}
-	if decision.NeedsConfirm {
-		t.Error("block should override confirmation")
-	}
-}
-
-func TestService_RegisterRequirement(t *testing.T) {
-	svc := newTestService(t)
-
-	// Register a custom requirement that blocks everything.
-	svc.RegisterRequirement(&staticRequirement{
-		kind:   "custom",
-		action: toolreqs.ActionBlock,
-		reason: "custom block",
-	})
-
-	decision, err := svc.EvaluateTool(context.Background(), &toolreqs.ToolEvalRequest{
-		ToolName: "any_tool",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if decision.Allowed {
-		t.Error("custom requirement should block the tool")
-	}
-}
-
-func TestService_RequiresConfirmation(t *testing.T) {
-	svc := newTestService(t)
-	svc.Confirmation().SetDefaultPolicy("web_search", &toolreqs.ConfirmationPolicy{
-		AlwaysConfirm: true,
-	})
-
-	if !svc.RequiresConfirmation(context.Background(), "agent1", "web_search", nil) {
-		t.Error("expected confirmation to be required")
-	}
-	if svc.RequiresConfirmation(context.Background(), "agent1", "calculator", nil) {
-		t.Error("calculator should not require confirmation")
-	}
-}
-
-func TestService_CheckConfirmation_NotNil(t *testing.T) {
-	svc := newTestService(t)
+func TestService_CheckConfirmation_Default(t *testing.T) {
+	svc, _ := newTestPair(t)
 	needs, _ := svc.CheckConfirmation(context.Background(), "user1", "agent1", "", "calculator", nil)
 	if needs {
 		t.Error("calculator should not require confirmation by default")
 	}
 }
-
-// =============================================================================
-// Test helpers — staticRequirement is shared from evaluator_test.go
-// =============================================================================
