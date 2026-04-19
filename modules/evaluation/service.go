@@ -65,17 +65,7 @@ func (s *service) createEvalSet(ctx context.Context, userID string, req EvalSetC
 }
 
 func (s *service) getEvalSet(ctx context.Context, id uuid.UUID, userID string) (EvalSet, error) {
-	es, err := s.repo.GetEvalSet(ctx, id)
-	if err != nil {
-		if err.Error() == "eval_set not found" {
-			return EvalSet{}, ErrNotFound
-		}
-		return EvalSet{}, fmt.Errorf("getting eval_set: %w", err)
-	}
-	if es.UserID != userID {
-		return EvalSet{}, ErrUnauthorized
-	}
-	return es, nil
+	return s.getOwnedEvalSet(ctx, id, userID)
 }
 
 func (s *service) listEvalSets(ctx context.Context, userID string) ([]EvalSet, error) {
@@ -89,16 +79,9 @@ func (s *service) updateEvalSet(ctx context.Context, id uuid.UUID, userID string
 		}
 	}
 
-	// Verify ownership before update
-	es, err := s.repo.GetEvalSet(ctx, id)
+	es, err := s.getOwnedEvalSet(ctx, id, userID)
 	if err != nil {
-		if err.Error() == "eval_set not found" {
-			return ErrNotFound
-		}
-		return fmt.Errorf("getting eval_set: %w", err)
-	}
-	if es.UserID != userID {
-		return ErrUnauthorized
+		return err
 	}
 
 	// Optimistic concurrency: reject if stale version
@@ -153,16 +136,8 @@ func (s *service) createEvalCase(ctx context.Context, userID string, req EvalCas
 		return EvalCase{}, fmt.Errorf("%w: input must be at most 10000 characters", ErrValidation)
 	}
 
-	// Verify ownership of parent EvalSet
-	es, err := s.repo.GetEvalSet(ctx, req.EvalSetID)
-	if err != nil {
-		if err.Error() == "eval_set not found" {
-			return EvalCase{}, ErrNotFound
-		}
-		return EvalCase{}, fmt.Errorf("getting eval_set: %w", err)
-	}
-	if es.UserID != userID {
-		return EvalCase{}, ErrUnauthorized
+	if _, err := s.getOwnedEvalSet(ctx, req.EvalSetID, userID); err != nil {
+		return EvalCase{}, err
 	}
 
 	// Validate JSON fields if provided
@@ -203,18 +178,9 @@ func (s *service) createEvalCase(ctx context.Context, userID string, req EvalCas
 }
 
 func (s *service) listEvalCases(ctx context.Context, evalSetID uuid.UUID, userID string) ([]EvalCase, error) {
-	// Verify ownership
-	es, err := s.repo.GetEvalSet(ctx, evalSetID)
-	if err != nil {
-		if err.Error() == "eval_set not found" {
-			return nil, ErrNotFound
-		}
-		return nil, fmt.Errorf("getting eval_set: %w", err)
+	if _, err := s.getOwnedEvalSet(ctx, evalSetID, userID); err != nil {
+		return nil, err
 	}
-	if es.UserID != userID {
-		return nil, ErrUnauthorized
-	}
-
 	return s.repo.ListEvalCases(ctx, evalSetID)
 }
 
@@ -228,20 +194,8 @@ func (s *service) updateEvalCase(ctx context.Context, id uuid.UUID, userID strin
 		}
 	}
 
-	// Verify ownership via parent EvalSet
-	existing, err := s.repo.GetEvalCase(ctx, id)
-	if err != nil {
-		if err.Error() == "eval_case not found" {
-			return ErrNotFound
-		}
-		return fmt.Errorf("getting eval_case: %w", err)
-	}
-	es, err := s.repo.GetEvalSet(ctx, existing.EvalSetID)
-	if err != nil {
-		return fmt.Errorf("getting parent eval_set: %w", err)
-	}
-	if es.UserID != userID {
-		return ErrUnauthorized
+	if _, err := s.getOwnedEvalCase(ctx, id, userID); err != nil {
+		return err
 	}
 
 	// Validate JSON fields if being updated
@@ -268,23 +222,9 @@ func (s *service) updateEvalCase(ctx context.Context, id uuid.UUID, userID strin
 }
 
 func (s *service) deleteEvalCase(ctx context.Context, id uuid.UUID, userID string) error {
-	existing, err := s.repo.GetEvalCase(ctx, id)
-	if err != nil {
-		if err.Error() == "eval_case not found" {
-			return ErrNotFound
-		}
-		return fmt.Errorf("getting eval_case: %w", err)
+	if _, err := s.getOwnedEvalCase(ctx, id, userID); err != nil {
+		return err
 	}
-
-	// Verify ownership via parent EvalSet
-	es, err := s.repo.GetEvalSet(ctx, existing.EvalSetID)
-	if err != nil {
-		return fmt.Errorf("getting parent eval_set: %w", err)
-	}
-	if es.UserID != userID {
-		return ErrUnauthorized
-	}
-
 	if err := s.repo.DeleteEvalCase(ctx, id); err != nil {
 		if err.Error() == "eval_case not found" {
 			return ErrNotFound
@@ -295,23 +235,69 @@ func (s *service) deleteEvalCase(ctx context.Context, id uuid.UUID, userID strin
 }
 
 func (s *service) reorderEvalCases(ctx context.Context, evalSetID uuid.UUID, userID string, caseIDs []uuid.UUID) error {
-	// Verify ownership
-	es, err := s.repo.GetEvalSet(ctx, evalSetID)
-	if err != nil {
-		if err.Error() == "eval_set not found" {
-			return ErrNotFound
-		}
-		return fmt.Errorf("getting eval_set: %w", err)
+	if _, err := s.getOwnedEvalSet(ctx, evalSetID, userID); err != nil {
+		return err
 	}
-	if es.UserID != userID {
-		return ErrUnauthorized
-	}
-
 	if len(caseIDs) == 0 {
 		return fmt.Errorf("%w: caseIDs cannot be empty", ErrValidation)
 	}
-
 	return s.repo.ReorderEvalCases(ctx, evalSetID, caseIDs)
+}
+
+// ─── Ownership helpers ───────────────────────────────────────────────────────
+
+// getOwnedEvalSet loads an EvalSet, translates the repo's string-based
+// not-found error to ErrNotFound, and verifies the caller owns it —
+// returning ErrUnauthorized otherwise. Callers that mutate the set or
+// any of its children should all go through this one gate so the
+// ownership check lives in one place.
+func (s *service) getOwnedEvalSet(ctx context.Context, id uuid.UUID, userID string) (EvalSet, error) {
+	es, err := s.repo.GetEvalSet(ctx, id)
+	if err != nil {
+		if err.Error() == "eval_set not found" {
+			return EvalSet{}, ErrNotFound
+		}
+		return EvalSet{}, fmt.Errorf("getting eval_set: %w", err)
+	}
+	if es.UserID != userID {
+		return EvalSet{}, ErrUnauthorized
+	}
+	return es, nil
+}
+
+// getOwnedEvalCase loads an EvalCase and verifies caller owns the
+// parent EvalSet (cases inherit ownership from their set).
+func (s *service) getOwnedEvalCase(ctx context.Context, id uuid.UUID, userID string) (EvalCase, error) {
+	ec, err := s.repo.GetEvalCase(ctx, id)
+	if err != nil {
+		if err.Error() == "eval_case not found" {
+			return EvalCase{}, ErrNotFound
+		}
+		return EvalCase{}, fmt.Errorf("getting eval_case: %w", err)
+	}
+	if _, err := s.getOwnedEvalSet(ctx, ec.EvalSetID, userID); err != nil {
+		// Don't leak that the case exists under someone else's set —
+		// collapse to ErrUnauthorized (the set-level check already
+		// distinguished not-found from unauthorized for the set itself).
+		return EvalCase{}, err
+	}
+	return ec, nil
+}
+
+// getOwnedMetricProfile loads a MetricProfile, translates not-found, and
+// verifies ownership. Mirrors getOwnedEvalSet for the metric-profile table.
+func (s *service) getOwnedMetricProfile(ctx context.Context, id uuid.UUID, userID string) (MetricProfile, error) {
+	p, err := s.repo.GetMetricProfile(ctx, id)
+	if err != nil {
+		if err.Error() == "metric profile not found" {
+			return MetricProfile{}, ErrNotFound
+		}
+		return MetricProfile{}, fmt.Errorf("getting metric profile: %w", err)
+	}
+	if p.UserID != userID {
+		return MetricProfile{}, ErrUnauthorized
+	}
+	return p, nil
 }
 
 // ─── Validation helpers ──────────────────────────────────────────────────────
@@ -554,17 +540,7 @@ func (s *service) createMetricProfile(ctx context.Context, userID string, req Me
 }
 
 func (s *service) getMetricProfile(ctx context.Context, id uuid.UUID, userID string) (MetricProfile, error) {
-	p, err := s.repo.GetMetricProfile(ctx, id)
-	if err != nil {
-		if err.Error() == "metric profile not found" {
-			return MetricProfile{}, ErrNotFound
-		}
-		return MetricProfile{}, fmt.Errorf("getting metric profile: %w", err)
-	}
-	if p.UserID != userID {
-		return MetricProfile{}, ErrUnauthorized
-	}
-	return p, nil
+	return s.getOwnedMetricProfile(ctx, id, userID)
 }
 
 func (s *service) listMetricProfiles(ctx context.Context, userID string) ([]MetricProfile, error) {
@@ -583,16 +559,8 @@ func (s *service) updateMetricProfile(ctx context.Context, id uuid.UUID, userID 
 		}
 	}
 
-	// Verify ownership
-	p, err := s.repo.GetMetricProfile(ctx, id)
-	if err != nil {
-		if err.Error() == "metric profile not found" {
-			return ErrNotFound
-		}
-		return fmt.Errorf("getting metric profile: %w", err)
-	}
-	if p.UserID != userID {
-		return ErrUnauthorized
+	if _, err := s.getOwnedMetricProfile(ctx, id, userID); err != nil {
+		return err
 	}
 
 	// If setting as default, unset previous defaults first
@@ -622,18 +590,9 @@ func (s *service) deleteMetricProfile(ctx context.Context, id uuid.UUID, userID 
 }
 
 func (s *service) setDefaultProfile(ctx context.Context, id uuid.UUID, userID string) error {
-	// Verify ownership
-	p, err := s.repo.GetMetricProfile(ctx, id)
-	if err != nil {
-		if err.Error() == "metric profile not found" {
-			return ErrNotFound
-		}
-		return fmt.Errorf("getting metric profile: %w", err)
+	if _, err := s.getOwnedMetricProfile(ctx, id, userID); err != nil {
+		return err
 	}
-	if p.UserID != userID {
-		return ErrUnauthorized
-	}
-
 	if err := s.repo.SetDefaultProfile(ctx, id, userID); err != nil {
 		return fmt.Errorf("setting default profile: %w", err)
 	}
@@ -708,19 +667,10 @@ func (s *service) createEvalRun(ctx context.Context, userID string, req EvalRunC
 		numRuns = 10
 	}
 
-	// Verify ownership of eval set
-	es, err := s.repo.GetEvalSet(ctx, req.EvalSetID)
-	if err != nil {
-		if err.Error() == "eval_set not found" {
-			return EvalRun{}, ErrNotFound
-		}
-		return EvalRun{}, fmt.Errorf("getting eval set: %w", err)
-	}
-	if es.UserID != userID {
-		return EvalRun{}, ErrUnauthorized
+	if _, err := s.getOwnedEvalSet(ctx, req.EvalSetID, userID); err != nil {
+		return EvalRun{}, err
 	}
 
-	// Get eval cases
 	cases, err := s.repo.ListEvalCases(ctx, req.EvalSetID)
 	if err != nil {
 		return EvalRun{}, fmt.Errorf("listing eval cases: %w", err)
