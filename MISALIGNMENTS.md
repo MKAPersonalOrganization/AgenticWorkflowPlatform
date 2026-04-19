@@ -28,7 +28,7 @@
    - [M15. Evaluation-set editor + runner](#m15-evaluation-sets)
    - [M16. Callback presets (non-programmer-friendly)](#m16-callback-presets)
    - [M17. Built-in ADK tool catalog visibility](#m17-builtin-adk-tool-catalog)
-   - [M18. Streaming-mode toggle](#m18-streaming-mode-toggle)
+   - [M18. Streaming-mode toggle](#m18-streaming-mode-toggle) ✅ **done**
    - [M19. Agent-card export (expose our agent as A2A)](#m19-agent-card-export)
    - [M20. Tool-confirmation hint UX](#m20-tool-confirmation-hint-ux)
    - [M21. OpenAI Responses API migration (unlocks code interpreter, file search, web search, computer use)](#m21-openai-responses-api-migration) ✅ **done**
@@ -635,6 +635,8 @@ Designer → they appear in the same Tools list as plugins, with a "built-in" ba
 ---
 
 ### M18. Streaming-mode toggle
+
+> **Status: ✅ Done.** Per-agent `Config.StreamingPolicy { Enabled }` drives a new Streaming card in the designer. Nil policy preserves ADK's historical default (`StreamingModeSSE`); an explicit `{ enabled: false }` flips the run to `StreamingModeNone`, and `runner_loop.go:onAssistantMessageAdded` already synthesises a single Started + Streamed (whole text) + Completed lifecycle, so the frontend sees the reply as exactly one `TEXT_MESSAGE_CONTENT` frame with no changes required in the AG-UI pipeline. Adapter dispatch lives in `adapters/adkgo/runner.go` (`resolveStreamingMode` + the `RunConfig.StreamingMode` call site). Persistence follows the same workflow-A recipe as the other policies: foundation type (`foundation/agent/config.go` — `AgentStreamingPolicy`), DB-side mirror (`modules/agentdefinition/types.go` — marshal/unmarshal helpers), migration `039_add_streaming_policy.sql`, repo wiring (`agent_definition_repo.go` — INSERT/UPDATE/hydrate), provider conversion (`provider.go` — `toFoundationStreamingPolicy`), REST surface (`handler.go` — `streamingPolicy` on create / update / read), designer UI (`frontend/ui/agenteditor/agenteditor.templ` — collapsible sky card peer to Code Execution; Alpine getter/setter in `agent-designer-dialog.js`). Integration tests (`userrequirements/streaming_policy_test.go`) assert the exactly-one-frame collapse for streaming off and the ≥ 2-frame fan-out for the default on the Gemini provider. Copy: "Stream responses (recommended)" with plain-English on/off explanations in the card body.
 
 **ADK.** `RunConfig.StreamingMode` ∈ `"none" | "sse"`. We currently always use `sse` (`adapters/adkgo/runner.go:540`).
 

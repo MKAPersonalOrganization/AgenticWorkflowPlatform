@@ -25,3 +25,4 @@ tls/
 
 # Hotspot analysis output
 .hotspots/
+.venv-scripts/

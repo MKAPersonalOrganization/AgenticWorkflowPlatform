@@ -1212,3 +1212,7 @@ ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS artifact_policy JSONB;
 -- Gemini today, OpenAI / Anthropic when their provider adapters gain native
 -- code-interpreter support. Nullable — null means code execution is off.
 ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS code_execution_policy JSONB;
+
+-- Version: 1.84
+-- Description: Add streaming_policy JSONB column to user_agents for the SSE streaming toggle; nullable, null means stream (matches ADK RunConfig.StreamingModeSSE default).
+ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS streaming_policy JSONB;

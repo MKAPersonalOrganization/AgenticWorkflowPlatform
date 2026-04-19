@@ -79,6 +79,7 @@ func (p *UserAwareProvider) agentFromDefinition(def *AgentDefinition) agent.Agen
 		MemoryPolicy:        toFoundationMemoryPolicy(def.MemoryPolicy),
 		ArtifactPolicy:      toFoundationArtifactPolicy(def.ArtifactPolicy),
 		CodeExecutionPolicy: toFoundationCodeExecutionPolicy(def.CodeExecutionPolicy),
+		StreamingPolicy:     toFoundationStreamingPolicy(def.StreamingPolicy),
 		AgentTools:          toFoundationAgentToolRefs(def.AgentTools),
 	}
 
@@ -207,6 +208,18 @@ func toFoundationCodeExecutionPolicy(src *AgentCodeExecutionPolicy) *agent.Agent
 		return nil
 	}
 	return &agent.AgentCodeExecutionPolicy{
+		Enabled: src.Enabled,
+	}
+}
+
+// toFoundationStreamingPolicy converts the persisted policy to the
+// foundation type consumed by the adapter. Nil means "stream" — matches
+// the adapter's historical default before this field existed.
+func toFoundationStreamingPolicy(src *AgentStreamingPolicy) *agent.AgentStreamingPolicy {
+	if src == nil {
+		return nil
+	}
+	return &agent.AgentStreamingPolicy{
 		Enabled: src.Enabled,
 	}
 }

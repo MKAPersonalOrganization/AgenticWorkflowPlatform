@@ -59,6 +59,7 @@ type createRequest struct {
 	MemoryPolicy             *AgentMemoryPolicy         `json:"memoryPolicy,omitempty"`
 	ArtifactPolicy           *AgentArtifactPolicy       `json:"artifactPolicy,omitempty"`
 	CodeExecutionPolicy      *AgentCodeExecutionPolicy  `json:"codeExecutionPolicy,omitempty"`
+	StreamingPolicy          *AgentStreamingPolicy      `json:"streamingPolicy,omitempty"`
 }
 
 type updateRequest struct {
@@ -81,6 +82,7 @@ type updateRequest struct {
 	MemoryPolicy             *AgentMemoryPolicy         `json:"memoryPolicy,omitempty"`
 	ArtifactPolicy           *AgentArtifactPolicy       `json:"artifactPolicy,omitempty"`
 	CodeExecutionPolicy      *AgentCodeExecutionPolicy  `json:"codeExecutionPolicy,omitempty"`
+	StreamingPolicy          *AgentStreamingPolicy      `json:"streamingPolicy,omitempty"`
 }
 
 type agentResponse struct {
@@ -115,6 +117,7 @@ type agentResponse struct {
 	MemoryPolicy             *AgentMemoryPolicy       `json:"memoryPolicy,omitempty"`
 	ArtifactPolicy           *AgentArtifactPolicy     `json:"artifactPolicy,omitempty"`
 	CodeExecutionPolicy      *AgentCodeExecutionPolicy `json:"codeExecutionPolicy,omitempty"`
+	StreamingPolicy          *AgentStreamingPolicy    `json:"streamingPolicy,omitempty"`
 	ShareToken               string                   `json:"shareToken,omitempty"`
 	Visibility               string                   `json:"visibility,omitempty"`
 	CreatedAt                string                   `json:"createdAt"`
@@ -188,6 +191,7 @@ func toAgentResponse(a *AgentDefinition) agentResponse {
 		MemoryPolicy:             a.MemoryPolicy,
 		ArtifactPolicy:           a.ArtifactPolicy,
 		CodeExecutionPolicy:      a.CodeExecutionPolicy,
+		StreamingPolicy:          a.StreamingPolicy,
 		ShareToken:               a.ShareToken,
 		Visibility:               a.Visibility,
 		CreatedAt:                a.CreatedAt.Format("2006-01-02T15:04:05Z"),
@@ -237,6 +241,7 @@ func (h *storeHandler) create(w http.ResponseWriter, r *http.Request) {
 		MemoryPolicy:             req.MemoryPolicy,
 		ArtifactPolicy:           req.ArtifactPolicy,
 		CodeExecutionPolicy:      req.CodeExecutionPolicy,
+		StreamingPolicy:          req.StreamingPolicy,
 	}
 
 	if err := h.svc.create(r.Context(), agent); err != nil {
@@ -366,6 +371,7 @@ func (h *storeHandler) update(w http.ResponseWriter, r *http.Request) {
 		MemoryPolicy:             req.MemoryPolicy,
 		ArtifactPolicy:           req.ArtifactPolicy,
 		CodeExecutionPolicy:      req.CodeExecutionPolicy,
+		StreamingPolicy:          req.StreamingPolicy,
 	}
 
 	if err := h.svc.update(r.Context(), agent); err != nil {

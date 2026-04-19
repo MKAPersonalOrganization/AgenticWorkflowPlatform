@@ -2026,6 +2026,45 @@ templ agentNodeForm() {
 			</div>
 		</div>
 	</div>
+	<!-- Streaming Section.
+	     Maps to ADK-Go's RunConfig.StreamingMode
+	     (see .READ/adk-go/agent/run_config.go — StreamingModeSSE /
+	     StreamingModeNone). Default is SSE so users get the live
+	     typewriter effect; flipping this off delivers the full reply
+	     as one frame, which is usually what you want for eval runs
+	     and structured-output agents where partial deltas are noise. -->
+	<div class="rounded-xl border border-border bg-card overflow-hidden">
+		<button
+			type="button"
+			@click="showStreaming = !showStreaming"
+			class="flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent/30 transition-colors"
+			:class="showStreaming ? 'bg-gradient-to-r from-sky-500/5 to-transparent border-b border-border/50' : ''"
+		>
+			<span class="flex items-center gap-2">
+				<div class="size-6 rounded-md bg-sky-500/10 flex items-center justify-center">
+					@icon.Zap(icon.Props{Class: "size-3.5 text-sky-600 dark:text-sky-400"})
+				</div>
+				{ i18n.T(ctx, "Streaming") }
+				<span x-show="!streamingEnabled" class="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+					{ i18n.T(ctx, "off") }
+				</span>
+			</span>
+			<span class="transition-transform duration-200" :class="showStreaming ? 'rotate-180' : ''">
+				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+			</span>
+		</button>
+		<div x-show="showStreaming" x-collapse>
+			<div class="p-4 space-y-4 border-t border-border/50">
+				<p class="text-xs text-muted-foreground leading-relaxed">
+					@icon.Info(icon.Props{Class: "size-3.5 inline me-1 text-sky-500"})
+					{ i18n.T(ctx, "On (default): the reply appears word-by-word as the model generates it. Off: the whole reply shows up at once — handy for evaluation runs or agents that must return strict structured output.") }
+				</p>
+				<div class="space-y-1.5">
+					@toggleSwitch("streamingEnabled", i18n.T(ctx, "Stream responses (recommended)"), i18n.T(ctx, "Typewriter effect in chat. Turn this off if you prefer to wait and show the full reply in a single frame."))
+				</div>
+			</div>
+		</div>
+	</div>
 	<!-- Sub-Agents (Coordinator) Section -->
 	<div class="rounded-xl border border-border bg-card overflow-hidden">
 		<button

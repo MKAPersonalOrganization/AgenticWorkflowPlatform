@@ -59,6 +59,16 @@ type AgentCodeExecutionPolicy struct {
 	Enabled bool `json:"enabled"`
 }
 
+// AgentStreamingPolicy mirrors foundation/agent.AgentStreamingPolicy.
+// Controls whether the adapter asks ADK's runner to stream the LLM
+// response via SSE (delta-by-delta) or to deliver it as a single frame.
+type AgentStreamingPolicy struct {
+	// Enabled toggles SSE streaming. Nil policy (the column is NULL for
+	// pre-existing rows) means streaming is on — matches the adapter's
+	// historical default before this field existed.
+	Enabled bool `json:"enabled"`
+}
+
 // AgentArtifactPolicy mirrors foundation/agent.AgentArtifactPolicy.
 type AgentArtifactPolicy struct {
 	// Enabled turns on artifact support for this agent. When true,
@@ -193,6 +203,13 @@ type AgentDefinition struct {
 	// the adapter's provider-specific dispatch.
 	CodeExecutionPolicy     *AgentCodeExecutionPolicy `json:"code_execution_policy,omitempty" db:"-"`
 	CodeExecutionPolicyJSON string                    `json:"-" db:"code_execution_policy"`
+
+	// ── Streaming ──
+	// StreamingPolicy controls whether the adapter requests SSE streaming
+	// from ADK's runner. nil means stream (historical default); non-nil
+	// carries the explicit toggle value from the designer.
+	StreamingPolicy     *AgentStreamingPolicy `json:"streaming_policy,omitempty" db:"-"`
+	StreamingPolicyJSON string                `json:"-" db:"streaming_policy"`
 
 	// ── Sharing ──
 	// ShareToken is a unique token that enables sharing this agent with other users.
@@ -351,6 +368,36 @@ func (a *AgentDefinition) UnmarshalCodeExecutionPolicy() error {
 		return fmt.Errorf("unmarshalling code execution policy: %w", err)
 	}
 	a.CodeExecutionPolicy = &cp
+	return nil
+}
+
+// MarshalStreamingPolicy serializes StreamingPolicy for storage.
+func (a *AgentDefinition) MarshalStreamingPolicy() error {
+	if a.StreamingPolicy == nil {
+		a.StreamingPolicyJSON = ""
+		return nil
+	}
+	b, err := json.Marshal(a.StreamingPolicy)
+	if err != nil {
+		return fmt.Errorf("marshalling streaming policy: %w", err)
+	}
+	a.StreamingPolicyJSON = string(b)
+	return nil
+}
+
+// UnmarshalStreamingPolicy deserializes StreamingPolicyJSON.
+// Empty JSON means nil — streaming is on by default (matches the adapter's
+// historical behaviour before this field existed).
+func (a *AgentDefinition) UnmarshalStreamingPolicy() error {
+	if a.StreamingPolicyJSON == "" || a.StreamingPolicyJSON == "null" {
+		a.StreamingPolicy = nil
+		return nil
+	}
+	var sp AgentStreamingPolicy
+	if err := json.Unmarshal([]byte(a.StreamingPolicyJSON), &sp); err != nil {
+		return fmt.Errorf("unmarshalling streaming policy: %w", err)
+	}
+	a.StreamingPolicy = &sp
 	return nil
 }
 

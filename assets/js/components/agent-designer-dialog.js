@@ -100,6 +100,11 @@ export const agentDesigner = () => ({
         memoryPolicy: null,
         artifactPolicy: null,
         codeExecutionPolicy: null,
+        // Streaming policy. Nil = stream (historical default, also what
+        // ADK-Go does when RunConfig.StreamingMode is unset). A non-null
+        // { enabled: false } is the only way to explicitly turn streaming
+        // off — keeping the shape parallel to the other optional policies.
+        streamingPolicy: null,
     },
 
     // UI state
@@ -110,6 +115,7 @@ export const agentDesigner = () => ({
     showMemory: false,
     showArtifacts: false,
     showCodeExecution: false,
+    showStreaming: false,
 
     // ── Instruction template autocomplete ─────────────────────────────
     // We expose the two ADK placeholder forms we officially support:
@@ -368,6 +374,24 @@ export const agentDesigner = () => ({
             this.form.codeExecutionPolicy = { enabled: true };
         } else {
             this.form.codeExecutionPolicy = { enabled: false };
+        }
+    },
+
+    // Streaming — on/off toggle. Nil policy (the default for existing
+    // agents) means "stream" since that matches the adapter's historical
+    // behaviour. Flipping the toggle off materialises an explicit
+    // { enabled: false } so the backend persists the choice and the
+    // runner passes StreamingModeNone. Flipping it back on clears the
+    // policy to keep the payload tidy — nil round-trips to "stream".
+    get streamingEnabled() {
+        if (!this.form.streamingPolicy) return true;
+        return !!this.form.streamingPolicy.enabled;
+    },
+    set streamingEnabled(v) {
+        if (v) {
+            this.form.streamingPolicy = null;
+        } else {
+            this.form.streamingPolicy = { enabled: false };
         }
     },
 
@@ -895,6 +919,7 @@ export const agentDesigner = () => ({
             memoryPolicy: null,
             artifactPolicy: null,
             codeExecutionPolicy: null,
+            streamingPolicy: null,
         };
         this.showTools = false;
         this.showKnowledgeBases = false;
@@ -909,6 +934,7 @@ export const agentDesigner = () => ({
         this.showMemory = false;
         this.showArtifacts = false;
         this.showCodeExecution = false;
+        this.showStreaming = false;
         this.agentPlugins = [];
         this.agentWorkspaces = [];
         this.agentFilesystems = [];
@@ -962,6 +988,9 @@ export const agentDesigner = () => ({
             codeExecutionPolicy: agent.codeExecutionPolicy
                 ? { enabled: !!agent.codeExecutionPolicy.enabled }
                 : null,
+            streamingPolicy: agent.streamingPolicy
+                ? { enabled: !!agent.streamingPolicy.enabled }
+                : null,
         };
         this.showTools = false;
         this.showKnowledgeBases = false;
@@ -976,6 +1005,7 @@ export const agentDesigner = () => ({
         this.showMemory = false;
         this.showArtifacts = false;
         this.showCodeExecution = false;
+        this.showStreaming = false;
         this.providerModelOptions = [];
         this.providerModelsError = '';
         this.hydrateSchemaRows('inputSchema');
@@ -1047,6 +1077,9 @@ export const agentDesigner = () => ({
                     : null,
                 codeExecutionPolicy: this.form.codeExecutionPolicy
                     ? { enabled: !!this.form.codeExecutionPolicy.enabled }
+                    : null,
+                streamingPolicy: this.form.streamingPolicy
+                    ? { enabled: !!this.form.streamingPolicy.enabled }
                     : null,
             };
 

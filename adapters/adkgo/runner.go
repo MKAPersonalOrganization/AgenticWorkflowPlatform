@@ -551,8 +551,9 @@ func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Se
 		// on the user message get persisted as artifacts and replaced with
 		// text placeholders the model reads as "Uploaded file: …".
 		saveInputBlobs := artifactsEnabled && artAutoSaveBlobs
+		streamingMode := r.resolveStreamingMode(agentCfg)
 		for adkEvt, adkErr := range adkRunner.Run(ctx, req.UserID, req.SessionID, userMsg, agent.RunConfig{
-			StreamingMode:             agent.StreamingModeSSE,
+			StreamingMode:             streamingMode,
 			SaveInputBlobsAsArtifacts: saveInputBlobs,
 		}, runOpts...) {
 			if adkErr != nil {
@@ -696,6 +697,19 @@ func (r *RunnerAdapter) resolveArtifactPolicy(agentCfg *fagent.Config) (enabled 
 		return false, false
 	}
 	return agentCfg.ArtifactPolicy.Enabled, agentCfg.ArtifactPolicy.AutoSaveUserBlobs
+}
+
+// resolveStreamingMode returns the ADK RunConfig.StreamingMode value for
+// this agent. Nil policy means stream — matches the adapter's historical
+// default. An explicit policy with Enabled=false flips the run to
+// StreamingModeNone so ADK delivers the full response in a single frame.
+//
+// See .READ/adk-go/agent/run_config.go for the mode enum.
+func (r *RunnerAdapter) resolveStreamingMode(agentCfg *fagent.Config) agent.StreamingMode {
+	if agentCfg != nil && agentCfg.StreamingPolicy != nil && !agentCfg.StreamingPolicy.Enabled {
+		return agent.StreamingModeNone
+	}
+	return agent.StreamingModeSSE
 }
 
 // threadHistoryToMessages translates thread aggregate messages into foundation

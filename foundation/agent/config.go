@@ -51,6 +51,29 @@ type AgentModelConfig struct {
 	StopSequences []string
 }
 
+// AgentStreamingPolicy controls whether the agent streams its LLM output
+// delta-by-delta (SSE) or waits until the full response is ready and
+// delivers it in a single frame.
+//
+// Maps to ADK-Go's runner.RunConfig.StreamingMode
+// (see .READ/adk-go/agent/run_config.go — StreamingModeNone / StreamingModeSSE).
+// The adapter passes the selected mode on every Run call; the value is
+// not stored on any session object.
+//
+// The UI frames this as a simple toggle: streaming on (the default) gives
+// users a live typewriter effect, streaming off is preferable for
+// evaluation runs or tool-heavy structured-output agents where the
+// partial stream is more noise than signal.
+//
+// Nil policy means "stream" — matches the adapter's historical default
+// before this field existed, so pre-existing agents keep streaming.
+type AgentStreamingPolicy struct {
+	// Enabled toggles streaming. true = SSE (delta-by-delta), false =
+	// deliver the full response in a single frame. Nil policy is
+	// equivalent to Enabled=true.
+	Enabled bool `json:"enabled"`
+}
+
 // AgentCodeExecutionPolicy controls whether the agent may ask the LLM
 // provider's built-in code executor to run code during a turn.
 //
@@ -274,6 +297,13 @@ type Config struct {
 	// provider's built-in code executor (Gemini today; OpenAI / Anthropic
 	// in the future). nil means code execution is off.
 	CodeExecutionPolicy *AgentCodeExecutionPolicy
+
+	// StreamingPolicy controls whether the adapter requests SSE streaming
+	// from ADK's runner. nil means stream (the historical default, matching
+	// ADK's StreamingModeSSE). Set an explicit non-nil policy with
+	// Enabled=false to deliver the full response as a single frame —
+	// useful for eval runs and structured-output agents.
+	StreamingPolicy *AgentStreamingPolicy
 
 	// AgentTools exposes other user-owned agents as callable tools on this
 	// agent. Each ref is resolved at runtime and wrapped via ADK-Go's

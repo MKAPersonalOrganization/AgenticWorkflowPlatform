@@ -176,3 +176,57 @@ scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
 ```
 
 This is already done in `parseSSE` in `shared_test.go` — use that helper rather than rolling your own.
+
+---
+
+## 13. Migrations must edit `sql/migrate.sql`, not just the numbered files — and description lines can't start with "-- ver" / "-- des"
+
+**Symptom.** After adding a new migration file (e.g. `039_add_streaming_policy.sql`) and restarting with `task up:cluster`, the migrate container exits with:
+
+```
+err="migrating database: Migration 1.010000 was removed"
+```
+
+The referenced version (`1.010000` = 1.01) is present both in the DB and in the source files, so the error message is misleading. Every subsequent run of the app crashes at startup because migrations never complete.
+
+**Why it's invisible.** Two traps stacked on top of each other:
+
+1. **`migrate.Migrate` embeds exactly one file.** `infra/sqldb/migrate/migrate.go` does `//go:embed sql/migrate.sql` — the numbered files (`034_*.sql`, `035_*.sql`, …) are **source references only**. Darwin never sees them. If you only create `039_add_streaming_policy.sql` and forget to append the same block to `migrate.sql`, the new column never gets created and `INSERT` into `user_agents` fails with `column "streaming_policy" does not exist`.
+
+2. **Darwin's `ParseMigrations` treats any comment starting with `-- ver` or `-- des` (case-insensitive) as a Version / Description line, requires exactly one `:`, and returns `nil` for the *entire* migration list the moment one line fails.** See `github.com/ardanlabs/darwin/v3@v3.3.1/parse.go`:
+
+   ```go
+   case (len(v) >= 5 && lower[:5] == "--ver") || (len(v) >= 6 && lower[:6] == "-- ver"):
+       parts := strings.Split(v, ":")
+       if len(parts) != 2 { return nil }
+   ```
+
+   A prose continuation line like `-- designer toggle SSE streaming per agent` starts with `-- des` → parsed as a Description → has no `:` → `len(parts) == 1` → **entire file parse returns `nil`**. The DB then has 80 applied migrations but the parsed list is empty, so `wasRemovedMigration` reports the first applied version (1.01) as "removed". Misleading error, real cause is your new migration's prose.
+
+**Fix.**
+
+- Always append the new version block to `infra/sqldb/migrate/sql/migrate.sql` in the **same commit** that adds the numbered source file. Don't ship either alone.
+- Keep the `-- Description:` line to a single line. Don't wrap prose across multiple `-- ...` continuation lines — any continuation that starts with "-- ver" or "-- des" (think "describing", "designer", "versioned", "very", "describe", …) bricks the parser.
+- If you need longer prose, put it above the `-- Version:` line, or use words that don't start with those prefixes in continuation comments.
+
+**How to confirm the parse is OK before restarting the cluster:**
+
+```bash
+# in a scratch dir
+cat > main.go <<'EOF'
+package main
+import (
+    "fmt"; "os"
+    "github.com/ardanlabs/darwin/v3"
+)
+func main() {
+    data, _ := os.ReadFile("/path/to/infra/sqldb/migrate/sql/migrate.sql")
+    fmt.Println(len(darwin.ParseMigrations(string(data))))
+}
+EOF
+go mod init probe && go get github.com/ardanlabs/darwin/v3 && go run main.go
+```
+
+Expect a count equal to `grep -c '^-- Version:' migrate.sql`. `0` means one of your description lines bricked the parse.
+
+**Related.** Pitfall #7 (`task down:cluster` wipes volumes) — don't be tempted to reach for a clean slate when you hit this error. The fix is in the file, not the DB.
