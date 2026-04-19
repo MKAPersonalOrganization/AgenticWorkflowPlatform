@@ -63,66 +63,70 @@ func BlockMiddleware(checker blockChecker, agentID string) agent.Middleware {
 // =============================================================================
 // Confirmation — per-user runtime check for ADK native HITL
 // =============================================================================
+//
+// Two narrow collaborators (instead of one kitchen-sink
+// ConfirmationConfigResolver) so the CheckConfirmation flow states its
+// dependencies plainly:
+//
+//   - a *PermissionStore for DB-backed per-user config reads
+//   - a toolMembershipChecker for "is this tool in that set?" lookups
+//
+// The store is a concrete type because there's only one real
+// implementation; the membership lookup is a small interface so that
+// tests and other checkers (e.g. per-user membership in the future)
+// can substitute without dragging in the persistence layer.
 
-// ConfirmationConfigResolver reads per-user, per-agent tool requirement configs
-// from persistent storage (DB + cache). Implemented by [Service].
-type ConfirmationConfigResolver interface {
-	GetToolRequirementConfig(ctx context.Context, userID, agentID, toolSetID, toolID string) (ToolRequirementConfig, error)
-	GetToolSetRequirementConfig(ctx context.Context, userID, agentID, toolSetID string) (ToolRequirementConfig, error)
-	GetToolSetsWithConfirmation(ctx context.Context, userID, agentID string) ([]string, error)
+// toolMembershipChecker answers "is tool X a member of tool set Y?".
+// Implemented by [Service] via the tool registry.
+type toolMembershipChecker interface {
 	IsToolInToolSet(ctx context.Context, userID, agentID, toolSetID, toolName string) (bool, error)
 }
 
-// CheckConfirmation determines whether a tool call needs user confirmation,
-// checking both per-user DB config and admin-level global policies.
+// CheckConfirmation determines whether a tool call needs user
+// confirmation, consulting both per-user DB config (the store) and
+// admin-level global policies (the ConfirmationRequirement). Returns
+// (needsConfirmation, hint).
 //
-// Returns (needsConfirmation, hint). The hint is shown to the user in the
-// confirmation dialog. If empty, callers should generate a default hint.
-//
-// This is used by the adapter layer to build ADK-native BeforeToolCallbacks
-// that call ctx.RequestConfirmation() instead of the legacy io.Confirm() flow.
+// Callers inside the package can pass a nil store to test only the
+// global-policy path; production callers go through
+// [Service.CheckConfirmation] which wires both collaborators.
 func CheckConfirmation(
 	ctx context.Context,
-	resolver ConfirmationConfigResolver,
+	store *PermissionStore,
+	membership toolMembershipChecker,
 	cr *ConfirmationRequirement,
 	userID, agentID, toolSetID, toolName string,
 	args map[string]any,
 ) (bool, string) {
 	// 1. Check per-user individual tool config from DB (primary source).
-	if userID != "" && resolver != nil {
-		cfg, err := resolver.GetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolName)
+	if userID != "" && store != nil {
+		cfg, err := store.GetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolName)
 		if err == nil && (cfg.Action == RequirementActionRequireConfirmation || cfg.RequireConfirmation) {
 			return true, cfg.ConfirmationHint
 		}
 
 		// 1b. Check tool-set level config if we know the tool-set ID.
 		if toolSetID != "" {
-			tsCfg, err := resolver.GetToolSetRequirementConfig(ctx, userID, agentID, toolSetID)
+			tsCfg, err := store.GetToolSetRequirementConfig(ctx, userID, agentID, toolSetID)
 			if err == nil && (tsCfg.Action == RequirementActionRequireConfirmation || tsCfg.RequireConfirmation) {
 				return true, tsCfg.ConfirmationHint
 			}
-		} else {
-			// 1c. No tool-set ID provided - check all tool-sets the user has configured
-			// with require_confirmation and see if any of them contain this tool.
-			// NOTE: This is a fallback. The preferred path is when toolSetID is
-			// provided (section 1b). Without toolSetID, we must check every toolset
-			// with require_confirmation to see if this tool is a member.
-			confToolSets, err := resolver.GetToolSetsWithConfirmation(ctx, userID, agentID)
+		} else if membership != nil {
+			// 1c. No tool-set ID provided — scan every tool-set flagged with
+			// require_confirmation and ask the membership checker whether
+			// the tool belongs. Preferred path is 1b (toolSetID known); this
+			// branch is the fallback for custom-tool invocations.
+			confToolSets, err := store.ToolSetsWithConfirmation(ctx, userID, agentID)
 			if err == nil && len(confToolSets) > 0 {
-				// Check each tool-set that has require_confirmation.
 				for _, tsID := range confToolSets {
-					tsCfg, err := resolver.GetToolSetRequirementConfig(ctx, userID, agentID, tsID)
+					tsCfg, err := store.GetToolSetRequirementConfig(ctx, userID, agentID, tsID)
 					if err == nil && (tsCfg.Action == RequirementActionRequireConfirmation || tsCfg.RequireConfirmation) {
-						// Verify the tool belongs to this tool-set by checking
-						// per-tool config exists or checking tool registry.
-						// If we can verify tool membership, enforce confirmation.
-						// Otherwise, only enforce if we have a positive match.
-						toolInSet, lookupErr := resolver.IsToolInToolSet(ctx, userID, agentID, tsID, toolName)
+						toolInSet, lookupErr := membership.IsToolInToolSet(ctx, userID, agentID, tsID, toolName)
 						if lookupErr == nil && toolInSet {
 							return true, tsCfg.ConfirmationHint
 						}
-						// If IsToolInToolSet is not implemented or returns error,
-						// skip confirmation to avoid false positives (fail-open for custom input).
+						// Membership lookup failed / returned false — fail-open
+						// so unknown custom tools don't gratuitously prompt.
 					}
 				}
 			}

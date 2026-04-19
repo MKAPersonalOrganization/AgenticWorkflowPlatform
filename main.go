@@ -480,6 +480,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Single authority for all tool access decisions: permissions, confirmation, etc.
 	toolReqsModule := toolreqs.New(log, permissionsRepo, permCacheRedis, toolRegistry)
 	toolReqsService := toolReqsModule.Service()
+	toolReqsStore := toolReqsModule.Store()
 
 	log.Info(ctx, "startup", "status", "tool requirements module initialized")
 
@@ -533,7 +534,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		UserProfileRepo:          &chatProfileAdapter{repo: userProfileRepo},
 		AgentProvider:            agentProvider,
 		ToolRegistry:             toolRegistry,
-		RequirementConfigService: toolReqsService,
+		RequirementConfigService: toolReqsStore,
 		DocumentProvider:         &DocumentProviderAdapter{svc: edgequakeService},
 		TenantID:                 cfg.Edgequake.TenantID,
 		AllowedOrigin:            cfg.Auth.AppURL,

@@ -12,7 +12,7 @@ import (
 
 func TestCheckConfirmation_NoPolicy_NoConfirmation(t *testing.T) {
 	cr := toolreqs.NewConfirmationRequirement()
-	needs, hint := toolreqs.CheckConfirmation(context.Background(), nil, cr, "user1", "agent1", "", "calculator", nil)
+	needs, hint := toolreqs.CheckConfirmation(context.Background(), nil, nil, cr,"user1", "agent1", "", "calculator", nil)
 	if needs {
 		t.Error("expected no confirmation when no policy exists")
 	}
@@ -28,7 +28,7 @@ func TestCheckConfirmation_GlobalPolicy_RequiresConfirmation(t *testing.T) {
 		Hint:          "Confirm dangerous action?",
 	})
 
-	needs, hint := toolreqs.CheckConfirmation(context.Background(), nil, cr, "user1", "agent1", "", "dangerous_tool", nil)
+	needs, hint := toolreqs.CheckConfirmation(context.Background(), nil, nil, cr,"user1", "agent1", "", "dangerous_tool", nil)
 	if !needs {
 		t.Error("expected confirmation when global policy exists")
 	}
@@ -44,7 +44,7 @@ func TestCheckConfirmation_GlobalPolicy_NoHint_UsesDefault(t *testing.T) {
 		// No Hint provided
 	})
 
-	needs, hint := toolreqs.CheckConfirmation(context.Background(), nil, cr, "user1", "agent1", "", "dangerous_tool", nil)
+	needs, hint := toolreqs.CheckConfirmation(context.Background(), nil, nil, cr,"user1", "agent1", "", "dangerous_tool", nil)
 	if !needs {
 		t.Error("expected confirmation when global policy exists")
 	}
@@ -65,13 +65,13 @@ func TestCheckConfirmation_ConfirmFunc_Dynamic(t *testing.T) {
 	})
 
 	// Should not require confirmation for soft delete
-	needs, _ := toolreqs.CheckConfirmation(context.Background(), nil, cr, "user1", "agent1", "", "delete_tool", map[string]any{"hard_delete": false})
+	needs, _ := toolreqs.CheckConfirmation(context.Background(), nil, nil, cr,"user1", "agent1", "", "delete_tool", map[string]any{"hard_delete": false})
 	if needs {
 		t.Error("should not require confirmation for soft delete")
 	}
 
 	// Should require confirmation for hard delete
-	needs, hint := toolreqs.CheckConfirmation(context.Background(), nil, cr, "user1", "agent1", "", "delete_tool", map[string]any{"hard_delete": true})
+	needs, hint := toolreqs.CheckConfirmation(context.Background(), nil, nil, cr,"user1", "agent1", "", "delete_tool", map[string]any{"hard_delete": true})
 	if !needs {
 		t.Error("should require confirmation for hard delete")
 	}
@@ -91,7 +91,7 @@ func TestCheckConfirmation_AgentSpecificPolicy_OverridesDefault(t *testing.T) {
 	})
 
 	// Agent1 should require confirmation
-	needs, hint := toolreqs.CheckConfirmation(context.Background(), nil, cr, "user1", "agent1", "", "tool_x", nil)
+	needs, hint := toolreqs.CheckConfirmation(context.Background(), nil, nil, cr,"user1", "agent1", "", "tool_x", nil)
 	if !needs {
 		t.Error("expected confirmation for agent-specific policy")
 	}
@@ -100,7 +100,7 @@ func TestCheckConfirmation_AgentSpecificPolicy_OverridesDefault(t *testing.T) {
 	}
 
 	// Agent2 should NOT require confirmation (falls back to default)
-	needs, _ = toolreqs.CheckConfirmation(context.Background(), nil, cr, "user1", "agent2", "", "tool_x", nil)
+	needs, _ = toolreqs.CheckConfirmation(context.Background(), nil, nil, cr,"user1", "agent2", "", "tool_x", nil)
 	if needs {
 		t.Error("should not require confirmation for agent without policy")
 	}

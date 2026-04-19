@@ -18,18 +18,16 @@ func testRedisClientIndiv(t *testing.T) goredis.Cmdable {
 	return goredis.NewClient(&goredis.Options{Addr: s.Addr()})
 }
 
-func testServiceIndiv(t *testing.T) *toolreqs.Service {
+func testPairIndiv(t *testing.T) (*toolreqs.Service, *toolreqs.PermissionStore) {
 	t.Helper()
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
-	return toolreqs.NewService(toolreqs.ServiceConfig{
-		Log:  log,
-		Repo: mocks.NewInMemoryRepository(),
-		RDB:  testRedisClientIndiv(t),
-	})
+	store := toolreqs.NewPermissionStore(log, mocks.NewInMemoryRepository(), testRedisClientIndiv(t))
+	svc := toolreqs.NewService(toolreqs.ServiceConfig{Log: log, Store: store})
+	return svc, store
 }
 
 func TestIndividualToolRequirementConfig(t *testing.T) {
-	service := testServiceIndiv(t)
+	service, store := testPairIndiv(t)
 	ctx := context.Background()
 
 	agentID := "math-instructor"
@@ -38,7 +36,7 @@ func TestIndividualToolRequirementConfig(t *testing.T) {
 	userID := "test-user"
 
 	// Test: Set individual tool requirement config to "allow"
-	err := service.SetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID, toolreqs.ToolRequirementConfig{
+	err := store.SetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID, toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
 	if err != nil {
@@ -52,7 +50,7 @@ func TestIndividualToolRequirementConfig(t *testing.T) {
 	}
 
 	// Test: Get requirement config
-	cfg, err := service.GetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID)
+	cfg, err := store.GetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID)
 	if err != nil {
 		t.Fatalf("Failed to get tool requirement config: %v", err)
 	}
@@ -62,7 +60,7 @@ func TestIndividualToolRequirementConfig(t *testing.T) {
 	}
 
 	// Test: Block the tool
-	err = service.SetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID, toolreqs.ToolRequirementConfig{
+	err = store.SetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID, toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionBlock,
 	})
 	if err != nil {
@@ -76,7 +74,7 @@ func TestIndividualToolRequirementConfig(t *testing.T) {
 }
 
 func TestToolSetRequirementInheritance(t *testing.T) {
-	service := testServiceIndiv(t)
+	service, store := testPairIndiv(t)
 	ctx := context.Background()
 
 	userID := "test-user"
@@ -87,7 +85,7 @@ func TestToolSetRequirementInheritance(t *testing.T) {
 	// Test: Tool inherits permission from tool set when no explicit config exists
 
 	// Allow the tool set
-	err := service.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
+	err := store.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
 	if err != nil {
@@ -101,7 +99,7 @@ func TestToolSetRequirementInheritance(t *testing.T) {
 	}
 
 	// Block the tool set
-	err = service.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
+	err = store.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionBlock,
 	})
 	if err != nil {
@@ -116,7 +114,7 @@ func TestToolSetRequirementInheritance(t *testing.T) {
 }
 
 func TestToolRequirementOverridesToolSet(t *testing.T) {
-	service := testServiceIndiv(t)
+	service, store := testPairIndiv(t)
 	ctx := context.Background()
 
 	userID := "test-user"
@@ -125,7 +123,7 @@ func TestToolRequirementOverridesToolSet(t *testing.T) {
 	toolID := "divide"
 
 	// Block the tool set
-	err := service.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
+	err := store.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionBlock,
 	})
 	if err != nil {
@@ -133,7 +131,7 @@ func TestToolRequirementOverridesToolSet(t *testing.T) {
 	}
 
 	// Explicitly allow the individual tool
-	err = service.SetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID, toolreqs.ToolRequirementConfig{
+	err = store.SetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID, toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
 	if err != nil {
@@ -154,7 +152,7 @@ func TestToolRequirementOverridesToolSet(t *testing.T) {
 }
 
 func TestRequireConfirmationConfig(t *testing.T) {
-	service := testServiceIndiv(t)
+	service, store := testPairIndiv(t)
 	ctx := context.Background()
 
 	userID := "test-user"
@@ -163,7 +161,7 @@ func TestRequireConfirmationConfig(t *testing.T) {
 	toolID := "divide"
 
 	// Set require_confirmation on the tool
-	err := service.SetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID, toolreqs.ToolRequirementConfig{
+	err := store.SetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID, toolreqs.ToolRequirementConfig{
 		Action:              toolreqs.RequirementActionRequireConfirmation,
 		RequireConfirmation: true,
 		ConfirmationHint:    "Division can produce unexpected results",
@@ -179,7 +177,7 @@ func TestRequireConfirmationConfig(t *testing.T) {
 	}
 
 	// Config should have confirmation details
-	cfg, err := service.GetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID)
+	cfg, err := store.GetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID)
 	if err != nil {
 		t.Fatalf("Failed to get config: %v", err)
 	}
@@ -198,7 +196,7 @@ func TestRequireConfirmationConfig(t *testing.T) {
 }
 
 func TestListToolRequirementConfigs(t *testing.T) {
-	service := testServiceIndiv(t)
+	_, store := testPairIndiv(t)
 	ctx := context.Background()
 
 	userID := "test-user"
@@ -213,7 +211,7 @@ func TestListToolRequirementConfigs(t *testing.T) {
 	}
 
 	for toolID, action := range tools {
-		err := service.SetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID, toolreqs.ToolRequirementConfig{
+		err := store.SetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID, toolreqs.ToolRequirementConfig{
 			Action: action,
 		})
 		if err != nil {
@@ -222,7 +220,7 @@ func TestListToolRequirementConfigs(t *testing.T) {
 	}
 
 	// List all configs in the tool set
-	configs, err := service.ListToolRequirementConfigs(ctx, userID, agentID, toolSetID)
+	configs, err := store.ListToolRequirementConfigs(ctx, userID, agentID, toolSetID)
 	if err != nil {
 		t.Fatalf("Failed to list configs: %v", err)
 	}
@@ -244,28 +242,28 @@ func TestListToolRequirementConfigs(t *testing.T) {
 }
 
 func TestGetAllowedToolSets(t *testing.T) {
-	service := testServiceIndiv(t)
+	service, store := testPairIndiv(t)
 	ctx := context.Background()
 
 	userID := "test-user"
 	agentID := "math-instructor"
 
 	// Allow two tool sets, block one
-	err := service.SetToolSetRequirementConfig(ctx, userID, agentID, "calc-set", toolreqs.ToolRequirementConfig{
+	err := store.SetToolSetRequirementConfig(ctx, userID, agentID, "calc-set", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
 	if err != nil {
 		t.Fatalf("Failed to allow calc-set: %v", err)
 	}
 
-	err = service.SetToolSetRequirementConfig(ctx, userID, agentID, "graph-set", toolreqs.ToolRequirementConfig{
+	err = store.SetToolSetRequirementConfig(ctx, userID, agentID, "graph-set", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
 	if err != nil {
 		t.Fatalf("Failed to allow graph-set: %v", err)
 	}
 
-	err = service.SetToolSetRequirementConfig(ctx, userID, agentID, "blocked-set", toolreqs.ToolRequirementConfig{
+	err = store.SetToolSetRequirementConfig(ctx, userID, agentID, "blocked-set", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionBlock,
 	})
 	if err != nil {

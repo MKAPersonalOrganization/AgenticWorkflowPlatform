@@ -18,18 +18,16 @@ func testRedisClient(t *testing.T) goredis.Cmdable {
 	return goredis.NewClient(&goredis.Options{Addr: s.Addr()})
 }
 
-func testService(t *testing.T) *toolreqs.Service {
+func testPair(t *testing.T) (*toolreqs.Service, *toolreqs.PermissionStore) {
 	t.Helper()
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
-	return toolreqs.NewService(toolreqs.ServiceConfig{
-		Log:  log,
-		Repo: mocks.NewInMemoryRepository(),
-		RDB:  testRedisClient(t),
-	})
+	store := toolreqs.NewPermissionStore(log, mocks.NewInMemoryRepository(), testRedisClient(t))
+	svc := toolreqs.NewService(toolreqs.ServiceConfig{Log: log, Store: store})
+	return svc, store
 }
 
 func TestToolSetRequirementConfigService(t *testing.T) {
-	service := testService(t)
+	service, store := testPair(t)
 	ctx := context.Background()
 
 	userID := "test-user"
@@ -37,7 +35,7 @@ func TestToolSetRequirementConfigService(t *testing.T) {
 	toolSetID := "calculator-set"
 
 	// Allow a tool set via requirement config
-	if err := service.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
+	if err := store.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	}); err != nil {
 		t.Fatalf("Failed to allow tool set: %v", err)
@@ -69,7 +67,7 @@ func TestToolSetRequirementConfigService(t *testing.T) {
 }
 
 func TestToolSetBlockingViaRequirementConfig(t *testing.T) {
-	service := testService(t)
+	service, store := testPair(t)
 	ctx := context.Background()
 
 	userID := "test-user"
@@ -77,14 +75,14 @@ func TestToolSetBlockingViaRequirementConfig(t *testing.T) {
 	toolSetID := "calculator-set"
 
 	// First allow the tool set
-	if err := service.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
+	if err := store.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	}); err != nil {
 		t.Fatalf("Failed to allow tool set: %v", err)
 	}
 
 	// Then block it
-	if err := service.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
+	if err := store.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionBlock,
 	}); err != nil {
 		t.Fatalf("Failed to block tool set: %v", err)
@@ -110,7 +108,7 @@ func TestToolSetBlockingViaRequirementConfig(t *testing.T) {
 }
 
 func TestDefaultToolSets(t *testing.T) {
-	service := testService(t)
+	service, _ := testPair(t)
 	ctx := context.Background()
 
 	userID := "test-user"

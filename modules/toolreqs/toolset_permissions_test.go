@@ -21,14 +21,12 @@ func testRedisClientToolset(t *testing.T) goredis.Cmdable {
 	return goredis.NewClient(&goredis.Options{Addr: s.Addr()})
 }
 
-func testServiceToolset(t *testing.T) *toolreqs.Service {
+func testPairToolset(t *testing.T) (*toolreqs.Service, *toolreqs.PermissionStore) {
 	t.Helper()
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
-	return toolreqs.NewService(toolreqs.ServiceConfig{
-		Log:  log,
-		Repo: mocks.NewInMemoryRepository(),
-		RDB:  testRedisClientToolset(t),
-	})
+	store := toolreqs.NewPermissionStore(log, mocks.NewInMemoryRepository(), testRedisClientToolset(t))
+	svc := toolreqs.NewService(toolreqs.ServiceConfig{Log: log, Store: store})
+	return svc, store
 }
 
 func TestToolSetRequirementConfigs(t *testing.T) {
@@ -37,7 +35,7 @@ func TestToolSetRequirementConfigs(t *testing.T) {
 
 	toolRegistryRepo := toolregistry_mocks.NewInMemoryRepository()
 
-	service := testServiceToolset(t)
+	service, store := testPairToolset(t)
 	toolRegistry := toolregistry.NewRegistry(log, toolRegistryRepo)
 
 	if err := toolRegistry.Initialize(ctx); err != nil {
@@ -63,14 +61,14 @@ func TestToolSetRequirementConfigs(t *testing.T) {
 
 	t.Log("Testing explicit tool set requirement config changes...")
 
-	err := service.SetToolSetRequirementConfig(ctx, userID, "math-expert", "calculator-set", toolreqs.ToolRequirementConfig{
+	err := store.SetToolSetRequirementConfig(ctx, userID, "math-expert", "calculator-set", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
 	if err != nil {
 		t.Fatalf("Failed to allow calculator-set for math-expert: %v", err)
 	}
 
-	err = service.SetToolSetRequirementConfig(ctx, userID, "math-expert", "cognitive-set", toolreqs.ToolRequirementConfig{
+	err = store.SetToolSetRequirementConfig(ctx, userID, "math-expert", "cognitive-set", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
 	if err != nil {
@@ -87,7 +85,7 @@ func TestToolSetRequirementConfigs(t *testing.T) {
 	}
 
 	// Block calculator-set
-	err = service.SetToolSetRequirementConfig(ctx, userID, "math-expert", "calculator-set", toolreqs.ToolRequirementConfig{
+	err = store.SetToolSetRequirementConfig(ctx, userID, "math-expert", "calculator-set", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionBlock,
 	})
 	if err != nil {
@@ -121,7 +119,7 @@ func TestToolSetRequirementConfigs(t *testing.T) {
 	}
 
 	// Allow a new tool set
-	err = service.SetToolSetRequirementConfig(ctx, userID, "math-expert", "chemistry-set", toolreqs.ToolRequirementConfig{
+	err = store.SetToolSetRequirementConfig(ctx, userID, "math-expert", "chemistry-set", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
 	if err != nil {

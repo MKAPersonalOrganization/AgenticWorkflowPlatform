@@ -22,13 +22,20 @@ func testRDB(t *testing.T) goredis.Cmdable {
 	return goredis.NewClient(&goredis.Options{Addr: s.Addr()})
 }
 
+func newTestPair(t *testing.T) (*toolreqs.Service, *toolreqs.PermissionStore) {
+	t.Helper()
+	log := testLogger()
+	store := toolreqs.NewPermissionStore(log, mocks.NewInMemoryRepository(), testRDB(t))
+	svc := toolreqs.NewService(toolreqs.ServiceConfig{Log: log, Store: store})
+	return svc, store
+}
+
+// newTestService is retained for tests that only care about the service
+// surface (eval / registration). Constructs a throwaway store alongside.
 func newTestService(t *testing.T) *toolreqs.Service {
 	t.Helper()
-	return toolreqs.NewService(toolreqs.ServiceConfig{
-		Log:  testLogger(),
-		Repo: mocks.NewInMemoryRepository(),
-		RDB:  testRDB(t),
-	})
+	svc, _ := newTestPair(t)
+	return svc
 }
 
 // =============================================================================
@@ -47,16 +54,16 @@ func TestService_GetEnabledToolSets_Empty(t *testing.T) {
 }
 
 func TestService_GetEnabledToolSets_WithData(t *testing.T) {
-	svc := newTestService(t)
+	svc, store := newTestPair(t)
 	ctx := context.Background()
 
 	// Set up some tool sets via requirement config.
-	if err := svc.SetToolSetRequirementConfig(ctx, "user1", "agent1", "calculator", toolreqs.ToolRequirementConfig{
+	if err := store.SetToolSetRequirementConfig(ctx, "user1", "agent1", "calculator", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.SetToolSetRequirementConfig(ctx, "user1", "agent1", "web-search", toolreqs.ToolRequirementConfig{
+	if err := store.SetToolSetRequirementConfig(ctx, "user1", "agent1", "web-search", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	}); err != nil {
 		t.Fatal(err)
@@ -72,14 +79,14 @@ func TestService_GetEnabledToolSets_WithData(t *testing.T) {
 }
 
 func TestService_HasPermission_Allowed(t *testing.T) {
-	svc := newTestService(t)
+	svc, store := newTestPair(t)
 	ctx := context.Background()
 
 	// Allow tool set and individual tool via requirement config.
-	svc.SetToolSetRequirementConfig(ctx, "user1", "agent1", "calc-set", toolreqs.ToolRequirementConfig{
+	store.SetToolSetRequirementConfig(ctx, "user1", "agent1", "calc-set", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
-	svc.SetToolRequirementConfig(ctx, "user1", "agent1", "calc-set", "add", toolreqs.ToolRequirementConfig{
+	store.SetToolRequirementConfig(ctx, "user1", "agent1", "calc-set", "add", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
 
@@ -89,14 +96,14 @@ func TestService_HasPermission_Allowed(t *testing.T) {
 }
 
 func TestService_HasPermission_Blocked(t *testing.T) {
-	svc := newTestService(t)
+	svc, store := newTestPair(t)
 	ctx := context.Background()
 
 	// Allow tool set but block individual tool via requirement config.
-	svc.SetToolSetRequirementConfig(ctx, "user1", "agent1", "calc-set", toolreqs.ToolRequirementConfig{
+	store.SetToolSetRequirementConfig(ctx, "user1", "agent1", "calc-set", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
-	svc.SetToolRequirementConfig(ctx, "user1", "agent1", "calc-set", "add", toolreqs.ToolRequirementConfig{
+	store.SetToolRequirementConfig(ctx, "user1", "agent1", "calc-set", "add", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionBlock,
 	})
 
@@ -106,7 +113,7 @@ func TestService_HasPermission_Blocked(t *testing.T) {
 }
 
 func TestService_HasToolSetPermission(t *testing.T) {
-	svc := newTestService(t)
+	svc, store := newTestPair(t)
 	ctx := context.Background()
 
 	// Not configured → denied (fail-closed: no config means no permission).
@@ -115,7 +122,7 @@ func TestService_HasToolSetPermission(t *testing.T) {
 	}
 
 	// Explicitly allowed → allowed.
-	svc.SetToolSetRequirementConfig(ctx, "user1", "agent1", "allowed-set", toolreqs.ToolRequirementConfig{
+	store.SetToolSetRequirementConfig(ctx, "user1", "agent1", "allowed-set", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
 	if !svc.HasToolSetPermission(ctx, "user1", "agent1", "allowed-set") {
@@ -123,7 +130,7 @@ func TestService_HasToolSetPermission(t *testing.T) {
 	}
 
 	// Explicitly blocked → blocked.
-	svc.SetToolSetRequirementConfig(ctx, "user1", "agent1", "blocked-set", toolreqs.ToolRequirementConfig{
+	store.SetToolSetRequirementConfig(ctx, "user1", "agent1", "blocked-set", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionBlock,
 	})
 	if svc.HasToolSetPermission(ctx, "user1", "agent1", "blocked-set") {
@@ -132,14 +139,14 @@ func TestService_HasToolSetPermission(t *testing.T) {
 }
 
 func TestService_EvaluateTool_WithConfirmation(t *testing.T) {
-	svc := newTestService(t)
+	svc, store := newTestPair(t)
 	ctx := context.Background()
 
 	// Allow permissions via requirement config so we can test confirmation.
-	svc.SetToolSetRequirementConfig(ctx, "user1", "agent1", "tools", toolreqs.ToolRequirementConfig{
+	store.SetToolSetRequirementConfig(ctx, "user1", "agent1", "tools", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
-	svc.SetToolRequirementConfig(ctx, "user1", "agent1", "tools", "dangerous_tool", toolreqs.ToolRequirementConfig{
+	store.SetToolRequirementConfig(ctx, "user1", "agent1", "tools", "dangerous_tool", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
 
@@ -174,11 +181,11 @@ func TestService_EvaluateTool_WithConfirmation(t *testing.T) {
 }
 
 func TestService_EvaluateTool_PermissionBlockOverridesConfirm(t *testing.T) {
-	svc := newTestService(t)
+	svc, store := newTestPair(t)
 	ctx := context.Background()
 
 	// Tool set blocked via requirement config.
-	svc.SetToolSetRequirementConfig(ctx, "user1", "agent1", "set1", toolreqs.ToolRequirementConfig{
+	store.SetToolSetRequirementConfig(ctx, "user1", "agent1", "set1", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionBlock,
 	})
 
