@@ -9,6 +9,7 @@ import (
 	"aicompass/modules/knowledge/rag/workspaces"
 	"aicompass/modules/knowledge/tenant"
 	"aicompass/foundation/auth"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -527,35 +528,14 @@ func (h *handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 		desc = &req.Description
 	}
 
-	// Resolve embedding config from the user's AI settings
-	var embeddingModel, embeddingProvider *string
-	var embeddingDimension *int
-
-	user := auth.GetUserFromContext(r.Context())
-	if user != nil && h.aiSettings != nil {
-		embCfg, err := h.aiSettings.GetEmbeddingConfigForUser(r.Context(), user.ID)
-		if err != nil {
-			h.log.Warn(r.Context(), "failed to resolve embedding config from AI settings, using server defaults", "error", err)
-		} else if embCfg != nil {
-			embeddingProvider = &embCfg.Provider
-			embeddingModel = &embCfg.Model
-			if embCfg.Dimension > 0 {
-				embeddingDimension = &embCfg.Dimension
-			}
-			h.log.Info(r.Context(), "using embedding config from AI settings",
-				"provider", embCfg.Provider,
-				"model", embCfg.Model,
-				"dimension", embCfg.Dimension,
-			)
-		}
-	}
+	provider, model, dimension := h.resolveEmbeddingConfig(r.Context())
 
 	ws, err := h.edgequakeService.CreateWorkspace(r.Context(), tCtx, &workspaces.CreateWorkspaceRequest{
 		Name:               req.Name,
 		Description:        desc,
-		EmbeddingModel:     embeddingModel,
-		EmbeddingProvider:  embeddingProvider,
-		EmbeddingDimension: embeddingDimension,
+		EmbeddingModel:     model,
+		EmbeddingProvider:  provider,
+		EmbeddingDimension: dimension,
 	})
 	if err != nil {
 		h.log.Error(r.Context(), "failed to create workspace", "error", err)
@@ -564,6 +544,37 @@ func (h *handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, ws)
+}
+
+// resolveEmbeddingConfig looks up the caller's per-user embedding config from
+// the AI-settings module and returns (provider, model, dimension) pointers
+// suitable for the CreateWorkspaceRequest. Any failure path (no user, no
+// module, lookup error, nil config) falls back to nil pointers so the
+// edgequake service applies server defaults.
+func (h *handler) resolveEmbeddingConfig(ctx context.Context) (provider, model *string, dimension *int) {
+	user := auth.GetUserFromContext(ctx)
+	if user == nil || h.aiSettings == nil {
+		return nil, nil, nil
+	}
+	embCfg, err := h.aiSettings.GetEmbeddingConfigForUser(ctx, user.ID)
+	if err != nil {
+		h.log.Warn(ctx, "failed to resolve embedding config from AI settings, using server defaults", "error", err)
+		return nil, nil, nil
+	}
+	if embCfg == nil {
+		return nil, nil, nil
+	}
+	provider = &embCfg.Provider
+	model = &embCfg.Model
+	if embCfg.Dimension > 0 {
+		dimension = &embCfg.Dimension
+	}
+	h.log.Info(ctx, "using embedding config from AI settings",
+		"provider", embCfg.Provider,
+		"model", embCfg.Model,
+		"dimension", embCfg.Dimension,
+	)
+	return provider, model, dimension
 }
 
 // DeleteWorkspace deletes a workspace.

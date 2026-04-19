@@ -105,44 +105,17 @@ func (s *Service) Shutdown() {
 
 // CreateConnector registers a new remote A2A agent endpoint.
 func (s *Service) CreateConnector(ctx context.Context, userID, agentURL, title, authType, authToken, authHeader string) (*A2AConnector, error) {
-	// Validate URL
-	parsed, err := url.Parse(agentURL)
-	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		return nil, fmt.Errorf("invalid agent URL: must be http or https")
-	}
-
-	// SSRF protection (skipped when A2A_ALLOW_PRIVATE_NETWORKS=true for Docker/dev environments)
-	if !s.allowPrivateNetworks {
-		if err := validateExternalURL(parsed); err != nil {
-			return nil, err
-		}
-	} else {
-		// Inside Docker, rewrite host-local addresses to the Docker host gateway.
-		agentURL, parsed = rewriteForDocker(agentURL, parsed)
-	}
-
-	// Check connector limit
-	count, err := s.repo.CountByUser(ctx, userID)
+	normalizedURL, err := s.resolveAgentURL(agentURL)
 	if err != nil {
-		return nil, fmt.Errorf("checking connector count: %w", err)
-	}
-	if count >= maxConnectorsPerUser {
-		return nil, ErrConnectorLimitReached
+		return nil, err
 	}
 
-	// Check for duplicate URL
-	existing, err := s.repo.ListByUser(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("checking duplicates: %w", err)
-	}
-	for _, c := range existing {
-		if c.AgentURL == agentURL {
-			return nil, ErrDuplicateConnector
-		}
+	if err := s.checkConnectorQuota(ctx, userID, normalizedURL); err != nil {
+		return nil, err
 	}
 
 	if title == "" {
-		title = titleFromURL(agentURL)
+		title = titleFromURL(normalizedURL)
 	}
 	if authType == "" {
 		authType = "none"
@@ -151,7 +124,7 @@ func (s *Service) CreateConnector(ctx context.Context, userID, agentURL, title, 
 	connector := &A2AConnector{
 		UserID:     userID,
 		Title:      title,
-		AgentURL:   agentURL,
+		AgentURL:   normalizedURL,
 		Status:     ConnectorStatusCreated,
 		AuthType:   authType,
 		AuthToken:  authToken,
@@ -163,6 +136,46 @@ func (s *Service) CreateConnector(ctx context.Context, userID, agentURL, title, 
 	}
 
 	return connector, nil
+}
+
+// resolveAgentURL parses and validates the agent URL, applies SSRF protection
+// (or — in private-networks mode — rewrites host-local addresses for Docker),
+// and returns the URL string the connector should be persisted with.
+func (s *Service) resolveAgentURL(agentURL string) (string, error) {
+	parsed, err := url.Parse(agentURL)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return "", fmt.Errorf("invalid agent URL: must be http or https")
+	}
+	if !s.allowPrivateNetworks {
+		if err := validateExternalURL(parsed); err != nil {
+			return "", err
+		}
+		return agentURL, nil
+	}
+	rewritten, _ := rewriteForDocker(agentURL, parsed)
+	return rewritten, nil
+}
+
+// checkConnectorQuota enforces per-user limits before creating a new connector:
+// max count per user and URL uniqueness within that user.
+func (s *Service) checkConnectorQuota(ctx context.Context, userID, agentURL string) error {
+	count, err := s.repo.CountByUser(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("checking connector count: %w", err)
+	}
+	if count >= maxConnectorsPerUser {
+		return ErrConnectorLimitReached
+	}
+	existing, err := s.repo.ListByUser(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("checking duplicates: %w", err)
+	}
+	for _, c := range existing {
+		if c.AgentURL == agentURL {
+			return ErrDuplicateConnector
+		}
+	}
+	return nil
 }
 
 // GetConnector retrieves a connector, scoped to user.

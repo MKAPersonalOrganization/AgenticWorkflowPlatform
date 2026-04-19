@@ -488,18 +488,36 @@ func translateCodeExecution(evt *session.Event, ctx EventContext) []thread.Event
 	if evt == nil || evt.Content == nil {
 		return nil
 	}
-	now := coalesceTime(evt.Timestamp)
 
-	// Collect code blocks and results keyed by ID for pairing.
-	type codeEntry struct {
-		language string
-		code     string
+	codes, codeOrder, results := collectCodeParts(evt.Content.Parts)
+	if len(codes) == 0 {
+		return nil
 	}
+
+	now := coalesceTime(evt.Timestamp)
+	events := make([]thread.Event, 0, len(codes))
+	for idx, id := range codeOrder {
+		events = append(events, buildCodeExecutionEvent(evt.ID, idx, id, codes[id], results[id], ctx, now))
+	}
+	return events
+}
+
+// codeEntry is the per-ID pair of language + source collected from a stream
+// of genai parts before emission.
+type codeEntry struct {
+	language string
+	code     string
+}
+
+// collectCodeParts walks the parts once and partitions them into ordered
+// code blocks (keyed by ID) and execution results (keyed by the same ID so
+// they can be paired in the emission phase).
+func collectCodeParts(parts []*genai.Part) (map[string]codeEntry, []string, map[string]*genai.CodeExecutionResult) {
 	codes := make(map[string]codeEntry)
 	var codeOrder []string
 	results := make(map[string]*genai.CodeExecutionResult)
 
-	for _, p := range evt.Content.Parts {
+	for _, p := range parts {
 		if p == nil {
 			continue
 		}
@@ -515,37 +533,33 @@ func translateCodeExecution(evt *session.Event, ctx EventContext) []thread.Event
 			results[p.CodeExecutionResult.ID] = p.CodeExecutionResult
 		}
 	}
+	return codes, codeOrder, results
+}
 
-	if len(codes) == 0 {
-		return nil
+// buildCodeExecutionEvent pairs a collected code block with its matching
+// execution result (if any) and materialises a thread.CodeExecutionRan.
+// When the provider omitted the part ID (synthetic Outcome-only case),
+// a deterministic blockID is synthesised from evt.ID + position so replay
+// dedupes correctly.
+func buildCodeExecutionEvent(evtID string, idx int, id string, c codeEntry, res *genai.CodeExecutionResult, ctx EventContext, now time.Time) *thread.CodeExecutionRan {
+	blockID := id
+	if blockID == "" {
+		blockID = fmt.Sprintf("%s-%d", evtID, idx)
 	}
-
-	events := make([]thread.Event, 0, len(codes))
-	for idx, id := range codeOrder {
-		c := codes[id]
-		blockID := id
-		if blockID == "" {
-			// Providers occasionally omit the part ID (the synthetic
-			// Outcome-only case). Fall back to a deterministic value so
-			// the persistent projection can still dedupe on replay.
-			blockID = fmt.Sprintf("%s-%d", evt.ID, idx)
-		}
-		evtOut := &thread.CodeExecutionRan{
-			ThreadID:  ctx.ThreadID,
-			MessageID: evt.ID,
-			BlockID:   blockID,
-			Language:  c.language,
-			Code:      c.code,
-			AgentName: ctx.AgentName,
-			Timestamp: now,
-		}
-		if res, ok := results[id]; ok && res != nil {
-			evtOut.Output = res.Output
-			evtOut.Outcome = string(res.Outcome)
-		}
-		events = append(events, evtOut)
+	out := &thread.CodeExecutionRan{
+		ThreadID:  ctx.ThreadID,
+		MessageID: evtID,
+		BlockID:   blockID,
+		Language:  c.language,
+		Code:      c.code,
+		AgentName: ctx.AgentName,
+		Timestamp: now,
 	}
-	return events
+	if res != nil {
+		out.Output = res.Output
+		out.Outcome = string(res.Outcome)
+	}
+	return out
 }
 
 func translateFunctionResponses(evt *session.Event, ctx EventContext) []thread.Event {
