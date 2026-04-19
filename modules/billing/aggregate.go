@@ -655,139 +655,160 @@ func (a *PaymentAccountAggregate) LastSucceededPayment() *LedgerEntry {
 // Apply applies an event to rebuild aggregate state.
 func (a *PaymentAccountAggregate) Apply(event es.Event) {
 	switch e := event.(type) {
-
 	case *PaymentAccountOpened:
-		a.Email = e.Email
-		a.OpenedAt = e.Timestamp
-		a.IsOpen = true
-
+		a.applyAccountOpened(e)
 	case *PaymentInitiated:
-		a.StripeCustomerID = e.StripeCustomerID
-		a.Ledger = append(a.Ledger, LedgerEntry{
-			PaymentID:       e.PaymentID,
-			StripePaymentID: e.StripePaymentID,
-			AmountCents:     e.AmountCents,
-			Currency:        e.Currency,
-			Status:          LedgerEntryStatusPending,
-			Description:     e.Description,
-			InitiatedAt:     e.Timestamp,
-		})
-
+		a.applyPaymentInitiated(e)
 	case *PaymentSucceeded:
-		if entry := a.findLedgerEntry(e.StripePaymentID); entry != nil {
-			entry.Status = LedgerEntryStatusSucceeded
-			entry.ResolvedAt = &e.Timestamp
-			entry.CardBrand = e.CardBrand
-			entry.CardLast4 = e.CardLast4
-			entry.StripeChargeID = e.StripeChargeID
-			entry.ReceiptURL = e.ReceiptURL
-		}
-		a.TotalDebitedCents += e.AmountCents
-		// A new payment after expiration reactivates the account.
-		a.Expired = false
-		// Reset invoice failure counter on successful payment
-		a.ConsecutiveInvoiceFailures = 0
-		// Update aggregate-level card info (always latest)
-		if e.CardBrand != "" {
-			a.CardBrand = e.CardBrand
-		}
-		if e.CardLast4 != "" {
-			a.CardLast4 = e.CardLast4
-		}
-		if e.ReceiptURL != "" {
-			a.ReceiptURL = e.ReceiptURL
-		}
-		// Track Stripe event ID for dedup
-		if e.StripeEventID != "" {
-			a.ProcessedStripeEvents[e.StripeEventID] = struct{}{}
-		}
-
+		a.applyPaymentSucceeded(e)
 	case *PaymentFailed:
-		if entry := a.findLedgerEntry(e.StripePaymentID); entry != nil {
-			entry.Status = LedgerEntryStatusFailed
-			entry.FailureReason = e.Reason
-			entry.ErrorCode = e.ErrorCode
-			entry.DeclineCode = e.DeclineCode
-			entry.ResolvedAt = &e.Timestamp
-		}
-		if e.StripeEventID != "" {
-			a.ProcessedStripeEvents[e.StripeEventID] = struct{}{}
-		}
-
+		a.applyPaymentFailed(e)
 	case *PaymentRefunded:
-		if entry := a.findLedgerEntryByID(e.PaymentID); entry != nil {
-			entry.RefundedCents += e.AmountCents
-			if entry.RefundedCents >= entry.AmountCents {
-				entry.Status = LedgerEntryStatusRefunded
-			}
-		}
-		a.TotalRefundedCents += e.AmountCents
-		if e.StripeEventID != "" {
-			a.ProcessedStripeEvents[e.StripeEventID] = struct{}{}
-		}
-
+		a.applyPaymentRefunded(e)
 	case *PaymentDisputed:
-		if entry := a.findLedgerEntryByID(e.PaymentID); entry != nil {
-			entry.DisputedCents += e.AmountCents
-			entry.Status = LedgerEntryStatusDisputed
-		}
-		a.TotalDisputedCents += e.AmountCents
-		a.ActiveDisputes++
-		a.HasActiveDispute = true
-		if e.StripeEventID != "" {
-			a.ProcessedStripeEvents[e.StripeEventID] = struct{}{}
-		}
-
+		a.applyPaymentDisputed(e)
 	case *DisputeResolved:
-		if e.Status == string(DisputeStatusLost) {
-			// Lost dispute — funds are permanently reversed (like a refund)
-			a.TotalRefundedCents += e.AmountCents
-		} else {
-			// Won dispute — funds released back
-			a.TotalDisputedCents -= e.AmountCents
-		}
-		a.ActiveDisputes--
-		if a.ActiveDisputes <= 0 {
-			a.ActiveDisputes = 0
-			a.HasActiveDispute = false
-		}
-		if e.StripeEventID != "" {
-			a.ProcessedStripeEvents[e.StripeEventID] = struct{}{}
-		}
-
+		a.applyDisputeResolved(e)
 	case *PaymentMethodUpdated:
-		if e.CardBrand != "" {
-			a.CardBrand = e.CardBrand
-		}
-		if e.CardLast4 != "" {
-			a.CardLast4 = e.CardLast4
-		}
-		if e.StripeEventID != "" {
-			a.ProcessedStripeEvents[e.StripeEventID] = struct{}{}
-		}
-
+		a.applyPaymentMethodUpdated(e)
 	case *InvoicePaymentFailed:
-		a.ConsecutiveInvoiceFailures++
-		if e.StripeEventID != "" {
-			a.ProcessedStripeEvents[e.StripeEventID] = struct{}{}
-		}
-
+		a.applyInvoicePaymentFailed(e)
 	case *SubscriptionCancelled:
 		a.CancelledAt = &e.CancelledAt
 		a.CancelsOn = &e.CancelsOn
-
 	case *SubscriptionExpired:
-		// Mark the subscription as expired. The ledger balances are
-		// preserved intact so they remain a truthful financial record.
+		// Ledger balances are preserved intact so they remain a truthful
+		// financial record even after the subscription expires.
 		a.Expired = true
 		a.CancelledAt = nil
 		a.CancelsOn = nil
-
 	case *SubscriptionReactivated:
 		a.CancelledAt = nil
 		a.CancelsOn = nil
 		a.Expired = false
 	}
+}
+
+// recordStripeEvent stores a Stripe event ID for idempotency so a
+// replayed webhook doesn't apply the same state change twice. Blank IDs
+// are skipped so the map doesn't accumulate empty keys from legacy
+// events that predate event-ID tracking.
+func (a *PaymentAccountAggregate) recordStripeEvent(id string) {
+	if id != "" {
+		a.ProcessedStripeEvents[id] = struct{}{}
+	}
+}
+
+func (a *PaymentAccountAggregate) applyAccountOpened(e *PaymentAccountOpened) {
+	a.Email = e.Email
+	a.OpenedAt = e.Timestamp
+	a.IsOpen = true
+}
+
+func (a *PaymentAccountAggregate) applyPaymentInitiated(e *PaymentInitiated) {
+	a.StripeCustomerID = e.StripeCustomerID
+	a.Ledger = append(a.Ledger, LedgerEntry{
+		PaymentID:       e.PaymentID,
+		StripePaymentID: e.StripePaymentID,
+		AmountCents:     e.AmountCents,
+		Currency:        e.Currency,
+		Status:          LedgerEntryStatusPending,
+		Description:     e.Description,
+		InitiatedAt:     e.Timestamp,
+	})
+}
+
+func (a *PaymentAccountAggregate) applyPaymentSucceeded(e *PaymentSucceeded) {
+	if entry := a.findLedgerEntry(e.StripePaymentID); entry != nil {
+		entry.Status = LedgerEntryStatusSucceeded
+		entry.ResolvedAt = &e.Timestamp
+		entry.CardBrand = e.CardBrand
+		entry.CardLast4 = e.CardLast4
+		entry.StripeChargeID = e.StripeChargeID
+		entry.ReceiptURL = e.ReceiptURL
+	}
+	a.TotalDebitedCents += e.AmountCents
+	// A new payment after expiration reactivates the account; reset the
+	// invoice-failure counter since dunning only cares about the current
+	// run of failures.
+	a.Expired = false
+	a.ConsecutiveInvoiceFailures = 0
+	// Aggregate-level card info tracks the most recent successful charge.
+	if e.CardBrand != "" {
+		a.CardBrand = e.CardBrand
+	}
+	if e.CardLast4 != "" {
+		a.CardLast4 = e.CardLast4
+	}
+	if e.ReceiptURL != "" {
+		a.ReceiptURL = e.ReceiptURL
+	}
+	a.recordStripeEvent(e.StripeEventID)
+}
+
+func (a *PaymentAccountAggregate) applyPaymentFailed(e *PaymentFailed) {
+	if entry := a.findLedgerEntry(e.StripePaymentID); entry != nil {
+		entry.Status = LedgerEntryStatusFailed
+		entry.FailureReason = e.Reason
+		entry.ErrorCode = e.ErrorCode
+		entry.DeclineCode = e.DeclineCode
+		entry.ResolvedAt = &e.Timestamp
+	}
+	a.recordStripeEvent(e.StripeEventID)
+}
+
+func (a *PaymentAccountAggregate) applyPaymentRefunded(e *PaymentRefunded) {
+	if entry := a.findLedgerEntryByID(e.PaymentID); entry != nil {
+		entry.RefundedCents += e.AmountCents
+		if entry.RefundedCents >= entry.AmountCents {
+			entry.Status = LedgerEntryStatusRefunded
+		}
+	}
+	a.TotalRefundedCents += e.AmountCents
+	a.recordStripeEvent(e.StripeEventID)
+}
+
+func (a *PaymentAccountAggregate) applyPaymentDisputed(e *PaymentDisputed) {
+	if entry := a.findLedgerEntryByID(e.PaymentID); entry != nil {
+		entry.DisputedCents += e.AmountCents
+		entry.Status = LedgerEntryStatusDisputed
+	}
+	a.TotalDisputedCents += e.AmountCents
+	a.ActiveDisputes++
+	a.HasActiveDispute = true
+	a.recordStripeEvent(e.StripeEventID)
+}
+
+// applyDisputeResolved distinguishes won vs. lost — lost disputes move
+// funds into refunded (the money's gone), won disputes release the
+// disputed amount back to the debited balance.
+func (a *PaymentAccountAggregate) applyDisputeResolved(e *DisputeResolved) {
+	if e.Status == string(DisputeStatusLost) {
+		a.TotalRefundedCents += e.AmountCents
+	} else {
+		a.TotalDisputedCents -= e.AmountCents
+	}
+	a.ActiveDisputes--
+	if a.ActiveDisputes <= 0 {
+		a.ActiveDisputes = 0
+		a.HasActiveDispute = false
+	}
+	a.recordStripeEvent(e.StripeEventID)
+}
+
+func (a *PaymentAccountAggregate) applyPaymentMethodUpdated(e *PaymentMethodUpdated) {
+	if e.CardBrand != "" {
+		a.CardBrand = e.CardBrand
+	}
+	if e.CardLast4 != "" {
+		a.CardLast4 = e.CardLast4
+	}
+	a.recordStripeEvent(e.StripeEventID)
+}
+
+func (a *PaymentAccountAggregate) applyInvoicePaymentFailed(e *InvoicePaymentFailed) {
+	a.ConsecutiveInvoiceFailures++
+	a.recordStripeEvent(e.StripeEventID)
 }
 
 // -------------------------------------------------------------------------
