@@ -401,6 +401,63 @@ func (a *AgentDefinition) UnmarshalStreamingPolicy() error {
 	return nil
 }
 
+// jsonMarshalers returns every per-column Marshal method in one list so
+// MarshalAllJSON / HydrateJSON can iterate. The two lists stay in lock
+// step — add a new policy by appending to both (and its matching
+// Marshal/Unmarshal methods above).
+func (a *AgentDefinition) jsonMarshalers() []func() error {
+	return []func() error{
+		a.MarshalGraph,
+		a.MarshalSubAgents,
+		a.MarshalAgentTools,
+		a.MarshalModelConfig,
+		a.MarshalModelOverride,
+		a.MarshalMemoryPolicy,
+		a.MarshalArtifactPolicy,
+		a.MarshalCodeExecutionPolicy,
+		a.MarshalStreamingPolicy,
+	}
+}
+
+func (a *AgentDefinition) jsonUnmarshalers() []func() error {
+	return []func() error{
+		a.UnmarshalGraph,
+		a.UnmarshalSubAgents,
+		a.UnmarshalAgentTools,
+		a.UnmarshalModelConfig,
+		a.UnmarshalModelOverride,
+		a.UnmarshalMemoryPolicy,
+		a.UnmarshalArtifactPolicy,
+		a.UnmarshalCodeExecutionPolicy,
+		a.UnmarshalStreamingPolicy,
+	}
+}
+
+// MarshalAllJSON runs every per-column Marshal helper and returns the
+// first error. Repository Create / Update call this to encode every
+// JSONB column in one step — adding a new policy is a one-line
+// extension of jsonMarshalers() rather than a new guard duplicated in
+// each caller.
+func (a *AgentDefinition) MarshalAllJSON() error {
+	for _, m := range a.jsonMarshalers() {
+		if err := m(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// HydrateJSON deserialises every JSONB column, best-effort: a malformed
+// column leaves its struct field nil and does not poison the rest.
+// Mirrors the long-standing hydrate contract — one corrupt column
+// shouldn't make a whole GET fail, callers always see the best
+// reconstruction the stored rows allow.
+func (a *AgentDefinition) HydrateJSON() {
+	for _, u := range a.jsonUnmarshalers() {
+		_ = u()
+	}
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // CoordinatorSubAgent — inline sub-agent definition for coordinator pattern
 //

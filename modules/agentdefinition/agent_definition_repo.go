@@ -47,18 +47,10 @@ func newPostgresAgentDefinitionRepository(db *sqlx.DB) *postgresAgentDefinitionR
 	return &postgresAgentDefinitionRepository{db: db}
 }
 
-// hydrateAgent populates JSON-backed fields from the raw JSON columns after scanning.
-func hydrateAgent(a *AgentDefinition) {
-	_ = a.UnmarshalGraph()
-	_ = a.UnmarshalSubAgents()
-	_ = a.UnmarshalAgentTools()
-	_ = a.UnmarshalModelConfig()
-	_ = a.UnmarshalModelOverride()
-	_ = a.UnmarshalMemoryPolicy()
-	_ = a.UnmarshalArtifactPolicy()
-	_ = a.UnmarshalCodeExecutionPolicy()
-	_ = a.UnmarshalStreamingPolicy()
-}
+// hydrateAgent populates JSON-backed fields from the raw JSON columns after
+// scanning. Delegates to AgentDefinition.HydrateJSON so new JSONB columns
+// plug in via jsonUnmarshalers() without touching every caller.
+func hydrateAgent(a *AgentDefinition) { a.HydrateJSON() }
 
 func (r *postgresAgentDefinitionRepository) Create(ctx context.Context, agent *AgentDefinition) error {
 	if agent.ID == "" {
@@ -69,32 +61,10 @@ func (r *postgresAgentDefinitionRepository) Create(ctx context.Context, agent *A
 	agent.CreatedAt = now
 	agent.UpdatedAt = now
 
-	// Marshal composition graph, sub_agents, agent_tools, model config, and model override to JSON for storage.
-	if err := agent.MarshalGraph(); err != nil {
-		return err
-	}
-	if err := agent.MarshalSubAgents(); err != nil {
-		return err
-	}
-	if err := agent.MarshalAgentTools(); err != nil {
-		return err
-	}
-	if err := agent.MarshalModelConfig(); err != nil {
-		return err
-	}
-	if err := agent.MarshalModelOverride(); err != nil {
-		return err
-	}
-	if err := agent.MarshalMemoryPolicy(); err != nil {
-		return err
-	}
-	if err := agent.MarshalArtifactPolicy(); err != nil {
-		return err
-	}
-	if err := agent.MarshalCodeExecutionPolicy(); err != nil {
-		return err
-	}
-	if err := agent.MarshalStreamingPolicy(); err != nil {
+	// Encode every JSONB column in one step — jsonMarshalers() on the
+	// AgentDefinition is the single source of truth for which columns
+	// exist, so adding a policy never requires editing this function.
+	if err := agent.MarshalAllJSON(); err != nil {
 		return err
 	}
 
@@ -147,32 +117,8 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $
 func (r *postgresAgentDefinitionRepository) Update(ctx context.Context, agent *AgentDefinition) error {
 	agent.UpdatedAt = time.Now().UTC()
 
-	// Marshal composition graph, sub_agents, agent_tools, model config, and model override to JSON for storage.
-	if err := agent.MarshalGraph(); err != nil {
-		return err
-	}
-	if err := agent.MarshalSubAgents(); err != nil {
-		return err
-	}
-	if err := agent.MarshalAgentTools(); err != nil {
-		return err
-	}
-	if err := agent.MarshalModelConfig(); err != nil {
-		return err
-	}
-	if err := agent.MarshalModelOverride(); err != nil {
-		return err
-	}
-	if err := agent.MarshalMemoryPolicy(); err != nil {
-		return err
-	}
-	if err := agent.MarshalArtifactPolicy(); err != nil {
-		return err
-	}
-	if err := agent.MarshalCodeExecutionPolicy(); err != nil {
-		return err
-	}
-	if err := agent.MarshalStreamingPolicy(); err != nil {
+	// Encode every JSONB column in one step — see Create.
+	if err := agent.MarshalAllJSON(); err != nil {
 		return err
 	}
 
