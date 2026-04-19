@@ -44,9 +44,8 @@ func writeSSEEvent(w io.Writer, event any, seqID string) error {
 
 // listEvalSets handles GET /api/eval-sets.
 func (h *handler) listEvalSets(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
 
@@ -66,32 +65,19 @@ func (h *handler) listEvalSets(w http.ResponseWriter, r *http.Request) {
 
 // createEvalSet handles POST /api/eval-sets.
 func (h *handler) createEvalSet(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
 
 	var req EvalSetCreate
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	req.UserID = user.ID
 
 	es, err := h.svc.createEvalSet(r.Context(), user.ID, req)
-	if err != nil {
-		switch {
-		case err.Error() == "validation error: name is required" ||
-			err.Error() == "validation error: name must be at most 255 characters" ||
-			err.Error() == "validation error: name contains invalid characters":
-			writeError(w, http.StatusBadRequest, err.Error())
-		case strings.HasPrefix(err.Error(), "duplicate name:"):
-			writeErrorWithField(w, http.StatusConflict, "name", err.Error())
-		default:
-			slog.Error("creating eval_set", "error", err)
-			http.Error(w, "Failed to create eval set", http.StatusInternalServerError)
-		}
+	if handleCreateError(w, err, "create eval set") {
 		return
 	}
 
@@ -100,15 +86,13 @@ func (h *handler) createEvalSet(w http.ResponseWriter, r *http.Request) {
 
 // getEvalSet handles GET /api/eval-sets/{id}.
 func (h *handler) getEvalSet(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
 
@@ -123,40 +107,28 @@ func (h *handler) getEvalSet(w http.ResponseWriter, r *http.Request) {
 
 // updateEvalSet handles PUT /api/eval-sets/{id}.
 func (h *handler) updateEvalSet(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
 
 	var req EvalSetUpdate
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
-	if err := h.svc.updateEvalSet(r.Context(), id, user.ID, req); err != nil {
-		switch err {
-		case ErrNotFound:
-			writeError(w, http.StatusNotFound, "eval set not found")
-		case ErrUnauthorized:
-			http.Error(w, "unauthorized", http.StatusForbidden)
-		case ErrConflict:
-			writeErrorWithField(w, http.StatusConflict, "version", "another user modified this eval set. Please refresh and try again.")
-		default:
-			if strings.HasPrefix(err.Error(), "validation error:") {
-				writeError(w, http.StatusBadRequest, err.Error())
-				return
-			}
-			slog.Error("updating eval_set", "error", err)
-			http.Error(w, "Failed to update eval set", http.StatusInternalServerError)
-		}
+	err := h.svc.updateEvalSet(r.Context(), id, user.ID, req)
+	if err == ErrConflict {
+		writeErrorWithField(w, http.StatusConflict, "version",
+			"another user modified this eval set. Please refresh and try again.")
+		return
+	}
+	if handleMutationError(w, err, "eval set", "update eval set") {
 		return
 	}
 
@@ -165,15 +137,13 @@ func (h *handler) updateEvalSet(w http.ResponseWriter, r *http.Request) {
 
 // deleteEvalSet handles DELETE /api/eval-sets/{id}.
 func (h *handler) deleteEvalSet(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
 
@@ -189,29 +159,18 @@ func (h *handler) deleteEvalSet(w http.ResponseWriter, r *http.Request) {
 
 // listEvalCases handles GET /api/eval-sets/{id}/cases.
 func (h *handler) listEvalCases(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
 
-	evalSetID, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	evalSetID, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
 
 	cases, err := h.svc.listEvalCases(r.Context(), evalSetID, user.ID)
-	if err != nil {
-		switch err {
-		case ErrNotFound:
-			writeError(w, http.StatusNotFound, "eval set not found")
-		case ErrUnauthorized:
-			http.Error(w, "unauthorized", http.StatusForbidden)
-		default:
-			slog.Error("listing eval_cases", "error", err)
-			http.Error(w, "Failed to list eval cases", http.StatusInternalServerError)
-		}
+	if handleMutationError(w, err, "eval set", "list eval cases") {
 		return
 	}
 
@@ -224,40 +183,24 @@ func (h *handler) listEvalCases(w http.ResponseWriter, r *http.Request) {
 
 // createEvalCase handles POST /api/eval-sets/{id}/cases.
 func (h *handler) createEvalCase(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
 
-	evalSetID, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	evalSetID, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
 
 	var req EvalCaseCreate
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	req.EvalSetID = evalSetID
 
 	ec, err := h.svc.createEvalCase(r.Context(), user.ID, req)
-	if err != nil {
-		switch err {
-		case ErrNotFound:
-			writeError(w, http.StatusNotFound, "eval set not found")
-		case ErrUnauthorized:
-			http.Error(w, "unauthorized", http.StatusForbidden)
-		default:
-			if strings.HasPrefix(err.Error(), "validation error:") {
-				writeError(w, http.StatusBadRequest, err.Error())
-				return
-			}
-			slog.Error("creating eval_case", "error", err)
-			http.Error(w, "Failed to create eval case", http.StatusInternalServerError)
-		}
+	if handleMutationError(w, err, "eval set", "create eval case") {
 		return
 	}
 
@@ -266,38 +209,23 @@ func (h *handler) createEvalCase(w http.ResponseWriter, r *http.Request) {
 
 // updateEvalCase handles PUT /api/eval-cases/{id}.
 func (h *handler) updateEvalCase(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
 
 	var req EvalCaseUpdate
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
-	if err := h.svc.updateEvalCase(r.Context(), id, user.ID, req); err != nil {
-		switch err {
-		case ErrNotFound:
-			writeError(w, http.StatusNotFound, "eval case not found")
-		case ErrUnauthorized:
-			http.Error(w, "unauthorized", http.StatusForbidden)
-		default:
-			if strings.HasPrefix(err.Error(), "validation error:") {
-				writeError(w, http.StatusBadRequest, err.Error())
-				return
-			}
-			slog.Error("updating eval_case", "error", err)
-			http.Error(w, "Failed to update eval case", http.StatusInternalServerError)
-		}
+	if handleMutationError(w, h.svc.updateEvalCase(r.Context(), id, user.ID, req),
+		"eval case", "update eval case") {
 		return
 	}
 
@@ -306,28 +234,18 @@ func (h *handler) updateEvalCase(w http.ResponseWriter, r *http.Request) {
 
 // deleteEvalCase handles DELETE /api/eval-cases/{id}.
 func (h *handler) deleteEvalCase(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
 
-	if err := h.svc.deleteEvalCase(r.Context(), id, user.ID); err != nil {
-		switch err {
-		case ErrNotFound:
-			writeError(w, http.StatusNotFound, "eval case not found")
-		case ErrUnauthorized:
-			http.Error(w, "unauthorized", http.StatusForbidden)
-		default:
-			slog.Error("deleting eval_case", "error", err)
-			http.Error(w, "Failed to delete eval case", http.StatusInternalServerError)
-		}
+	if handleMutationError(w, h.svc.deleteEvalCase(r.Context(), id, user.ID),
+		"eval case", "delete eval case") {
 		return
 	}
 
@@ -336,23 +254,20 @@ func (h *handler) deleteEvalCase(w http.ResponseWriter, r *http.Request) {
 
 // reorderEvalCases handles POST /api/eval-sets/{id}/reorder.
 func (h *handler) reorderEvalCases(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
 
-	evalSetID, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	evalSetID, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
 
 	var req struct {
 		CaseIDs []string `json:"case_ids"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -366,20 +281,9 @@ func (h *handler) reorderEvalCases(w http.ResponseWriter, r *http.Request) {
 		caseIDs = append(caseIDs, id)
 	}
 
-	if err := h.svc.reorderEvalCases(r.Context(), evalSetID, user.ID, caseIDs); err != nil {
-		switch err {
-		case ErrNotFound:
-			writeError(w, http.StatusNotFound, "eval set not found")
-		case ErrUnauthorized:
-			http.Error(w, "unauthorized", http.StatusForbidden)
-		default:
-			if strings.HasPrefix(err.Error(), "validation error:") {
-				writeError(w, http.StatusBadRequest, err.Error())
-				return
-			}
-			slog.Error("reordering eval_cases", "error", err)
-			http.Error(w, "Failed to reorder eval cases", http.StatusInternalServerError)
-		}
+	if handleMutationError(w,
+		h.svc.reorderEvalCases(r.Context(), evalSetID, user.ID, caseIDs),
+		"eval set", "reorder eval cases") {
 		return
 	}
 
@@ -429,6 +333,82 @@ func handleNotFound(w http.ResponseWriter, err error, resource string) {
 	}
 }
 
+// requireUser reads the authenticated user from request context; on miss
+// it writes 401 and returns ok=false so the handler can early-return.
+func requireUser(w http.ResponseWriter, r *http.Request) (*auth.User, bool) {
+	user := auth.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return nil, false
+	}
+	return user, true
+}
+
+// parsePathUUID parses the named path variable as a UUID; on miss it
+// writes 400 and returns ok=false. name is used in both the error
+// message and the path lookup.
+func parsePathUUID(w http.ResponseWriter, r *http.Request, name string) (uuid.UUID, bool) {
+	id, err := uuid.Parse(r.PathValue(name))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid "+name)
+		return uuid.Nil, false
+	}
+	return id, true
+}
+
+// decodeJSONBody decodes the request body into dst; on malformed JSON it
+// writes 400 and returns ok=false.
+func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst any) bool {
+	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return false
+	}
+	return true
+}
+
+// handleMutationError maps a service error onto an HTTP response for the
+// update/delete/mutation shape: ErrNotFound → 404, ErrUnauthorized → 403,
+// "validation error:" prefix → 400, other → 500 with action-labelled log.
+// Returns true when a response was written.
+func handleMutationError(w http.ResponseWriter, err error, resource, action string) bool {
+	if err == nil {
+		return false
+	}
+	switch err {
+	case ErrNotFound:
+		writeError(w, http.StatusNotFound, resource+" not found")
+	case ErrUnauthorized:
+		http.Error(w, "unauthorized", http.StatusForbidden)
+	default:
+		if strings.HasPrefix(err.Error(), "validation error:") {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return true
+		}
+		slog.Error(action, "error", err)
+		http.Error(w, "Failed to "+action, http.StatusInternalServerError)
+	}
+	return true
+}
+
+// handleCreateError handles the create-shape error set: validation-prefix →
+// 400, duplicate-name-prefix → 409 with field=name, default → 500. Returns
+// true when a response was written.
+func handleCreateError(w http.ResponseWriter, err error, action string) bool {
+	if err == nil {
+		return false
+	}
+	switch {
+	case strings.HasPrefix(err.Error(), "validation error:"):
+		writeError(w, http.StatusBadRequest, err.Error())
+	case strings.HasPrefix(err.Error(), "duplicate name:"):
+		writeErrorWithField(w, http.StatusConflict, "name", err.Error())
+	default:
+		slog.Error(action, "error", err)
+		http.Error(w, "Failed to "+action, http.StatusInternalServerError)
+	}
+	return true
+}
+
 // ─── Metric Catalog Handlers ─────────────────────────────────────────────────
 
 // listMetrics handles GET /api/evaluation/metrics.
@@ -455,9 +435,8 @@ func (h *handler) getMetric(w http.ResponseWriter, r *http.Request) {
 
 // listMetricProfiles handles GET /api/evaluation/profiles.
 func (h *handler) listMetricProfiles(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
 	profiles, err := h.svc.listMetricProfiles(r.Context(), user.ID)
@@ -474,29 +453,18 @@ func (h *handler) listMetricProfiles(w http.ResponseWriter, r *http.Request) {
 
 // createMetricProfile handles POST /api/evaluation/profiles.
 func (h *handler) createMetricProfile(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
 	var req MetricProfileCreate
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	req.UserID = user.ID
 
 	p, err := h.svc.createMetricProfile(r.Context(), user.ID, req)
-	if err != nil {
-		switch {
-		case strings.HasPrefix(err.Error(), "validation error:"):
-			writeError(w, http.StatusBadRequest, err.Error())
-		case strings.HasPrefix(err.Error(), "duplicate name:"):
-			writeErrorWithField(w, http.StatusConflict, "name", err.Error())
-		default:
-			slog.Error("creating metric profile", "error", err)
-			http.Error(w, "Failed to create metric profile", http.StatusInternalServerError)
-		}
+	if handleCreateError(w, err, "create metric profile") {
 		return
 	}
 	writeJSON(w, http.StatusCreated, p)
@@ -504,14 +472,12 @@ func (h *handler) createMetricProfile(w http.ResponseWriter, r *http.Request) {
 
 // getMetricProfile handles GET /api/evaluation/profiles/{id}.
 func (h *handler) getMetricProfile(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
 	p, err := h.svc.getMetricProfile(r.Context(), id, user.ID)
@@ -524,35 +490,20 @@ func (h *handler) getMetricProfile(w http.ResponseWriter, r *http.Request) {
 
 // updateMetricProfile handles PUT /api/evaluation/profiles/{id}.
 func (h *handler) updateMetricProfile(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
 	var req MetricProfileUpdate
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
-	if err := h.svc.updateMetricProfile(r.Context(), id, user.ID, req); err != nil {
-		switch err {
-		case ErrNotFound:
-			writeError(w, http.StatusNotFound, "metric profile not found")
-		case ErrUnauthorized:
-			http.Error(w, "unauthorized", http.StatusForbidden)
-		default:
-			if strings.HasPrefix(err.Error(), "validation error:") {
-				writeError(w, http.StatusBadRequest, err.Error())
-				return
-			}
-			slog.Error("updating metric profile", "error", err)
-			http.Error(w, "Failed to update metric profile", http.StatusInternalServerError)
-		}
+	if handleMutationError(w, h.svc.updateMetricProfile(r.Context(), id, user.ID, req),
+		"metric profile", "update metric profile") {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -560,14 +511,12 @@ func (h *handler) updateMetricProfile(w http.ResponseWriter, r *http.Request) {
 
 // deleteMetricProfile handles DELETE /api/evaluation/profiles/{id}.
 func (h *handler) deleteMetricProfile(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
 	if err := h.svc.deleteMetricProfile(r.Context(), id, user.ID); err != nil {
@@ -579,26 +528,16 @@ func (h *handler) deleteMetricProfile(w http.ResponseWriter, r *http.Request) {
 
 // setDefaultProfile handles POST /api/evaluation/profiles/{id}/set-default.
 func (h *handler) setDefaultProfile(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
-	if err := h.svc.setDefaultProfile(r.Context(), id, user.ID); err != nil {
-		switch err {
-		case ErrNotFound:
-			writeError(w, http.StatusNotFound, "metric profile not found")
-		case ErrUnauthorized:
-			http.Error(w, "unauthorized", http.StatusForbidden)
-		default:
-			slog.Error("setting default profile", "error", err)
-			http.Error(w, "Failed to set default profile", http.StatusInternalServerError)
-		}
+	if handleMutationError(w, h.svc.setDefaultProfile(r.Context(), id, user.ID),
+		"metric profile", "set default profile") {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -608,29 +547,18 @@ func (h *handler) setDefaultProfile(w http.ResponseWriter, r *http.Request) {
 
 // createEvalRun handles POST /api/evaluation/runs.
 func (h *handler) createEvalRun(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
 	var req EvalRunCreate
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	req.UserID = user.ID
 
 	run, err := h.svc.createEvalRun(r.Context(), user.ID, req)
-	if err != nil {
-		switch err {
-		case ErrNotFound:
-			writeError(w, http.StatusNotFound, "eval set not found")
-		case ErrUnauthorized:
-			http.Error(w, "unauthorized", http.StatusForbidden)
-		default:
-			slog.Error("creating evaluation run", "error", err)
-			http.Error(w, "Failed to create evaluation run", http.StatusInternalServerError)
-		}
+	if handleMutationError(w, err, "eval set", "create evaluation run") {
 		return
 	}
 	writeJSON(w, http.StatusCreated, run)
@@ -638,9 +566,8 @@ func (h *handler) createEvalRun(w http.ResponseWriter, r *http.Request) {
 
 // listEvalRuns handles GET /api/evaluation/runs.
 func (h *handler) listEvalRuns(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
 	runs, err := h.svc.listEvalRuns(r.Context(), user.ID)
@@ -657,14 +584,12 @@ func (h *handler) listEvalRuns(w http.ResponseWriter, r *http.Request) {
 
 // getEvalRun handles GET /api/evaluation/runs/{id}.
 func (h *handler) getEvalRun(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
 	run, err := h.svc.getEvalRun(r.Context(), id, user.ID)
@@ -677,14 +602,12 @@ func (h *handler) getEvalRun(w http.ResponseWriter, r *http.Request) {
 
 // getEvalResults handles GET /api/evaluation/runs/{id}/results.
 func (h *handler) getEvalResults(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
 	results, err := h.svc.getEvalResults(r.Context(), id, user.ID)
@@ -700,14 +623,12 @@ func (h *handler) getEvalResults(w http.ResponseWriter, r *http.Request) {
 
 // cancelEvalRun handles POST /api/evaluation/runs/{id}/cancel.
 func (h *handler) cancelEvalRun(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
 	if err := h.svc.cancelEvalRun(r.Context(), id, user.ID); err != nil {
@@ -727,14 +648,12 @@ func (h *handler) cancelEvalRun(w http.ResponseWriter, r *http.Request) {
 // streamEvalRun handles GET /api/evaluation/runs/{id}/stream.
 // Streams evaluation run status changes via SSE.
 func (h *handler) streamEvalRun(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
 
@@ -807,14 +726,12 @@ func (h *handler) streamEvalRun(w http.ResponseWriter, r *http.Request) {
 
 // deleteEvalRun handles DELETE /api/evaluation/runs/{id}.
 func (h *handler) deleteEvalRun(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
 	if err := h.svc.deleteEvalRun(r.Context(), id, user.ID); err != nil {
@@ -827,14 +744,12 @@ func (h *handler) deleteEvalRun(w http.ResponseWriter, r *http.Request) {
 // exportEvalRun handles GET /api/evaluation/runs/{id}/export.
 // Exports evaluation results as a JSON file.
 func (h *handler) exportEvalRun(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
 
@@ -943,9 +858,8 @@ func (h *handler) exportEvalRun(w http.ResponseWriter, r *http.Request) {
 
 // listRubrics handles GET /api/evaluation/rubrics.
 func (h *handler) listRubrics(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
 	rubrics, err := h.svc.listRubrics(r.Context(), user.ID)
@@ -962,29 +876,18 @@ func (h *handler) listRubrics(w http.ResponseWriter, r *http.Request) {
 
 // createRubric handles POST /api/evaluation/rubrics.
 func (h *handler) createRubric(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
 	var req RubricCreate
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	req.UserID = user.ID
 
 	rubric, err := h.svc.createRubric(r.Context(), user.ID, req)
-	if err != nil {
-		switch {
-		case strings.HasPrefix(err.Error(), "validation error:"):
-			writeError(w, http.StatusBadRequest, err.Error())
-		case strings.HasPrefix(err.Error(), "duplicate name:"):
-			writeErrorWithField(w, http.StatusConflict, "name", err.Error())
-		default:
-			slog.Error("creating rubric", "error", err)
-			http.Error(w, "Failed to create rubric", http.StatusInternalServerError)
-		}
+	if handleCreateError(w, err, "create rubric") {
 		return
 	}
 	writeJSON(w, http.StatusCreated, rubric)
@@ -992,14 +895,12 @@ func (h *handler) createRubric(w http.ResponseWriter, r *http.Request) {
 
 // getRubric handles GET /api/evaluation/rubrics/{id}.
 func (h *handler) getRubric(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
 	rubric, err := h.svc.getRubric(r.Context(), id, user.ID)
@@ -1012,35 +913,20 @@ func (h *handler) getRubric(w http.ResponseWriter, r *http.Request) {
 
 // updateRubric handles PUT /api/evaluation/rubrics/{id}.
 func (h *handler) updateRubric(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
 	var req RubricUpdate
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
-	if err := h.svc.updateRubric(r.Context(), id, user.ID, req); err != nil {
-		switch err {
-		case ErrNotFound:
-			writeError(w, http.StatusNotFound, "rubric not found")
-		case ErrUnauthorized:
-			http.Error(w, "unauthorized", http.StatusForbidden)
-		default:
-			if strings.HasPrefix(err.Error(), "validation error:") {
-				writeError(w, http.StatusBadRequest, err.Error())
-				return
-			}
-			slog.Error("updating rubric", "error", err)
-			http.Error(w, "Failed to update rubric", http.StatusInternalServerError)
-		}
+	if handleMutationError(w, h.svc.updateRubric(r.Context(), id, user.ID, req),
+		"rubric", "update rubric") {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -1048,14 +934,12 @@ func (h *handler) updateRubric(w http.ResponseWriter, r *http.Request) {
 
 // deleteRubric handles DELETE /api/evaluation/rubrics/{id}.
 func (h *handler) deleteRubric(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
 	if err := h.svc.deleteRubric(r.Context(), id, user.ID); err != nil {
@@ -1070,9 +954,8 @@ func (h *handler) deleteRubric(w http.ResponseWriter, r *http.Request) {
 // importEvalSet handles POST /api/eval-sets/import.
 // Accepts a multipart form with a JSON file.
 func (h *handler) importEvalSet(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
 
@@ -1097,16 +980,7 @@ func (h *handler) importEvalSet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	es, err := h.svc.importEvalSet(r.Context(), user.ID, data)
-	if err != nil {
-		switch {
-		case strings.HasPrefix(err.Error(), "validation error:"):
-			writeError(w, http.StatusBadRequest, err.Error())
-		case strings.HasPrefix(err.Error(), "duplicate name:"):
-			writeErrorWithField(w, http.StatusConflict, "name", err.Error())
-		default:
-			slog.Error("importing eval_set", "error", err)
-			http.Error(w, "Failed to import eval set", http.StatusInternalServerError)
-		}
+	if handleCreateError(w, err, "import eval set") {
 		return
 	}
 
@@ -1116,15 +990,13 @@ func (h *handler) importEvalSet(w http.ResponseWriter, r *http.Request) {
 // exportEvalSet handles GET /api/eval-sets/{id}/export.
 // Returns a JSON file download.
 func (h *handler) exportEvalSet(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
-	if user == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	user, ok := requireUser(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, idOK := parsePathUUID(w, r, "id")
+	if !idOK {
 		return
 	}
 
