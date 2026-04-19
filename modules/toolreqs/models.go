@@ -85,7 +85,6 @@ type Permission struct {
 	AgentID   string    `json:"agent_id"`
 	ToolSetID string    `json:"tool_set_id"`
 	ToolID    string    `json:"tool_id"`
-	Enabled   bool      `json:"enabled"`
 	Config    string    `json:"config,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -101,7 +100,6 @@ type ToolSetPermission struct {
 	UserID    string    `json:"user_id"`
 	AgentID   string    `json:"agent_id"`
 	ToolSetID string    `json:"tool_set_id"`
-	Enabled   bool      `json:"enabled"`
 	Config    string    `json:"config,omitempty"` // JSON string for tool set-specific config
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

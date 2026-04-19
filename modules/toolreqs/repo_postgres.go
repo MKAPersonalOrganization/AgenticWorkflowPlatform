@@ -30,10 +30,10 @@ func NewPostgresRepository(db *sqlx.DB) *PostgresRepository {
 // GetPermission retrieves a specific agent-tool permission within a tool set.
 func (r *PostgresRepository) GetPermission(ctx context.Context, userID, agentID, toolSetID, toolID string) (*Permission, error) {
 	const q = `
-		SELECT 
-			user_id, agent_id, tool_set_id, tool_id, enabled, 
+		SELECT
+			user_id, agent_id, tool_set_id, tool_id,
 			COALESCE(config, '{}') as config, created_at, updated_at
-		FROM agent_tool_permissions 
+		FROM agent_tool_permissions
 		WHERE user_id = $1 AND agent_id = $2 AND tool_set_id = $3 AND tool_id = $4
 	`
 
@@ -42,7 +42,6 @@ func (r *PostgresRepository) GetPermission(ctx context.Context, userID, agentID,
 		AgentID   string          `db:"agent_id"`
 		ToolSetID string          `db:"tool_set_id"`
 		ToolID    string          `db:"tool_id"`
-		Enabled   bool            `db:"enabled"`
 		Config    json.RawMessage `db:"config"`
 		CreatedAt sql.NullTime    `db:"created_at"`
 		UpdatedAt sql.NullTime    `db:"updated_at"`
@@ -60,7 +59,6 @@ func (r *PostgresRepository) GetPermission(ctx context.Context, userID, agentID,
 		AgentID:   dest.AgentID,
 		ToolSetID: dest.ToolSetID,
 		ToolID:    dest.ToolID,
-		Enabled:   dest.Enabled,
 		CreatedAt: dest.CreatedAt.Time,
 		UpdatedAt: dest.UpdatedAt.Time,
 	}
@@ -75,10 +73,10 @@ func (r *PostgresRepository) GetPermission(ctx context.Context, userID, agentID,
 // ListPermissions returns all individual tool permissions for an agent within a tool set.
 func (r *PostgresRepository) ListPermissions(ctx context.Context, userID, agentID, toolSetID string) ([]Permission, error) {
 	const q = `
-		SELECT 
-			user_id, agent_id, tool_set_id, tool_id, enabled, 
+		SELECT
+			user_id, agent_id, tool_set_id, tool_id,
 			COALESCE(config, '{}') as config, created_at, updated_at
-		FROM agent_tool_permissions 
+		FROM agent_tool_permissions
 		WHERE user_id = $1 AND agent_id = $2 AND tool_set_id = $3
 	`
 
@@ -87,7 +85,6 @@ func (r *PostgresRepository) ListPermissions(ctx context.Context, userID, agentI
 		AgentID   string          `db:"agent_id"`
 		ToolSetID string          `db:"tool_set_id"`
 		ToolID    string          `db:"tool_id"`
-		Enabled   bool            `db:"enabled"`
 		Config    json.RawMessage `db:"config"`
 		CreatedAt sql.NullTime    `db:"created_at"`
 		UpdatedAt sql.NullTime    `db:"updated_at"`
@@ -104,7 +101,6 @@ func (r *PostgresRepository) ListPermissions(ctx context.Context, userID, agentI
 			AgentID:   dest.AgentID,
 			ToolSetID: dest.ToolSetID,
 			ToolID:    dest.ToolID,
-			Enabled:   dest.Enabled,
 			Config:    string(dest.Config),
 			CreatedAt: dest.CreatedAt.Time,
 			UpdatedAt: dest.UpdatedAt.Time,
@@ -118,11 +114,10 @@ func (r *PostgresRepository) ListPermissions(ctx context.Context, userID, agentI
 func (r *PostgresRepository) SavePermission(ctx context.Context, permission *Permission) error {
 	const q = `
 		INSERT INTO agent_tool_permissions (
-			user_id, agent_id, tool_set_id, tool_id, enabled, config, created_at, updated_at
+			user_id, agent_id, tool_set_id, tool_id, config, created_at, updated_at
 		) VALUES (
-			:user_id, :agent_id, :tool_set_id, :tool_id, :enabled, :config, :created_at, :updated_at
+			:user_id, :agent_id, :tool_set_id, :tool_id, :config, :created_at, :updated_at
 		) ON CONFLICT (user_id, agent_id, tool_set_id, tool_id) DO UPDATE SET
-			enabled = EXCLUDED.enabled,
 			config = EXCLUDED.config,
 			updated_at = EXCLUDED.updated_at
 	`
@@ -137,7 +132,6 @@ func (r *PostgresRepository) SavePermission(ctx context.Context, permission *Per
 		"agent_id":    permission.AgentID,
 		"tool_set_id": permission.ToolSetID,
 		"tool_id":     permission.ToolID,
-		"enabled":     permission.Enabled,
 		"config":      config,
 		"created_at":  permission.CreatedAt,
 		"updated_at":  permission.UpdatedAt,
@@ -153,7 +147,7 @@ func (r *PostgresRepository) SavePermission(ctx context.Context, permission *Per
 // DeletePermission removes a specific agent-tool permission.
 func (r *PostgresRepository) DeletePermission(ctx context.Context, userID, agentID, toolSetID, toolID string) error {
 	const q = `
-		DELETE FROM agent_tool_permissions 
+		DELETE FROM agent_tool_permissions
 		WHERE user_id = $1 AND agent_id = $2 AND tool_set_id = $3 AND tool_id = $4
 	`
 
@@ -171,10 +165,10 @@ func (r *PostgresRepository) DeletePermission(ctx context.Context, userID, agent
 // GetToolSetPermission retrieves a specific agent-toolset permission.
 func (r *PostgresRepository) GetToolSetPermission(ctx context.Context, userID, agentID, toolSetID string) (*ToolSetPermission, error) {
 	const q = `
-		SELECT 
-			user_id, agent_id, tool_set_id, enabled, 
+		SELECT
+			user_id, agent_id, tool_set_id,
 			COALESCE(config, '{}') as config, created_at, updated_at
-		FROM agent_tool_set_permissions 
+		FROM agent_tool_set_permissions
 		WHERE user_id = $1 AND agent_id = $2 AND tool_set_id = $3
 	`
 
@@ -182,7 +176,6 @@ func (r *PostgresRepository) GetToolSetPermission(ctx context.Context, userID, a
 		UserID    string          `db:"user_id"`
 		AgentID   string          `db:"agent_id"`
 		ToolSetID string          `db:"tool_set_id"`
-		Enabled   bool            `db:"enabled"`
 		Config    json.RawMessage `db:"config"`
 		CreatedAt sql.NullTime    `db:"created_at"`
 		UpdatedAt sql.NullTime    `db:"updated_at"`
@@ -199,7 +192,6 @@ func (r *PostgresRepository) GetToolSetPermission(ctx context.Context, userID, a
 		UserID:    dest.UserID,
 		AgentID:   dest.AgentID,
 		ToolSetID: dest.ToolSetID,
-		Enabled:   dest.Enabled,
 		CreatedAt: dest.CreatedAt.Time,
 		UpdatedAt: dest.UpdatedAt.Time,
 	}
@@ -214,10 +206,10 @@ func (r *PostgresRepository) GetToolSetPermission(ctx context.Context, userID, a
 // ListToolSetPermissions returns all tool set permissions for an agent.
 func (r *PostgresRepository) ListToolSetPermissions(ctx context.Context, userID, agentID string) ([]ToolSetPermission, error) {
 	const q = `
-		SELECT 
-			user_id, agent_id, tool_set_id, enabled, 
+		SELECT
+			user_id, agent_id, tool_set_id,
 			COALESCE(config, '{}') as config, created_at, updated_at
-		FROM agent_tool_set_permissions 
+		FROM agent_tool_set_permissions
 		WHERE user_id = $1 AND agent_id = $2
 	`
 
@@ -225,7 +217,6 @@ func (r *PostgresRepository) ListToolSetPermissions(ctx context.Context, userID,
 		UserID    string          `db:"user_id"`
 		AgentID   string          `db:"agent_id"`
 		ToolSetID string          `db:"tool_set_id"`
-		Enabled   bool            `db:"enabled"`
 		Config    json.RawMessage `db:"config"`
 		CreatedAt sql.NullTime    `db:"created_at"`
 		UpdatedAt sql.NullTime    `db:"updated_at"`
@@ -241,7 +232,6 @@ func (r *PostgresRepository) ListToolSetPermissions(ctx context.Context, userID,
 			UserID:    dest.UserID,
 			AgentID:   dest.AgentID,
 			ToolSetID: dest.ToolSetID,
-			Enabled:   dest.Enabled,
 			Config:    string(dest.Config),
 			CreatedAt: dest.CreatedAt.Time,
 			UpdatedAt: dest.UpdatedAt.Time,
@@ -255,11 +245,10 @@ func (r *PostgresRepository) ListToolSetPermissions(ctx context.Context, userID,
 func (r *PostgresRepository) SaveToolSetPermission(ctx context.Context, permission *ToolSetPermission) error {
 	const q = `
 		INSERT INTO agent_tool_set_permissions (
-			user_id, agent_id, tool_set_id, enabled, config, created_at, updated_at
+			user_id, agent_id, tool_set_id, config, created_at, updated_at
 		) VALUES (
-			:user_id, :agent_id, :tool_set_id, :enabled, :config, :created_at, :updated_at
+			:user_id, :agent_id, :tool_set_id, :config, :created_at, :updated_at
 		) ON CONFLICT (user_id, agent_id, tool_set_id) DO UPDATE SET
-			enabled = EXCLUDED.enabled,
 			config = EXCLUDED.config,
 			updated_at = EXCLUDED.updated_at
 	`
@@ -273,7 +262,6 @@ func (r *PostgresRepository) SaveToolSetPermission(ctx context.Context, permissi
 		"user_id":     permission.UserID,
 		"agent_id":    permission.AgentID,
 		"tool_set_id": permission.ToolSetID,
-		"enabled":     permission.Enabled,
 		"config":      config,
 		"created_at":  permission.CreatedAt,
 		"updated_at":  permission.UpdatedAt,
@@ -289,7 +277,7 @@ func (r *PostgresRepository) SaveToolSetPermission(ctx context.Context, permissi
 // DeleteToolSetPermission removes a specific agent-toolset permission.
 func (r *PostgresRepository) DeleteToolSetPermission(ctx context.Context, userID, agentID, toolSetID string) error {
 	const q = `
-		DELETE FROM agent_tool_set_permissions 
+		DELETE FROM agent_tool_set_permissions
 		WHERE user_id = $1 AND agent_id = $2 AND tool_set_id = $3
 	`
 

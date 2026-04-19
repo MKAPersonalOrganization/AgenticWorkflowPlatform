@@ -1216,3 +1216,8 @@ ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS code_execution_policy JSONB;
 -- Version: 1.84
 -- Description: Add streaming_policy JSONB column to user_agents for the SSE streaming toggle; nullable, null means stream (matches ADK RunConfig.StreamingModeSSE default).
 ALTER TABLE user_agents ADD COLUMN IF NOT EXISTS streaming_policy JSONB;
+
+-- Version: 1.85
+-- Description: Drop the vestigial enabled column from agent_tool_permissions and agent_tool_set_permissions; the action field inside the JSON config column is the single source of truth for allow/block/require_confirmation.
+ALTER TABLE agent_tool_permissions DROP COLUMN IF EXISTS enabled;
+ALTER TABLE agent_tool_set_permissions DROP COLUMN IF EXISTS enabled;

@@ -60,7 +60,6 @@ func TestPostgresRepository(t *testing.T) {
 			UserID:    userID,
 			AgentID:   agentID,
 			ToolSetID: toolSetID,
-			Enabled:   true,
 			Config:    `{"limit": 10}`,
 			CreatedAt: time.Now().Truncate(time.Microsecond),
 			UpdatedAt: time.Now().Truncate(time.Microsecond),
@@ -71,7 +70,6 @@ func TestPostgresRepository(t *testing.T) {
 
 		got, err := repo.GetToolSetPermission(ctx, userID, agentID, toolSetID)
 		require.NoError(t, err)
-		assert.Equal(t, perm.Enabled, got.Enabled)
 		assert.Equal(t, perm.Config, got.Config)
 		assert.Equal(t, perm.UserID, got.UserID)
 
@@ -97,7 +95,6 @@ func TestPostgresRepository(t *testing.T) {
 			AgentID:   agentID,
 			ToolSetID: toolSetID,
 			ToolID:    toolID,
-			Enabled:   true,
 			Config:    `{"timeout": "5s"}`,
 			CreatedAt: time.Now().Truncate(time.Microsecond),
 			UpdatedAt: time.Now().Truncate(time.Microsecond),
@@ -108,7 +105,6 @@ func TestPostgresRepository(t *testing.T) {
 
 		got, err := repo.GetPermission(ctx, userID, agentID, toolSetID, toolID)
 		require.NoError(t, err)
-		assert.Equal(t, perm.Enabled, got.Enabled)
 		assert.Equal(t, perm.Config, got.Config)
 		assert.Equal(t, perm.UserID, got.UserID)
 

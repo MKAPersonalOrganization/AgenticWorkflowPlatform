@@ -103,8 +103,7 @@ func (s *PermissionStore) GetToolRequirementConfig(ctx context.Context, userID, 
 }
 
 // SetToolRequirementConfig updates the requirement configuration for a
-// specific tool within a tool set. The tool's enabled state is preserved;
-// only the config column is updated.
+// specific tool within a tool set.
 func (s *PermissionStore) SetToolRequirementConfig(ctx context.Context, userID, agentID, toolSetID, toolID string, cfg ToolRequirementConfig) error {
 	now := time.Now()
 
@@ -115,7 +114,6 @@ func (s *PermissionStore) SetToolRequirementConfig(ctx context.Context, userID, 
 			AgentID:   agentID,
 			ToolSetID: toolSetID,
 			ToolID:    toolID,
-			Enabled:   true,
 			CreatedAt: now,
 		}
 	}
@@ -157,7 +155,6 @@ func (s *PermissionStore) SetToolSetRequirementConfig(ctx context.Context, userI
 			UserID:    userID,
 			AgentID:   agentID,
 			ToolSetID: toolSetID,
-			Enabled:   true,
 			CreatedAt: now,
 		}
 	}
