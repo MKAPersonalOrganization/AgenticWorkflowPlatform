@@ -1,0 +1,224 @@
+package agenteditor
+
+import (
+	"aicompass/frontend/components/icon"
+	"aicompass/frontend/ui/i18n"
+)
+
+// toolsSection renders the collapsible tools section for an agent in edit mode.
+//
+// Each plugin and tool row has two independent controls:
+//   1. Enable toggle (right side) — allow ↔ block. Binary. Saves immediately.
+//   2. "Confirm" mini-toggle — shown only when enabled. Sets require_confirmation.
+//      Orthogonal to the enable state: a tool can be enabled with or without confirmation.
+//
+// A gear (⚙) icon appears next to the confirm toggle when confirmation is on,
+// opening a small settings panel for the hint text and per-turn invocation limit.
+// Additional future requirements (rate limits, cost budgets, etc.) can be added
+// as further independent mini-toggles in the same row without restructuring.
+templ toolsSection() {
+	<div class="border border-border rounded-lg">
+		<button
+			type="button"
+			@click="showTools = !showTools"
+			class="flex items-center justify-between w-full p-3 text-sm font-medium text-foreground hover:bg-accent/30 rounded-lg transition-colors"
+		>
+			<span class="flex items-center gap-2">
+				@icon.Blocks(icon.Props{Class: "size-4 text-muted-foreground"})
+				{ i18n.T(ctx, "Tools") }
+				<span class="text-[10px] text-muted-foreground tabular-nums" x-text="toolsSummary"></span>
+			</span>
+			<span class="transition-transform duration-200" :class="showTools ? 'rotate-180' : ''">
+				@icon.ChevronDown(icon.Props{Class: "size-4 text-muted-foreground"})
+			</span>
+		</button>
+		<div x-show="showTools" x-collapse class="px-3 pb-3 border-t border-border pt-3">
+			<template x-if="loadingTools">
+				<div class="space-y-2">
+					<template x-for="i in 3" :key="i">
+						<div class="flex items-center gap-3 p-2 animate-pulse rounded-md">
+							<div class="size-7 rounded bg-muted"></div>
+							<div class="flex-1 space-y-1">
+								<div class="h-3 bg-muted rounded w-1/3"></div>
+								<div class="h-2 bg-muted rounded w-2/3"></div>
+							</div>
+						</div>
+					</template>
+				</div>
+			</template>
+			<template x-if="!loadingTools">
+				<div>
+					<template x-if="agentPlugins.length === 0">
+						<div class="py-4 text-center text-xs text-muted-foreground">
+							{ i18n.T(ctx, "No plugins available. Add plugins from the Tools sidebar.") }
+						</div>
+					</template>
+					<div class="space-y-1.5">
+						<template x-for="plugin in agentPlugins" :key="plugin.id">
+							<div class="rounded-md border border-border overflow-hidden">
+								<!-- Plugin header row -->
+								<div
+									class="flex items-center gap-2 p-2 transition-colors"
+									:class="plugin.requirement_config?.action === 'block' ? 'bg-muted/30' : ''"
+								>
+									<!-- Icon -->
+									<div
+										class="size-7 rounded-md flex items-center justify-center shrink-0 transition-colors"
+										:class="plugin.requirement_config?.action === 'block' ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'"
+									>
+										@icon.Blocks(icon.Props{Class: "size-3.5"})
+									</div>
+									<!-- Name + tool count -->
+									<div class="flex-1 min-w-0">
+										<div
+											class="text-xs font-medium truncate transition-colors"
+											:class="plugin.requirement_config?.action === 'block' ? 'line-through text-muted-foreground' : 'text-foreground'"
+											x-text="plugin.name"
+										></div>
+										<div class="text-[10px] text-muted-foreground tabular-nums" x-text="plugin.tools.length + ' tools'"></div>
+									</div>
+									<!-- Confirm mini-toggle — only visible when plugin is enabled.
+									     Orthogonal to the enable toggle: pauses before each run and asks user. -->
+									<template x-if="isPluginEnabled(plugin)">
+										<div class="flex items-center gap-1.5 shrink-0">
+											<label
+												class="flex items-center gap-1 cursor-pointer select-none"
+												:title="plugin.requirement_config?.action === 'require_confirmation' ? 'Confirmation required before each run — click to turn off' : 'Click to require user confirmation before each run'"
+											>
+												<span
+													class="text-[10px] transition-colors"
+													:class="plugin.requirement_config?.action === 'require_confirmation' ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-muted-foreground'"
+												>{ i18n.T(ctx, "Confirm") }</span>
+												<!-- Mini toggle switch -->
+												<button
+													type="button"
+													@click.stop="setToolSetAction(plugin, plugin.requirement_config?.action === 'require_confirmation' ? 'allow' : 'require_confirmation')"
+													role="switch"
+													:aria-checked="plugin.requirement_config?.action === 'require_confirmation'"
+													class="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+													:class="plugin.requirement_config?.action === 'require_confirmation' ? 'bg-amber-500' : 'bg-input'"
+												>
+													<span
+														class="pointer-events-none inline-block size-3 rounded-full bg-background shadow ring-0 transition-transform duration-200"
+														:class="plugin.requirement_config?.action === 'require_confirmation' ? 'translate-x-3' : 'translate-x-0'"
+													></span>
+												</button>
+											</label>
+											<!-- Gear icon for confirmation hint + invocation limit -->
+											<template x-if="plugin.requirement_config?.action === 'require_confirmation'">
+												<button
+													type="button"
+													@click.stop="openToolSetRequirements(plugin)"
+													title="Set confirmation prompt and invocation limits"
+													class="p-1 rounded text-amber-500/70 hover:text-amber-600 hover:bg-amber-500/10 transition-colors"
+												>
+													@icon.SlidersHorizontal(icon.Props{Class: "size-3"})
+												</button>
+											</template>
+										</div>
+									</template>
+									<!-- Enable/disable toggle — allow ↔ block -->
+									<!-- Absence of requirement_config means disabled (no tools enabled by default) -->
+									<button
+										type="button"
+										@click.stop="setToolSetAction(plugin, isPluginEnabled(plugin) ? 'block' : 'allow')"
+										role="switch"
+										:aria-checked="isPluginEnabled(plugin)"
+										:title="isPluginEnabled(plugin) ? 'Disable plugin' : 'Enable plugin'"
+										class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+										:class="isPluginEnabled(plugin) ? 'bg-primary' : 'bg-input'"
+									>
+										<span
+											class="pointer-events-none inline-block size-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200"
+											:class="isPluginEnabled(plugin) ? 'translate-x-4' : 'translate-x-0'"
+										></span>
+									</button>
+								</div>
+								<!-- Individual tools — shown when plugin is enabled and has multiple tools -->
+								<template x-if="isPluginEnabled(plugin) && plugin.tools.length > 1">
+									<div class="border-t border-border/50 divide-y divide-border/30 bg-background/40">
+										<template x-for="tool in plugin.tools" :key="tool.id">
+											<div
+												class="flex items-center gap-2 px-2 py-1.5 transition-colors"
+												:class="!isToolEnabled(tool) ? 'bg-muted/20' : ''"
+											>
+												<!-- Indent marker + name -->
+												<span class="w-3 shrink-0"></span>
+												<span
+													class="text-[11px] flex-1 min-w-0 truncate transition-colors"
+													:class="!isToolEnabled(tool) ? 'line-through text-muted-foreground/50' : 'text-muted-foreground'"
+													x-text="tool.name"
+												></span>
+												<!-- Confirm mini-toggle (only when tool is enabled) -->
+												<template x-if="isToolEnabled(tool)">
+													<div class="flex items-center gap-1 shrink-0">
+														<label
+															class="flex items-center gap-1 cursor-pointer select-none"
+															:title="tool.requirement_config?.action === 'require_confirmation' ? 'Confirmation required — click to turn off' : 'Require confirmation before this tool runs'"
+														>
+															<span
+																class="text-[9px] transition-colors"
+																:class="tool.requirement_config?.action === 'require_confirmation' ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-muted-foreground'"
+															>{ i18n.T(ctx, "Confirm") }</span>
+															<button
+																type="button"
+																@click.stop="setToolAction(plugin, tool, tool.requirement_config?.action === 'require_confirmation' ? 'allow' : 'require_confirmation')"
+																role="switch"
+																:aria-checked="tool.requirement_config?.action === 'require_confirmation'"
+																class="relative inline-flex h-3.5 w-6 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+																:class="tool.requirement_config?.action === 'require_confirmation' ? 'bg-amber-500' : 'bg-input'"
+															>
+																<span
+																	class="pointer-events-none inline-block size-2.5 rounded-full bg-background shadow ring-0 transition-transform duration-200"
+																	:class="tool.requirement_config?.action === 'require_confirmation' ? 'translate-x-2.5' : 'translate-x-0'"
+																></span>
+															</button>
+														</label>
+														<!-- Gear for tool-level confirmation hint/limits -->
+														<template x-if="tool.requirement_config?.action === 'require_confirmation'">
+															<button
+																type="button"
+																@click.stop="openToolRequirements(plugin, tool)"
+																title="Set confirmation prompt and invocation limits"
+																class="p-0.5 rounded text-amber-500/70 hover:text-amber-600 hover:bg-amber-500/10 transition-colors"
+															>
+																@icon.SlidersHorizontal(icon.Props{Class: "size-2.5"})
+															</button>
+														</template>
+													</div>
+												</template>
+												<!-- Enable/disable toggle for individual tool -->
+												<button
+													type="button"
+													@click.stop="setToolAction(plugin, tool, tool.requirement_config?.action === 'block' ? 'allow' : 'block')"
+													role="switch"
+													:aria-checked="tool.requirement_config?.action !== 'block'"
+													:title="tool.requirement_config?.action === 'block' ? 'Enable tool' : 'Disable tool'"
+													class="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+													:class="tool.requirement_config?.action !== 'block' ? 'bg-primary' : 'bg-input'"
+												>
+													<span
+														class="pointer-events-none inline-block size-3 rounded-full bg-background shadow ring-0 transition-transform duration-200"
+														:class="tool.requirement_config?.action !== 'block' ? 'translate-x-3' : 'translate-x-0'"
+													></span>
+												</button>
+											</div>
+										</template>
+									</div>
+								</template>
+							</div>
+						</template>
+					</div>
+				</div>
+			</template>
+		</div>
+	</div>
+	<!-- Confirmation settings panel — opens via the gear icon when confirm is on.
+	     Contains only the hint text and invocation limit; the enable/confirm toggles
+	     are inline in the row and do not appear here. -->
+	@toolRequirementsDialog()
+}
+
+// toolRequirementsDialog renders the confirmation settings panel for a tool or tool set.
+// Reached only via the gear (⚙) icon that appears next to the Confirm toggle.
+// Contains only the hint text and per-turn invocation limit.
