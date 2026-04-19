@@ -79,69 +79,86 @@ func (m *openAIModel) Name() string { return m.modelName }
 // completion API, supporting both streaming and non-streaming modes.
 func (m *openAIModel) GenerateContent(ctx context.Context, req *adkmodel.LLMRequest, stream bool) iter.Seq2[*adkmodel.LLMResponse, error] {
 	return func(yield func(*adkmodel.LLMResponse, error) bool) {
-		modelName := req.Model
-		if modelName == "" {
-			modelName = m.modelName
-		}
-
-		messages := contentsToOpenAI(req.Contents)
-		if req.Config != nil && req.Config.SystemInstruction != nil {
-			sysText := extractText(req.Config.SystemInstruction)
-			if sysText != "" {
-				messages = append([]openai.ChatCompletionMessageParamUnion{
-					openai.SystemMessage(sysText),
-				}, messages...)
-			}
-		}
-
-		params := openai.ChatCompletionNewParams{
-			Model:    modelName,
-			Messages: messages,
-		}
-
-		// Convert tool declarations to OpenAI tools.
-		if req.Config != nil {
-			// GPT-5 and o1-series models only support default temperature (1).
-			// Setting custom temperature causes errors.
-			if req.Config.Temperature != nil && !isOpenAIReasoningModel(modelName) {
-				params.Temperature = openai.Float(float64(*req.Config.Temperature))
-			}
-			if req.Config.TopP != nil {
-				params.TopP = openai.Float(float64(*req.Config.TopP))
-			}
-			if req.Config.MaxOutputTokens > 0 {
-				params.MaxTokens = openai.Int(int64(req.Config.MaxOutputTokens))
-			}
-			for _, t := range req.Config.Tools {
-				for _, fd := range t.FunctionDeclarations {
-					// Filter out internal ADK tools (adk_ prefix)
-					if strings.HasPrefix(fd.Name, "adk_") {
-						continue
-					}
-					funcDef := openai.FunctionDefinitionParam{
-						Name:        fd.Name,
-						Description: openai.String(fd.Description),
-						Parameters:  declarationParamsToOpenAI(fd),
-					}
-					params.Tools = append(params.Tools, openai.ChatCompletionFunctionTool(funcDef))
-				}
-			}
-
-			// Translate genai.ResponseSchema → OpenAI response_format.json_schema.
-			// ADK's basic_processor populates ResponseSchema for every non-Gemini
-			// provider when the agent has an OutputSchema — without this translation
-			// OpenAI silently ignores it and the model replies in free-form text.
-			if req.Config.ResponseSchema != nil {
-				params.ResponseFormat = buildOpenAIResponseFormat(req.Config.ResponseSchema)
-			}
-		}
-
+		params := m.buildChatParams(req)
 		if stream {
 			m.generateStream(ctx, params, yield)
 		} else {
 			m.generate(ctx, params, yield)
 		}
 	}
+}
+
+// buildChatParams converts an ADK LLMRequest into the OpenAI chat
+// completion parameter struct: resolved model name + messages (with
+// optional prepended system instruction) + generation config + tool
+// declarations + response schema.
+func (m *openAIModel) buildChatParams(req *adkmodel.LLMRequest) openai.ChatCompletionNewParams {
+	modelName := req.Model
+	if modelName == "" {
+		modelName = m.modelName
+	}
+
+	messages := contentsToOpenAI(req.Contents)
+	if req.Config != nil && req.Config.SystemInstruction != nil {
+		if sysText := extractText(req.Config.SystemInstruction); sysText != "" {
+			messages = append([]openai.ChatCompletionMessageParamUnion{
+				openai.SystemMessage(sysText),
+			}, messages...)
+		}
+	}
+
+	params := openai.ChatCompletionNewParams{
+		Model:    modelName,
+		Messages: messages,
+	}
+	if req.Config != nil {
+		applyOpenAIGenerationConfig(&params, modelName, req.Config)
+		params.Tools = append(params.Tools, openAIToolsFromConfig(req.Config)...)
+		// Translate genai.ResponseSchema → OpenAI response_format.json_schema.
+		// ADK's basic_processor populates ResponseSchema for every non-Gemini
+		// provider when the agent has an OutputSchema — without this translation
+		// OpenAI silently ignores it and the model replies in free-form text.
+		if req.Config.ResponseSchema != nil {
+			params.ResponseFormat = buildOpenAIResponseFormat(req.Config.ResponseSchema)
+		}
+	}
+	return params
+}
+
+// applyOpenAIGenerationConfig wires temperature / top_p / max_tokens onto
+// the params struct. GPT-5 and o1-series reasoning models only accept
+// the default temperature, so explicit temperature is dropped for them
+// (setting it triggers an API error).
+func applyOpenAIGenerationConfig(params *openai.ChatCompletionNewParams, modelName string, cfg *genai.GenerateContentConfig) {
+	if cfg.Temperature != nil && !isOpenAIReasoningModel(modelName) {
+		params.Temperature = openai.Float(float64(*cfg.Temperature))
+	}
+	if cfg.TopP != nil {
+		params.TopP = openai.Float(float64(*cfg.TopP))
+	}
+	if cfg.MaxOutputTokens > 0 {
+		params.MaxTokens = openai.Int(int64(cfg.MaxOutputTokens))
+	}
+}
+
+// openAIToolsFromConfig converts genai tool declarations into OpenAI
+// function tools. Internal ADK tools (adk_* prefix) are filtered out so
+// the HITL protocol doesn't leak into the provider's tool list.
+func openAIToolsFromConfig(cfg *genai.GenerateContentConfig) []openai.ChatCompletionToolUnionParam {
+	var tools []openai.ChatCompletionToolUnionParam
+	for _, t := range cfg.Tools {
+		for _, fd := range t.FunctionDeclarations {
+			if strings.HasPrefix(fd.Name, "adk_") {
+				continue
+			}
+			tools = append(tools, openai.ChatCompletionFunctionTool(openai.FunctionDefinitionParam{
+				Name:        fd.Name,
+				Description: openai.String(fd.Description),
+				Parameters:  declarationParamsToOpenAI(fd),
+			}))
+		}
+	}
+	return tools
 }
 
 // generate performs a non-streaming request.
