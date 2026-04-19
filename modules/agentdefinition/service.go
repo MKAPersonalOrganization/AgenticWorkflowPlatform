@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -329,7 +330,6 @@ func (s *Service) GetAvailableStateKeys(ctx context.Context, userID, agentID str
 	if err != nil {
 		return nil, err
 	}
-
 	all, err := s.repo.ListByUser(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -340,45 +340,69 @@ func (s *Service) GetAvailableStateKeys(ctx context.Context, userID, agentID str
 		byID[all[i].ID] = &all[i]
 	}
 
-	// Highest-priority entry wins when a key appears in multiple tiers.
-	// Source/priority both update on upgrade so the label matches the
-	// tier actually displayed.
-	best := make(map[string]StateKeySuggestion)
-	addKey := func(key, source string, priority int) {
-		key = strings.TrimSpace(key)
-		if key == "" {
-			return
-		}
-		existing, ok := best[key]
-		if ok && existing.Priority >= priority {
-			return
-		}
-		best[key] = StateKeySuggestion{
-			Key:      key,
-			Scope:    "session",
-			Source:   source,
-			Priority: priority,
-		}
-	}
+	acc := newStateKeyAccumulator()
+	acc.addSelfKey(agent)
+	acc.addDirectChildKeys(agent, byID)
+	acc.addGraphChildKeys(agent, byID)
+	acc.addWorkflowPeerKeys(agent, all, byID)
+	acc.addLibraryKeys(agent, all)
+	return acc.sorted(), nil
+}
 
-	if agent.OutputKey != "" {
-		addKey(agent.OutputKey, "self", prioritySelf)
+// stateKeyAccumulator is the shared mutable state for
+// GetAvailableStateKeys' tier passes. Callers repeatedly invoke add with
+// (key, source, priority) — the highest priority wins when a key shows
+// up in multiple tiers, and source/priority both update on upgrade so
+// the label matches the tier actually displayed.
+type stateKeyAccumulator struct {
+	best map[string]StateKeySuggestion
+}
+
+func newStateKeyAccumulator() *stateKeyAccumulator {
+	return &stateKeyAccumulator{best: map[string]StateKeySuggestion{}}
+}
+
+func (a *stateKeyAccumulator) add(key, source string, priority int) {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return
 	}
+	if existing, ok := a.best[key]; ok && existing.Priority >= priority {
+		return
+	}
+	a.best[key] = StateKeySuggestion{
+		Key:      key,
+		Scope:    "session",
+		Source:   source,
+		Priority: priority,
+	}
+}
+
+func (a *stateKeyAccumulator) addSelfKey(agent *AgentDefinition) {
+	if agent.OutputKey != "" {
+		a.add(agent.OutputKey, "self", prioritySelf)
+	}
+}
+
+// addDirectChildKeys surfaces OutputKeys from agents referenced as
+// SubAgents or AgentTools. SubAgentRef may override the child's
+// OutputKey at the call site — both the override and the child's own
+// key are surfaced so either name works in the prompt.
+func (a *stateKeyAccumulator) addDirectChildKeys(agent *AgentDefinition, byID map[string]*AgentDefinition) {
 	for _, ref := range agent.SubAgents {
 		if ref == nil {
 			continue
 		}
-		// A SubAgentRef may override the child's OutputKey at the call
-		// site — surface both so either name works in the prompt.
+		child := byID[ref.AgentID]
 		if ref.OutputKey != "" {
-			if child, ok := byID[ref.AgentID]; ok {
-				addKey(ref.OutputKey, "sub-agent output: "+child.Name, priorityDirectChild)
-			} else {
-				addKey(ref.OutputKey, "sub-agent output", priorityDirectChild)
+			source := "sub-agent output"
+			if child != nil {
+				source = "sub-agent output: " + child.Name
 			}
+			a.add(ref.OutputKey, source, priorityDirectChild)
 		}
-		if child, ok := byID[ref.AgentID]; ok && child.OutputKey != "" {
-			addKey(child.OutputKey, "sub-agent output: "+child.Name, priorityDirectChild)
+		if child != nil && child.OutputKey != "" {
+			a.add(child.OutputKey, "sub-agent output: "+child.Name, priorityDirectChild)
 		}
 	}
 	for _, ref := range agent.AgentTools {
@@ -386,38 +410,39 @@ func (s *Service) GetAvailableStateKeys(ctx context.Context, userID, agentID str
 			continue
 		}
 		if child, ok := byID[ref.AgentID]; ok && child.OutputKey != "" {
-			addKey(child.OutputKey, "agent-tool output: "+child.Name, priorityDirectChild)
+			a.add(child.OutputKey, "agent-tool output: "+child.Name, priorityDirectChild)
 		}
 	}
-	if agent.Graph != nil {
-		for _, id := range agent.Graph.CollectAgentIDs() {
-			if id == agent.ID {
-				continue
-			}
-			if child, ok := byID[id]; ok && child.OutputKey != "" {
-				addKey(child.OutputKey, "workflow step: "+child.Name, priorityGraphChild)
-			}
-		}
-	}
+}
 
-	// Reverse lookup: find workflows (agents with a Graph) that embed the
-	// current agent, then surface its peers' OutputKeys. This covers the
-	// dominant ADK pattern — editing a leaf that's a sub-agent inside a
-	// Sequential/Parallel/Loop, referencing an earlier peer's output.
+// addGraphChildKeys surfaces OutputKeys of agents embedded inside this
+// agent's own composition graph (sequential/parallel/loop children).
+func (a *stateKeyAccumulator) addGraphChildKeys(agent *AgentDefinition, byID map[string]*AgentDefinition) {
+	if agent.Graph == nil {
+		return
+	}
+	for _, id := range agent.Graph.CollectAgentIDs() {
+		if id == agent.ID {
+			continue
+		}
+		if child, ok := byID[id]; ok && child.OutputKey != "" {
+			a.add(child.OutputKey, "workflow step: "+child.Name, priorityGraphChild)
+		}
+	}
+}
+
+// addWorkflowPeerKeys does the reverse lookup: for every workflow agent
+// that embeds the current agent, surface its peers' OutputKeys. This
+// covers the dominant ADK pattern — editing a leaf that's a sub-agent
+// inside a Sequential/Parallel/Loop, referencing an earlier peer's output.
+func (a *stateKeyAccumulator) addWorkflowPeerKeys(agent *AgentDefinition, all []AgentDefinition, byID map[string]*AgentDefinition) {
 	for i := range all {
 		workflow := &all[i]
 		if workflow.ID == agent.ID || workflow.Graph == nil {
 			continue
 		}
 		members := workflow.Graph.CollectAgentIDs()
-		containsCurrent := false
-		for _, id := range members {
-			if id == agent.ID {
-				containsCurrent = true
-				break
-			}
-		}
-		if !containsCurrent {
+		if !slices.Contains(members, agent.ID) {
 			continue
 		}
 		for _, id := range members {
@@ -428,35 +453,39 @@ func (s *Service) GetAvailableStateKeys(ctx context.Context, userID, agentID str
 			if !ok || peer.OutputKey == "" {
 				continue
 			}
-			addKey(peer.OutputKey,
+			a.add(peer.OutputKey,
 				"workflow peer: "+workflow.Name+" → "+peer.Name,
 				priorityWorkflow)
 		}
 	}
+}
 
-	// Library-wide fallback — any other OutputKey the user has declared,
-	// so a reference still resolves if the workflow isn't wired yet.
+// addLibraryKeys is the fallback tier: any other OutputKey the user has
+// declared, so a reference still resolves if the workflow isn't wired yet.
+func (a *stateKeyAccumulator) addLibraryKeys(agent *AgentDefinition, all []AgentDefinition) {
 	for i := range all {
 		other := &all[i]
 		if other.ID == agent.ID || other.OutputKey == "" {
 			continue
 		}
-		addKey(other.OutputKey, "agent: "+other.Name, priorityLibrary)
+		a.add(other.OutputKey, "agent: "+other.Name, priorityLibrary)
 	}
+}
 
-	suggestions := make([]StateKeySuggestion, 0, len(best))
-	for _, sug := range best {
-		suggestions = append(suggestions, sug)
+// sorted returns the accumulated suggestions by descending priority,
+// tiebreaking alphabetically for stable output.
+func (a *stateKeyAccumulator) sorted() []StateKeySuggestion {
+	out := make([]StateKeySuggestion, 0, len(a.best))
+	for _, sug := range a.best {
+		out = append(out, sug)
 	}
-	// Descending priority, then alphabetical by key for stable ordering
-	// across calls with identical input.
-	sort.Slice(suggestions, func(i, j int) bool {
-		if suggestions[i].Priority != suggestions[j].Priority {
-			return suggestions[i].Priority > suggestions[j].Priority
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Priority != out[j].Priority {
+			return out[i].Priority > out[j].Priority
 		}
-		return suggestions[i].Key < suggestions[j].Key
+		return out[i].Key < out[j].Key
 	})
-	return suggestions, nil
+	return out
 }
 
 // GetConsumers returns all agents that reference the given agent ID in their graph.
