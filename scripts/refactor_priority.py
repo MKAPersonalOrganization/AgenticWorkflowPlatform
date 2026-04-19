@@ -200,7 +200,36 @@ def print_stdout(records: list[dict], packages: list[dict]) -> None:
 
 
 def to_markdown(records: list[dict], packages: list[dict], meta: dict,
-                md_min_signals: int = 2, md_min_commits: int = 3) -> str:
+                md_min_signals: int = 2, md_min_commits: int = 3,
+                plot_paths: dict[str, Path] | None = None,
+                md_dir: Path | None = None) -> str:
+    """Render the markdown data report.
+
+    If ``plot_paths`` is given, each entry (keyed by diagram id) is
+    embedded as an image reference near the relevant section. ``md_dir``
+    is the directory where the markdown file will be written; image
+    paths are rewritten to be relative to that directory when possible,
+    so the report stays portable.
+    """
+    plot_paths = plot_paths or {}
+
+    def _img_src(p: Path) -> str:
+        # Prefer a path relative to the markdown file so the report
+        # renders correctly when served from another directory. Fall
+        # back to the absolute resolved path if the plot lives outside
+        # the markdown's tree.
+        if md_dir is None:
+            return str(p)
+        abs_p = p.resolve()
+        try:
+            return str(abs_p.relative_to(md_dir))
+        except ValueError:
+            import os
+            try:
+                return os.path.relpath(abs_p, md_dir)
+            except ValueError:
+                return str(abs_p)
+
     lines: list[str] = []
     lines.append("# Code Signals — Data Report\n")
     lines.append(f"**Generated:** {meta['generated_at']}  **Window:** {meta['window']}\n")
@@ -237,6 +266,20 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
         lines.append(f"| {p['score']:,} | {p['revisions']} | {p['loc']:,} | `{p['name']}` |")
     lines.append("")
 
+    # Embed the cross-signal scatter here — it's the big-picture view that
+    # belongs right after the orientation table. Only included when the
+    # renderer was actually run (plot_paths has the key).
+    if "scatter" in plot_paths:
+        lines.append("## Cross-signal scatter\n")
+        lines.append(
+            "Every file that has both a hotspot score and a complexity-trend "
+            "classification, placed by its churn (x) and structural rot (y). "
+            "Marker color = number of analyses the file appears in; marker "
+            "size = bug-fix percentage. Quadrant labels are hints, not "
+            "judgments — the reader decides what matters."
+        )
+        lines.append(f"\n![cross-signal scatter]({_img_src(plot_paths['scatter'])})\n")
+
     def _visible(r: dict) -> bool:
         if r["signal_count"] < md_min_signals:
             return False
@@ -251,6 +294,20 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
         return c >= md_min_commits
 
     visible = [r for r in records if _visible(r)]
+
+    # Signal matrix sits right before the overview table, so the reader
+    # can glance across rows to see which files are lit up in multiple
+    # analyses before diving into the tabular data.
+    if "matrix" in plot_paths:
+        lines.append("## Signal matrix\n")
+        lines.append(
+            "Top files by signal count, one column per analysis. Cell color "
+            "is normalized per column (darker = stronger relative signal in "
+            "that column); the number inside is the raw value. A file that's "
+            "dark across multiple columns is lit up by several analyses — "
+            "whether that matters is a human judgment."
+        )
+        lines.append(f"\n![signal matrix]({_img_src(plot_paths['matrix'])})\n")
 
     lines.append(f"## File overview ({len(visible)} files)\n")
     lines.append("| File | Signals | Commits | Fix count | Fix % | Trend verdict | Δmean | Max indent | Hotspot score | Coupling partners |")
@@ -390,6 +447,300 @@ def _detail_block(r: dict) -> list[str]:
     return out
 
 
+# Plots --------------------------------------------------------------------
+#
+# Diagrams here are deliberately cross-signal — they show relationships the
+# per-analysis scripts can't: "which files light up across multiple signals"
+# (signal matrix), "where does each file sit on the churn × structural-rot
+# plane" (scatter). The per-signal scripts (go_hotspots PNG, complexity_trend
+# per-file PNGs, file_coupling network) already cover single-signal views,
+# so we don't duplicate them.
+#
+# All diagrams use the same headless matplotlib import pattern as
+# complexity_trend.py; if matplotlib isn't installed the plotting flags are
+# silently no-ops (the textual report is the source of truth).
+
+_CMAP_RED = "#d7263d"
+_CMAP_AMBER = "#e09f3e"
+_CMAP_BLUE = "#3a7ca5"
+
+
+def _try_import_mpl():
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        return plt
+    except ImportError:
+        return None
+
+
+def _apply_plot_style(plt) -> None:
+    plt.rcParams.update({
+        "font.family": "DejaVu Sans",
+        "font.size": 9,
+        "axes.titlesize": 10,
+        "axes.labelsize": 9,
+        "axes.edgecolor": "#b0b0b0",
+        "axes.linewidth": 0.8,
+        "axes.grid": True,
+        "grid.color": "#dcdcdc",
+        "grid.linewidth": 0.6,
+        "grid.alpha": 0.8,
+        "xtick.color": "#404040",
+        "ytick.color": "#404040",
+        "xtick.labelsize": 8,
+        "ytick.labelsize": 8,
+        "figure.facecolor": "white",
+        "axes.facecolor": "#fafbfc",
+        "legend.frameon": True,
+        "legend.framealpha": 0.95,
+        "legend.edgecolor": "#cccccc",
+        "legend.fontsize": 8,
+    })
+
+
+def _file_metric_tuple(r: dict) -> tuple[float, float, float, float]:
+    """Return the four per-file signal values as a normalized tuple.
+
+    Picks one representative number per analysis so the matrix/scatter
+    can plot them side-by-side. Returns raw values; normalization is
+    handled per-diagram.
+    """
+    hs_score = float(r["hotspot"]["total_score"]) if r["hotspot"] else 0.0
+    tm = (r["trend"] or {}).get("metrics") or {}
+    # Clamp negative Δmean to 0 for the matrix (REFACTORED files look cool,
+    # DETERIORATING look hot). The scatter keeps the signed value.
+    dmean = float(tm.get("mean_delta") or 0.0)
+    fix_pct = float(r["bugfix"]["fix_pct"]) if r["bugfix"] else 0.0
+    cpl = float(len(r["coupling"]) if r["coupling"] else 0)
+    return hs_score, dmean, fix_pct, cpl
+
+
+def render_signal_matrix(records: list[dict], out_path: Path,
+                         top_n: int = 30, min_signals: int = 2) -> Path | None:
+    """Heatmap: rows = top files by signal count, cols = the four analyses.
+
+    Cell intensity = that file's relative strength in that signal (rescaled
+    0..1 per column). Lets the reader see at a glance which files are
+    lit up across every column vs just one. Columns and their scaling:
+
+    - hotspot: total_score, linear scale (log would over-compress the tail).
+    - trend:   Δmean clamped to [0, max] — DETERIORATING direction only,
+      since a REFACTORED file showing up in this matrix would be misleading.
+    - bugfix:  fix_pct as-is.
+    - coupling: partner count, linear.
+
+    Intentionally not a composite score: readers compose their own priority
+    by looking across the row.
+    """
+    plt = _try_import_mpl()
+    if plt is None:
+        return None
+    visible = [r for r in records if r["signal_count"] >= min_signals]
+    if not visible:
+        return None
+
+    rows = []
+    for r in visible:
+        hs, dmean, fix, cpl = _file_metric_tuple(r)
+        # Clamp Δmean to the deteriorating direction for the matrix.
+        rows.append((r["path"], r["signal_count"], hs, max(0.0, dmean), fix, cpl))
+
+    # Rank rows by "number of non-zero signals then max normalized value"
+    # so the top of the matrix is the most-lit-up files.
+    rows.sort(key=lambda t: (-t[1], -(t[2] + 100 * t[3] + t[4] + t[5])))
+    rows = rows[:top_n]
+    if not rows:
+        return None
+
+    _apply_plot_style(plt)
+    import numpy as np
+    data = np.array([[r[2], r[3], r[4], r[5]] for r in rows], dtype=float)
+    # Per-column max for normalisation. Guard against all-zero column.
+    col_max = data.max(axis=0)
+    col_max[col_max == 0] = 1.0
+    norm = data / col_max
+
+    labels = [r[0] for r in rows]
+    cols = ["hotspot\nscore", "Δmean\n(deterioration)", "bug-fix %", "coupling\npartners"]
+    sig_counts = [r[1] for r in rows]
+
+    # Figure size scales with row count so rows stay legible.
+    row_h = 0.30
+    fig_h = max(5.0, 1.5 + row_h * len(rows))
+    fig, ax = plt.subplots(figsize=(11, fig_h))
+    fig.subplots_adjust(left=0.42, right=0.92, top=0.92, bottom=0.08)
+
+    im = ax.imshow(norm, aspect="auto", cmap="YlOrRd", vmin=0.0, vmax=1.0)
+    ax.set_xticks(range(len(cols)))
+    ax.set_xticklabels(cols)
+    ax.set_yticks(range(len(labels)))
+    ax.set_yticklabels(labels, fontsize=7.5)
+    ax.tick_params(axis="y", length=0)
+    ax.tick_params(axis="x", length=0, pad=6)
+    ax.grid(False)
+
+    # Annotate each cell with the raw (un-normalized) value so the reader
+    # can read off actual numbers, not just relative intensity.
+    for i, row in enumerate(rows):
+        vals = [row[2], row[3], row[4], row[5]]
+        for j, v in enumerate(vals):
+            if v == 0:
+                txt = "—"
+            elif j == 0:
+                txt = f"{int(v):,}"
+            elif j == 1:
+                txt = f"{v:+.2f}"
+            elif j == 2:
+                txt = f"{v:.0f}%"
+            else:
+                txt = f"{int(v)}"
+            # Pick text color by cell darkness (imshow YlOrRd: high = dark).
+            color = "white" if norm[i, j] > 0.55 else "#303030"
+            ax.text(j, i, txt, ha="center", va="center",
+                    fontsize=7.2, color=color, fontweight="semibold")
+
+    # Signal-count badge on the right of each row.
+    for i, n in enumerate(sig_counts):
+        ax.text(3.7, i, f"[{n}/4]",
+                ha="left", va="center", fontsize=7, color="#606060",
+                fontstyle="italic")
+
+    ax.set_title(
+        "Cross-signal matrix — per-file intensity across four analyses\n"
+        f"(top {len(rows)} files, signals≥{min_signals}; cells normalized per column; "
+        "raw values overlaid; [n/4] = how many analyses mentioned the file)",
+        fontsize=10, loc="left", pad=14,
+    )
+    cbar = fig.colorbar(im, ax=ax, shrink=0.55, pad=0.02, aspect=20)
+    cbar.set_label("normalized intensity (per column)", fontsize=8)
+    cbar.ax.tick_params(labelsize=7)
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    return out_path
+
+
+def render_signal_scatter(records: list[dict], out_path: Path,
+                          min_signals: int = 1, label_top: int = 15) -> Path | None:
+    """Scatter: x = hotspot score (log), y = Δmean indent (signed).
+
+    Marker size encodes bug-fix % (5..25% → 40..400 pt²).
+    Marker color encodes signal_count (1=grey, 2=blue, 3=amber, 4=red).
+    Quadrant annotations help the reader parse the plot without a legend.
+
+    Why this view: each axis comes from a different analysis, so the
+    scatter shows interactions that per-analysis plots can't:
+      - upper-right  = high churn AND structurally rotting (your usual
+        refactor candidates)
+      - upper-left   = rotting but not a hotspot (quiet ticking bomb)
+      - lower-right  = hotspot but flat shape (stable workhorse)
+      - lower-left   = background noise
+    Signed Δmean keeps REFACTORED files visible (negative Δmean = below
+    the horizontal axis).
+    """
+    plt = _try_import_mpl()
+    if plt is None:
+        return None
+
+    visible = [r for r in records if r["signal_count"] >= min_signals]
+    pts = []
+    for r in visible:
+        hs, dmean, fix, cpl = _file_metric_tuple(r)
+        # A file needs both a hotspot score AND a trend signal to appear —
+        # otherwise we can't place it on the plane honestly.
+        if hs <= 0 or r["trend"] is None:
+            continue
+        pts.append({
+            "path": r["path"], "signal_count": r["signal_count"],
+            "hs": hs, "dmean": dmean, "fix": fix, "cpl": cpl,
+        })
+    if not pts:
+        return None
+
+    _apply_plot_style(plt)
+    fig, ax = plt.subplots(figsize=(11, 7.5))
+    fig.subplots_adjust(left=0.08, right=0.97, top=0.88, bottom=0.12)
+
+    color_by_sig = {1: "#9ca3af", 2: _CMAP_BLUE, 3: _CMAP_AMBER, 4: _CMAP_RED}
+    xs = [p["hs"] for p in pts]
+    ys = [p["dmean"] for p in pts]
+    sizes = [40 + min(360, p["fix"] * 12) for p in pts]
+    colors = [color_by_sig.get(p["signal_count"], "#9ca3af") for p in pts]
+    ax.scatter(xs, ys, s=sizes, c=colors, alpha=0.75,
+               edgecolor="white", linewidth=0.8)
+
+    ax.set_xscale("symlog", linthresh=100)
+    ax.set_xlabel("hotspot score (go_hotspots)  ·  log axis")
+    ax.set_ylabel("Δmean indent (complexity_trend, signed)")
+    ax.axhline(0.0, color="#888", linewidth=0.9, linestyle="--", alpha=0.8)
+    ax.axhline(0.08, color=_CMAP_RED, linewidth=0.7, linestyle=":", alpha=0.7)
+    ax.text(ax.get_xlim()[1], 0.083, "deteriorating threshold (Δmean > 0.08)",
+            ha="right", va="bottom", fontsize=7.5, color=_CMAP_RED, alpha=0.9)
+
+    # Quadrant labels — anchored to the plot's data range, not viewport.
+    xr_min, xr_max = max(1, min(xs)), max(xs)
+    yr_min, yr_max = min(ys), max(ys)
+    y_top = yr_max if yr_max > 0 else 0.05
+    y_bot = yr_min if yr_min < 0 else -0.05
+    quad_args = dict(fontsize=8, color="#606060", alpha=0.85, fontstyle="italic")
+    ax.text(xr_max, y_top, "hotspot · rotting", ha="right", va="top", **quad_args)
+    ax.text(xr_min, y_top, "quiet rot", ha="left", va="top", **quad_args)
+    ax.text(xr_max, y_bot, "hotspot · flat", ha="right", va="bottom", **quad_args)
+    ax.text(xr_min, y_bot, "noise", ha="left", va="bottom", **quad_args)
+
+    # Label the top N points by a crude (hotspot × max(Δmean, 0)) ordering —
+    # intentionally not a score in the report sense; just picks the corner
+    # of the scatter a human eye would look at first. File names are
+    # shortened to their tail two path segments to avoid overplotting.
+    pts_ranked = sorted(
+        pts,
+        key=lambda p: -(p["hs"] * max(0.01, p["dmean"] + 0.2)),
+    )[:label_top]
+    for p in pts_ranked:
+        short = "/".join(p["path"].rsplit("/", 2)[-2:])
+        ax.annotate(
+            short, xy=(p["hs"], p["dmean"]),
+            xytext=(5, 5), textcoords="offset points",
+            fontsize=7, color="#303030", alpha=0.9,
+        )
+
+    # Legend for color (signal count) and size (fix%).
+    legend_markers = []
+    from matplotlib.lines import Line2D
+    for n in (2, 3, 4):
+        legend_markers.append(Line2D(
+            [0], [0], marker="o", linestyle="", markersize=8,
+            markerfacecolor=color_by_sig[n], markeredgecolor="white",
+            label=f"{n} signals",
+        ))
+    legend_markers.append(Line2D(
+        [0], [0], marker="o", linestyle="", markersize=6,
+        markerfacecolor="#aaa", markeredgecolor="white",
+        label="bug-fix 5%",
+    ))
+    legend_markers.append(Line2D(
+        [0], [0], marker="o", linestyle="", markersize=14,
+        markerfacecolor="#aaa", markeredgecolor="white",
+        label="bug-fix 25%",
+    ))
+    ax.legend(handles=legend_markers, loc="lower right", ncol=2,
+              fontsize=8, title="marker key", title_fontsize=8)
+
+    ax.set_title(
+        "Cross-signal scatter — where each file sits on churn × structural rot\n"
+        f"({len(pts)} files with both hotspot + trend signals; marker size = bug-fix %)",
+        fontsize=10, loc="left", pad=12,
+    )
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    return out_path
+
+
 # Driver -------------------------------------------------------------------
 
 def main() -> int:
@@ -409,6 +760,13 @@ def main() -> int:
                     help="in markdown, only show files with ≥ N commits (default 3); JSON always has the full dataset")
     ap.add_argument("--window", default="6 months",
                     help="description for the markdown header (default '6 months')")
+    ap.add_argument("--out-plots", type=str, default=None,
+                    help="directory to write cross-signal PNGs into "
+                         "(signal_matrix.png, signal_scatter.png). When set "
+                         "and --out-md is also set, the plots are embedded "
+                         "inline in the markdown report.")
+    ap.add_argument("--matrix-top-n", type=int, default=30,
+                    help="max rows in the signal matrix heatmap (default 30)")
     args = ap.parse_args()
 
     try:
@@ -437,11 +795,38 @@ def main() -> int:
         }, indent=2, default=str))
         print(f"\nJSON: {args.out_json}")
 
+    # Render cross-signal diagrams. Matplotlib is optional — if it's not
+    # installed we print a hint and skip; the textual report stands alone.
+    plot_paths: dict[str, Path] = {}
+    if args.out_plots:
+        out_dir = Path(args.out_plots)
+        if _try_import_mpl() is None:
+            print("warning: matplotlib unavailable — skipping --out-plots",
+                  file=sys.stderr)
+        else:
+            matrix_path = render_signal_matrix(
+                records, out_dir / "signal_matrix.png",
+                top_n=args.matrix_top_n, min_signals=args.md_min_signals,
+            )
+            if matrix_path:
+                plot_paths["matrix"] = matrix_path
+                print(f"Signal matrix: {matrix_path}")
+            scatter_path = render_signal_scatter(
+                records, out_dir / "signal_scatter.png",
+                min_signals=1,
+            )
+            if scatter_path:
+                plot_paths["scatter"] = scatter_path
+                print(f"Signal scatter: {scatter_path}")
+
     if args.out_md:
+        md_path = Path(args.out_md)
         Path(args.out_md).write_text(to_markdown(
             records, packages, meta,
             md_min_signals=args.md_min_signals,
             md_min_commits=args.md_min_commits,
+            plot_paths=plot_paths,
+            md_dir=md_path.parent.resolve(),
         ))
         print(f"Markdown: {args.out_md}")
 
