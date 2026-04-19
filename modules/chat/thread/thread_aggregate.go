@@ -166,222 +166,253 @@ func (t *ThreadAggregate) RecordToolEvent(event Event) error {
 func (t *ThreadAggregate) Apply(event Event) {
 	switch e := event.(type) {
 	case *ThreadCreated:
-		t.ID = e.ThreadID
-		t.UserID = e.UserID
-		t.Title = e.Title
-		t.CreatedAt = e.Timestamp
-		t.UpdatedAt = e.Timestamp
-		t.IsDeleted = false
-
+		t.applyThreadCreated(e)
 	case *UserMessageAdded:
-		msg := Message{
-			ID:        e.MessageID,
-			Role:      "user",
-			Content:   e.Content,
-			Timestamp: e.Timestamp,
-		}
-		if len(e.Attachments) > 0 {
-			atts := make([]any, len(e.Attachments))
-			for i, att := range e.Attachments {
-				atts[i] = map[string]any{
-					"url":      att.URL,
-					"mimeType": att.MimeType,
-					"fileName": att.FileName,
-				}
-			}
-			msg.Metadata = map[string]any{"attachments": atts}
-		}
-		t.Messages = append(t.Messages, msg)
-		t.UpdatedAt = e.Timestamp
-
+		t.applyUserMessageAdded(e)
 	case *AssistantMessageAdded:
-		msg := Message{
-			ID:        e.MessageID,
-			Role:      "assistant",
-			Content:   e.Content,
-			ToolCalls: e.ToolCalls,
-			AgentName: e.AgentName,
-			Timestamp: e.Timestamp,
-		}
-		t.Messages = append(t.Messages, msg)
-		t.UpdatedAt = e.Timestamp
-
+		t.applyAssistantMessageAdded(e)
 	case *ToolResultAdded:
-		msg := Message{
-			ID:         e.MessageID,
-			Role:       "tool",
-			Content:    e.Result,
-			ToolCallID: e.ToolCallID,
-			ToolName:   e.ToolName,
-			AgentName:  e.AgentName,
-			Timestamp:  e.Timestamp,
-		}
-		t.Messages = append(t.Messages, msg)
-		t.UpdatedAt = e.Timestamp
-
-		// Remove the tool from active states when result is added
-		delete(t.ActiveToolStates, e.ToolCallID)
-
+		t.applyToolResultAdded(e)
 	case *CodeExecutionRan:
-		// Each code block the LLM provider's sandbox ran becomes its own
-		// message row so the chat card survives a refresh. Structured
-		// context (language, output, outcome) travels in Metadata; the
-		// projection reads these back into the AguiThreadState sidecar.
-		//
-		// The synthesised ID matches applyCodeExecutionRan's key so the
-		// aggregate's view and the projection's view agree on message_id
-		// — important for ON CONFLICT dedup and for frontend lookups.
-		msg := Message{
-			ID:        "codeexec_" + e.MessageID + "_" + e.BlockID,
-			Role:      "code_execution",
-			Content:   e.Code,
-			AgentName: e.AgentName,
-			Timestamp: e.Timestamp,
-			Metadata: map[string]any{
-				"codeExecution": map[string]any{
-					"language": e.Language,
-					"output":   e.Output,
-					"outcome":  e.Outcome,
-					"blockId":  e.BlockID,
-				},
-			},
-		}
-		t.Messages = append(t.Messages, msg)
-		t.UpdatedAt = e.Timestamp
-
+		t.applyCodeExecutionRan(e)
 	case *ThreadTitleUpdated:
 		t.Title = e.Title
 		t.UpdatedAt = e.Timestamp
-
 	case *ThreadDeleted:
 		t.IsDeleted = true
 		t.UpdatedAt = e.Timestamp
-
 	case *ToolNeedsInput:
-		state := ToolCallState{
-			ToolCallID:         e.ToolCallID,
-			OriginalToolCallID: e.OriginalToolCallID,
-			ToolName:           e.ToolName,
-			AgentName:          e.AgentName,
-			Status:             "AwaitingInput",
-			Elicitation: map[string]any{
-				"question": e.Elicitation.Question,
-				"schema":   e.Elicitation.Schema,
-			},
-		}
-		t.ActiveToolStates[e.ToolCallID] = state
-
+		t.applyToolNeedsInput(e)
 	case *ToolNeedsConfirmation:
-		state := ToolCallState{
-			ToolCallID:         e.ToolCallID,
-			OriginalToolCallID: e.OriginalToolCallID,
-			ToolName:           e.ToolName,
-			AgentName:          e.AgentName,
-			Status:             "AwaitingConfirmation",
-			Elicitation: map[string]any{
-				"question": e.Question,
-			},
-		}
-		t.ActiveToolStates[e.ToolCallID] = state
-
+		t.applyToolNeedsConfirmation(e)
 	case *ToolNeedsAuth:
-		state := ToolCallState{
-			ToolCallID: e.ToolCallID,
-			ToolName:   e.ToolName,
-			AgentName:  e.AgentName,
-			Status:     "AwaitingAuth",
-			AuthSpec: map[string]any{
-				"resource": e.AuthSpec.Resource,
-				"action":   e.AuthSpec.Action,
-				"reason":   e.AuthSpec.Reason,
-				"scopes":   e.AuthSpec.Scopes,
-			},
-		}
-		t.ActiveToolStates[e.ToolCallID] = state
-
+		t.applyToolNeedsAuth(e)
 	case *InputProvided:
-		// Look up by original tool call ID (for confirmations) or wrapper ID
-		var state ToolCallState
-		var found bool
-		var keyToDelete string
-
-		// Try direct lookup first
-		if s, ok := t.ActiveToolStates[e.ToolCallID]; ok {
-			state = s
-			keyToDelete = e.ToolCallID
-			found = true
-		} else {
-			// Try finding by OriginalToolCallID (for confirmation responses)
-			for k, s := range t.ActiveToolStates {
-				if s.OriginalToolCallID == e.ToolCallID {
-					state = s
-					keyToDelete = k
-					found = true
-					break
-				}
-			}
-		}
-
-		if found {
-			// Record the user's answer as the real tool result message.
-			// No placeholder was stored during the pause — this is the
-			// single source of truth for the tool's output, ensuring the
-			// LLM sees a valid tool_call → tool_result pair.
-			msg := Message{
-				ID:                 e.MessageID,
-				Role:               "tool",
-				Content:            e.Input,
-				ToolCallID:         e.ToolCallID,
-				ToolName:           state.ToolName,
-				AgentName:          state.AgentName,
-				Timestamp:          e.Timestamp,
-				OriginalToolCallID: state.OriginalToolCallID, // Preserve for session rebuild
-			}
-			t.Messages = append(t.Messages, msg)
-			delete(t.ActiveToolStates, keyToDelete)
-			t.UpdatedAt = e.Timestamp
-		}
-
+		t.applyInputProvided(e)
 	case *AuthGranted:
-		if state, ok := t.ActiveToolStates[e.ToolCallID]; ok {
-			state.Status = "AuthGranted"
-			t.ActiveToolStates[e.ToolCallID] = state
-		}
-
+		t.updateToolStatus(e.ToolCallID, "AuthGranted")
 	case *AuthDenied:
-		if state, ok := t.ActiveToolStates[e.ToolCallID]; ok {
-			state.Status = "AuthDenied"
-			t.ActiveToolStates[e.ToolCallID] = state
-		}
-
+		t.updateToolStatus(e.ToolCallID, "AuthDenied")
 	case *ToolCancelled:
-		// Remove the tool from active states when cancelled
 		delete(t.ActiveToolStates, e.ToolCallID)
 		t.UpdatedAt = e.Timestamp
-
-	case *RunStarted:
-		// Update the thread's last activity timestamp when a run starts
-		t.UpdatedAt = e.Timestamp
-
-	case *RunFinished:
-		// Update the thread's last activity timestamp when a run finishes
-		t.UpdatedAt = e.Timestamp
-
-	case *TokenUsageReported:
-		// Track token usage if needed
-		t.UpdatedAt = e.Timestamp
-
+	case *RunStarted, *RunFinished, *TokenUsageReported:
+		// These events only bump the thread's last-activity timestamp.
+		t.UpdatedAt = eventTimestamp(event)
 	case *StateChangeReported:
-		// Persist session state from agent runs.
-		// Keys prefixed with "__" or "temp:" are internal ADK keys and not persisted.
-		if !strings.HasPrefix(e.Key, "__") && !strings.HasPrefix(e.Key, "temp:") {
-			if t.State == nil {
-				t.State = make(map[string]any)
-			}
-			t.State[e.Key] = e.Value
-		}
-		t.UpdatedAt = e.Timestamp
+		t.applyStateChangeReported(e)
 	}
+}
+
+// ─── Per-event application helpers ───────────────────────────────────────────
+//
+// Each method owns the state mutation for one event type. Grouping them by
+// concern (thread metadata / message additions / tool lifecycle / state
+// mutations) keeps Apply a flat dispatch table.
+
+func (t *ThreadAggregate) applyThreadCreated(e *ThreadCreated) {
+	t.ID = e.ThreadID
+	t.UserID = e.UserID
+	t.Title = e.Title
+	t.CreatedAt = e.Timestamp
+	t.UpdatedAt = e.Timestamp
+	t.IsDeleted = false
+}
+
+func (t *ThreadAggregate) applyUserMessageAdded(e *UserMessageAdded) {
+	msg := Message{
+		ID:        e.MessageID,
+		Role:      "user",
+		Content:   e.Content,
+		Timestamp: e.Timestamp,
+	}
+	if len(e.Attachments) > 0 {
+		atts := make([]any, len(e.Attachments))
+		for i, att := range e.Attachments {
+			atts[i] = map[string]any{
+				"url":      att.URL,
+				"mimeType": att.MimeType,
+				"fileName": att.FileName,
+			}
+		}
+		msg.Metadata = map[string]any{"attachments": atts}
+	}
+	t.Messages = append(t.Messages, msg)
+	t.UpdatedAt = e.Timestamp
+}
+
+func (t *ThreadAggregate) applyAssistantMessageAdded(e *AssistantMessageAdded) {
+	t.Messages = append(t.Messages, Message{
+		ID:        e.MessageID,
+		Role:      "assistant",
+		Content:   e.Content,
+		ToolCalls: e.ToolCalls,
+		AgentName: e.AgentName,
+		Timestamp: e.Timestamp,
+	})
+	t.UpdatedAt = e.Timestamp
+}
+
+func (t *ThreadAggregate) applyToolResultAdded(e *ToolResultAdded) {
+	t.Messages = append(t.Messages, Message{
+		ID:         e.MessageID,
+		Role:       "tool",
+		Content:    e.Result,
+		ToolCallID: e.ToolCallID,
+		ToolName:   e.ToolName,
+		AgentName:  e.AgentName,
+		Timestamp:  e.Timestamp,
+	})
+	t.UpdatedAt = e.Timestamp
+	// Remove the tool from active states when result is added.
+	delete(t.ActiveToolStates, e.ToolCallID)
+}
+
+// applyCodeExecutionRan materialises one code-execution block as a chat
+// message row so the card survives a refresh. Structured context
+// (language, output, outcome) travels in Metadata; the projection reads
+// these back into the AguiThreadState sidecar. The synthesised ID
+// matches the projection's key so the aggregate view and the projection
+// agree on message_id — important for ON CONFLICT dedup and frontend
+// lookups.
+func (t *ThreadAggregate) applyCodeExecutionRan(e *CodeExecutionRan) {
+	t.Messages = append(t.Messages, Message{
+		ID:        "codeexec_" + e.MessageID + "_" + e.BlockID,
+		Role:      "code_execution",
+		Content:   e.Code,
+		AgentName: e.AgentName,
+		Timestamp: e.Timestamp,
+		Metadata: map[string]any{
+			"codeExecution": map[string]any{
+				"language": e.Language,
+				"output":   e.Output,
+				"outcome":  e.Outcome,
+				"blockId":  e.BlockID,
+			},
+		},
+	})
+	t.UpdatedAt = e.Timestamp
+}
+
+func (t *ThreadAggregate) applyToolNeedsInput(e *ToolNeedsInput) {
+	t.ActiveToolStates[e.ToolCallID] = ToolCallState{
+		ToolCallID:         e.ToolCallID,
+		OriginalToolCallID: e.OriginalToolCallID,
+		ToolName:           e.ToolName,
+		AgentName:          e.AgentName,
+		Status:             "AwaitingInput",
+		Elicitation: map[string]any{
+			"question": e.Elicitation.Question,
+			"schema":   e.Elicitation.Schema,
+		},
+	}
+}
+
+func (t *ThreadAggregate) applyToolNeedsConfirmation(e *ToolNeedsConfirmation) {
+	t.ActiveToolStates[e.ToolCallID] = ToolCallState{
+		ToolCallID:         e.ToolCallID,
+		OriginalToolCallID: e.OriginalToolCallID,
+		ToolName:           e.ToolName,
+		AgentName:          e.AgentName,
+		Status:             "AwaitingConfirmation",
+		Elicitation: map[string]any{
+			"question": e.Question,
+		},
+	}
+}
+
+func (t *ThreadAggregate) applyToolNeedsAuth(e *ToolNeedsAuth) {
+	t.ActiveToolStates[e.ToolCallID] = ToolCallState{
+		ToolCallID: e.ToolCallID,
+		ToolName:   e.ToolName,
+		AgentName:  e.AgentName,
+		Status:     "AwaitingAuth",
+		AuthSpec: map[string]any{
+			"resource": e.AuthSpec.Resource,
+			"action":   e.AuthSpec.Action,
+			"reason":   e.AuthSpec.Reason,
+			"scopes":   e.AuthSpec.Scopes,
+		},
+	}
+}
+
+// applyInputProvided records the user's answer as the real tool result
+// message. No placeholder was stored during the pause — this event is
+// the single source of truth for the tool's output so the LLM sees a
+// valid tool_call → tool_result pair. The lookup is two-step: try the
+// direct tool-call ID, then fall back to OriginalToolCallID scan to
+// handle confirmation responses that carry the original id.
+func (t *ThreadAggregate) applyInputProvided(e *InputProvided) {
+	state, keyToDelete, ok := t.findActiveToolState(e.ToolCallID)
+	if !ok {
+		return
+	}
+	t.Messages = append(t.Messages, Message{
+		ID:                 e.MessageID,
+		Role:               "tool",
+		Content:            e.Input,
+		ToolCallID:         e.ToolCallID,
+		ToolName:           state.ToolName,
+		AgentName:          state.AgentName,
+		Timestamp:          e.Timestamp,
+		OriginalToolCallID: state.OriginalToolCallID,
+	})
+	delete(t.ActiveToolStates, keyToDelete)
+	t.UpdatedAt = e.Timestamp
+}
+
+// findActiveToolState returns the ToolCallState keyed by id, either
+// directly or via a scan on OriginalToolCallID (confirmation-response
+// path). The returned key is the actual map key — which the caller
+// deletes to retire the tool from the active set.
+func (t *ThreadAggregate) findActiveToolState(id string) (ToolCallState, string, bool) {
+	if s, ok := t.ActiveToolStates[id]; ok {
+		return s, id, true
+	}
+	for k, s := range t.ActiveToolStates {
+		if s.OriginalToolCallID == id {
+			return s, k, true
+		}
+	}
+	return ToolCallState{}, "", false
+}
+
+// updateToolStatus flips the Status of an active tool call (no-op when
+// the id is unknown). Shared by AuthGranted/AuthDenied.
+func (t *ThreadAggregate) updateToolStatus(id, status string) {
+	if state, ok := t.ActiveToolStates[id]; ok {
+		state.Status = status
+		t.ActiveToolStates[id] = state
+	}
+}
+
+// applyStateChangeReported persists session state from agent runs. Keys
+// prefixed with "__" (internal markers) or "temp:" (ADK ephemeral scope)
+// are suppressed — they are never visible outside the run.
+func (t *ThreadAggregate) applyStateChangeReported(e *StateChangeReported) {
+	if !strings.HasPrefix(e.Key, "__") && !strings.HasPrefix(e.Key, "temp:") {
+		if t.State == nil {
+			t.State = make(map[string]any)
+		}
+		t.State[e.Key] = e.Value
+	}
+	t.UpdatedAt = e.Timestamp
+}
+
+// eventTimestamp pulls the Timestamp field from events that only update
+// the thread's last-activity time — the three activity-meter events
+// share this shape but not a common interface, so a small type switch
+// does the lookup.
+func eventTimestamp(event Event) time.Time {
+	switch e := event.(type) {
+	case *RunStarted:
+		return e.Timestamp
+	case *RunFinished:
+		return e.Timestamp
+	case *TokenUsageReported:
+		return e.Timestamp
+	}
+	return time.Time{}
 }
 
 // StreamName returns the event stream name for this aggregate.
