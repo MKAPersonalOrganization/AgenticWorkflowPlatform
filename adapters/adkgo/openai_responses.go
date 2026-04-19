@@ -214,45 +214,55 @@ func contentsToResponsesInputItems(contents []*genai.Content) responses.Response
 		}
 		switch c.Role {
 		case "user":
-			if text := extractText(c); text != "" {
-				items = append(items, responses.ResponseInputItemParamOfMessage(text, responses.EasyInputMessageRoleUser))
-			}
-			for _, p := range c.Parts {
-				if p.FunctionResponse == nil {
-					continue
-				}
-				if strings.HasPrefix(p.FunctionResponse.Name, "adk_") {
-					continue
-				}
-				resultJSON, _ := json.Marshal(p.FunctionResponse.Response)
-				items = append(items, responses.ResponseInputItemParamOfFunctionCallOutput(
-					p.FunctionResponse.ID, string(resultJSON),
-				))
-			}
-
+			items = append(items, userContentToResponsesInput(c)...)
 		case "model":
-			if text := extractText(c); text != "" {
-				items = append(items, responses.ResponseInputItemParamOfMessage(text, responses.EasyInputMessageRoleAssistant))
-			}
-			for _, p := range c.Parts {
-				if p.FunctionCall == nil {
-					continue
-				}
-				if strings.HasPrefix(p.FunctionCall.Name, "adk_") {
-					continue
-				}
-				argsJSON, _ := json.Marshal(p.FunctionCall.Args)
-				items = append(items, responses.ResponseInputItemParamOfFunctionCall(
-					string(argsJSON), p.FunctionCall.ID, p.FunctionCall.Name,
-				))
-			}
-
+			items = append(items, modelContentToResponsesInput(c)...)
 		default:
 			// Treat unknown roles as user, matching the Chat Completions adapter.
 			if text := extractText(c); text != "" {
 				items = append(items, responses.ResponseInputItemParamOfMessage(text, responses.EasyInputMessageRoleUser))
 			}
 		}
+	}
+	return items
+}
+
+// userContentToResponsesInput emits one user message for any text, plus
+// one function_call_output entry per FunctionResponse. Internal adk_*
+// responses never cross the provider boundary.
+func userContentToResponsesInput(c *genai.Content) responses.ResponseInputParam {
+	var items responses.ResponseInputParam
+	if text := extractText(c); text != "" {
+		items = append(items, responses.ResponseInputItemParamOfMessage(text, responses.EasyInputMessageRoleUser))
+	}
+	for _, p := range c.Parts {
+		if p.FunctionResponse == nil || strings.HasPrefix(p.FunctionResponse.Name, "adk_") {
+			continue
+		}
+		resultJSON, _ := json.Marshal(p.FunctionResponse.Response)
+		items = append(items, responses.ResponseInputItemParamOfFunctionCallOutput(
+			p.FunctionResponse.ID, string(resultJSON),
+		))
+	}
+	return items
+}
+
+// modelContentToResponsesInput emits one assistant message for any text,
+// plus one function_call entry per FunctionCall. Internal adk_* tool
+// calls are filtered for the same reason as user responses.
+func modelContentToResponsesInput(c *genai.Content) responses.ResponseInputParam {
+	var items responses.ResponseInputParam
+	if text := extractText(c); text != "" {
+		items = append(items, responses.ResponseInputItemParamOfMessage(text, responses.EasyInputMessageRoleAssistant))
+	}
+	for _, p := range c.Parts {
+		if p.FunctionCall == nil || strings.HasPrefix(p.FunctionCall.Name, "adk_") {
+			continue
+		}
+		argsJSON, _ := json.Marshal(p.FunctionCall.Args)
+		items = append(items, responses.ResponseInputItemParamOfFunctionCall(
+			string(argsJSON), p.FunctionCall.ID, p.FunctionCall.Name,
+		))
 	}
 	return items
 }
@@ -303,89 +313,114 @@ func toolsToResponsesParam(tools []*genai.Tool) []responses.ToolUnionParam {
 // events.go:translateCodeExecution already knows how to turn into
 // CodeExecutionRan domain events — so the same chat card that works for
 // Gemini renders for OpenAI without any downstream changes.
+// messageItemToParts pulls every non-empty output_text segment out of a
+// Responses-API message item. Other content types (refusal, tool calls
+// buried inside messages) are ignored — the Responses API surfaces them
+// as their own top-level items.
+func messageItemToParts(item responses.ResponseOutputItemUnion) []*genai.Part {
+	var parts []*genai.Part
+	for _, c := range item.Content {
+		if c.Type == "output_text" && c.Text != "" {
+			parts = append(parts, &genai.Part{Text: c.Text})
+		}
+	}
+	return parts
+}
+
+// functionCallItemToPart converts a Responses function_call into a
+// genai FunctionCall Part. Arguments is a union — OfString is the
+// common wire form; we fall back to marshalling the opaque shape so
+// unexpected variants aren't silently dropped. The call ID defaults to
+// item.ID when CallID is absent (older API versions).
+func functionCallItemToPart(item responses.ResponseOutputItemUnion) *genai.Part {
+	raw := item.Arguments.OfString
+	if raw == "" {
+		if b, err := json.Marshal(item.Arguments); err == nil {
+			raw = string(b)
+		}
+	}
+	var args map[string]any
+	_ = json.Unmarshal([]byte(raw), &args)
+	id := item.CallID
+	if id == "" {
+		id = item.ID
+	}
+	return &genai.Part{
+		FunctionCall: &genai.FunctionCall{
+			ID:   id,
+			Name: item.Name,
+			Args: args,
+		},
+	}
+}
+
+// codeInterpreterItemToParts expands a code_interpreter_call into
+// ExecutableCode + CodeExecutionResult pair keyed on the same item.ID,
+// so events.go:translateCodeExecution groups them into one
+// CodeExecutionRan domain event — the same chat card that renders for
+// Gemini renders for OpenAI with zero downstream changes.
+func codeInterpreterItemToParts(item responses.ResponseOutputItemUnion) []*genai.Part {
+	var parts []*genai.Part
+	if item.Code != "" {
+		parts = append(parts, &genai.Part{
+			ExecutableCode: &genai.ExecutableCode{
+				ID:       item.ID,
+				Language: genai.LanguagePython,
+				Code:     item.Code,
+			},
+		})
+	}
+	outText := codeInterpreterOutputText(item.Outputs)
+	if outText != "" || item.Status != "" {
+		outcome := "OUTCOME_OK"
+		if item.Status == "failed" || item.Status == "incomplete" {
+			outcome = "OUTCOME_FAILED"
+		}
+		parts = append(parts, &genai.Part{
+			CodeExecutionResult: &genai.CodeExecutionResult{
+				ID:      item.ID,
+				Outcome: genai.Outcome(outcome),
+				Output:  outText,
+			},
+		})
+	}
+	return parts
+}
+
+// codeInterpreterOutputText concatenates textual logs and image URLs
+// into a single blob — what the chat card renders beneath the code
+// block. Images are referenced by URL so the card can link out.
+func codeInterpreterOutputText(outputs []responses.ResponseCodeInterpreterToolCallOutputUnion) string {
+	var b strings.Builder
+	for _, o := range outputs {
+		switch o.Type {
+		case "logs":
+			if o.Logs != "" {
+				b.WriteString(o.Logs)
+			}
+		case "image":
+			if o.URL != "" {
+				if b.Len() > 0 {
+					b.WriteString("\n")
+				}
+				b.WriteString("[image] ")
+				b.WriteString(o.URL)
+			}
+		}
+	}
+	return b.String()
+}
+
 func responsesOutputToLLMResponse(out []responses.ResponseOutputItemUnion, usage responses.ResponseUsage) *adkmodel.LLMResponse {
 	var parts []*genai.Part
 	for _, item := range out {
 		switch item.Type {
 		case "message":
-			for _, c := range item.Content {
-				if c.Type == "output_text" && c.Text != "" {
-					parts = append(parts, &genai.Part{Text: c.Text})
-				}
-			}
-
+			parts = append(parts, messageItemToParts(item)...)
 		case "function_call":
-			// Arguments is a union; OfString carries the raw JSON when
-			// the wire form is a string (the common case for function
-			// calls). Unmarshal through it.
-			raw := item.Arguments.OfString
-			if raw == "" {
-				// Fallback: marshal whatever arbitrary shape came back.
-				if b, err := json.Marshal(item.Arguments); err == nil {
-					raw = string(b)
-				}
-			}
-			var args map[string]any
-			_ = json.Unmarshal([]byte(raw), &args)
-			id := item.CallID
-			if id == "" {
-				id = item.ID
-			}
-			parts = append(parts, &genai.Part{
-				FunctionCall: &genai.FunctionCall{
-					ID:   id,
-					Name: item.Name,
-					Args: args,
-				},
-			})
-
+			parts = append(parts, functionCallItemToPart(item))
 		case "code_interpreter_call":
-			// Pair Code + Output under the same call ID so
-			// events.go:translateCodeExecution groups them into one
-			// CodeExecutionRan event.
-			if item.Code != "" {
-				parts = append(parts, &genai.Part{
-					ExecutableCode: &genai.ExecutableCode{
-						ID:       item.ID,
-						Language: genai.LanguagePython,
-						Code:     item.Code,
-					},
-				})
-			}
-			// Aggregate logs/image outputs into a single text blob so the
-			// chat card has something to show. Images are referenced by URL
-			// — we include the URL so the card can link out.
-			var outText strings.Builder
-			for _, o := range item.Outputs {
-				switch o.Type {
-				case "logs":
-					if o.Logs != "" {
-						outText.WriteString(o.Logs)
-					}
-				case "image":
-					if o.URL != "" {
-						if outText.Len() > 0 {
-							outText.WriteString("\n")
-						}
-						outText.WriteString("[image] ")
-						outText.WriteString(o.URL)
-					}
-				}
-			}
-			if outText.Len() > 0 || item.Status != "" {
-				outcome := "OUTCOME_OK"
-				if item.Status == "failed" || item.Status == "incomplete" {
-					outcome = "OUTCOME_FAILED"
-				}
-				parts = append(parts, &genai.Part{
-					CodeExecutionResult: &genai.CodeExecutionResult{
-						ID:      item.ID,
-						Outcome: genai.Outcome(outcome),
-						Output:  outText.String(),
-					},
-				})
-			}
-
+			parts = append(parts, codeInterpreterItemToParts(item)...)
 		default:
 			// Ignore unsupported item types (reasoning, file_search_call,
 			// web_search_call, image_generation_call, …). They'll land in
