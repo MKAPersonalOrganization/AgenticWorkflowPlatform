@@ -11,6 +11,7 @@ Inputs (all JSON from sibling tools):
   --trends        complexity_trend.py --discover --json
   --coupling      file_coupling.py -o
   --bugfix        bugfix_density.py -o (optional)
+  --lcom4         lcom4.py --json (optional; Go files only)
 
 Outputs:
   stdout          compact table of files with ≥1 signal, sorted by number
@@ -100,6 +101,46 @@ def load_bugfix(path: str | None) -> dict[str, dict]:
     return {f["path"]: f for f in d.get("files", [])}
 
 
+def load_lcom4(path: str | None, min_lcom4: int = 2) -> dict[str, dict]:
+    """Return by-file map of LCOM4 findings for Go files.
+
+    Only files whose current max LCOM4 meets the threshold are kept — a
+    cohesive file (LCOM4=1) is not a signal worth counting. The shape
+    mirrors the other loaders: a flat per-file record with the bits the
+    collator and reporters need (current max, delta, worst type, method
+    count, verdict).
+
+    The raw ``types`` list is preserved so detail blocks can surface
+    which type is fracturing and what its disjoint method groups are —
+    that's the insight LCOM4 provides that other signals can't.
+    """
+    if not path:
+        return {}
+    d = json.loads(Path(path).read_text())
+    entries = d.get("all") or d.get("ranked") or []
+    out: dict[str, dict] = {}
+    for e in entries:
+        last = e.get("last") or {}
+        max_lcom4 = last.get("max_lcom4") or 0
+        if max_lcom4 < min_lcom4:
+            continue
+        metrics = e.get("metrics") or {}
+        types = last.get("types") or []
+        # The "worst" type = highest LCOM4; ties broken by method count.
+        worst = max(types, key=lambda t: (t.get("lcom4", 0), t.get("methods", 0)), default=None)
+        out[e["path"]] = {
+            "path": e["path"],
+            "verdict": e.get("verdict", ""),
+            "max_lcom4": max_lcom4,
+            "lcom4_delta": metrics.get("lcom4_delta", 0),
+            "total_methods": last.get("total_methods", 0),
+            "worst_type": worst,
+            "types": types,
+            "score": e.get("score", 0),
+        }
+    return out
+
+
 def load_coupling(path: str, cooc_floor: int = 6) -> dict[str, list[dict]]:
     """Return by-file map of coupling partners."""
     d = json.loads(Path(path).read_text())
@@ -129,13 +170,15 @@ def collate(
     trends_by_file: dict[str, dict],
     coupling_by_file: dict[str, list[dict]],
     bugfix_by_file: dict[str, dict],
+    lcom4_by_file: dict[str, dict] | None = None,
 ) -> list[dict]:
     """Merge per-file data from every signal. No ranking, no scoring — just
     a record listing which analyses touched each file and what they measured.
     """
+    lcom4_by_file = lcom4_by_file or {}
     all_paths = (
         set(hotspots_by_file) | set(trends_by_file) | set(coupling_by_file)
-        | set(bugfix_by_file)
+        | set(bugfix_by_file) | set(lcom4_by_file)
     )
     records: list[dict] = []
     for path in all_paths:
@@ -143,12 +186,14 @@ def collate(
         tr = trends_by_file.get(path)
         cp = coupling_by_file.get(path) or []
         bf = bugfix_by_file.get(path)
+        lc = lcom4_by_file.get(path)
 
         present_in: list[str] = []
         if hs: present_in.append("hotspot")
         if tr: present_in.append("trend")
         if cp: present_in.append("coupling")
         if bf: present_in.append("bugfix")
+        if lc: present_in.append("lcom4")
 
         records.append({
             "path": path,
@@ -158,6 +203,7 @@ def collate(
             "trend": tr,
             "coupling": cp,
             "bugfix": bf,
+            "lcom4": lc,
         })
 
     # Order: files present in more analyses first (a factual count, not a
@@ -180,7 +226,7 @@ def print_stdout(records: list[dict], packages: list[dict]) -> None:
     print(f"\n── Files with ≥1 signal ({len(records)} total) ──")
     hdr = (f"{'Sig':<3}  {'Commits':>7}  {'Fix%':>5}  "
            f"{'Trend':<12}  {'Δmean':>6}  {'MaxI':>4}  "
-           f"{'Cpl':>3}  Path")
+           f"{'Cpl':>3}  {'LCOM4':>5}  Path")
     print(hdr)
     print("-" * len(hdr))
     for r in records:
@@ -194,9 +240,14 @@ def print_stdout(records: list[dict], packages: list[dict]) -> None:
         dmean = f"{tm['mean_delta']:+.2f}" if "mean_delta" in tm else ""
         maxi = f"{tm['last_max']:.0f}" if "last_max" in tm else ""
         cpl = len(r["coupling"]) if r["coupling"] else ""
+        lc = r["lcom4"]
+        lcom4_txt = ""
+        if lc:
+            d = lc.get("lcom4_delta") or 0
+            lcom4_txt = f"{lc['max_lcom4']}" + (f"(+{d})" if d > 0 else "")
         print(f"{r['signal_count']:<3}  {str(commits):>7}  {fix_pct:>5}  "
               f"{_trunc(trend_verdict, 12):<12}  {dmean:>6}  {maxi:>4}  "
-              f"{str(cpl):>3}  {r['path']}")
+              f"{str(cpl):>3}  {lcom4_txt:>5}  {r['path']}")
 
 
 def to_markdown(records: list[dict], packages: list[dict], meta: dict,
@@ -256,6 +307,7 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
     lines.append("| max-indent | `complexity_trend.py` | Deepest whitespace-indent in the last sampled revision |")
     lines.append("| fix-pct | `bugfix_density.py` | Fraction of this file's commits whose subject line matched fix keywords (`fix`, `bug`, `hotfix`, `regression`, `crash`, `revert`, `typo`, etc., word-bounded) |")
     lines.append("| coupling count | `file_coupling.py` | Number of partner files that co-change with this one at cooccurrence ≥ 6 |")
+    lines.append("| LCOM4 | `lcom4.py` | Max number of disjoint method groups across any Go type in the file. 1 = cohesive. ≥ 2 = the type could be split into that many types with no shared state or calls. Go-only; ignores receiverless functions; known false-positives on types that delegate to an embedded interface. |")
     lines.append("")
 
     # Top packages — orientation.
@@ -310,8 +362,8 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
         lines.append(f"\n![signal matrix]({_img_src(plot_paths['matrix'])})\n")
 
     lines.append(f"## File overview ({len(visible)} files)\n")
-    lines.append("| File | Signals | Commits | Fix count | Fix % | Trend verdict | Δmean | Max indent | Hotspot score | Coupling partners |")
-    lines.append("|---|:-:|---:|---:|---:|:-:|---:|---:|---:|---:|")
+    lines.append("| File | Signals | Commits | Fix count | Fix % | Trend verdict | Δmean | Max indent | Hotspot score | Coupling partners | LCOM4 (Δ) |")
+    lines.append("|---|:-:|---:|---:|---:|:-:|---:|---:|---:|---:|:-:|")
     for r in visible:
         commits = (r["bugfix"]["total_commits"] if r["bugfix"]
                    else (r["trend"]["commits"] if r["trend"] else ""))
@@ -323,10 +375,16 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
         maxi = f"{tm['last_max']:.0f}" if "last_max" in tm else ""
         hs_score = f"{r['hotspot']['total_score']:,}" if r["hotspot"] else ""
         cpl = len(r["coupling"]) if r["coupling"] else ""
+        lc = r["lcom4"]
+        if lc:
+            d = lc.get("lcom4_delta") or 0
+            lcom4_cell = f"{lc['max_lcom4']}" + (f" (+{d})" if d > 0 else (f" ({d})" if d < 0 else ""))
+        else:
+            lcom4_cell = ""
         lines.append(
             f"| `{r['path']}` | {r['signal_count']} | "
             f"{commits} | {fix_n} | {fix_p} | {verdict} | "
-            f"{dmean} | {maxi} | {hs_score} | {cpl} |"
+            f"{dmean} | {maxi} | {hs_score} | {cpl} | {lcom4_cell} |"
         )
     lines.append("")
 
@@ -444,6 +502,37 @@ def _detail_block(r: dict) -> list[str]:
             out.append(f"- `{p['partner']}` — {p['cooccur']:.0f} co-changes, J={p['jaccard']:.0f}{marker}")
         out.append("")
 
+    if r["lcom4"]:
+        lc = r["lcom4"]
+        delta = lc.get("lcom4_delta") or 0
+        delta_txt = f" (Δ {delta:+d} over the window)" if delta else ""
+        out.append(
+            f"**lcom4** — max LCOM4 {lc['max_lcom4']}{delta_txt}, "
+            f"{lc.get('total_methods', 0)} methods total across "
+            f"{len(lc.get('types', []))} type(s). Verdict: **{lc.get('verdict', 'n/a')}**."
+        )
+        # Surface only types whose LCOM4 ≥ 2 — the cohesive ones aren't
+        # the story. For each, show how the methods split into disjoint
+        # groups so the reader can see whether the split lines up with
+        # a real seam (e.g., two unrelated responsibilities) or is a
+        # false positive (e.g., thin delegates over an embedded type).
+        worst = [t for t in lc.get("types", []) if t.get("lcom4", 0) >= 2]
+        worst.sort(key=lambda t: (-t.get("lcom4", 0), -t.get("methods", 0)))
+        for t in worst[:3]:
+            line = t.get("first_line") or 0
+            loc_ref = f" (L{line})" if line else ""
+            out.append(f"- `{t['type']}`{loc_ref} — LCOM4={t['lcom4']}, "
+                       f"{t['methods']} methods, groups of "
+                       f"{[len(g) for g in t.get('groups', [])]}")
+            # Pool the groups into a readable hint: full membership for small
+            # groups, a count+sample for large ones.
+            for g in t.get("groups", []):
+                if len(g) <= 6:
+                    out.append(f"  - {{{', '.join(g)}}}")
+                else:
+                    out.append(f"  - {{{', '.join(g[:4])}, … +{len(g) - 4} more}}")
+        out.append("")
+
     return out
 
 
@@ -500,12 +589,17 @@ def _apply_plot_style(plt) -> None:
     })
 
 
-def _file_metric_tuple(r: dict) -> tuple[float, float, float, float]:
-    """Return the four per-file signal values as a normalized tuple.
+def _file_metric_tuple(r: dict) -> tuple[float, float, float, float, float]:
+    """Return the per-file signal values as a tuple.
 
     Picks one representative number per analysis so the matrix/scatter
     can plot them side-by-side. Returns raw values; normalization is
     handled per-diagram.
+
+    LCOM4 is surfaced as ``max_lcom4 - 1`` so that LCOM4=1 (cohesive) is
+    0 — the matrix column then reads as "how many extra responsibilities
+    does this file carry". Files that don't appear in the LCOM4 report
+    (not Go, or below threshold) get 0.
     """
     hs_score = float(r["hotspot"]["total_score"]) if r["hotspot"] else 0.0
     tm = (r["trend"] or {}).get("metrics") or {}
@@ -514,7 +608,9 @@ def _file_metric_tuple(r: dict) -> tuple[float, float, float, float]:
     dmean = float(tm.get("mean_delta") or 0.0)
     fix_pct = float(r["bugfix"]["fix_pct"]) if r["bugfix"] else 0.0
     cpl = float(len(r["coupling"]) if r["coupling"] else 0)
-    return hs_score, dmean, fix_pct, cpl
+    lc = r.get("lcom4")
+    lcom4_excess = float(max(0, (lc.get("max_lcom4") or 0) - 1)) if lc else 0.0
+    return hs_score, dmean, fix_pct, cpl, lcom4_excess
 
 
 def render_signal_matrix(records: list[dict], out_path: Path,
@@ -543,27 +639,28 @@ def render_signal_matrix(records: list[dict], out_path: Path,
 
     rows = []
     for r in visible:
-        hs, dmean, fix, cpl = _file_metric_tuple(r)
+        hs, dmean, fix, cpl, lc = _file_metric_tuple(r)
         # Clamp Δmean to the deteriorating direction for the matrix.
-        rows.append((r["path"], r["signal_count"], hs, max(0.0, dmean), fix, cpl))
+        rows.append((r["path"], r["signal_count"], hs, max(0.0, dmean), fix, cpl, lc))
 
     # Rank rows by "number of non-zero signals then max normalized value"
     # so the top of the matrix is the most-lit-up files.
-    rows.sort(key=lambda t: (-t[1], -(t[2] + 100 * t[3] + t[4] + t[5])))
+    rows.sort(key=lambda t: (-t[1], -(t[2] + 100 * t[3] + t[4] + t[5] + 100 * t[6])))
     rows = rows[:top_n]
     if not rows:
         return None
 
     _apply_plot_style(plt)
     import numpy as np
-    data = np.array([[r[2], r[3], r[4], r[5]] for r in rows], dtype=float)
+    data = np.array([[r[2], r[3], r[4], r[5], r[6]] for r in rows], dtype=float)
     # Per-column max for normalisation. Guard against all-zero column.
     col_max = data.max(axis=0)
     col_max[col_max == 0] = 1.0
     norm = data / col_max
 
     labels = [r[0] for r in rows]
-    cols = ["hotspot\nscore", "Δmean\n(deterioration)", "bug-fix %", "coupling\npartners"]
+    cols = ["hotspot\nscore", "Δmean\n(deterioration)", "bug-fix %",
+            "coupling\npartners", "LCOM4\n(excess)"]
     sig_counts = [r[1] for r in rows]
 
     # Figure size scales with row count so rows stay legible.
@@ -584,7 +681,7 @@ def render_signal_matrix(records: list[dict], out_path: Path,
     # Annotate each cell with the raw (un-normalized) value so the reader
     # can read off actual numbers, not just relative intensity.
     for i, row in enumerate(rows):
-        vals = [row[2], row[3], row[4], row[5]]
+        vals = [row[2], row[3], row[4], row[5], row[6]]
         for j, v in enumerate(vals):
             if v == 0:
                 txt = "—"
@@ -594,6 +691,10 @@ def render_signal_matrix(records: list[dict], out_path: Path,
                 txt = f"{v:+.2f}"
             elif j == 2:
                 txt = f"{v:.0f}%"
+            elif j == 4:
+                # LCOM4 column stores "excess" (max_lcom4 - 1); print back
+                # the original LCOM4 so a reader doesn't have to translate.
+                txt = f"{int(v) + 1}"
             else:
                 txt = f"{int(v)}"
             # Pick text color by cell darkness (imshow YlOrRd: high = dark).
@@ -601,16 +702,16 @@ def render_signal_matrix(records: list[dict], out_path: Path,
             ax.text(j, i, txt, ha="center", va="center",
                     fontsize=7.2, color=color, fontweight="semibold")
 
-    # Signal-count badge on the right of each row.
+    # Signal-count badge on the right of each row (5 analyses now).
     for i, n in enumerate(sig_counts):
-        ax.text(3.7, i, f"[{n}/4]",
+        ax.text(4.7, i, f"[{n}/5]",
                 ha="left", va="center", fontsize=7, color="#606060",
                 fontstyle="italic")
 
     ax.set_title(
-        "Cross-signal matrix — per-file intensity across four analyses\n"
+        "Cross-signal matrix — per-file intensity across five analyses\n"
         f"(top {len(rows)} files, signals≥{min_signals}; cells normalized per column; "
-        "raw values overlaid; [n/4] = how many analyses mentioned the file)",
+        "raw values overlaid; [n/5] = how many analyses mentioned the file)",
         fontsize=10, loc="left", pad=14,
     )
     cbar = fig.colorbar(im, ax=ax, shrink=0.55, pad=0.02, aspect=20)
@@ -648,7 +749,7 @@ def render_signal_scatter(records: list[dict], out_path: Path,
     visible = [r for r in records if r["signal_count"] >= min_signals]
     pts = []
     for r in visible:
-        hs, dmean, fix, cpl = _file_metric_tuple(r)
+        hs, dmean, fix, cpl, lc = _file_metric_tuple(r)
         # A file needs both a hotspot score AND a trend signal to appear —
         # otherwise we can't place it on the plane honestly.
         if hs <= 0 or r["trend"] is None:
@@ -656,6 +757,7 @@ def render_signal_scatter(records: list[dict], out_path: Path,
         pts.append({
             "path": r["path"], "signal_count": r["signal_count"],
             "hs": hs, "dmean": dmean, "fix": fix, "cpl": cpl,
+            "lcom4_excess": lc,
         })
     if not pts:
         return None
@@ -664,13 +766,21 @@ def render_signal_scatter(records: list[dict], out_path: Path,
     fig, ax = plt.subplots(figsize=(11, 7.5))
     fig.subplots_adjust(left=0.08, right=0.97, top=0.88, bottom=0.12)
 
-    color_by_sig = {1: "#9ca3af", 2: _CMAP_BLUE, 3: _CMAP_AMBER, 4: _CMAP_RED}
+    # Color ramps with signal count up to 5 (hotspot + trend + coupling +
+    # bugfix + lcom4). Points with an LCOM4 signal get a dark ring so the
+    # structural-cohesion flag pops out visually without needing its own
+    # axis — you can read "this file has hotspot + trend + LCOM4" at a
+    # glance from color + outline.
+    color_by_sig = {1: "#9ca3af", 2: _CMAP_BLUE, 3: _CMAP_AMBER,
+                    4: _CMAP_RED, 5: "#7b1133"}
     xs = [p["hs"] for p in pts]
     ys = [p["dmean"] for p in pts]
     sizes = [40 + min(360, p["fix"] * 12) for p in pts]
     colors = [color_by_sig.get(p["signal_count"], "#9ca3af") for p in pts]
+    edges = ["#222" if p["lcom4_excess"] > 0 else "white" for p in pts]
+    widths = [1.6 if p["lcom4_excess"] > 0 else 0.8 for p in pts]
     ax.scatter(xs, ys, s=sizes, c=colors, alpha=0.75,
-               edgecolor="white", linewidth=0.8)
+               edgecolor=edges, linewidth=widths)
 
     ax.set_xscale("symlog", linthresh=100)
     ax.set_xlabel("hotspot score (go_hotspots)  ·  log axis")
@@ -707,10 +817,10 @@ def render_signal_scatter(records: list[dict], out_path: Path,
             fontsize=7, color="#303030", alpha=0.9,
         )
 
-    # Legend for color (signal count) and size (fix%).
+    # Legend for color (signal count), size (fix%), and outline (LCOM4).
     legend_markers = []
     from matplotlib.lines import Line2D
-    for n in (2, 3, 4):
+    for n in (2, 3, 4, 5):
         legend_markers.append(Line2D(
             [0], [0], marker="o", linestyle="", markersize=8,
             markerfacecolor=color_by_sig[n], markeredgecolor="white",
@@ -725,6 +835,11 @@ def render_signal_scatter(records: list[dict], out_path: Path,
         [0], [0], marker="o", linestyle="", markersize=14,
         markerfacecolor="#aaa", markeredgecolor="white",
         label="bug-fix 25%",
+    ))
+    legend_markers.append(Line2D(
+        [0], [0], marker="o", linestyle="", markersize=10,
+        markerfacecolor="#ddd", markeredgecolor="#222", markeredgewidth=1.6,
+        label="LCOM4 ≥ 2 (outlined)",
     ))
     ax.legend(handles=legend_markers, loc="lower right", ncol=2,
               fontsize=8, title="marker key", title_fontsize=8)
@@ -750,6 +865,7 @@ def main() -> int:
     ap.add_argument("--trends", required=True, help="complexity_trend.py --json output")
     ap.add_argument("--coupling", required=True, help="file_coupling.py -o output")
     ap.add_argument("--bugfix", help="bugfix_density.py -o output (optional)")
+    ap.add_argument("--lcom4", help="lcom4.py --json output (optional; Go files only)")
     ap.add_argument("--out-md", type=str, help="write markdown data report to this path")
     ap.add_argument("--out-json", type=str, help="write merged data JSON to this path")
     ap.add_argument("--cooccur-floor", type=int, default=6,
@@ -774,11 +890,13 @@ def main() -> int:
         trends_by_file = load_trends(args.trends)
         coupling_by_file = load_coupling(args.coupling, args.cooccur_floor)
         bugfix_by_file = load_bugfix(args.bugfix)
+        lcom4_by_file = load_lcom4(args.lcom4)
     except FileNotFoundError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
 
-    records = collate(hotspots_by_file, trends_by_file, coupling_by_file, bugfix_by_file)
+    records = collate(hotspots_by_file, trends_by_file, coupling_by_file,
+                      bugfix_by_file, lcom4_by_file)
     print_stdout(records, packages)
 
     meta = {
