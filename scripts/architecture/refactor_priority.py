@@ -13,6 +13,8 @@ Inputs (all JSON from sibling tools in scripts/architecture/):
   --bugfix        bugfix_density.py -o (optional)
   --lcom4         cohesion.py --json (optional; Go files only)
   --cyclomatic    cyclomatic.py --json (optional; multi-language)
+  --package-deps  package_deps.py --json (optional; Go packages,
+                  structural coupling via goda)
 
 Outputs:
   stdout          compact table of files with ≥1 signal, sorted by number
@@ -193,6 +195,36 @@ def load_cyclomatic(path: str | None, min_verdict: str = "LOW") -> dict[str, dic
     return out
 
 
+def load_package_deps(path: str | None) -> dict:
+    """Load the structural package-coupling report (from goda).
+
+    Unlike every other signal in this file, this one is
+    **package-granular**, not file-granular. We don't push it into the
+    per-file `records` — that would smear the same fan_in/fan_out
+    across every file in a package and create noise. Instead we carry
+    the entries through to the report unchanged so the reader sees a
+    dedicated "Package coupling (structural)" section.
+
+    Returned shape (or empty dict when no path supplied):
+      {
+        "module_prefix": "aicompass/",
+        "entries":  [...]   # per-package, filtered to the JSON's own
+                            # non-FINE set
+        "groups":   [...]   # per-grouping-rule rollups (optional)
+      }
+    """
+    if not path:
+        return {}
+    d = json.loads(Path(path).read_text())
+    return {
+        "module_prefix": d.get("module_prefix", ""),
+        "entries": d.get("all", []),
+        "ranked": d.get("ranked", []),
+        "groups": d.get("groups", []),
+        "thresholds": d.get("thresholds", {}),
+    }
+
+
 def load_coupling(path: str, cooc_floor: int = 6) -> dict[str, list[dict]]:
     """Return by-file map of coupling partners."""
     d = json.loads(Path(path).read_text())
@@ -315,7 +347,8 @@ def print_stdout(records: list[dict], packages: list[dict]) -> None:
 def to_markdown(records: list[dict], packages: list[dict], meta: dict,
                 md_min_signals: int = 2, md_min_commits: int = 3,
                 plot_paths: dict[str, Path] | None = None,
-                md_dir: Path | None = None) -> str:
+                md_dir: Path | None = None,
+                package_deps: dict | None = None) -> str:
     """Render the markdown data report.
 
     If ``plot_paths`` is given, each entry (keyed by diagram id) is
@@ -372,15 +405,112 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
     lines.append("| LCOM4 | `cohesion.py` | Max number of disjoint method groups across any Go type in the file. 1 = cohesive. ≥ 2 = the type could be split into that many types with no shared state or calls. Go-only; ignores receiverless functions; known false-positives on types that delegate to an embedded interface. |")
     lines.append("| CCN / Mod / High | `cyclomatic.py` | Max per-function cyclomatic complexity / max *modified* CCN (switch counts as 1) / count of functions ≥ threshold. A large gap between CCN and Mod means the file's complexity is switch-driven (a dispatcher), not tangled logic — refactor-by-splitting won't help. Multi-language (Go, JS, TS, Python, …); skips templ. |")
     lines.append("| Dups | `cyclomatic.py` | Number of duplicate (cloned) code blocks touching this file. Only populated when cyclomatic.py is run with `--duplicates`. Clones of ≥ 6 lines across files or within a file. |")
+    if package_deps and package_deps.get("entries"):
+        lines.append("| fan_in / fan_out / cut_pkgs | `package_deps.py` | Intra-module import fan-in, fan-out, and **cut-packages** (how many packages would become unreachable if this one vanished). Structural coupling — complements `file_coupling.py` which is temporal. Go-only; requires the `goda` binary. |")
     lines.append("")
 
-    # Top packages — orientation.
+    # Top packages — orientation (churn view from go_hotspots).
     lines.append("## Top package hotspots (orientation)\n")
     lines.append("| Score | Revs | LOC | Package |")
     lines.append("|---:|---:|---:|---|")
     for p in packages[:10]:
         lines.append(f"| {p['score']:,} | {p['revisions']} | {p['loc']:,} | `{p['name']}` |")
     lines.append("")
+
+    # Package coupling — the structural sibling to the churn view above.
+    # Two different questions: "which packages change a lot" (hotspots)
+    # vs. "which packages concentrate the dependency graph" (coupling).
+    # They usually name different packages. When the SAME package tops
+    # both lists the reader knows it's a bottleneck in every sense;
+    # when they disagree the reader has to decide which kind of
+    # refactor is cheaper.
+    if package_deps and package_deps.get("entries"):
+        pd_entries = package_deps["entries"]
+        module_prefix = package_deps.get("module_prefix", "")
+        lines.append("## Package coupling — structural (orientation)\n")
+        lines.append(
+            "Intra-module Go package imports (via `goda`). Complements the "
+            "churn table above by showing where the dependency graph "
+            "concentrates. A package with **high `cut_pkgs`** gates "
+            "everything downstream — refactoring it forces work in N "
+            "other packages. **High `fan_in`** = wide API surface; "
+            "**high `fan_out`** = orchestrator; **`instability = "
+            "fan_out / (fan_in + fan_out)`** 0→1, lower = more depended-on."
+        )
+        lines.append("")
+        # Short the package IDs to module-relative form so the table
+        # stays readable (e.g. "aicompass/modules/chat" → "modules/chat").
+        # The module root itself (pkg == module_prefix) reduces to an
+        # empty string — rename it so the row carries a label.
+        def _short(pkg: str) -> str:
+            if module_prefix and pkg.startswith(module_prefix):
+                short = pkg[len(module_prefix):].lstrip("/")
+                return short or "(module root — main.go)"
+            return pkg
+
+        # Skip the module root itself — it's always the biggest
+        # cut-package by construction (main.go reaches everything), and
+        # nothing reads it, so it's not a refactoring target.
+        pd_for_table = [e for e in pd_entries if e.get("id") != module_prefix]
+        ranked = sorted(
+            pd_for_table,
+            key=lambda e: (-e.get("cut_pkgs", 0), -e.get("fan_in", 0), -e.get("fan_out", 0)),
+        )[:15]
+        if ranked:
+            lines.append("| Verdict | Package | fan_in | fan_out | instability | cut_pkgs | cut_loc | LOC |")
+            lines.append("|:-:|---|---:|---:|---:|---:|---:|---:|")
+            for e in ranked:
+                inst = e.get("instability")
+                inst_cell = f"{inst:.2f}" if isinstance(inst, (int, float)) else "—"
+                lines.append(
+                    f"| {e.get('verdict', 'n/a')} | `{_short(e['id'])}` | "
+                    f"{e.get('fan_in', 0)} | {e.get('fan_out', 0)} | {inst_cell} | "
+                    f"{e.get('cut_pkgs', 0)} | {e.get('cut_loc', 0):,} | "
+                    f"{e.get('loc', 0):,} |"
+                )
+            lines.append("")
+
+        # Per-group rollups only when the author ran with a grouping
+        # file — the module-grouping view answers "which subsystem
+        # concentrates coupling".
+        groups = package_deps.get("groups") or []
+        if groups:
+            lines.append("### By group (module-level rollup)\n")
+            lines.append("| Group | Packages | LOC | Σ fan_in | Σ fan_out | max cut_pkgs |")
+            lines.append("|---|---:|---:|---:|---:|---:|")
+            for g in sorted(groups, key=lambda g: -g.get("max_cut_pkgs", 0))[:15]:
+                lines.append(
+                    f"| {g.get('name', '—')} | {g.get('packages', 0)} | "
+                    f"{g.get('loc', 0):,} | {g.get('fan_in_sum', 0)} | "
+                    f"{g.get('fan_out_sum', 0)} | {g.get('max_cut_pkgs', 0)} |"
+                )
+            lines.append("")
+
+        # Detail blocks for the HIGH-verdict packages only. MEDIUM/LOW
+        # live in the table + JSON; the HIGH ones deserve the importer
+        # list for "who depends on this" context. Skip the module root
+        # for the same reason as above.
+        high = [e for e in pd_entries
+                if e.get("verdict") == "HIGH" and e.get("id") != module_prefix]
+        if high:
+            lines.append("### Cut-package detail (HIGH)\n")
+            for e in sorted(high, key=lambda x: -x.get("cut_pkgs", 0)):
+                lines.append(
+                    f"**`{_short(e['id'])}`** — cut_pkgs {e.get('cut_pkgs', 0)}, "
+                    f"cut_loc {e.get('cut_loc', 0):,}, fan_in {e.get('fan_in', 0)}, "
+                    f"fan_out {e.get('fan_out', 0)}, own LOC {e.get('loc', 0):,}."
+                )
+                imp = e.get("top_importers") or []
+                if imp:
+                    shown = ", ".join(f"`{_short(p)}`" for p in imp[:6])
+                    more = f", +{len(imp) - 6} more" if len(imp) > 6 else ""
+                    lines.append(f"- importers: {shown}{more}")
+                deps = e.get("top_imports") or []
+                if deps:
+                    shown = ", ".join(f"`{_short(p)}`" for p in deps[:6])
+                    more = f", +{len(deps) - 6} more" if len(deps) > 6 else ""
+                    lines.append(f"- imports: {shown}{more}")
+                lines.append("")
 
     # Embed the cross-signal scatter here — it's the big-picture view that
     # belongs right after the orientation table. Only included when the
@@ -1039,6 +1169,8 @@ def main() -> int:
     ap.add_argument("--bugfix", help="bugfix_density.py -o output (optional)")
     ap.add_argument("--lcom4", help="cohesion.py --json output (optional; Go files only)")
     ap.add_argument("--cyclomatic", help="cyclomatic.py --json output (optional; multi-language)")
+    ap.add_argument("--package-deps", help="package_deps.py --json output "
+                                           "(optional; structural Go package coupling via goda)")
     ap.add_argument("--out-md", type=str, help="write markdown data report to this path")
     ap.add_argument("--out-json", type=str, help="write merged data JSON to this path")
     ap.add_argument("--cooccur-floor", type=int, default=6,
@@ -1065,6 +1197,7 @@ def main() -> int:
         bugfix_by_file = load_bugfix(args.bugfix)
         lcom4_by_file = load_lcom4(args.lcom4)
         cyclomatic_by_file = load_cyclomatic(args.cyclomatic)
+        package_deps = load_package_deps(args.package_deps)
     except FileNotFoundError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
@@ -1079,12 +1212,17 @@ def main() -> int:
     }
 
     if args.out_json:
-        Path(args.out_json).write_text(json.dumps({
+        merged_out = {
             "schema": "code-signals/1",
             "meta": meta,
             "packages": packages,
             "records": records,
-        }, indent=2, default=str))
+        }
+        if package_deps:
+            # Additive — keep the nested structure so consumers can
+            # tell file-level records from package-level entries.
+            merged_out["package_deps"] = package_deps
+        Path(args.out_json).write_text(json.dumps(merged_out, indent=2, default=str))
         print(f"\nJSON: {args.out_json}")
 
     # Render cross-signal diagrams. Matplotlib is optional — if it's not
@@ -1119,6 +1257,7 @@ def main() -> int:
             md_min_commits=args.md_min_commits,
             plot_paths=plot_paths,
             md_dir=md_path.parent.resolve(),
+            package_deps=package_deps,
         ))
         print(f"Markdown: {args.out_md}")
 
