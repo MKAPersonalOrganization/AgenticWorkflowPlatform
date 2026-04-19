@@ -167,7 +167,6 @@ export const agentDesigner = () => ({
         action: 'allow',
         require_confirmation: false,
         confirmation_hint: '',
-        max_invocations: 0,
     },
     savingReqConfig: false,
 
@@ -1508,7 +1507,6 @@ export const agentDesigner = () => ({
             action: plugin.requirement_config?.action || 'allow',
             require_confirmation: plugin.requirement_config?.require_confirmation || false,
             confirmation_hint: plugin.requirement_config?.confirmation_hint || '',
-            max_invocations: plugin.requirement_config?.max_invocations || 0,
         };
         this.showRequirementsPanel = true;
     },
@@ -1528,7 +1526,6 @@ export const agentDesigner = () => ({
             action: tool.requirement_config?.action || 'allow',
             require_confirmation: tool.requirement_config?.require_confirmation || false,
             confirmation_hint: tool.requirement_config?.confirmation_hint || '',
-            max_invocations: tool.requirement_config?.max_invocations || 0,
         };
         this.showRequirementsPanel = true;
     },

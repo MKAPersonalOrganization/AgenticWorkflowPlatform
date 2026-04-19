@@ -28,24 +28,18 @@ func New(
 
 // ToolRequirementConfigResponse is the JSON shape returned to the frontend.
 type ToolRequirementConfigResponse struct {
-	ToolSetID           string         `json:"tool_set_id"`
-	ToolID              string         `json:"tool_id,omitempty"`
-	Action              string         `json:"action"`
-	RequireConfirmation bool           `json:"require_confirmation"`
-	ConfirmationHint    string         `json:"confirmation_hint,omitempty"`
-	MaxInvocations      int            `json:"max_invocations,omitempty"`
-	Priority            int            `json:"priority,omitempty"`
-	CustomRules         map[string]any `json:"custom_rules,omitempty"`
+	ToolSetID           string `json:"tool_set_id"`
+	ToolID              string `json:"tool_id,omitempty"`
+	Action              string `json:"action"`
+	RequireConfirmation bool   `json:"require_confirmation"`
+	ConfirmationHint    string `json:"confirmation_hint,omitempty"`
 }
 
 // ToolRequirementConfigRequest is the JSON shape accepted from the frontend.
 type ToolRequirementConfigRequest struct {
-	Action              string         `json:"action"`
-	RequireConfirmation bool           `json:"require_confirmation"`
-	ConfirmationHint    string         `json:"confirmation_hint,omitempty"`
-	MaxInvocations      int            `json:"max_invocations,omitempty"`
-	Priority            int            `json:"priority,omitempty"`
-	CustomRules         map[string]any `json:"custom_rules,omitempty"`
+	Action              string `json:"action"`
+	RequireConfirmation bool   `json:"require_confirmation"`
+	ConfirmationHint    string `json:"confirmation_hint,omitempty"`
 }
 
 // GetToolRequirementConfig returns the requirement configuration for a single tool.

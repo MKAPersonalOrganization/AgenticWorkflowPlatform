@@ -32,31 +32,20 @@ const (
 // of the permission tables.
 //
 // The zero value is a valid "no special requirements" config: action defaults
-// to [RequirementActionAllow], no confirmation hint, no invocation limits.
+// to [RequirementActionAllow], no confirmation hint.
 type ToolRequirementConfig struct {
 	// Action governs the top-level requirement: allow / block / require_confirmation.
 	Action RequirementAction `json:"action,omitempty"`
 
-	// RequireConfirmation is an explicit flag (for forward-compat with
-	// future actions). When true, every invocation pauses for user approval.
-	// Equivalent to ADK-Go's FunctionTool.Config.RequireConfirmation.
+	// RequireConfirmation is an explicit flag equivalent to
+	// Action == RequirementActionRequireConfirmation. When true, every
+	// invocation pauses for user approval. Maps to ADK-Go's
+	// FunctionTool.Config.RequireConfirmation.
 	RequireConfirmation bool `json:"require_confirmation,omitempty"`
 
 	// ConfirmationHint is the human-readable prompt shown to the user when
 	// confirmation is required. Maps to ADK-Go ToolConfirmation.Hint.
 	ConfirmationHint string `json:"confirmation_hint,omitempty"`
-
-	// MaxInvocations limits how many times the tool may be called per
-	// conversation turn. 0 means unlimited.
-	MaxInvocations int `json:"max_invocations,omitempty"`
-
-	// Priority controls evaluation precedence when multiple requirements
-	// conflict. Higher priority wins.
-	Priority int `json:"priority,omitempty"`
-
-	// CustomRules holds additional key/value pairs for future extensibility
-	// (e.g. rate limits, cost budgets, time-of-day restrictions).
-	CustomRules map[string]any `json:"custom_rules,omitempty"`
 }
 
 // ParseToolRequirementConfig deserialises a JSON config string into a
@@ -83,12 +72,7 @@ func (c ToolRequirementConfig) MarshalConfig() string {
 
 // IsEmpty returns true when the config carries no meaningful requirements.
 func (c ToolRequirementConfig) IsEmpty() bool {
-	return c.Action == "" &&
-		!c.RequireConfirmation &&
-		c.ConfirmationHint == "" &&
-		c.MaxInvocations == 0 &&
-		c.Priority == 0 &&
-		len(c.CustomRules) == 0
+	return c.Action == "" && !c.RequireConfirmation && c.ConfirmationHint == ""
 }
 
 // =============================================================================
