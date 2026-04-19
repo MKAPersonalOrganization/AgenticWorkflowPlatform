@@ -211,12 +211,3 @@ type RunConfig struct {
 	StopSequences []string
 }
 
-// DefaultRunConfig returns sensible defaults for agent execution.
-func DefaultRunConfig() *RunConfig {
-	return &RunConfig{
-		Temperature:   0.7,
-		MaxTokens:     4096,
-		MaxIterations: 10,
-		StreamingMode: StreamingModeSSE,
-	}
-}

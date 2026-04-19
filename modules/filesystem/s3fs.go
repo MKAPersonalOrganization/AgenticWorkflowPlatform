@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 // S3VFS is a VFS implementation backed by S3/MinIO for file storage and
@@ -30,25 +29,6 @@ type S3Config struct {
 	UseSSL          bool
 	BucketName      string
 	Region          string
-}
-
-// NewS3VFS creates a new S3-backed VFS for the given filesystem.
-func NewS3VFS(cfg S3Config, filesystemID uuid.UUID, repo repository) (*S3VFS, error) {
-	client, err := minio.New(cfg.Endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(cfg.AccessKeyID, cfg.SecretAccessKey, ""),
-		Secure: cfg.UseSSL,
-		Region: cfg.Region,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("s3vfs: connect: %w", err)
-	}
-
-	return &S3VFS{
-		client:       client,
-		bucket:       cfg.BucketName,
-		filesystemID: filesystemID,
-		repo:         repo,
-	}, nil
 }
 
 // NewS3VFSFromClient creates a new S3-backed VFS re-using an existing MinIO

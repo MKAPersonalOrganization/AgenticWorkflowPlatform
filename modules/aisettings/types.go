@@ -118,11 +118,6 @@ func TTSVoices(model string) []string {
 	}
 }
 
-// ProviderSupportsTTS reports whether the given provider has TTS capability.
-func ProviderSupportsTTS(provider AIProvider) bool {
-	return len(ProviderTTSModels(provider)) > 0
-}
-
 // AISettings represents per-user AI provider credentials.
 // Each user has completely isolated settings.
 // Capability-specific configuration (LLM model, TTS voice, embedding model, etc.)
@@ -180,15 +175,6 @@ const (
 	CapabilitySTT       AICapability = "stt"
 	CapabilityImage     AICapability = "image"
 )
-
-// SupportedCapabilities returns all capabilities that can be configured.
-func SupportedCapabilities() []AICapability {
-	return []AICapability{
-		CapabilityLLM,
-		CapabilityTTS,
-		CapabilityEmbedding,
-	}
-}
 
 // AICapabilityConfig stores per-user, per-capability model assignment.
 // A user can use OpenAI for LLM, Anthropic for embeddings, and OpenAI for TTS—

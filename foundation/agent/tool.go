@@ -95,12 +95,6 @@ type StreamingExecutableTool interface {
 	StreamingExecutor
 }
 
-// IsStreamingTool checks if an ExecutableTool also implements StreamingExecutableTool.
-func IsStreamingTool(tool ExecutableTool) (StreamingExecutableTool, bool) {
-	st, ok := tool.(StreamingExecutableTool)
-	return st, ok
-}
-
 // LongRunningTool is implemented by tools that initiate a background operation
 // and return immediately with a status identifier, completing asynchronously.
 // Aligned with ADK-Go's tool.Tool.IsLongRunning() semantics.
@@ -162,16 +156,6 @@ type Arguments struct {
 // Decode unmarshals arguments into the target type.
 func (a *Arguments) Decode(target any) error {
 	return json.Unmarshal(a.Raw, target)
-}
-
-// NewResult creates a Result with content.
-func NewResult(content ...any) Result {
-	return Result{Content: content}
-}
-
-// NewResultWithMetadata creates a Result with content and metadata.
-func NewResultWithMetadata(metadata Metadata, content ...any) Result {
-	return Result{Content: content, Metadata: metadata}
 }
 
 // NewResultError creates a Result with an error.

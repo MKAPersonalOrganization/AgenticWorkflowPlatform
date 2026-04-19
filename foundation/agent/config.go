@@ -352,11 +352,3 @@ type AgentModelOverride struct {
 	ModelName string
 }
 
-// DefaultConfig returns a Config with sensible defaults.
-func DefaultConfig(name string) Config {
-	return Config{
-		Name:          name,
-		MaxIterations: 10,
-	}
-}
-

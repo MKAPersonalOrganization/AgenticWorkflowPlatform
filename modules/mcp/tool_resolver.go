@@ -9,58 +9,6 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// MCPToolResolver implements agent.ToolResolver to provide tools from
-// connected MCP servers for a specific user.
-type MCPToolResolver struct {
-	service *Service
-	userID  string
-}
-
-// NewMCPToolResolver creates a tool resolver for a user's MCP connectors.
-func NewMCPToolResolver(service *Service, userID string) *MCPToolResolver {
-	return &MCPToolResolver{
-		service: service,
-		userID:  userID,
-	}
-}
-
-// Resolve returns all tools from all connected MCP servers belonging to the user.
-// Tool metadata comes from the DB cache; execution uses ephemeral sessions.
-func (r *MCPToolResolver) Resolve(ctx context.Context) ([]agent.Tool, error) {
-	connectors, err := r.service.ListConnectors(ctx, r.userID)
-	if err != nil {
-		return nil, fmt.Errorf("listing connectors: %w", err)
-	}
-
-	// Collect connected connector IDs for a single batch query.
-	var connectedIDs []string
-	for _, conn := range connectors {
-		if conn.Status != ConnectorStatusConnected {
-			continue
-		}
-		connectedIDs = append(connectedIDs, conn.ID)
-	}
-
-	if len(connectedIDs) == 0 {
-		return nil, nil
-	}
-
-	// Single query fetches tools for ALL connected connectors — avoids N+1.
-	allTools, err := r.service.repo.ListToolsByConnectors(ctx, connectedIDs)
-	if err != nil {
-		return nil, fmt.Errorf("batch listing tools: %w", err)
-	}
-
-	var tools []agent.Tool
-	for _, connID := range connectedIDs {
-		for _, dt := range allTools[connID] {
-			tools = append(tools, NewMCPRemoteTool(r.service, connID, r.userID, dt.Name, dt.Description, dt.InputSchema))
-		}
-	}
-
-	return tools, nil
-}
-
 // mcpRemoteTool wraps a discovered MCP tool as an agent.ExecutableTool.
 // It holds a reference to the Service for ephemeral session-based execution.
 type mcpRemoteTool struct {

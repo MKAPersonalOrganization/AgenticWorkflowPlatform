@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"path/filepath"
 	"runtime"
@@ -36,11 +35,6 @@ func New(w io.Writer, minLevel Level, serviceName string, traceIDFn TraceIDFn) *
 	return new(w, minLevel, serviceName, traceIDFn, Events{}, modeJSON)
 }
 
-// NewWithEvents constructs a new log for application use with events using JSON.
-func NewWithEvents(w io.Writer, minLevel Level, serviceName string, traceIDFn TraceIDFn, events Events) *Logger {
-	return new(w, minLevel, serviceName, traceIDFn, events, modeJSON)
-}
-
 // NewText constructs a new log for application use using Text.
 func NewText(w io.Writer, minLevel Level, serviceName string, traceIDFn TraceIDFn) *Logger {
 	return new(w, minLevel, serviceName, traceIDFn, Events{}, modeText)
@@ -49,27 +43,6 @@ func NewText(w io.Writer, minLevel Level, serviceName string, traceIDFn TraceIDF
 // NewTextWithEvents constructs a new log for application use with events using Text.
 func NewTextWithEvents(w io.Writer, minLevel Level, serviceName string, traceIDFn TraceIDFn, events Events) *Logger {
 	return new(w, minLevel, serviceName, traceIDFn, events, modeText)
-}
-
-// NewMinimal constructs a new log for application use using a minimal format (values only).
-func NewMinimal(w io.Writer, minLevel Level, serviceName string, traceIDFn TraceIDFn) *Logger {
-	return new(w, minLevel, serviceName, traceIDFn, Events{}, modeMinimal)
-}
-
-// NewMinimalWithEvents constructs a new log for application use with events using a minimal format.
-func NewMinimalWithEvents(w io.Writer, minLevel Level, serviceName string, traceIDFn TraceIDFn, events Events) *Logger {
-	return new(w, minLevel, serviceName, traceIDFn, events, modeMinimal)
-}
-
-// NewWithHandler returns a new log for application use with the underlying
-// handler.
-func NewWithHandler(h slog.Handler) *Logger {
-	return &Logger{Handler: h}
-}
-
-// NewStdLogger returns a standard library Logger that wraps the slog Logger.
-func NewStdLogger(logger *Logger, level Level) *log.Logger {
-	return slog.NewLogLogger(logger.Handler, slog.Level(level))
 }
 
 // Debug logs at LevelDebug with the given context.

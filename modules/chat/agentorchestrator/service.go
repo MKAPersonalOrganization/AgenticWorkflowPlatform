@@ -107,30 +107,6 @@ func WithSnapshotStore(store es.SnapshotStore) Option {
 	}
 }
 
-// WithRunner configures the agent with a runner.
-func WithRunner(runner Runner) Option {
-	return func(s *Service) {
-		s.runner = runner
-	}
-}
-
-// WithThreadManagement lets the caller inject an existing threadmgmt.Manager
-// (and therefore an existing ThreadRepository) instead of having the
-// orchestrator build a fresh one. Use this when the runner you're about to
-// configure with WithRunner was itself built against a specific
-// threadmgmt.Manager — sharing it avoids two independent ThreadRepository
-// instances fighting over the same event stream via optimistic concurrency.
-// (Prior to this, the debug endpoint hit spurious 10× retry conflicts on
-// CodeExecutionRan because the runner persisted UserMessageAdded through one
-// ThreadRepository while the orchestrator persisted CodeExecutionRan through
-// another — the in-memory aggregate versions diverged even though the DB
-// advisory lock serialised the writes.)
-func WithThreadManagement(mgr *threadmgmt.Manager) Option {
-	return func(s *Service) {
-		s.threadMgmt = mgr
-	}
-}
-
 // SetRunner sets the runner for the agent orchestrator.
 func (s *Service) SetRunner(runner Runner) {
 	s.runnerMu.Lock()
@@ -515,45 +491,6 @@ func (s *Service) saveAttachments(ctx context.Context, req RunExecutionRequest) 
 		})
 	}
 	return refs
-}
-
-// mimeToExt returns a file extension for common MIME types.
-func mimeToExt(mimeType string) string {
-	switch mimeType {
-	case "image/jpeg":
-		return "jpg"
-	case "image/png":
-		return "png"
-	case "image/gif":
-		return "gif"
-	case "image/webp":
-		return "webp"
-	case "audio/wav", "audio/x-wav":
-		return "wav"
-	case "audio/mpeg", "audio/mp3":
-		return "mp3"
-	case "audio/ogg":
-		return "ogg"
-	case "audio/webm":
-		return "webm"
-	case "application/pdf":
-		return "pdf"
-	case "text/plain":
-		return "txt"
-	case "text/csv":
-		return "csv"
-	case "text/markdown":
-		return "md"
-	default:
-		if idx := strings.LastIndex(mimeType, "/"); idx >= 0 {
-			ext := mimeType[idx+1:]
-			if plus := strings.Index(ext, "+"); plus >= 0 {
-				ext = ext[:plus]
-			}
-			return ext
-		}
-		return "bin"
-	}
 }
 
 // buildMessageContent constructs the Content slice for a user message,

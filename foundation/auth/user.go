@@ -8,8 +8,7 @@ import (
 type contextKey string
 
 const (
-	UserContextKey     contextKey = "user"
-	ThreadIDContextKey contextKey = "thread_id"
+	UserContextKey contextKey = "user"
 )
 
 // User is the canonical authenticated-user model. Authentication providers
@@ -66,17 +65,3 @@ func SetUserInContext(ctx context.Context, user *User) context.Context {
 	return context.WithValue(ctx, UserContextKey, user)
 }
 
-func GetThreadIDFromContext(ctx context.Context) string {
-	if tid, ok := ctx.Value(ThreadIDContextKey).(string); ok {
-		return tid
-	}
-	return ""
-}
-
-func SetThreadIDInContext(ctx context.Context, threadID string) context.Context {
-	return context.WithValue(ctx, ThreadIDContextKey, threadID)
-}
-
-func IsAuthenticated(ctx context.Context) bool {
-	return GetUserFromContext(ctx) != nil
-}

@@ -133,27 +133,12 @@ type WebSearchTool struct {
 	limiter *rateLimiter
 }
 
-// WebSearchToolOption configures optional parameters for NewWebSearchTool.
-type WebSearchToolOption func(*WebSearchTool)
-
-// WithRateLimiter sets a custom rate limiter for the tool.
-// Useful for tests or per-instance isolation.
-func WithRateLimiter(rl *rateLimiter) WebSearchToolOption {
-	return func(t *WebSearchTool) {
-		t.limiter = rl
-	}
-}
-
 // NewWebSearchTool creates a new web search tool backed by the given client.
-func NewWebSearchTool(client GroundedSearchClient, opts ...WebSearchToolOption) *WebSearchTool {
-	t := &WebSearchTool{
+func NewWebSearchTool(client GroundedSearchClient) *WebSearchTool {
+	return &WebSearchTool{
 		client:  client,
 		limiter: newRateLimiter(),
 	}
-	for _, opt := range opts {
-		opt(t)
-	}
-	return t
 }
 
 func (t *WebSearchTool) Name() string          { return "web_search" }

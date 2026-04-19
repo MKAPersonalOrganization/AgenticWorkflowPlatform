@@ -6,7 +6,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"sync"
 	"time"
 
 	es "aicompass/foundation/eventsourcing"
@@ -48,7 +47,6 @@ type ProjectionUpdater struct {
 	checkpointStore *CheckpointStore
 	router          EventRouter
 	shutdownChan    chan struct{}
-	shutdownOnce    sync.Once
 	projectionNames []string // registered projection names for per-projection checkpoints
 
 	// Polling configuration
@@ -61,22 +59,6 @@ type ProjectionUpdater struct {
 
 // ProjectionUpdaterOption configures the projection updater.
 type ProjectionUpdaterOption func(*ProjectionUpdater)
-
-// WithPollInterval sets the polling interval (default 100ms).
-func WithPollInterval(d time.Duration) ProjectionUpdaterOption {
-	return func(u *ProjectionUpdater) { u.pollInterval = d }
-}
-
-// WithBatchSize sets the max events per poll (default 500).
-func WithBatchSize(n int) ProjectionUpdaterOption {
-	return func(u *ProjectionUpdater) { u.batchSize = n }
-}
-
-// WithLeaderRetryInterval sets how often a non-leader pod retries lock
-// acquisition (default 5s).
-func WithLeaderRetryInterval(d time.Duration) ProjectionUpdaterOption {
-	return func(u *ProjectionUpdater) { u.leaderRetryInterval = d }
-}
 
 // NewProjectionUpdater creates a new projection updater that polls Postgres.
 func NewProjectionUpdater(
@@ -320,38 +302,10 @@ func (u *ProjectionUpdater) pollLoop(ctx context.Context) error {
 	}
 }
 
-// Shutdown signals the updater to stop gracefully. Safe to call multiple times.
-func (u *ProjectionUpdater) Shutdown() {
-	u.shutdownOnce.Do(func() {
-		close(u.shutdownChan)
-	})
-}
-
 // min returns the smaller of two durations.
 func min(a, b time.Duration) time.Duration {
 	if a < b {
 		return a
 	}
 	return b
-}
-
-// WaitForEvent blocks until at least one event beyond afterPosition is available,
-// or the context is cancelled. Useful for tests.
-func (u *ProjectionUpdater) WaitForEvent(ctx context.Context, afterPosition int64) error {
-	ticker := time.NewTicker(50 * time.Millisecond)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-			events, err := u.eventStore.ReadAllFromPosition(ctx, afterPosition, 1)
-			if err != nil {
-				return fmt.Errorf("wait for event: %w", err)
-			}
-			if len(events) > 0 {
-				return nil
-			}
-		}
-	}
 }

@@ -47,15 +47,6 @@ func (s *service) getUserSettings(ctx context.Context, userID string) ([]AISetti
 	return settings, nil
 }
 
-// getDefaultSettings returns the user's default AI settings.
-func (s *service) getDefaultSettings(ctx context.Context, userID string) (*AISettings, error) {
-	settings, err := s.repo.GetDefaultForUser(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("getting default ai settings: %w", err)
-	}
-	return settings, nil
-}
-
 // saveSettings creates or updates an AI settings entry.
 func (s *service) saveSettings(ctx context.Context, settings *AISettings) error {
 	if settings.UserID == "" {
@@ -290,15 +281,6 @@ func (s *service) getAllCapabilityConfigs(ctx context.Context, userID string) ([
 		return nil, fmt.Errorf("getting capability configs: %w", err)
 	}
 	return configs, nil
-}
-
-// getCapabilityConfig returns a specific capability config for a user.
-func (s *service) getCapabilityConfig(ctx context.Context, userID string, capability AICapability) (*AICapabilityConfig, error) {
-	config, err := s.capRepo.GetByCapability(ctx, userID, capability)
-	if err != nil {
-		return nil, fmt.Errorf("getting capability config %s: %w", capability, err)
-	}
-	return config, nil
 }
 
 // saveCapabilityConfig validates and upserts a capability config.

@@ -1,9 +1,6 @@
 package thread
 
 import (
-	"crypto/rand"
-	"encoding/hex"
-	"fmt"
 	"time"
 
 	es "aicompass/foundation/eventsourcing"
@@ -90,18 +87,6 @@ type Thread struct {
 	Messages  []Message `json:"messages"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-// GenerateMessageID generates a unique message ID.
-func GenerateMessageID() string {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		// This should never happen, but if it does, panic is appropriate
-		// since we can't generate a secure random ID
-		panic(fmt.Sprintf("failed to generate random ID: %s", err))
-	}
-
-	return hex.EncodeToString(b)
 }
 
 // ToolCallState represents the current state of a tool call in the thread.

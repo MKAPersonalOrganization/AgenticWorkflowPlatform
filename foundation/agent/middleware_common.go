@@ -15,28 +15,6 @@ import (
 // adapter layer (adapters/adkgo/callbacks.go), not by foundation middleware.
 // =============================================================================
 
-// Validator is the interface for validating function arguments.
-type Validator interface {
-	Validate(tool Tool, arguments map[string]any) error
-}
-
-// FunctionValidation validates function arguments before execution.
-func FunctionValidation(validator Validator) Middleware {
-	return func(next Handler) Handler {
-		return HandlerFunc(func(c *Context) error {
-			if c.Tool == nil {
-				return next.Handle(c)
-			}
-
-			if err := validator.Validate(c.Tool.Tool, c.Tool.Arguments); err != nil {
-				return fmt.Errorf("validation failed: %w", err)
-			}
-
-			return next.Handle(c)
-		})
-	}
-}
-
 // Cache is the interface for caching function results.
 type Cache interface {
 	Get(key string) (any, bool)
@@ -105,17 +83,3 @@ var NoOpHandler = HandlerFunc(func(c *Context) error {
 	return nil
 })
 
-// ErrorHandler creates a handler that always returns an error.
-func ErrorHandler(err error) Handler {
-	return HandlerFunc(func(c *Context) error {
-		return err
-	})
-}
-
-// ResultHandler creates a handler that sets a result.
-func ResultHandler(result any) Handler {
-	return HandlerFunc(func(c *Context) error {
-		c.Result = result
-		return nil
-	})
-}

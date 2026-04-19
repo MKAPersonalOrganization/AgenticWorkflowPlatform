@@ -30,18 +30,6 @@ const (
 	PaymentIntentStatusCanceled              PaymentIntentStatus = "canceled"
 )
 
-// IsTerminal returns true if the PaymentIntent is in a final state.
-func (s PaymentIntentStatus) IsTerminal() bool {
-	return s == PaymentIntentStatusSucceeded || s == PaymentIntentStatusCanceled
-}
-
-// IsActionable returns true if the PI is in a state where user action can proceed.
-func (s PaymentIntentStatus) IsActionable() bool {
-	return s == PaymentIntentStatusRequiresPaymentMethod ||
-		s == PaymentIntentStatusRequiresConfirmation ||
-		s == PaymentIntentStatusRequiresAction
-}
-
 // ---------------------------------------------------------------------------
 // Charge Status — mirrors stripe.ChargeStatus
 // ---------------------------------------------------------------------------
@@ -97,11 +85,6 @@ const (
 	SubscriptionStatusTrialing          SubscriptionStatus = "trialing"
 	SubscriptionStatusUnpaid            SubscriptionStatus = "unpaid"
 )
-
-// IsActive returns true if the subscription grants access.
-func (s SubscriptionStatus) IsActive() bool {
-	return s == SubscriptionStatusActive || s == SubscriptionStatusTrialing
-}
 
 // ---------------------------------------------------------------------------
 // Checkout Session — mirrors stripe.CheckoutSessionStatus
@@ -177,21 +160,6 @@ const (
 	PaymentErrorAmountTooLarge         PaymentErrorCode = "amount_too_large"
 	PaymentErrorAmountTooSmall         PaymentErrorCode = "amount_too_small"
 )
-
-// IsRetryable returns true if the error code indicates the payment can be retried.
-func (c PaymentErrorCode) IsRetryable() bool {
-	switch c {
-	case PaymentErrorProcessingError, PaymentErrorRateLimit:
-		return true
-	default:
-		return false
-	}
-}
-
-// IsUserActionRequired returns true if the user needs to take action (e.g. 3D Secure).
-func (c PaymentErrorCode) IsUserActionRequired() bool {
-	return c == PaymentErrorAuthenticationRequired
-}
 
 // DeclineCode represents card-specific decline reasons from the issuing bank.
 // Mirrors stripe.DeclineCode for the most common decline scenarios.
@@ -319,11 +287,6 @@ const (
 	AccountStatusPastDue   AccountStatusValue = "past_due"
 	AccountStatusDisputed  AccountStatusValue = "disputed"
 )
-
-// GrantsAccess returns true if this status grants the user access to paid features.
-func (s AccountStatusValue) GrantsAccess() bool {
-	return s == AccountStatusActive || s == AccountStatusCancelled
-}
 
 // ---------------------------------------------------------------------------
 // Currency — typed ISO 4217 currency codes matching Stripe's Currency type

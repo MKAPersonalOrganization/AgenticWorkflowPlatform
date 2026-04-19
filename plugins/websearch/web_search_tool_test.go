@@ -49,10 +49,9 @@ func (s *stubClient) Search(_ context.Context, query string) (*WebSearchResult, 
 // stubFactory returns a ClientFactory that records the apiKey and model it
 // receives and always vends the given stubClient.
 type stubFactory struct {
-	client   GroundedSearchClient
-	apiKey   string
-	model    string
-	defaults string // the default model string expected when none is supplied
+	client GroundedSearchClient
+	apiKey string
+	model  string
 }
 
 func (f *stubFactory) factory(apiKey, model string) GroundedSearchClient {

@@ -20,11 +20,6 @@ type Language struct {
 	UseEasternDigits bool   // Whether to convert numbers to Eastern Arabic digits
 }
 
-// IsRTL returns true if the language is right-to-left.
-func (l Language) IsRTL() bool {
-	return l.Dir == "rtl"
-}
-
 var (
 	// SupportedLanguages lists all available languages.
 	SupportedLanguages = []Language{

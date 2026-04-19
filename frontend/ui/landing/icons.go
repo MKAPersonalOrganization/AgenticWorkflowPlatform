@@ -14,23 +14,10 @@ func iconSized(fn func(...icon.Props) templ.Component) templ.Component {
 }
 
 var (
-	iconCompass     = icon.CompassLogo("size-5")
-	iconRocket      = iconSized(icon.Rocket)
-	iconStore       = iconSized(icon.Store)
 	iconGitBranch   = iconSized(icon.GitBranch)
-	iconPuzzle      = iconSized(icon.Puzzle)
 	iconDatabase    = iconSized(icon.Database)
 	iconBrain       = iconSized(icon.Brain)
-	iconLayers      = iconSized(icon.Layers)
 	iconShieldCheck = iconSized(icon.ShieldCheck)
 	iconMessageSq   = iconSized(icon.MessageSquare)
-	iconPlug        = iconSized(icon.Plug)
-	iconMCPLogo     = icon.MCPLogo("size-5")
-	iconStar        = iconSized(icon.Star)
-	iconUser        = iconSized(icon.User)
-	iconHeadphones  = iconSized(icon.Headphones)
-	iconActivity    = iconSized(icon.Activity)
-	iconZap         = iconSized(icon.Zap)
-	iconSparkles    = iconSized(icon.Sparkles)
 	iconA2ALogo     = icon.A2ALogo("size-5")
 )

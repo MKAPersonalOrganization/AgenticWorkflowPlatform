@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	"log/slog"
 	"net"
 	"net/http"
@@ -58,12 +57,6 @@ func RateLimiter(rdb *goredis.Client, rps int, burst int) func(http.Handler) htt
 			next.ServeHTTP(w, r)
 		})
 	}
-}
-
-// RateLimiterHealthCheck pings Redis and returns an error if unreachable.
-// Useful for wiring into /readiness probes.
-func RateLimiterHealthCheck(ctx context.Context, rdb *goredis.Client) error {
-	return rdb.Ping(ctx).Err()
 }
 
 // clientIP extracts the client IP from the request.

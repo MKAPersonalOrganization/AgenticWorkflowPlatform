@@ -56,10 +56,6 @@ const (
 	// circuitRecoveryTimeout is how long the breaker stays open before allowing
 	// a probe request (half-open state).
 	circuitRecoveryTimeout = 60 * time.Second
-
-	// maxMCPResponseBytes limits the size of any MCP response body read during
-	// tool calls to prevent OOM from malicious or oversized servers.
-	maxMCPResponseBytes = 16 << 20 // 16 MiB
 )
 
 // Service orchestrates MCP connector lifecycle: create, connect, discover tools, OAuth.

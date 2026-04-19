@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"aicompass/foundation/i18n"
-	"context"
 	"net/http"
 	"time"
 
@@ -66,12 +65,3 @@ func I18n(next http.Handler) http.Handler {
 	})
 }
 
-// GetLanguage returns the language tag from context, or "en" if missing.
-func GetLanguage(ctx context.Context) string {
-	return i18n.FromContext(ctx).String()
-}
-
-// GetDirection returns "rtl" or "ltr" from context.
-func GetDirection(ctx context.Context) string {
-	return i18n.GetDirection(i18n.FromContext(ctx))
-}

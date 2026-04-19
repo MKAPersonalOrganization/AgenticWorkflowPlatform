@@ -182,25 +182,6 @@ func (s *service) createPaymentIntent(ctx context.Context, userID, email string)
 	return pi.ClientSecret, nil
 }
 
-func (s *service) confirmPayment(ctx context.Context, stripePaymentID string, amountCents int64, currency, cardBrand, cardLast4 string, metadata map[string]string) error {
-	userID := metadata[MetadataKeyUserID]
-	if userID == "" {
-		return fmt.Errorf("billing: webhook missing user_id in metadata")
-	}
-	acct, err := s.repo.Load(ctx, userID)
-	if err != nil {
-		return fmt.Errorf("billing: load account for confirm: %w", err)
-	}
-	if err := acct.ConfirmPayment(stripePaymentID, amountCents, currency, cardBrand, cardLast4); err != nil {
-		return fmt.Errorf("billing: confirm payment: %w", err)
-	}
-	if err := s.repo.Save(ctx, acct); err != nil {
-		return fmt.Errorf("billing: save after confirm: %w", err)
-	}
-	s.log.Info(ctx, "billing: payment confirmed", "user_id", userID, "stripe_pi", stripePaymentID, "card", cardBrand+" ••••"+cardLast4)
-	return nil
-}
-
 func (s *service) confirmPaymentWithDetails(
 	ctx context.Context,
 	stripePaymentID, stripeChargeID, stripeEventID string,
@@ -224,25 +205,6 @@ func (s *service) confirmPaymentWithDetails(
 	s.log.Info(ctx, "billing: payment confirmed",
 		"user_id", userID, "stripe_pi", stripePaymentID, "stripe_charge", stripeChargeID,
 		"stripe_event", stripeEventID, "card", cardBrand+" ••••"+cardLast4, "receipt_url", receiptURL)
-	return nil
-}
-
-func (s *service) failPayment(ctx context.Context, stripePaymentID, reason string, metadata map[string]string) error {
-	userID := metadata[MetadataKeyUserID]
-	if userID == "" {
-		return fmt.Errorf("billing: webhook missing user_id in metadata")
-	}
-	acct, err := s.repo.Load(ctx, userID)
-	if err != nil {
-		return fmt.Errorf("billing: load account for fail: %w", err)
-	}
-	if err := acct.FailPayment(stripePaymentID, reason); err != nil {
-		return fmt.Errorf("billing: fail payment: %w", err)
-	}
-	if err := s.repo.Save(ctx, acct); err != nil {
-		return fmt.Errorf("billing: save after fail: %w", err)
-	}
-	s.log.Info(ctx, "billing: payment failed", "user_id", userID, "stripe_pi", stripePaymentID, "reason", reason)
 	return nil
 }
 
@@ -612,25 +574,6 @@ func (s *service) logStripeError(ctx context.Context, msg string, err error, ext
 	}
 	fields = append(fields, extra...)
 	s.log.Error(ctx, msg, fields...)
-}
-
-func classifyStripeError(err error) (retryable bool, userActionRequired bool) {
-	var stripeErr *stripe.Error
-	if !errors.As(err, &stripeErr) {
-		return false, false
-	}
-	switch stripeErr.Type {
-	case stripe.ErrorTypeCard:
-		return false, stripeErr.Code == stripe.ErrorCodeAuthenticationRequired
-	case stripe.ErrorTypeAPI:
-		return true, false
-	case stripe.ErrorTypeIdempotency:
-		return false, false
-	case stripe.ErrorTypeInvalidRequest:
-		return false, false
-	default:
-		return false, false
-	}
 }
 
 func piGetParams(ctx context.Context) *stripe.PaymentIntentParams {

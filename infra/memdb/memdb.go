@@ -17,21 +17,6 @@ import (
 	"google.golang.org/genai"
 )
 
-// memoryEntry is the database representation of a single indexed event.
-type memoryEntry struct {
-	ID             string          `db:"id"`
-	AppName        string          `db:"app_name"`
-	UserID         string          `db:"user_id"`
-	SessionID      string          `db:"session_id"`
-	EventID        string          `db:"event_id"`
-	Author         string          `db:"author"`
-	ContentJSON    json.RawMessage `db:"content"`
-	ContentText    string          `db:"content_text"`
-	CustomMetaJSON json.RawMessage `db:"custom_metadata"`
-	Timestamp      time.Time       `db:"event_timestamp"`
-	CreatedAt      time.Time       `db:"created_at"`
-}
-
 // Service implements memory.Service using PostgreSQL with full-text search.
 type Service struct {
 	db *sqlx.DB
