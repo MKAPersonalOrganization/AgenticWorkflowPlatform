@@ -77,10 +77,10 @@ templ FilesTab() {
 									<span
 										class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium"
 										:class="{
-											'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400': file.status === 'completed',
-											'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400': file.status === 'processing',
-											'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400': file.status === 'pending',
-											'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400': file.status === 'failed',
+											'bg-success/15 text-success': file.status === 'completed',
+											'bg-info/15 text-info': file.status === 'processing',
+											'bg-warning/15 text-warning': file.status === 'pending',
+											'bg-destructive/15 text-destructive': file.status === 'failed',
 										}"
 										x-text="file.status || 'uploaded'"
 									></span>
@@ -91,7 +91,7 @@ templ FilesTab() {
 										<button
 											x-show="file.status === 'failed'"
 											@click="retryPdf(file.pdf_id)"
-											class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-amber-500/10 hover:text-amber-600 h-8 w-8"
+											class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-warning/10 hover:text-warning h-8 w-8"
 											title="Retry"
 										>
 											@icon.RotateCcw(icon.Props{Class: "size-4"})

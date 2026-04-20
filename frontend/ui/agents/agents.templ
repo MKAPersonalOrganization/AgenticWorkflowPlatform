@@ -777,7 +777,7 @@ templ AgentsDialog() {
 													<span class="text-[11px] text-muted-foreground" x-text="'depth ' + nodeDepth(form.graph)"></span>
 													<span class="text-[11px] text-muted-foreground" x-text="collectAgentIds(form.graph).length + ' agents'"></span>
 													<template x-if="countNodes(form.graph) >= 50">
-														<span class="text-[11px] text-amber-600 dark:text-amber-400 font-medium">{ i18n.T(ctx, "Node limit reached") }</span>
+														<span class="text-[11px] text-warning font-medium">{ i18n.T(ctx, "Node limit reached") }</span>
 													</template>
 												</div>
 											</div>
@@ -924,16 +924,12 @@ templ AgentsNavButtonTrigger() {
 // AgentStoreNavButtonTrigger renders a store icon for the navbar that opens the
 // Agent Designer directly on the templates (catalog) view.
 templ AgentStoreNavButtonTrigger() {
-	@button.Button(button.Props{
-		Size:    button.SizeIcon,
-		Variant: button.VariantGhost,
-		Class:   "size-9",
-		Attributes: templ.Attributes{
-			"@click": "$dispatch('open-agent-designer-templates')",
-			"title":  i18n.T(ctx, "Browse Templates"),
-		},
-	}) {
+	<a
+		href="/agent-designer?view=templates"
+		class="size-9 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+		title={ i18n.T(ctx, "Browse Templates") }
+	>
 		@icon.Store(icon.Props{Class: "size-5"})
 		<span class="sr-only">{ i18n.T(ctx, "Browse Templates") }</span>
-	}
+	</a>
 }

@@ -168,10 +168,10 @@ templ DashboardPage(props DashboardPageProps) {
 													<span
 														class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium"
 														:class="{
-															'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400': doc.status === 'completed' || doc.current_stage === 'completed',
-															'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400': doc.status === 'processing' || doc.current_stage === 'processing',
-															'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400': doc.status === 'failed',
-															'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400': !doc.status && !doc.current_stage,
+															'bg-success/15 text-success': doc.status === 'completed' || doc.current_stage === 'completed',
+															'bg-warning/15 text-warning': doc.status === 'processing' || doc.current_stage === 'processing',
+															'bg-destructive/15 text-destructive': doc.status === 'failed',
+															'bg-muted text-muted-foreground': !doc.status && !doc.current_stage,
 														}"
 														x-text="doc.current_stage || doc.status || 'unknown'"
 													></span>
@@ -287,7 +287,7 @@ templ DashboardPage(props DashboardPageProps) {
 											@table.Row(table.RowProps{}) {
 												@table.Cell(table.CellProps{}) {
 													<div class="flex items-center gap-2">
-														@icon.File(icon.Props{Class: "size-4 text-red-500 shrink-0"})
+														@icon.File(icon.Props{Class: "size-4 text-destructive shrink-0"})
 														<span class="font-medium text-sm truncate" x-text="pdf.filename"></span>
 													</div>
 												}
@@ -295,9 +295,9 @@ templ DashboardPage(props DashboardPageProps) {
 													<span
 														class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium"
 														:class="{
-															'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400': pdf.status === 'completed',
-															'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400': pdf.status === 'processing' || pdf.status === 'pending',
-															'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400': pdf.status === 'failed',
+															'bg-success/15 text-success': pdf.status === 'completed',
+															'bg-warning/15 text-warning': pdf.status === 'processing' || pdf.status === 'pending',
+															'bg-destructive/15 text-destructive': pdf.status === 'failed',
 														}"
 														x-text="pdf.status"
 													></span>
@@ -555,7 +555,7 @@ templ uploadPdfDialog() {
 						@drop.prevent="handlePdfDrop($event)"
 						@click="$refs.pdfFileInput.click()"
 					>
-						@icon.File(icon.Props{Class: "size-8 text-red-500 mx-auto mb-3"})
+						@icon.File(icon.Props{Class: "size-8 text-destructive mx-auto mb-3"})
 						<p class="text-sm font-medium">{ i18n.T(ctx, "Drop your PDF here or click to browse") }</p>
 						<p class="text-xs text-muted-foreground mt-1">{ i18n.T(ctx, "Max file size: 64MB") }</p>
 						<input
@@ -567,7 +567,7 @@ templ uploadPdfDialog() {
 						/>
 					</div>
 					<div x-show="selectedFile" x-cloak class="flex items-center gap-3 rounded-lg border p-3">
-						@icon.File(icon.Props{Class: "size-5 text-red-500 shrink-0"})
+						@icon.File(icon.Props{Class: "size-5 text-destructive shrink-0"})
 						<div class="min-w-0 flex-1">
 							<p class="text-sm font-medium truncate" x-text="selectedFile?.name"></p>
 							<p class="text-xs text-muted-foreground" x-text="formatBytes(selectedFile?.size)"></p>

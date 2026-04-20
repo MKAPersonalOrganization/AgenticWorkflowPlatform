@@ -1,7 +1,6 @@
 package knowledge
 
 import (
-	"aicompass/frontend/ui/agenteditor"
 	"aicompass/frontend/components/button"
 	"aicompass/frontend/components/dialog"
 	"aicompass/frontend/ui/i18n"
@@ -131,7 +130,7 @@ templ knowledgeLayout(props knowledgeLayoutProps) {
 							<div class="flex items-center gap-3">
 								<!-- Agent Designer -->
 								<div class="hidden md:flex shrink-0">
-									@agenteditor.AgentDesignerHeaderButton()
+									@nav.AgentDesignerHeaderButton()
 								</div>
 								@nav.AccountSettings(nav.AccountSettingsProps{
 									User:    props.User,

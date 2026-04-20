@@ -55,7 +55,7 @@ templ DebuggerPanel() {
 					<button
 						@click="toggleEventLogEnabled()"
 						class="p-1.5 hover:bg-muted rounded text-xs transition-colors"
-						:class="eventLogEnabled ? 'text-red-500' : 'text-muted-foreground hover:text-foreground'"
+						:class="eventLogEnabled ? 'text-destructive' : 'text-muted-foreground hover:text-foreground'"
 						:title="eventLogEnabled ? 'Pause logging' : 'Resume logging'"
 					>
 						<!-- Record dot when enabled -->
@@ -177,7 +177,7 @@ templ DebuggerPanel() {
 						</span>
 					</template>
 					<template x-if="!isStreaming && Object.keys(completedNodes).length > 0">
-						<span class="flex items-center gap-1 text-green-600 dark:text-green-400">
+						<span class="flex items-center gap-1 text-success">
 							<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
 							Done
 						</span>

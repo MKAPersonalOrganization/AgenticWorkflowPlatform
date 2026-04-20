@@ -2,7 +2,6 @@ package nav
 
 import (
 	a2acomp "aicompass/frontend/ui/a2a"
-	"aicompass/frontend/ui/agenteditor"
 	"aicompass/frontend/components/button"
 	"aicompass/frontend/ui/filesystem"
 	"aicompass/frontend/ui/i18n"
@@ -12,6 +11,51 @@ import (
 	"aicompass/frontend/ui/tools"
 	"aicompass/foundation/auth"
 )
+
+// AgentDesignerHeaderButton renders the TopBar link to the full Agent
+// Designer page. Lives here (nav chrome) rather than in the agenteditor
+// package because the designer page's template imports frontend/ui for
+// BaseLayout, which itself imports this nav package — splitting the
+// chrome away from the page code avoids the cycle.
+templ AgentDesignerHeaderButton() {
+	<a
+		href="/agent-designer"
+		class="size-9 inline-flex items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-all duration-200 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+		title={ i18n.T(ctx, "Agent Designer") }
+	>
+		@icon.Workflow(icon.Props{Class: "size-5"})
+		<span class="sr-only">{ i18n.T(ctx, "Agent Designer") }</span>
+	</a>
+}
+
+// AgentDesignerNavButtonTrigger is an alternate compact icon variant for
+// side navigation entries that want the same link.
+templ AgentDesignerNavButtonTrigger() {
+	<a
+		href="/agent-designer"
+		class="size-9 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+		title={ i18n.T(ctx, "Agent Designer") }
+	>
+		@icon.Workflow(icon.Props{Class: "size-5"})
+		<span class="sr-only">{ i18n.T(ctx, "Agent Designer") }</span>
+	</a>
+}
+
+// ChatHeaderButton renders the TopBar link back to the chat page. Paired
+// with AgentDesignerHeaderButton: TopBar shows exactly one of them based
+// on the current path — when you're anywhere except the designer, the
+// button takes you to the designer; when you're on the designer, the
+// button takes you back to chat.
+templ ChatHeaderButton() {
+	<a
+		href="/chat"
+		class="size-9 inline-flex items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-all duration-200 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+		title={ i18n.T(ctx, "Chat") }
+	>
+		@icon.MessageSquare(icon.Props{Class: "size-5"})
+		<span class="sr-only">{ i18n.T(ctx, "Chat") }</span>
+	</a>
+}
 
 type NavbarProps struct {
 	Class string
@@ -90,11 +134,22 @@ templ TopBar(props ...TopBarProps) {
 		</a>
 		<div class="flex-1"></div>
 		if p.User != nil {
-			<!-- Agent Designer — lives in the top bar because it's a
-			     global tool, orthogonal to the left nav's chat/service
-			     clusters. Dialog is mounted in layout.templ for
-			     authenticated users, so we gate on p.User to match. -->
-			@agenteditor.AgentDesignerHeaderButton()
+			<!--
+				Context-aware chrome button: swaps target based on where
+				the user currently is. On /agent-designer we show a Chat
+				link (escape hatch back to the conversation); everywhere
+				else we show the Agent Designer link (entry into the
+				design surface). Uses window.location.pathname at init
+				time, so no per-handler LayoutProps plumbing is needed.
+			-->
+			<div x-data="{ onDesigner: window.location.pathname.startsWith('/agent-designer') }">
+				<template x-if="!onDesigner">
+					@AgentDesignerHeaderButton()
+				</template>
+				<template x-if="onDesigner">
+					@ChatHeaderButton()
+				</template>
+			</div>
 		}
 	</header>
 }
@@ -127,10 +182,17 @@ templ Navbar(props ...NavbarProps) {
 	<nav
 		class={ "h-full w-10 flex flex-col items-center pt-2 pb-3 gap-0.5 shrink-0 z-40 bg-sidebar border-e border-sidebar-border/50 shadow-[1px_0_20px_rgba(0,0,0,0.06)]", p.Class }
 		id="main-navbar"
+		x-data="{ onDesigner: window.location.pathname.startsWith('/agent-designer') }"
 	>
 		if p.User != nil {
-			<!-- Chat History -->
-			<div class="nav-item w-full flex justify-center">
+			<!--
+				Chat History (Telescope). Hidden on the Agent Designer
+				page — the designer is a chat-independent tool so the
+				history control would be noise there; the TopBar's
+				Chat escape button covers navigation back to
+				conversations.
+			-->
+			<div class="nav-item w-full flex justify-center" x-show="!onDesigner">
 				@threads.ThreadsButtonTrigger()
 			</div>
 		}

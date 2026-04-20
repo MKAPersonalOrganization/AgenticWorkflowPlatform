@@ -124,7 +124,7 @@ templ WorkspaceSettings() {
 					}
 					@button.Button(button.Props{
 						Variant: button.VariantOutline,
-						Class:   "text-amber-600 border-amber-500 hover:bg-amber-500/10",
+						Class:   "text-warning border-warning hover:bg-warning/10",
 						Attributes: templ.Attributes{
 							"@click":    "reprocessFailed()",
 							":disabled": "reprocessingFailed",
@@ -132,13 +132,13 @@ templ WorkspaceSettings() {
 					}) {
 						<span x-show="!reprocessingFailed">{ i18n.T(ctx, "Retry Failed Only") }</span>
 						<span x-show="reprocessingFailed" class="flex items-center gap-2">
-							<span class="animate-spin size-4 border-2 border-amber-500 border-t-transparent rounded-full"></span>
+							<span class="animate-spin size-4 border-2 border-warning border-t-transparent rounded-full"></span>
 							{ i18n.T(ctx, "Queued...") }
 						</span>
 					}
 					@button.Button(button.Props{
 						Variant: button.VariantOutline,
-						Class:   "text-blue-600 border-blue-500 hover:bg-blue-500/10",
+						Class:   "text-info border-info hover:bg-info/10",
 						Attributes: templ.Attributes{
 							"@click":    "scanDocuments()",
 							":disabled": "scanningDocuments",
@@ -146,13 +146,13 @@ templ WorkspaceSettings() {
 					}) {
 						<span x-show="!scanningDocuments">{ i18n.T(ctx, "Scan for Documents") }</span>
 						<span x-show="scanningDocuments" class="flex items-center gap-2">
-							<span class="animate-spin size-4 border-2 border-blue-500 border-t-transparent rounded-full"></span>
+							<span class="animate-spin size-4 border-2 border-info border-t-transparent rounded-full"></span>
 							{ i18n.T(ctx, "Scanning...") }
 						</span>
 					}
 					@button.Button(button.Props{
 						Variant: button.VariantOutline,
-						Class:   "text-orange-600 border-orange-500 hover:bg-orange-500/10",
+						Class:   "text-warning border-warning hover:bg-warning/10",
 						Attributes: templ.Attributes{
 							"@click":    "recoverStuck()",
 							":disabled": "recoveringStuck",
@@ -160,7 +160,7 @@ templ WorkspaceSettings() {
 					}) {
 						<span x-show="!recoveringStuck">{ i18n.T(ctx, "Recover Stuck") }</span>
 						<span x-show="recoveringStuck" class="flex items-center gap-2">
-							<span class="animate-spin size-4 border-2 border-orange-500 border-t-transparent rounded-full"></span>
+							<span class="animate-spin size-4 border-2 border-warning border-t-transparent rounded-full"></span>
 							{ i18n.T(ctx, "Recovering...") }
 						</span>
 					}

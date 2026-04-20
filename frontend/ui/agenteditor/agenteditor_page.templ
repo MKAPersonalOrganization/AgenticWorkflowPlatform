@@ -1,0 +1,42 @@
+package agenteditor
+
+import (
+	"aicompass/foundation/auth"
+	"aicompass/frontend/ui"
+	"aicompass/frontend/ui/i18n"
+)
+
+// AgentDesignerPage renders the Agent Designer as a full app page at
+// /agent-designer. Wraps the shared designer body with BaseLayout so the
+// TopBar, left navbar, and BottomBar all come along.
+//
+// On load it calls open() (fetches agents + connectors, resets to the list
+// view) and then applies URL query params for deep links:
+//
+//   /agent-designer                → list view
+//   /agent-designer?view=templates → templates catalog
+//   /agent-designer?edit=<id>      → open the agent (node or pipeline) for edit
+templ AgentDesignerPage(user *auth.User) {
+	@ui.BaseLayout(ui.LayoutProps{
+		Title: i18n.T(ctx, "Agent Designer"),
+		User:  user,
+	}) {
+		@agentDesignerBody(`
+			(async () => {
+				await open();
+				const params = new URLSearchParams(window.location.search);
+				const editId = params.get('edit');
+				const view = params.get('view');
+				if (view === 'templates') {
+					openTemplatesView();
+					return;
+				}
+				if (editId) {
+					const agent = await fetchAgentById(editId);
+					if (!agent) return;
+					if (agent.isComposed) showEditPipelineForm(agent); else showEditNodeForm(agent);
+				}
+			})();
+		`)
+	}
+}

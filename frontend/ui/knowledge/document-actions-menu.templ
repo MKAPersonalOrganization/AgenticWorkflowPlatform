@@ -41,7 +41,7 @@ templ DocumentActionsMenu() {
 		<template x-if="doc.status === 'failed' || doc.status === 'partial_failure'">
 			<button
 				@click="doc.track_id ? retryTask(doc.track_id) : reprocessDocument(doc.id)"
-				class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-amber-500/10 hover:text-amber-600 h-8 w-8"
+				class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-warning/10 hover:text-warning h-8 w-8"
 				title="Retry"
 			>
 				@icon.RotateCcw(icon.Props{Class: "size-4"})
@@ -93,7 +93,7 @@ templ DocumentActionsMenu() {
 				<template x-if="doc.status === 'failed' || doc.status === 'partial_failure'">
 					<button
 						@click="doc.track_id ? retryTask(doc.track_id) : reprocessDocument(doc.id); menuOpen = false"
-						class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted transition-colors text-start cursor-pointer text-amber-600"
+						class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted transition-colors text-start cursor-pointer text-warning"
 					>
 						@icon.RotateCcw(icon.Props{Class: "size-4"})
 						Retry Failed
@@ -103,7 +103,7 @@ templ DocumentActionsMenu() {
 				<template x-if="!isTerminalStatus(doc.status)">
 					<button
 						@click="cancelDocumentTask(doc.id, doc.track_id); menuOpen = false"
-						class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted transition-colors text-start cursor-pointer text-orange-600"
+						class="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted transition-colors text-start cursor-pointer text-warning"
 					>
 						@icon.Square(icon.Props{Class: "size-4 fill-current"})
 						Cancel Extraction

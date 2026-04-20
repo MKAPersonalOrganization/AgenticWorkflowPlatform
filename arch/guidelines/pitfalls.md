@@ -230,3 +230,19 @@ go mod init probe && go get github.com/ardanlabs/darwin/v3 && go run main.go
 Expect a count equal to `grep -c '^-- Version:' migrate.sql`. `0` means one of your description lines bricked the parse.
 
 **Related.** Pitfall #7 (`task down:cluster` wipes volumes) — don't be tempted to reach for a clean slate when you hit this error. The fix is in the file, not the DB.
+
+---
+
+## 14. templui component scripts must be loaded on every page that renders the component — or its triggers are dead
+
+**Symptom.** A templui control (dialog, popover, dropdown, tabs, select, etc.) renders visually but does nothing when clicked. The page has no JS errors — the button is simply inert. Commonly seen on a brand new page that wraps `ui.BaseLayout` without an `ExtraHead`, while the chat page and other "full-fat" pages work fine.
+
+**Why it's invisible.** Each templui component ships a tiny module (`/templui/js/<component>.min.js`) that attaches the click/keyboard handlers to `data-tui-*` attributes. You opt-in by calling `@<component>.Script()` in the page's `ExtraHead`. The script is what turns a `@dialog.Trigger` into something interactive — without it the markup is just an inert `<span>` with data attributes. Alpine, CSS, and the dialog element itself all render correctly, so nothing *looks* broken until you click.
+
+Also bites pages that *don't* call anything locally but rely on chrome from `BaseLayout` — e.g. the bottom navbar's Filesystem/Resources/A2A/Tools triggers and the account settings popover. If a page (Agent Designer, profile, pricing, etc.) forgets its `ExtraHead`, the chrome itself breaks.
+
+**Fix.** Component scripts used by chrome that BaseLayout always renders — currently `dialog` and `popover` — are loaded globally in `frontend/ui/layout.templ` so every page gets them. `templ.NewOnceHandle()` inside each `Script()` templ makes duplicate calls from page-level `ExtraHead` no-ops. Anything a *specific* page needs (tabs, dropdowns, etc., used inside that page's body) still goes in that page's `ExtraHead`.
+
+**If you add a new navbar entry or global dialog to `BaseLayout`:** check whether it relies on a templui component, and if so add the corresponding `@<component>.Script()` next to the existing `@dialog.Script()` / `@popover.Script()` block in `layout.templ`. The symptom (silent inert click) won't show up in any build, test, or typecheck — only in the browser.
+
+**How to diagnose fast.** Open devtools, click the dead button, confirm no JS errors. Then check whether the page loaded `/templui/js/<component>.min.js` in the Network tab. If not, that's the whole bug.

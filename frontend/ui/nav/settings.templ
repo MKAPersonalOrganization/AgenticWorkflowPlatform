@@ -15,10 +15,19 @@ import (
 // Settings renders the settings dialog
 // (matches LibreChat's Settings.tsx).
 templ Settings() {
+	<!--
+		Self-contained x-data="settingsManager" (assets/js/components/settings-manager.js)
+		so the dialog works on any BaseLayout page, not just /chat whose
+		x-data="chat" scope historically owned showSettings / profile /
+		preferences / sessions. The settingsManager component persists
+		preference toggles to localStorage so changes made from any page
+		survive navigation. fetchProfile() runs when the dialog opens.
+	-->
 	<div
+		x-data="settingsManager"
 		x-show="showSettings"
 		x-cloak
-		@open-settings-dialog.window="let _tab = ($event.detail || {}).tab; showSettings = true; if (_tab) $nextTick(function() { if (window.tui && window.tui.tabs) window.tui.tabs.setActive('settings-tabs', _tab); })"
+		@open-settings-dialog.window="let _tab = ($event.detail || {}).tab; showSettings = true; fetchProfile(); if (_tab) $nextTick(function() { if (window.tui && window.tui.tabs) window.tui.tabs.setActive('settings-tabs', _tab); })"
 	>
 		@dialog.Dialog(dialog.Props{Class: "relative z-50"}) {
 			<!-- Backdrop — mode-aware scrim + blur, matches premium dialog pattern -->

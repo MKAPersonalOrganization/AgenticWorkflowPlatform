@@ -178,10 +178,10 @@ templ A2ADialog() {
 										<span
 											class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium"
 											:class="{
-												'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400': detailItem.status === 'connected',
-												'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400': detailItem.status === 'discovering',
-												'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400': detailItem.status === 'error',
-												'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300': detailItem.status === 'disconnected' || detailItem.status === 'created'
+												'bg-success/15 text-success': detailItem.status === 'connected',
+												'bg-warning/15 text-warning': detailItem.status === 'discovering',
+												'bg-destructive/15 text-destructive': detailItem.status === 'error',
+												'bg-muted text-muted-foreground': detailItem.status === 'disconnected' || detailItem.status === 'created'
 											}"
 											x-text="detailItem.status.replace('_', ' ')"
 										></span>
@@ -346,9 +346,9 @@ templ A2AConnectorCard() {
 					<span
 						class="absolute -bottom-0.5 -end-0.5 size-2.5 rounded-full border-2 border-background"
 						:class="{
-							'bg-emerald-500': conn.status === 'connected',
-							'bg-yellow-500 animate-pulse': conn.status === 'discovering',
-							'bg-red-500': conn.status === 'error',
+							'bg-success': conn.status === 'connected',
+							'bg-warning animate-pulse': conn.status === 'discovering',
+							'bg-destructive': conn.status === 'error',
 							'bg-gray-400': conn.status === 'created' || conn.status === 'disconnected'
 						}"
 					></span>

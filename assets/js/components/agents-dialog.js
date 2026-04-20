@@ -158,30 +158,18 @@ export const agentsManager = () => ({
     // ============================================
 
     showCreateForm() {
-        // Redirect to the Agent Designer dialog (node design mode)
-        if (window.tui?.dialog?.close) {
-            window.tui.dialog.close('agents-manager-dialog');
-        }
-        setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('open-agent-designer'));
-            if (window.tui?.dialog?.open) {
-                window.tui.dialog.open('agent-designer-dialog');
-            }
-        }, 150);
+        // Navigate to the Agent Designer page.
+        window.location.href = '/agent-designer';
     },
 
     showEditForm(agent) {
-        // Redirect to the Agent Designer dialog with agent data
-        if (window.tui?.dialog?.close) {
-            window.tui.dialog.close('agents-manager-dialog');
+        // Navigate to the Agent Designer page, preloading the agent for edit
+        // via the ?edit=<id> query param.
+        if (agent && agent.id) {
+            window.location.href = '/agent-designer?edit=' + encodeURIComponent(agent.id);
+        } else {
+            window.location.href = '/agent-designer';
         }
-        setTimeout(() => {
-            const eventName = agent.isComposed ? 'open-agent-designer-pipeline' : 'open-agent-designer-node';
-            window.dispatchEvent(new CustomEvent(eventName, { detail: agent }));
-            if (window.tui?.dialog?.open) {
-                window.tui.dialog.open('agent-designer-dialog');
-            }
-        }, 150);
     },
 
     /** Enable composition mode — transforms a simple agent into a composed one. */

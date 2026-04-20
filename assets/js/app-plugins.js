@@ -15,6 +15,7 @@ import { a2aConnectors } from './components/a2a-connectors.js';
 import { evalSetsDialog } from './components/evalsets-dialog.js';
 import { metricConfigDialog } from './components/metric-config.js';
 import { evaluationDialog } from './components/evaluation-ui.js';
+import { settingsManager } from './components/settings-manager.js';
 import { workflowTreeBuilder } from './components/workflow-tree-builder.js';
 import { workflowTreeVisualizer } from './components/workflow-tree-visualizer.js';
 import { workflowGraphPanel } from './components/workflow-graph-panel.js';
@@ -55,6 +56,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('evalSetsDialog', evalSetsDialog);
     Alpine.data('metricConfigDialog', metricConfigDialog);
     Alpine.data('evaluationDialog', evaluationDialog);
+    Alpine.data('settingsManager', settingsManager);
     Alpine.data('workflowTreeBuilder', workflowTreeBuilder);
     Alpine.data('workflowTreeVisualizer', workflowTreeVisualizer);
     Alpine.data('workflowGraphPanel', workflowGraphPanel);

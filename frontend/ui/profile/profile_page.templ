@@ -2,7 +2,7 @@ package profile
 
 import (
 	"aicompass/frontend/ui"
-	"aicompass/frontend/ui/agenteditor"
+	"aicompass/frontend/ui/nav"
 	"aicompass/frontend/components/button"
 	"aicompass/frontend/components/card"
 	"aicompass/frontend/components/icon"
@@ -50,7 +50,7 @@ templ ProfilePage(props ProfilePageProps) {
 				</div>
 				<!-- Agent Designer -->
 				<div class="hidden md:flex shrink-0">
-					@agenteditor.AgentDesignerHeaderButton()
+					@nav.AgentDesignerHeaderButton()
 				</div>
 			</div>
 			<!-- Profile Form -->

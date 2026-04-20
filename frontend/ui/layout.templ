@@ -2,14 +2,17 @@ package ui
 
 import (
 	a2acomp "aicompass/frontend/ui/a2a"
-	"aicompass/frontend/ui/agenteditor"
 	"aicompass/frontend/ui/agents"
 	"aicompass/frontend/ui/convsearch"
+	"aicompass/frontend/components/dialog"
 	"aicompass/frontend/ui/evals"
 	"aicompass/frontend/ui/filesystem"
 	"aicompass/frontend/ui/i18n"
 	"aicompass/frontend/ui/nav"
+	"aicompass/frontend/components/popover"
 	"aicompass/frontend/ui/resources"
+	"aicompass/frontend/components/selectbox"
+	"aicompass/frontend/components/tabs"
 	"aicompass/frontend/ui/tools"
 	"aicompass/foundation/toolregistry"
 	"aicompass/foundation/auth"
@@ -84,6 +87,26 @@ templ BaseLayout(props LayoutProps) {
 			     so using defer here caused a race where Alpine would start
 			     before the module-based component registrations ran. -->
 			<script src="/assets/js/filesystem.js"></script>
+			<!--
+				Component scripts required by chrome that every BaseLayout page
+				gets for free — the global dialogs rendered below (Resources,
+				Agents, Tools, A2A, Filesystem, …) and the navbar's account
+				popover. Loading them here — rather than in each page's
+				ExtraHead — ensures pages that don't define an ExtraHead
+				(e.g. Agent Designer) still have working chrome. Both use
+				OnceHandle so duplicate calls from page-level ExtraHead are
+				no-ops.
+			-->
+			@dialog.Script()
+			@popover.Script()
+			<!--
+				Additional component scripts needed by global Settings chrome:
+				tabs (settings tab nav), selectbox (work style / language
+				pickers inside Settings). Loaded here so Settings works on
+				every page, not just /chat. (Switch component is JS-less.)
+			-->
+			@tabs.Script()
+			@selectbox.Script()
 			<script type="module" src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 		</head>
 		<body class="flex flex-col h-dvh bg-background text-foreground antialiased overflow-hidden" x-data="themeManager">
@@ -113,7 +136,7 @@ templ BaseLayout(props LayoutProps) {
 				<div x-cloak>
 					@resources.ResourcesDialog()
 					@agents.AgentsDialog()
-					@agenteditor.AgentDesignerDialog()
+					<!-- Agent Designer is a full page at /agent-designer (not a dialog). -->
 					@tools.ToolsDialog()
 					@a2acomp.A2ADialog()
 					@evals.EvalSetsDialog()
@@ -121,6 +144,14 @@ templ BaseLayout(props LayoutProps) {
 					@evals.EvaluationDialog()
 					@convsearch.SearchDialog()
 					@filesystem.FilesystemDialog()
+					<!--
+						Settings + the nested pricing (Activate Account) dialog.
+						Both are triggered by window events dispatched from the
+						account popover in the left navbar; rendering them
+						globally means every BaseLayout page gets working
+						Settings / Activate Account menu items, not just /chat.
+					-->
+					@nav.Settings()
 				</div>
 			}
 		</body>

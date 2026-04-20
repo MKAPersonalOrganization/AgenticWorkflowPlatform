@@ -78,7 +78,7 @@ templ WorkspaceDetailsPage(props WorkspaceDetailsPageProps) {
 				<span class="text-sm font-medium" x-text="`${selectedFiles.length} files selected`"></span>
 				<div class="h-4 w-px bg-background/20"></div>
 				<div class="flex items-center gap-2">
-					<button @click="bulkDelete()" class="inline-flex items-center gap-1.5 hover:text-red-400 transition-colors text-sm font-medium">
+					<button @click="bulkDelete()" class="inline-flex items-center gap-1.5 hover:text-destructive transition-colors text-sm font-medium">
 						@icon.Trash2(icon.Props{Class: "size-4"})
 						{ i18n.T(ctx, "Delete") }
 					</button>
@@ -960,7 +960,7 @@ templ workspaceDetailsScript() {
 				highlightSearch(text) {
 					if (!text || !this.docSearch) return text;
 					const q = this.docSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-					return text.replace(new RegExp(`(${q})`, 'gi'), '<mark class="bg-yellow-200 dark:bg-yellow-800 rounded px-0.5">$1</mark>');
+					return text.replace(new RegExp(`(${q})`, 'gi'), '<mark class="bg-warning/30 text-foreground rounded px-0.5">$1</mark>');
 				},
 
 				fileTypeIcon(fileName) {
@@ -1044,11 +1044,11 @@ templ workspaceDetailsScript() {
 				statusBadgeClass(status) {
 					if (!status) return 'bg-muted text-muted-foreground';
 					const s = status.toLowerCase();
-					if (s === 'completed' || s === 'indexed' || s === 'partial_success') return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800';
-					if (this.isProcessingStatus(s)) return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800';
-					if (s === 'pending') return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800';
-					if (s === 'failed') return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800';
-					if (s === 'cancelled' || s === 'partial_failure') return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800';
+					if (s === 'completed' || s === 'indexed' || s === 'partial_success') return 'bg-success/15 text-success border-success/30';
+					if (this.isProcessingStatus(s)) return 'bg-info/15 text-info border-info/30';
+					if (s === 'pending') return 'bg-warning/15 text-warning border-warning/30';
+					if (s === 'failed') return 'bg-destructive/15 text-destructive border-destructive/30';
+					if (s === 'cancelled' || s === 'partial_failure') return 'bg-warning/15 text-warning border-warning/30';
 					return 'bg-muted text-muted-foreground';
 				},
 

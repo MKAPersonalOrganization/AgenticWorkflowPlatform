@@ -5,6 +5,7 @@ import (
 	"aicompass/adapters/filesystembridge"
 	"aicompass/adapters/gemini"
 	"aicompass/frontend/ui"
+	"aicompass/frontend/ui/agenteditor"
 	authcomp "aicompass/frontend/ui/auth"
 	"aicompass/frontend/ui/blog"
 	"aicompass/frontend/ui/docs"
@@ -913,6 +914,21 @@ func registerRoutes(
 	r.Get("/blog/{slug}", authMW.OptionalAuthFunc(HandleBlogPost(log)))
 	r.Get("/pricing", authMW.RequireAuthFunc(HandlePricingPage(log)))
 	r.Get("/chat", authMW.RequireAuthFunc(HandleViewChatInputScreen(log, edgequakeService)))
+	r.Get("/agent-designer", authMW.RequireAuthFunc(HandleAgentDesignerPage(log)))
+}
+
+// HandleAgentDesignerPage renders the Agent Designer as a full page at
+// /agent-designer. Optional query params:
+//   - ?view=templates   → open to the templates catalog
+//   - ?edit=<agent-id>  → fetch and open the agent for edit
+func HandleAgentDesignerPage(log *logger.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := auth.GetUserFromContext(r.Context())
+		component := agenteditor.AgentDesignerPage(user)
+		if err := component.Render(r.Context(), w); err != nil {
+			log.Error(r.Context(), "failed to render agent designer page", "error", err)
+		}
+	}
 }
 
 // ─── Page Handlers ──────────────────────────────────────────────────────────

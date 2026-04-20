@@ -85,14 +85,14 @@ templ a2aAgentRow(name, status, provider, skills, accentColor string) {
 			<div class="flex items-center gap-1.5">
 				switch status {
 					case "connected":
-						<div class="h-2 w-2 rounded-full bg-green-500"></div>
-						<span class="text-xs text-green-600 dark:text-green-400">Connected</span>
+						<div class="h-2 w-2 rounded-full bg-success"></div>
+						<span class="text-xs text-success">Connected</span>
 					case "discovering":
-						<div class="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></div>
-						<span class="text-xs text-blue-600 dark:text-blue-400">Discovering</span>
+						<div class="h-2 w-2 rounded-full bg-info animate-pulse"></div>
+						<span class="text-xs text-info">Discovering</span>
 					case "error":
-						<div class="h-2 w-2 rounded-full bg-red-500"></div>
-						<span class="text-xs text-red-600 dark:text-red-400">Error</span>
+						<div class="h-2 w-2 rounded-full bg-destructive"></div>
+						<span class="text-xs text-destructive">Error</span>
 				}
 			</div>
 		</div>
