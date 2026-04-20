@@ -95,57 +95,98 @@ func toConnectorResponse(c MCPConnector, toolCount int) connectorResponse {
 // Handlers
 // --------------------------------------------------------------------------
 
-// listConnectors handles GET /v1/mcp/connectors
-func (h *handler) listConnectors(w http.ResponseWriter, r *http.Request) {
+// requireMCPUser is the MCP-package variant of the auth prologue. It
+// returns the authenticated user or writes a translated 401 and returns
+// nil so the caller returns immediately.
+func requireMCPUser(w http.ResponseWriter, r *http.Request) *auth.User {
 	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
+		return nil
+	}
+	return user
+}
+
+// respondConnectorJSON writes a connector response as JSON with the
+// given optional status. Consolidates the Header/WriteHeader/Encode
+// pattern that every handler repeats.
+func respondConnectorJSON(w http.ResponseWriter, status int, body any) {
+	w.Header().Set("Content-Type", "application/json")
+	if status != 0 {
+		w.WriteHeader(status)
+	}
+	_ = json.NewEncoder(w).Encode(body)
+}
+
+// toolsResponseList marshals the per-tool JSON envelope shared by
+// listTools and refreshTools. Unmarshalling the schema / annotations
+// columns here keeps the handlers as one-liners.
+func toolsResponseList(tools []MCPDiscoveredTool) []toolResponse {
+	result := make([]toolResponse, 0, len(tools))
+	for _, t := range tools {
+		var schema, annotations any
+		_ = json.Unmarshal([]byte(t.InputSchema), &schema)
+		_ = json.Unmarshal([]byte(t.Annotations), &annotations)
+		result = append(result, toolResponse{
+			ID:          t.ID,
+			Name:        t.Name,
+			Description: t.Description,
+			InputSchema: schema,
+			Annotations: annotations,
+		})
+	}
+	return result
+}
+
+// connectorResponseWithTools builds a connector response with its
+// currently-known tool count. Swallows tool-fetch errors the way every
+// caller does — a nil-safe len(tools) is plenty for the UI.
+func (h *handler) connectorResponseWithTools(r *http.Request, connector *MCPConnector, userID string) connectorResponse {
+	tools, _ := h.service.GetConnectorTools(r.Context(), connector.ID, userID)
+	return toConnectorResponse(*connector, len(tools))
+}
+
+// listConnectors handles GET /v1/mcp/connectors
+func (h *handler) listConnectors(w http.ResponseWriter, r *http.Request) {
+	user := requireMCPUser(w, r)
+	if user == nil {
 		return
 	}
-
 	connectors, err := h.service.ListConnectors(r.Context(), user.ID)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to list connectors", "error", err)
 		http.Error(w, i18n.T(r.Context(), "Failed to list MCP connectors"), http.StatusInternalServerError)
 		return
 	}
-
-	// Batch-fetch tool counts to avoid N+1 queries.
-	ids := make([]string, len(connectors))
-	for i, c := range connectors {
-		ids[i] = c.ID
-	}
-	toolCounts, _ := h.service.CountToolsByConnectors(r.Context(), ids)
-
+	toolCounts, _ := h.service.CountToolsByConnectors(r.Context(), connectorIDs(connectors))
 	result := make([]connectorResponse, 0, len(connectors))
 	for _, c := range connectors {
 		result = append(result, toConnectorResponse(c, toolCounts[c.ID]))
 	}
+	respondConnectorJSON(w, 0, map[string]any{"connectors": result})
+}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"connectors": result})
+// connectorIDs projects a connector slice to the id slice the service's
+// batch CountToolsByConnectors call expects — avoids the N+1 per-row
+// count query.
+func connectorIDs(connectors []MCPConnector) []string {
+	ids := make([]string, len(connectors))
+	for i, c := range connectors {
+		ids[i] = c.ID
+	}
+	return ids
 }
 
 // createConnector handles POST /v1/mcp/connectors
 func (h *handler) createConnector(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
+	user := requireMCPUser(w, r)
 	if user == nil {
-		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
 	}
-
-	var req createConnectorRequest
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MiB limit
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, i18n.T(r.Context(), "Invalid request body"), http.StatusBadRequest)
+	req, ok := decodeCreateConnectorRequest(w, r)
+	if !ok {
 		return
 	}
-
-	if req.ServerURL == "" {
-		http.Error(w, i18n.T(r.Context(), "Server URL is required"), http.StatusBadRequest)
-		return
-	}
-
 	connector, err := h.service.CreateConnector(r.Context(), user.ID, req.ServerURL, req.Title, req.OAuthClientID, req.OAuthClientSecret)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to create connector", "error", err)
@@ -153,20 +194,32 @@ func (h *handler) createConnector(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, msg, code)
 		return
 	}
+	respondConnectorJSON(w, http.StatusCreated, toConnectorResponse(*connector, 0))
+}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(toConnectorResponse(*connector, 0))
+// decodeCreateConnectorRequest reads + validates the create-connector
+// body (1 MiB cap, required ServerURL). On any failure it writes a
+// translated 400 and returns ok=false.
+func decodeCreateConnectorRequest(w http.ResponseWriter, r *http.Request) (*createConnectorRequest, bool) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	var req createConnectorRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, i18n.T(r.Context(), "Invalid request body"), http.StatusBadRequest)
+		return nil, false
+	}
+	if req.ServerURL == "" {
+		http.Error(w, i18n.T(r.Context(), "Server URL is required"), http.StatusBadRequest)
+		return nil, false
+	}
+	return &req, true
 }
 
 // getConnector handles GET /v1/mcp/connectors/{id}
 func (h *handler) getConnector(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
+	user := requireMCPUser(w, r)
 	if user == nil {
-		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
 	}
-
 	id := chi.URLParam(r, "id")
 	connector, err := h.service.GetConnector(r.Context(), id, user.ID)
 	if err != nil {
@@ -174,20 +227,15 @@ func (h *handler) getConnector(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, msg, code)
 		return
 	}
-
-	tools, _ := h.service.GetConnectorTools(r.Context(), id, user.ID)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(toConnectorResponse(*connector, len(tools)))
+	respondConnectorJSON(w, 0, h.connectorResponseWithTools(r, connector, user.ID))
 }
 
 // deleteConnector handles DELETE /v1/mcp/connectors/{id}
 func (h *handler) deleteConnector(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
+	user := requireMCPUser(w, r)
 	if user == nil {
-		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
 	}
-
 	id := chi.URLParam(r, "id")
 	if err := h.service.DeleteConnector(r.Context(), id, user.ID); err != nil {
 		h.log.Error(r.Context(), "failed to delete connector", "error", err)
@@ -195,67 +243,70 @@ func (h *handler) deleteConnector(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, msg, code)
 		return
 	}
-
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // connect handles POST /v1/mcp/connectors/{id}/connect
 func (h *handler) connect(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
+	user := requireMCPUser(w, r)
 	if user == nil {
-		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
 	}
-
 	id := chi.URLParam(r, "id")
+	accessToken := readOptionalAccessToken(r)
 
-	// Read optional access_token from request body (agentstack pattern).
+	updated, authURL, err := h.service.ConnectConnector(r.Context(), id, user.ID, accessToken)
+	if err != nil {
+		h.writeConnectFailure(w, r, id, user.ID, updated, authURL, err)
+		return
+	}
+	setOAuthStateCookie(w, r, authURL)
+	respondConnectorJSON(w, 0, connectResponse{
+		Connector: ptr(h.connectorResponseWithTools(r, updated, user.ID)),
+		AuthURL:   authURL,
+	})
+}
+
+// readOptionalAccessToken best-effort decodes the agentstack
+// access_token body (4 KiB cap). Missing / malformed body is silent
+// because the field is optional.
+func readOptionalAccessToken(r *http.Request) string {
+	if r.Body == nil {
+		return ""
+	}
 	var body struct {
 		AccessToken string `json:"access_token"`
 	}
-	if r.Body != nil {
-		_ = json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&body)
-	}
+	_ = json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&body)
+	return body.AccessToken
+}
 
-	updated, authURL, err := h.service.ConnectConnector(r.Context(), id, user.ID, body.AccessToken)
-	if err != nil {
-		h.log.Error(r.Context(), "failed to connect", "error", err, "connector_id", id)
-		// Return the connector status even on error so the UI can show the state.
-		if updated != nil {
-			tools, _ := h.service.GetConnectorTools(r.Context(), id, user.ID)
-			setOAuthStateCookie(w, r, authURL)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnprocessableEntity)
-			json.NewEncoder(w).Encode(connectResponse{
-				Connector: ptr(toConnectorResponse(*updated, len(tools))),
-				AuthURL:   authURL,
-			})
-			return
-		}
+// writeConnectFailure keeps `connect` flat by handling the
+// "return the partial connector state even on error" branch: when the
+// service surfaced an updated connector, we still emit a 422 with the
+// same shape so the UI can render the status; otherwise we fall back
+// to the normal service-error mapping.
+func (h *handler) writeConnectFailure(w http.ResponseWriter, r *http.Request, id, userID string, updated *MCPConnector, authURL string, err error) {
+	h.log.Error(r.Context(), "failed to connect", "error", err, "connector_id", id)
+	if updated == nil {
 		msg, code := mapServiceError(err)
 		writeJSONError(w, msg, code)
 		return
 	}
-
-	tools, _ := h.service.GetConnectorTools(r.Context(), id, user.ID)
 	setOAuthStateCookie(w, r, authURL)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(connectResponse{
-		Connector: ptr(toConnectorResponse(*updated, len(tools))),
+	respondConnectorJSON(w, http.StatusUnprocessableEntity, connectResponse{
+		Connector: ptr(h.connectorResponseWithTools(r, updated, userID)),
 		AuthURL:   authURL,
 	})
 }
 
 // disconnect handles POST /v1/mcp/connectors/{id}/disconnect
 func (h *handler) disconnect(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
+	user := requireMCPUser(w, r)
 	if user == nil {
-		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
 	}
-
 	id := chi.URLParam(r, "id")
-
 	updated, err := h.service.DisconnectConnector(r.Context(), id, user.ID)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to disconnect", "error", err)
@@ -263,59 +314,32 @@ func (h *handler) disconnect(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, msg, code)
 		return
 	}
-
-	tools, _ := h.service.GetConnectorTools(r.Context(), id, user.ID)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(toConnectorResponse(*updated, len(tools)))
+	respondConnectorJSON(w, 0, h.connectorResponseWithTools(r, updated, user.ID))
 }
 
 // listTools handles GET /v1/mcp/connectors/{id}/tools
 func (h *handler) listTools(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
+	user := requireMCPUser(w, r)
 	if user == nil {
-		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
 	}
-
 	id := chi.URLParam(r, "id")
-
 	tools, err := h.service.GetConnectorTools(r.Context(), id, user.ID)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to list tools", "error", err)
 		http.Error(w, i18n.T(r.Context(), "Failed to list tools"), http.StatusInternalServerError)
 		return
 	}
-
-	result := make([]toolResponse, 0, len(tools))
-	for _, t := range tools {
-		var schema any
-		json.Unmarshal([]byte(t.InputSchema), &schema)
-		var annotations any
-		json.Unmarshal([]byte(t.Annotations), &annotations)
-
-		result = append(result, toolResponse{
-			ID:          t.ID,
-			Name:        t.Name,
-			Description: t.Description,
-			InputSchema: schema,
-			Annotations: annotations,
-		})
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"tools": result})
+	respondConnectorJSON(w, 0, map[string]any{"tools": toolsResponseList(tools)})
 }
 
 // refreshTools handles POST /v1/mcp/connectors/{id}/refresh
 func (h *handler) refreshTools(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
+	user := requireMCPUser(w, r)
 	if user == nil {
-		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
 	}
-
 	id := chi.URLParam(r, "id")
-
 	tools, err := h.service.RefreshTools(r.Context(), id, user.ID)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to refresh tools", "error", err)
@@ -323,25 +347,7 @@ func (h *handler) refreshTools(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, msg, code)
 		return
 	}
-
-	result := make([]toolResponse, 0, len(tools))
-	for _, t := range tools {
-		var schema any
-		json.Unmarshal([]byte(t.InputSchema), &schema)
-		var annotations any
-		json.Unmarshal([]byte(t.Annotations), &annotations)
-
-		result = append(result, toolResponse{
-			ID:          t.ID,
-			Name:        t.Name,
-			Description: t.Description,
-			InputSchema: schema,
-			Annotations: annotations,
-		})
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"tools": result})
+	respondConnectorJSON(w, 0, map[string]any{"tools": toolsResponseList(tools)})
 }
 
 // listPresets handles GET /v1/mcp/connectors/presets
@@ -356,8 +362,7 @@ func (h *handler) listPresets(w http.ResponseWriter, r *http.Request) {
 			Description: p.Description,
 		})
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"presets": result})
+	respondConnectorJSON(w, 0, map[string]any{"presets": result})
 }
 
 // mcpProxy handles all methods on /v1/mcp/connectors/{id}/mcp/*
@@ -365,72 +370,76 @@ func (h *handler) listPresets(w http.ResponseWriter, r *http.Request) {
 // This is agentstack's core pattern: the platform forwards raw MCP protocol
 // messages so external clients can use connectors directly.
 func (h *handler) mcpProxy(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
+	user := requireMCPUser(w, r)
 	if user == nil {
-		http.Error(w, i18n.T(r.Context(), "Unauthorized"), http.StatusUnauthorized)
 		return
 	}
-
 	id := chi.URLParam(r, "id")
-
-	if err := h.service.MCPProxy(r.Context(), id, user.ID, w, r); err != nil {
-		h.log.Error(r.Context(), "mcp proxy error", "error", err, "connector_id", id)
-		// Don't write error if headers already sent (streaming started).
-		if !headersSent(w) {
-			msg, code := mapServiceError(err)
-			writeJSONError(w, msg, code)
-		}
+	err := h.service.MCPProxy(r.Context(), id, user.ID, w, r)
+	if err == nil {
+		return
 	}
+	h.log.Error(r.Context(), "mcp proxy error", "error", err, "connector_id", id)
+	if headersSent(w) {
+		return // streaming already started — can't send a structured error
+	}
+	msg, code := mapServiceError(err)
+	writeJSONError(w, msg, code)
 }
 
 // oauthCallback handles GET /v1/mcp/oauth/callback
 func (h *handler) oauthCallback(w http.ResponseWriter, r *http.Request) {
-	// Handle OAuth error response from the authorization server (RFC 6749 §4.1.2.1).
 	if oauthErr := r.URL.Query().Get("error"); oauthErr != "" {
-		desc := r.URL.Query().Get("error_description")
-		if desc == "" {
-			desc = oauthErr
-		}
-		h.log.Error(r.Context(), "OAuth provider returned error",
-			"error", oauthErr, "description", desc)
-		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte(`<!DOCTYPE html><html><body><script>
-window.opener && window.opener.postMessage({type:'mcp-oauth-callback',success:false,error:` + jsonEscape(desc) + `},window.location.origin);
-window.close();
-</script><p>Authentication failed: ` + desc + `. You can close this window.</p></body></html>`))
+		h.handleOAuthProviderError(w, r, oauthErr, r.URL.Query().Get("error_description"))
 		return
 	}
-
 	state := r.URL.Query().Get("state")
 	code := r.URL.Query().Get("code")
-
 	if state == "" || code == "" {
 		http.Error(w, "Missing state or code parameter", http.StatusBadRequest)
 		return
 	}
-
 	connector, err := h.service.HandleOAuthCallback(r.Context(), state, code)
 	if err != nil {
 		h.log.Error(r.Context(), "OAuth callback failed", "error", err)
-		// Return an HTML page that communicates the error to the opener.
-		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte(`<!DOCTYPE html><html><body><script>
-window.opener && window.opener.postMessage({type:'mcp-oauth-callback',success:false,error:` + jsonEscape(err.Error()) + `},window.location.origin);
-window.close();
-</script><p>Authentication failed. You can close this window.</p></body></html>`))
+		writeOAuthFailureHTML(w, err.Error())
 		return
 	}
+	writeOAuthSuccessHTML(w, connector)
+}
 
-	// Return an HTML page that communicates success to the opener.
+// handleOAuthProviderError renders the RFC 6749 §4.1.2.1 error-redirect
+// page, choosing the authz-server's error_description over the bare
+// error code when both are present.
+func (h *handler) handleOAuthProviderError(w http.ResponseWriter, r *http.Request, oauthErr, desc string) {
+	if desc == "" {
+		desc = oauthErr
+	}
+	h.log.Error(r.Context(), "OAuth provider returned error", "error", oauthErr, "description", desc)
+	writeOAuthFailureHTML(w, desc)
+}
+
+// writeOAuthFailureHTML posts a `{success:false, error:…}` message back
+// to the opener window and closes the popup.
+func writeOAuthFailureHTML(w http.ResponseWriter, reason string) {
+	w.Header().Set("Content-Type", "text/html")
+	_, _ = w.Write([]byte(`<!DOCTYPE html><html><body><script>
+window.opener && window.opener.postMessage({type:'mcp-oauth-callback',success:false,error:` + jsonEscape(reason) + `},window.location.origin);
+window.close();
+</script><p>Authentication failed: ` + reason + `. You can close this window.</p></body></html>`))
+}
+
+// writeOAuthSuccessHTML posts a `{success:true, connector_id, status}`
+// message back to the opener and closes the popup.
+func writeOAuthSuccessHTML(w http.ResponseWriter, connector *MCPConnector) {
 	connectorJSON, _ := json.Marshal(map[string]any{
 		"type":         "mcp-oauth-callback",
 		"success":      true,
 		"connector_id": connector.ID,
 		"status":       string(connector.Status),
 	})
-
 	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(`<!DOCTYPE html><html><body><script>
+	_, _ = w.Write([]byte(`<!DOCTYPE html><html><body><script>
 window.opener && window.opener.postMessage(` + string(connectorJSON) + `,window.location.origin);
 window.close();
 </script><p>Authentication successful! You can close this window.</p></body></html>`))

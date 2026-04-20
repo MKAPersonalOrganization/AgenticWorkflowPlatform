@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/jsonschema-go/jsonschema"
 
+	"google.golang.org/adk/session"
 	adktool "google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
 )
@@ -33,14 +34,29 @@ import (
 
 // WrapExecutableTool converts a foundation ExecutableTool to an adk-go Tool.
 func WrapExecutableTool(et agent.ExecutableTool, sessionID, userID string) adktool.Tool {
-	schema := et.Schema()
-	var inputSchema *jsonschema.Schema
-	if schema != nil {
-		inputSchema = agentSchemaToJSONSchema(schema)
+	exec := wrapWithPanicRecovery(et, sessionID, userID)
+	cfg := functiontool.Config{
+		Name:          et.Name(),
+		Description:   et.Description(),
+		InputSchema:   agentSchemaToJSONSchema(et.Schema()),
+		IsLongRunning: agent.IsLongRunningTool(et),
 	}
+	t, err := functiontool.New(cfg, exec)
+	if err == nil {
+		return t
+	}
+	// Schema conversion can fail for complex schemas. Fall back to a tool
+	// without schema — the LLM still sees name + description.
+	cfg.InputSchema = nil
+	t, _ = functiontool.New(cfg, exec)
+	return t
+}
 
-	exec := func(ctx adktool.Context, args map[string]any) (result map[string]any, err error) {
-		// Panic recovery — tools should never crash the agent loop.
+// wrapWithPanicRecovery returns the adktool execution closure with a
+// deferred recover() so panics in tool code surface as structured
+// {"error": "..."} results instead of crashing the agent loop.
+func wrapWithPanicRecovery(et agent.ExecutableTool, sessionID, userID string) func(adktool.Context, map[string]any) (map[string]any, error) {
+	return func(ctx adktool.Context, args map[string]any) (result map[string]any, err error) {
 		defer func() {
 			if r := recover(); r != nil {
 				result = map[string]any{errorKey: fmt.Sprintf("tool panic: %v", r)}
@@ -49,31 +65,6 @@ func WrapExecutableTool(et agent.ExecutableTool, sessionID, userID string) adkto
 		}()
 		return executeFoundationTool(ctx, et, args, sessionID, userID)
 	}
-
-	isLongRunning := agent.IsLongRunningTool(et)
-
-	t, buildErr := functiontool.New(
-		functiontool.Config{
-			Name:          et.Name(),
-			Description:   et.Description(),
-			InputSchema:   inputSchema,
-			IsLongRunning: isLongRunning,
-		},
-		exec,
-	)
-	if buildErr != nil {
-		// Schema conversion can fail for complex schemas. Fall back to
-		// a tool without schema — the LLM still sees name + description.
-		t, _ = functiontool.New(
-			functiontool.Config{
-				Name:          et.Name(),
-				Description:   et.Description(),
-				IsLongRunning: isLongRunning,
-			},
-			exec,
-		)
-	}
-	return t
 }
 
 // WrapExecutableTools converts a slice of foundation ExecutableTools.
@@ -110,14 +101,7 @@ func executeFoundationTool(
 	if err != nil {
 		return nil, err
 	}
-
-	// Inject an IO handler so tools can use io.Read() / io.Confirm().
-	// If a handler is already set (e.g. CachedReadHandler on resume), keep it.
-	var execCtx context.Context = ctx
-	if agentio.FromContext(ctx) == nil {
-		execCtx = agentio.WithHandler(ctx, agentio.NewPauseHandler())
-	}
-
+	execCtx := ensureIOHandler(ctx)
 	result, err := et.Execute(execCtx, agent.Arguments{
 		Raw:       raw,
 		CallID:    ctx.FunctionCallID(),
@@ -125,38 +109,50 @@ func executeFoundationTool(
 		UserID:    userID,
 	})
 	if err != nil {
-		// Check for ErrInputRequired — tool is requesting custom user input
-		// via io.Read(). We pause the ADK agent loop using the confirmation
-		// mechanism (the only pause mechanism in ADK-Go), with a payload that
-		// marks this as a custom input request (Python ADK's adk_request_input
-		// pattern).
-		var inputReq *agentio.ErrInputRequired
-		if errors.As(err, &inputReq) {
-			// Build a payload that distinguishes custom input from confirmation.
-			payload := map[string]any{
-				"type": "custom_input",
-			}
-			if inputReq.Schema != nil {
-				payload["schema"] = inputReq.Schema
-			}
-
-			if reqErr := ctx.RequestConfirmation(inputReq.Question, payload); reqErr != nil {
-				return map[string]any{errorKey: reqErr.Error()}, nil
-			}
-			ctx.Actions().SkipSummarization = true
-
-			return nil, fmt.Errorf("tool %q %w", et.Name(), adktool.ErrConfirmationRequired)
-		}
-
-		// Convention: execution errors are surfaced as {"error":"..."} so the LLM
-		// sees the failure reason and can retry or report to the user.
-		return map[string]any{errorKey: err.Error()}, nil
+		return handleToolExecError(ctx, et, err)
 	}
-
-	// Forward any runtime directives the tool emitted (transfer, escalate, state).
 	applyEventActions(ctx, result.Actions)
-
 	return resultToMap(result), nil
+}
+
+// ensureIOHandler injects the default PauseHandler when no io handler
+// is already attached to ctx. Callers (e.g. the confirmation-resume
+// path) may pre-attach a CachedReadHandler; we keep it when present.
+func ensureIOHandler(ctx adktool.Context) context.Context {
+	if agentio.FromContext(ctx) != nil {
+		return ctx
+	}
+	return agentio.WithHandler(ctx, agentio.NewPauseHandler())
+}
+
+// handleToolExecError translates a foundation-tool execution error into
+// the adk response shape. The ErrInputRequired branch routes through
+// ADK's confirmation pause (the only pause primitive), marking the
+// payload as custom_input so the frontend disambiguates it from a
+// yes/no confirmation prompt. All other errors surface as
+// {"error": "..."} so the LLM sees the failure and can recover.
+func handleToolExecError(ctx adktool.Context, et agent.ExecutableTool, err error) (map[string]any, error) {
+	var inputReq *agentio.ErrInputRequired
+	if errors.As(err, &inputReq) {
+		return requestInputPause(ctx, et, inputReq)
+	}
+	return map[string]any{errorKey: err.Error()}, nil
+}
+
+// requestInputPause bridges ErrInputRequired to ADK's confirmation
+// protocol: build a custom_input payload (optionally carrying a schema)
+// and ask the orchestrator to pause. SkipSummarization stops the LLM
+// from freely talking after the pause.
+func requestInputPause(ctx adktool.Context, et agent.ExecutableTool, inputReq *agentio.ErrInputRequired) (map[string]any, error) {
+	payload := map[string]any{"type": "custom_input"}
+	if inputReq.Schema != nil {
+		payload["schema"] = inputReq.Schema
+	}
+	if reqErr := ctx.RequestConfirmation(inputReq.Question, payload); reqErr != nil {
+		return map[string]any{errorKey: reqErr.Error()}, nil
+	}
+	ctx.Actions().SkipSummarization = true
+	return nil, fmt.Errorf("tool %q %w", et.Name(), adktool.ErrConfirmationRequired)
 }
 
 // applyEventActions maps foundation EventActions onto ADK's mutable EventActions.
@@ -180,13 +176,21 @@ func applyEventActions(ctx adktool.Context, actions *agent.EventActions) {
 	if actions.Escalate {
 		adkActions.Escalate = true
 	}
-	if len(actions.StateDelta) > 0 {
-		if adkActions.StateDelta == nil {
-			adkActions.StateDelta = make(map[string]any)
-		}
-		for k, v := range actions.StateDelta {
-			adkActions.StateDelta[k] = v
-		}
+	mergeStateDelta(adkActions, actions.StateDelta)
+}
+
+// mergeStateDelta copies src's keys into adkActions.StateDelta,
+// lazy-initialising the destination map when the tool emits the first
+// delta for this call.
+func mergeStateDelta(adkActions *session.EventActions, src map[string]any) {
+	if len(src) == 0 {
+		return
+	}
+	if adkActions.StateDelta == nil {
+		adkActions.StateDelta = make(map[string]any)
+	}
+	for k, v := range src {
+		adkActions.StateDelta[k] = v
 	}
 }
 
