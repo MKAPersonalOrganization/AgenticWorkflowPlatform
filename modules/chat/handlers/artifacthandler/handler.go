@@ -2,13 +2,14 @@ package artifacthandler
 
 import (
 	"aicompass/foundation/artifact"
+	"aicompass/foundation/auth"
 	"aicompass/foundation/logger"
 	"aicompass/modules/chat/projection/agui"
-	"aicompass/foundation/auth"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
@@ -85,62 +86,87 @@ func (h *Handler) DownloadArtifact(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-
 	threadID := r.PathValue("threadId")
 	fileName := r.PathValue("fileName")
 	if threadID == "" || fileName == "" {
 		jsonError(w, "threadId and fileName are required", http.StatusBadRequest)
 		return
 	}
-
-	// ── Thread ownership check ────────────────────────────────────────────
-	// Prevents user A from reading user B's artifacts by guessing thread IDs.
-	state, exists := h.aguiProjection.GetThreadState(r.Context(), threadID)
-	if !exists || state.UserID != user.ID {
+	// Thread ownership check: stops user A from reading user B's
+	// artifacts by guessing thread IDs.
+	if !h.ownsThread(r, user.ID, threadID, /*allowMissing=*/ false) {
 		jsonError(w, "Artifact not found", http.StatusNotFound)
 		return
 	}
 
 	content, meta, err := h.artifactStore.Load(r.Context(), user.ID, threadID, fileName)
 	if err != nil {
-		if errors.Is(err, artifact.ErrNotFound) {
-			jsonError(w, "Artifact not found", http.StatusNotFound)
-			return
-		}
-		h.log.Error(r.Context(), "failed to load artifact", "error", err, "userID", user.ID, "threadID", threadID, "fileName", fileName)
-		jsonError(w, "Failed to load artifact", http.StatusInternalServerError)
+		h.writeLoadError(w, r, err, user.ID, threadID, fileName)
 		return
 	}
 	defer content.Close()
 
-	// Set content type from S3 metadata
-	ct := meta.ContentType
-	if ct == "" {
-		ct = "application/octet-stream"
-	}
-	w.Header().Set("Content-Type", ct)
+	writeArtifactHeaders(w, fileName, meta.ContentType)
+	h.streamArtifactBody(w, r, content, fileName)
+}
 
-	// Use inline disposition for media types so browsers can play/display them,
-	// and attachment for everything else so they download.
-	if strings.HasPrefix(ct, "image/") || strings.HasPrefix(ct, "audio/") || strings.HasPrefix(ct, "video/") {
-		w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", fileName))
-	} else {
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", fileName))
+// ownsThread returns true when the thread is accessible to userID: it
+// either belongs to userID, or doesn't exist yet (allowMissing=true).
+// Used by all ownership gates to keep the caller bodies linear.
+func (h *Handler) ownsThread(r *http.Request, userID, threadID string, allowMissing bool) bool {
+	state, exists := h.aguiProjection.GetThreadState(r.Context(), threadID)
+	if !exists {
+		return allowMissing
 	}
+	return state.UserID == userID
+}
 
-	// Artifacts are named with UUID prefixes (immutable content-addressing).
-	// Set aggressive cache headers so browsers and CDNs never re-fetch.
+// writeLoadError maps artifact-Load errors onto HTTP responses: the
+// ErrNotFound sentinel becomes 404, anything else is a logged 500.
+func (h *Handler) writeLoadError(w http.ResponseWriter, r *http.Request, err error, userID, threadID, fileName string) {
+	if errors.Is(err, artifact.ErrNotFound) {
+		jsonError(w, "Artifact not found", http.StatusNotFound)
+		return
+	}
+	h.log.Error(r.Context(), "failed to load artifact", "error", err, "userID", userID, "threadID", threadID, "fileName", fileName)
+	jsonError(w, "Failed to load artifact", http.StatusInternalServerError)
+}
+
+// writeArtifactHeaders sets Content-Type, Content-Disposition (inline
+// for media that browsers can render, attachment otherwise), and the
+// immutable-cache header driven by the UUID-prefixed filename.
+func writeArtifactHeaders(w http.ResponseWriter, fileName, contentType string) {
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	w.Header().Set("Content-Type", contentType)
+	disposition := "attachment"
+	if isInlineMediaType(contentType) {
+		disposition = "inline"
+	}
+	w.Header().Set("Content-Disposition", fmt.Sprintf("%s; filename=%q", disposition, fileName))
 	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+}
 
-	// minio.Object implements io.ReadSeeker, so http.ServeContent can handle
-	// Range requests (HTTP 206), Content-Length, and conditional headers.
+// isInlineMediaType returns true for image/audio/video types browsers
+// can render directly — those get inline disposition so the browser
+// plays them rather than downloading.
+func isInlineMediaType(contentType string) bool {
+	return strings.HasPrefix(contentType, "image/") ||
+		strings.HasPrefix(contentType, "audio/") ||
+		strings.HasPrefix(contentType, "video/")
+}
+
+// streamArtifactBody ships the body: ReadSeekers go through
+// http.ServeContent (Range support, Content-Length, conditional
+// requests); anything else falls back to io.Copy with no Range support.
+func (h *Handler) streamArtifactBody(w http.ResponseWriter, r *http.Request, content io.ReadCloser, fileName string) {
 	if rs, ok := content.(io.ReadSeeker); ok {
 		http.ServeContent(w, r, fileName, time.Time{}, rs)
-	} else {
-		// Fallback: plain copy (no Range support)
-		if _, copyErr := io.Copy(w, content); copyErr != nil {
-			h.log.Error(r.Context(), "failed to stream artifact to client", "error", copyErr, "fileName", fileName)
-		}
+		return
+	}
+	if _, err := io.Copy(w, content); err != nil {
+		h.log.Error(r.Context(), "failed to stream artifact to client", "error", err, "fileName", fileName)
 	}
 }
 
@@ -214,31 +240,24 @@ func (h *Handler) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-
 	threadID := r.PathValue("threadId")
 	if threadID == "" {
 		jsonError(w, "threadId is required", http.StatusBadRequest)
 		return
 	}
-
-	// ── Thread ownership check ────────────────────────────────────────────
-	// S3 keys are prefixed with userID/threadID, so namespace isolation is
-	// inherent. For new sessions the thread doesn't exist in the projection
-	// yet (it's created when the first message is sent), so we allow the
-	// upload. If the thread *does* exist and belongs to another user, block.
-	if state, exists := h.aguiProjection.GetThreadState(r.Context(), threadID); exists && state.UserID != user.ID {
+	// Thread ownership: fresh threads (not yet in the projection) are
+	// allowed — the thread row gets created on first message send.
+	if !h.ownsThread(r, user.ID, threadID, /*allowMissing=*/ true) {
 		jsonError(w, "Thread not found", http.StatusNotFound)
 		return
 	}
 
-	// ── Parse multipart ───────────────────────────────────────────────────
-	// maxMemory = 2 MB: keeps RAM bounded under concurrent load.
-	// Excess spills to OS temp files (cleaned up when request ends).
+	// maxMemory = 2 MB so RAM stays bounded under concurrent load;
+	// excess spills to OS temp files cleaned up when the request ends.
 	if err := r.ParseMultipartForm(2 << 20); err != nil {
 		jsonError(w, "Failed to parse multipart form", http.StatusBadRequest)
 		return
 	}
-
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		jsonError(w, "Missing 'file' field", http.StatusBadRequest)
@@ -246,62 +265,66 @@ func (h *Handler) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// ── Content-type validation ───────────────────────────────────────────
-	// 1. Read the declared type from the multipart header.
-	contentType := header.Header.Get("Content-Type")
-
-	// 2. Sniff actual bytes to defeat spoofed Content-Type headers.
-	//    Read first 512 bytes (the amount http.DetectContentType uses).
-	sniffBuf := make([]byte, 512)
-	n, _ := file.Read(sniffBuf)
-	detected := http.DetectContentType(sniffBuf[:n])
-
-	// Seek back so S3 upload reads from the beginning.
-	if _, seekErr := file.Seek(0, io.SeekStart); seekErr != nil {
-		jsonError(w, "Internal error", http.StatusInternalServerError)
+	contentType, err := resolveUploadContentType(file, header)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusUnsupportedMediaType)
 		return
 	}
+	fileName := buildUploadFileName(header)
 
-	// Trust the declared type if it's in our allowlist AND the sniffed type
-	// is either a match or "application/octet-stream" (many audio/pdf files
-	// sniff as octet-stream because DetectContentType only knows a few).
-	if contentType == "" || !allowedUploadTypes[contentType] {
-		contentType = detected
-	}
-	if !allowedUploadTypes[contentType] {
-		jsonError(w, fmt.Sprintf("Unsupported file type: %s", contentType), http.StatusUnsupportedMediaType)
-		return
-	}
-
-	// ── Collision-safe filename ───────────────────────────────────────────
-	// UUID prefix ensures no two concurrent uploads collide, even with the
-	// same original filename across 100K users.
-	originalName := sanitizeFileName(header.Filename)
-	if originalName == "" {
-		originalName = "upload"
-	}
-	fileName := fmt.Sprintf("%s_%s", uuid.New().String()[:8], originalName)
-
-	// ── Save to S3 ───────────────────────────────────────────────────────
-	_, saveErr := h.artifactStore.Save(r.Context(), user.ID, threadID, fileName, contentType, file)
-	if saveErr != nil {
+	if _, saveErr := h.artifactStore.Save(r.Context(), user.ID, threadID, fileName, contentType, file); saveErr != nil {
 		h.log.Error(r.Context(), "failed to save uploaded attachment",
 			"error", saveErr, "userID", user.ID, "threadID", threadID, "fileName", fileName)
 		jsonError(w, "Failed to save attachment", http.StatusInternalServerError)
 		return
 	}
-
-	artifactURL := fmt.Sprintf("/v1/threads/%s/artifacts/%s", threadID, fileName)
-
 	h.log.Info(r.Context(), "[API] Attachment uploaded",
 		"userID", user.ID, "threadID", threadID, "fileName", fileName,
 		"contentType", contentType, "size", header.Size)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
-		"url":      artifactURL,
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"url":      fmt.Sprintf("/v1/threads/%s/artifacts/%s", threadID, fileName),
 		"mimeType": contentType,
 		"fileName": fileName,
 	})
+}
+
+// resolveUploadContentType decides the MIME to store on the artifact.
+// Strategy:
+//  1. Read the declared header type.
+//  2. Sniff the first 512 bytes (http.DetectContentType's window).
+//  3. Prefer the declared type when it's in the allowlist; fall back to
+//     the sniffed type otherwise.
+//
+// Returns an error when the final type isn't allowed, so the caller
+// surfaces 415 Unsupported Media Type.
+func resolveUploadContentType(file io.ReadSeeker, header *multipart.FileHeader) (string, error) {
+	sniffBuf := make([]byte, 512)
+	n, _ := file.Read(sniffBuf)
+	detected := http.DetectContentType(sniffBuf[:n])
+	// Seek back so the S3 upload reads from byte zero.
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return "", fmt.Errorf("Internal error")
+	}
+	contentType := header.Header.Get("Content-Type")
+	if contentType == "" || !allowedUploadTypes[contentType] {
+		contentType = detected
+	}
+	if !allowedUploadTypes[contentType] {
+		return "", fmt.Errorf("Unsupported file type: %s", contentType)
+	}
+	return contentType, nil
+}
+
+// buildUploadFileName produces a collision-safe stored filename: 8 hex
+// chars of a UUID, underscore, then the sanitised original name (or
+// "upload" if the original was empty / all control chars).
+func buildUploadFileName(header *multipart.FileHeader) string {
+	original := sanitizeFileName(header.Filename)
+	if original == "" {
+		original = "upload"
+	}
+	return fmt.Sprintf("%s_%s", uuid.New().String()[:8], original)
 }

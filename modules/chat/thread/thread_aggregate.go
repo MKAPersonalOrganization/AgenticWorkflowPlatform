@@ -161,12 +161,51 @@ func (t *ThreadAggregate) RecordToolEvent(event Event) error {
 	return nil
 }
 
+// eventApplicators is the ordered dispatch table from event type to
+// per-category applicator. Each returns true when it handled the event
+// so Apply can short-circuit. An event that matches nothing is silently
+// ignored — matching the prior switch-statement's default arm.
+var eventApplicators = []func(*ThreadAggregate, Event) bool{
+	(*ThreadAggregate).applyMetadataEvent,
+	(*ThreadAggregate).applyMessageEvent,
+	(*ThreadAggregate).applyToolElicitationEvent,
+	(*ThreadAggregate).applyToolStatusEvent,
+	(*ThreadAggregate).applyRunLifecycleEvent,
+	(*ThreadAggregate).applyStateEvent,
+}
+
 // Apply applies an event to update the thread's state.
 // This is the only place where state mutations happen.
 func (t *ThreadAggregate) Apply(event Event) {
+	for _, apply := range eventApplicators {
+		if apply(t, event) {
+			return
+		}
+	}
+}
+
+// applyMetadataEvent handles thread-wide lifecycle events: creation,
+// title changes, deletion.
+func (t *ThreadAggregate) applyMetadataEvent(event Event) bool {
 	switch e := event.(type) {
 	case *ThreadCreated:
 		t.applyThreadCreated(e)
+	case *ThreadTitleUpdated:
+		t.Title = e.Title
+		t.UpdatedAt = e.Timestamp
+	case *ThreadDeleted:
+		t.IsDeleted = true
+		t.UpdatedAt = e.Timestamp
+	default:
+		return false
+	}
+	return true
+}
+
+// applyMessageEvent handles message-producing events: user / assistant
+// turns, tool results, code-execution results.
+func (t *ThreadAggregate) applyMessageEvent(event Event) bool {
+	switch e := event.(type) {
 	case *UserMessageAdded:
 		t.applyUserMessageAdded(e)
 	case *AssistantMessageAdded:
@@ -175,12 +214,17 @@ func (t *ThreadAggregate) Apply(event Event) {
 		t.applyToolResultAdded(e)
 	case *CodeExecutionRan:
 		t.applyCodeExecutionRan(e)
-	case *ThreadTitleUpdated:
-		t.Title = e.Title
-		t.UpdatedAt = e.Timestamp
-	case *ThreadDeleted:
-		t.IsDeleted = true
-		t.UpdatedAt = e.Timestamp
+	default:
+		return false
+	}
+	return true
+}
+
+// applyToolElicitationEvent handles the HITL pause requests and their
+// resolutions: tool needs input / confirmation / auth, and the user's
+// input-provided reply.
+func (t *ThreadAggregate) applyToolElicitationEvent(event Event) bool {
+	switch e := event.(type) {
 	case *ToolNeedsInput:
 		t.applyToolNeedsInput(e)
 	case *ToolNeedsConfirmation:
@@ -189,6 +233,16 @@ func (t *ThreadAggregate) Apply(event Event) {
 		t.applyToolNeedsAuth(e)
 	case *InputProvided:
 		t.applyInputProvided(e)
+	default:
+		return false
+	}
+	return true
+}
+
+// applyToolStatusEvent handles tool-lifecycle flips that don't carry
+// new content: auth grant/deny plus external cancellation.
+func (t *ThreadAggregate) applyToolStatusEvent(event Event) bool {
+	switch e := event.(type) {
 	case *AuthGranted:
 		t.updateToolStatus(e.ToolCallID, "AuthGranted")
 	case *AuthDenied:
@@ -196,12 +250,33 @@ func (t *ThreadAggregate) Apply(event Event) {
 	case *ToolCancelled:
 		delete(t.ActiveToolStates, e.ToolCallID)
 		t.UpdatedAt = e.Timestamp
-	case *RunStarted, *RunFinished, *TokenUsageReported:
-		// These events only bump the thread's last-activity timestamp.
-		t.UpdatedAt = eventTimestamp(event)
-	case *StateChangeReported:
-		t.applyStateChangeReported(e)
+	default:
+		return false
 	}
+	return true
+}
+
+// applyRunLifecycleEvent absorbs the run-level events that only bump
+// the thread's last-activity timestamp — run start/finish and token
+// usage reports.
+func (t *ThreadAggregate) applyRunLifecycleEvent(event Event) bool {
+	switch event.(type) {
+	case *RunStarted, *RunFinished, *TokenUsageReported:
+		t.UpdatedAt = eventTimestamp(event)
+		return true
+	}
+	return false
+}
+
+// applyStateEvent handles session-state mutations (ADK-Go state-delta
+// propagation) — kept as its own category so future state-shaped events
+// can join without touching the main dispatcher.
+func (t *ThreadAggregate) applyStateEvent(event Event) bool {
+	if e, ok := event.(*StateChangeReported); ok {
+		t.applyStateChangeReported(e)
+		return true
+	}
+	return false
 }
 
 // ─── Per-event application helpers ───────────────────────────────────────────
