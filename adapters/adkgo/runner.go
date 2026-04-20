@@ -129,269 +129,359 @@ func NewRunnerAdapter(cfg RunnerAdapterConfig) (*RunnerAdapter, error) {
 	}, nil
 }
 
+// runPrep is the assembled output of prepareRun — everything the streaming
+// loop needs. Exists so Run's closure body stays flat.
+type runPrep struct {
+	toolCallID     string
+	initialEvents  []thread.Event
+	agg            *thread.ThreadAggregate
+	modelCfg       *fagent.ModelConfig
+	agentName      string
+	agentPositions map[string]AgentPosition
+	sessionSvc     session.Service
+	adkRunner      *adkrunner.Runner
+	userMsg        *genai.Content
+	runOpts        []adkrunner.RunOption
+	streamingMode  agent.StreamingMode
+	saveInputBlobs bool
+	memoryEnabled  bool
+}
+
 // Run executes an agent with the given request, yielding thread domain events.
 // Implements agentorchestrator.Runner.
 func (r *RunnerAdapter) Run(ctx context.Context, req *fagent.RunRequest) iter.Seq2[thread.Event, error] {
 	return func(yield func(thread.Event, error) bool) {
-		// 0. Resolve per-user model config.
-		modelCfg, err := r.configResolver.GetModelConfigForUser(ctx, req.UserID)
-		if err != nil {
-			yield(nil, fmt.Errorf("resolving AI settings for user: %w", err))
-			return
-		}
-
-		// 1. Persist user message and get thread aggregate.
-		agg, toolCallID, initialEvents, err := r.loadOrSeedThread(ctx, req)
+		prep, err := r.prepareRun(ctx, req)
 		if err != nil {
 			yield(nil, err)
 			return
 		}
-
-		// 2. Resolve agent.
-		agentName := req.AgentName
-		if agentName == "" && agg != nil {
-			for i := len(agg.Messages) - 1; i >= 0; i-- {
-				if agg.Messages[i].AgentName != "" {
-					agentName = agg.Messages[i].AgentName
-					break
-				}
-			}
-		}
-
-		foundAgent, agErr := r.agentProvider.GetForUser(ctx, agentName, req.UserID)
-		if agErr != nil {
-			yield(nil, fmt.Errorf("resolving agent %q: %w", agentName, agErr))
-			return
-		}
-
-		// 3. Extract full agent config for requirements, middlewares, tools.
-		agentCfg := extractAgentConfig(foundAgent)
-
-		// 3b. Apply per-agent model override — swaps provider/model/apiKey when set.
-		if agentCfg != nil && agentCfg.ModelOverride != nil {
-			overridden, ovErr := r.applyModelOverride(ctx, req.UserID, modelCfg, agentCfg.ModelOverride)
-			if ovErr != nil {
-				yield(nil, ovErr)
-				return
-			}
-			modelCfg = overridden
-		}
-
-		// 4. Build session from thread history (if any).
-		//
-		// When there is existing conversation history, we replay it into an
-		// adk-go session so the LLM agent sees prior context. For fresh
-		// conversations (no history), we skip this — the runner's
-		// AutoCreateSession will create the session on the first Run call.
-		//
-		// Session state from history must be available before Invocation is
-		// constructed so inv.State reflects values accumulated by prior agents
-		// (e.g. via Config.OutputKey).
-		//
-		// Session state is persisted via StateChangeReported events to the event
-		// store. State is restored from ThreadAggregate.State during BuildSessionFromThread.
-		sessionSvc := session.InMemoryService()
-		var sess session.Session
-		if agg != nil && len(agg.Messages) > 0 {
-			sess, err = BuildSessionFromThread(ctx, sessionSvc, agg, req.UserID)
-			if err != nil {
-				yield(nil, fmt.Errorf("building session from thread: %w", err))
-				return
-			}
-		}
-
-		// 5. Build invocation with history and live session state for Requirements.
-		var state fagent.ReadonlyState
-		if sess != nil {
-			state = &adkSessionState{state: sess.State()}
-		}
-		inv := &fagent.Invocation{
-			ID:        req.InvocationID,
-			SessionID: req.SessionID,
-			UserID:    req.UserID,
-			Message:   req.Message,
-			Config:    req.Config,
-			Context:   req.Context,
-			State:     state,
-		}
-		if agg != nil {
-			inv.History = threadHistoryToMessages(agg.Messages)
-		}
-
-		// 8. Create model.LLM (needed for both regular and workflow agents).
-		llm, mErr := NewModel(ctx, modelCfg.Provider, modelCfg.Model, modelCfg.APIKey)
-		if mErr != nil {
-			yield(nil, fmt.Errorf("creating LLM model: %w", mErr))
-			return
-		}
-
-		// 9. Build the ADK-Go agent — either a workflow agent or a regular LLM agent.
-		var adkAgent agent.Agent
-		var agentPositions map[string]AgentPosition
-		memEnabled, memPreload := r.resolveMemoryPolicy(agentCfg)
-		memoryEnabled := r.memoryService != nil && memEnabled
-		artEnabled, artAutoSaveBlobs := r.resolveArtifactPolicy(agentCfg)
-		artifactsEnabled := r.artifactService != nil && artEnabled
-
-		if wa, isWF := isWorkflowAgent(foundAgent); isWF {
-			// ── Workflow Agent Path ──
-			// Build a sequential/parallel/loop agent from the workflow steps.
-			wbc := &workflowBuildContext{
-				ctx:      ctx,
-				adapter:  r,
-				userID:   req.UserID,
-				modelCfg: modelCfg,
-				llm:      llm,
-				threadID: req.SessionID,
-				req:      req,
-			}
-			var wErr error
-			adkAgent, agentPositions, wErr = buildWorkflowAgent(wbc, wa)
-			if wErr != nil {
-				yield(nil, fmt.Errorf("building workflow agent: %w", wErr))
-				return
-			}
-		} else {
-			// ── Regular LLM Agent Path ──
-			var aErr error
-			adkAgent, aErr = r.buildRegularLLMAgent(ctx, req, agentName, foundAgent, agentCfg, modelCfg, llm, inv,
-				memoryEnabled, memPreload, artifactsEnabled)
-			if aErr != nil {
-				yield(nil, aErr)
-				return
-			}
-		}
-
-		// 11. Build adk-go runner with RetryAndReflect plugin.
-		// RetryAndReflect (ADK-Go v1.0.0) intercepts tool errors and injects a
-		// structured reflection prompt into the LLM context, guiding the model
-		// to diagnose and retry with corrected arguments. Up to 3 retries are
-		// allowed per invocation; on exhaustion the plugin tells the model to
-		// stop using the failing tool rather than returning a raw error.
-		runnerCfg := adkrunner.Config{
-			AppName:           appName,
-			Agent:             adkAgent,
-			SessionService:    sessionSvc,
-			AutoCreateSession: true,
-			PluginConfig: adkrunner.PluginConfig{
-				Plugins: []*plugin.Plugin{
-					retryandreflect.MustNew(
-						retryandreflect.WithMaxRetries(3),
-						retryandreflect.WithTrackingScope(retryandreflect.Invocation),
-						retryandreflect.WithErrorIfRetryExceeded(false),
-					),
-				},
-			},
-		}
-		if memoryEnabled {
-			runnerCfg.MemoryService = r.memoryService
-		}
-		if artifactsEnabled {
-			runnerCfg.ArtifactService = r.artifactService
-		}
-		adkRunner, rErr := adkrunner.New(runnerCfg)
-		if rErr != nil {
-			yield(nil, fmt.Errorf("creating adk-go runner: %w", rErr))
-			return
-		}
-
-		// 12. Inject user + IO handler into context.
-		ctx = r.injectRunContext(ctx, req, toolCallID)
-
-		// 13. Yield initial events.
-		for _, ie := range initialEvents {
+		ctx = r.injectRunContext(ctx, req, prep.toolCallID)
+		for _, ie := range prep.initialEvents {
 			if !yield(ie, nil) {
 				return
 			}
 		}
+		r.streamAdkEvents(ctx, yield, req, prep)
+		if prep.memoryEnabled {
+			r.persistSessionToMemory(ctx, prep.sessionSvc, req)
+		}
+	}
+}
 
-		// 14. Build user content for adk-go.
-		userMsg := buildRunUserMessage(req, agg, toolCallID)
+// prepareRun assembles every dependency the streaming loop needs: thread
+// state, resolved agent, session + invocation, LLM, ADK agent, ADK runner,
+// and the user message. All branching error paths live here so Run's
+// closure can stay linear.
+func (r *RunnerAdapter) prepareRun(ctx context.Context, req *fagent.RunRequest) (*runPrep, error) {
+	modelCfg, err := r.configResolver.GetModelConfigForUser(ctx, req.UserID)
+	if err != nil {
+		return nil, fmt.Errorf("resolving AI settings for user: %w", err)
+	}
+	agg, toolCallID, initialEvents, err := r.loadOrSeedThread(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	agentName, foundAgent, agentCfg, err := r.resolveAgentForRun(ctx, req, agg)
+	if err != nil {
+		return nil, err
+	}
+	modelCfg, err = r.maybeApplyModelOverride(ctx, req.UserID, modelCfg, agentCfg)
+	if err != nil {
+		return nil, err
+	}
 
-		// 15. Run the agent and translate events.
-		//
-		// Per-event translation + streaming-lifecycle bookkeeping lives in
-		// runner_loop.go. State that accumulates across iterations (current
-		// author, streaming/assistant message IDs, node start time, loop
-		// iteration counters) is held in runLoopState so the outer iterator
-		// stays flat.
-		loopState := &runLoopState{
-			evtCtx: EventContext{
-				ThreadID:  req.SessionID,
-				RunID:     messageIDFromRequest(req),
-				AgentName: agentName,
-				Provider:  modelCfg.Provider,
-				Model:     modelCfg.Model,
+	sessionSvc := session.InMemoryService()
+	sess, err := r.buildSessionFromAggregate(ctx, sessionSvc, agg, req.UserID)
+	if err != nil {
+		return nil, err
+	}
+	inv := buildInvocation(req, sess, agg)
+
+	llm, err := NewModel(ctx, modelCfg.Provider, modelCfg.Model, modelCfg.APIKey)
+	if err != nil {
+		return nil, fmt.Errorf("creating LLM model: %w", err)
+	}
+
+	memEnabled, memPreload := r.resolveMemoryPolicy(agentCfg)
+	memoryEnabled := r.memoryService != nil && memEnabled
+	artEnabled, artAutoSaveBlobs := r.resolveArtifactPolicy(agentCfg)
+	artifactsEnabled := r.artifactService != nil && artEnabled
+
+	adkAgent, agentPositions, err := r.buildAdkAgent(
+		ctx, req, agentName, foundAgent, agentCfg, modelCfg, llm, inv,
+		memoryEnabled, memPreload, artifactsEnabled,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	adkRunner, err := r.buildAdkRunner(adkAgent, sessionSvc, memoryEnabled, artifactsEnabled)
+	if err != nil {
+		return nil, err
+	}
+
+	return &runPrep{
+		toolCallID:     toolCallID,
+		initialEvents:  initialEvents,
+		agg:            agg,
+		modelCfg:       modelCfg,
+		agentName:      agentName,
+		agentPositions: agentPositions,
+		sessionSvc:     sessionSvc,
+		adkRunner:      adkRunner,
+		userMsg:        buildRunUserMessage(req, agg, toolCallID),
+		runOpts:        buildRunOptions(req),
+		streamingMode:  r.resolveStreamingMode(agentCfg),
+		saveInputBlobs: artifactsEnabled && artAutoSaveBlobs,
+		memoryEnabled:  memoryEnabled,
+	}, nil
+}
+
+// resolveAgentForRun picks the agent for this run. agentName falls back to
+// the last agent that authored a message in the aggregate, then the
+// provider looks up the agent and we cache its foundation config.
+func (r *RunnerAdapter) resolveAgentForRun(
+	ctx context.Context, req *fagent.RunRequest, agg *thread.ThreadAggregate,
+) (string, fagent.Agent, *fagent.Config, error) {
+	agentName := req.AgentName
+	if agentName == "" && agg != nil {
+		for i := len(agg.Messages) - 1; i >= 0; i-- {
+			if agg.Messages[i].AgentName != "" {
+				agentName = agg.Messages[i].AgentName
+				break
+			}
+		}
+	}
+	foundAgent, err := r.agentProvider.GetForUser(ctx, agentName, req.UserID)
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("resolving agent %q: %w", agentName, err)
+	}
+	return agentName, foundAgent, extractAgentConfig(foundAgent), nil
+}
+
+// maybeApplyModelOverride returns modelCfg unchanged when the agent has no
+// ModelOverride; otherwise it swaps provider/model/apiKey using the per-agent
+// override and resolves the new API key.
+func (r *RunnerAdapter) maybeApplyModelOverride(
+	ctx context.Context, userID string, modelCfg *fagent.ModelConfig, agentCfg *fagent.Config,
+) (*fagent.ModelConfig, error) {
+	if agentCfg == nil || agentCfg.ModelOverride == nil {
+		return modelCfg, nil
+	}
+	return r.applyModelOverride(ctx, userID, modelCfg, agentCfg.ModelOverride)
+}
+
+// buildSessionFromAggregate reconstructs an in-memory ADK session from the
+// prior thread so the LLM agent sees past context. When there is no history
+// (fresh conversation), the runner's AutoCreateSession will build the
+// session on first run.
+//
+// Session state is restored from ThreadAggregate.State during
+// BuildSessionFromThread and later persisted via StateChangeReported events.
+func (r *RunnerAdapter) buildSessionFromAggregate(
+	ctx context.Context, sessionSvc session.Service, agg *thread.ThreadAggregate, userID string,
+) (session.Session, error) {
+	if agg == nil || len(agg.Messages) == 0 {
+		return nil, nil
+	}
+	sess, err := BuildSessionFromThread(ctx, sessionSvc, agg, userID)
+	if err != nil {
+		return nil, fmt.Errorf("building session from thread: %w", err)
+	}
+	return sess, nil
+}
+
+// buildInvocation assembles the foundation Invocation for Requirements
+// (history + live session state). State mirrors values accumulated by
+// prior agents so per-agent Requirements see what OutputKey callbacks
+// wrote.
+func buildInvocation(req *fagent.RunRequest, sess session.Session, agg *thread.ThreadAggregate) *fagent.Invocation {
+	var state fagent.ReadonlyState
+	if sess != nil {
+		state = &adkSessionState{state: sess.State()}
+	}
+	inv := &fagent.Invocation{
+		ID:        req.InvocationID,
+		SessionID: req.SessionID,
+		UserID:    req.UserID,
+		Message:   req.Message,
+		Config:    req.Config,
+		Context:   req.Context,
+		State:     state,
+	}
+	if agg != nil {
+		inv.History = threadHistoryToMessages(agg.Messages)
+	}
+	return inv
+}
+
+// buildAdkAgent dispatches to the workflow or regular-LLM agent builder.
+// Returns the ADK agent and any workflow agent-position map (nil for the
+// regular path).
+func (r *RunnerAdapter) buildAdkAgent(
+	ctx context.Context, req *fagent.RunRequest, agentName string,
+	foundAgent fagent.Agent, agentCfg *fagent.Config, modelCfg *fagent.ModelConfig,
+	llm adkmodel.LLM, inv *fagent.Invocation,
+	memoryEnabled, memPreload, artifactsEnabled bool,
+) (agent.Agent, map[string]AgentPosition, error) {
+	if wa, isWF := isWorkflowAgent(foundAgent); isWF {
+		wbc := &workflowBuildContext{
+			ctx: ctx, adapter: r, userID: req.UserID,
+			modelCfg: modelCfg, llm: llm, threadID: req.SessionID, req: req,
+		}
+		adkAgent, positions, err := buildWorkflowAgent(wbc, wa)
+		if err != nil {
+			return nil, nil, fmt.Errorf("building workflow agent: %w", err)
+		}
+		return adkAgent, positions, nil
+	}
+	adkAgent, err := r.buildRegularLLMAgent(
+		ctx, req, agentName, foundAgent, agentCfg, modelCfg, llm, inv,
+		memoryEnabled, memPreload, artifactsEnabled,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	return adkAgent, nil, nil
+}
+
+// buildAdkRunner wires the RetryAndReflect plugin and optional
+// memory/artifact services into a runner configured for this invocation.
+//
+// RetryAndReflect (ADK-Go v1.0.0) intercepts tool errors and injects a
+// structured reflection prompt into the LLM context, guiding the model
+// to diagnose and retry with corrected arguments. Up to 3 retries per
+// invocation; on exhaustion the plugin tells the model to stop using
+// the failing tool rather than returning a raw error.
+func (r *RunnerAdapter) buildAdkRunner(
+	adkAgent agent.Agent, sessionSvc session.Service, memoryEnabled, artifactsEnabled bool,
+) (*adkrunner.Runner, error) {
+	runnerCfg := adkrunner.Config{
+		AppName:           appName,
+		Agent:             adkAgent,
+		SessionService:    sessionSvc,
+		AutoCreateSession: true,
+		PluginConfig: adkrunner.PluginConfig{
+			Plugins: []*plugin.Plugin{
+				retryandreflect.MustNew(
+					retryandreflect.WithMaxRetries(3),
+					retryandreflect.WithTrackingScope(retryandreflect.Invocation),
+					retryandreflect.WithErrorIfRetryExceeded(false),
+				),
 			},
-			agentPositions: agentPositions,
-			currentAuthor:  agentName,
-			assistantMsgID: generateID(),
-			loopIterations: map[string]int{},
-			nodeStartedAt:  time.Now(),
+		},
+	}
+	if memoryEnabled {
+		runnerCfg.MemoryService = r.memoryService
+	}
+	if artifactsEnabled {
+		runnerCfg.ArtifactService = r.artifactService
+	}
+	adkRunner, err := adkrunner.New(runnerCfg)
+	if err != nil {
+		return nil, fmt.Errorf("creating adk-go runner: %w", err)
+	}
+	return adkRunner, nil
+}
+
+// buildRunOptions builds the ADK RunOption slice for this invocation.
+// WithStateDelta (ADK-Go v1.0.0) injects per-invocation state at run start
+// using the "temp:" prefix so it is never persisted or surfaced as a
+// StateChangeReported event (translateStateDelta filters temp: keys).
+func buildRunOptions(req *fagent.RunRequest) []adkrunner.RunOption {
+	if req.InvocationID == "" {
+		return nil
+	}
+	return []adkrunner.RunOption{
+		adkrunner.WithStateDelta(map[string]any{
+			"temp:invocation_id": req.InvocationID,
+		}),
+	}
+}
+
+// streamAdkEvents runs the prepared ADK runner and yields translated
+// thread events. Streaming-lifecycle state (current author, streaming /
+// assistant message IDs, node start time, loop iteration counters) lives
+// in runLoopState so the outer iterator stays flat.
+//
+// SaveInputBlobsAsArtifacts only takes effect when the runner has an
+// artifact service wired; we gate on artifactsEnabled for cleanliness.
+// See .READ/adk-go/runner/runner.go:270-309 — when true, inline blobs on
+// the user message get persisted as artifacts and replaced with text
+// placeholders the model reads as "Uploaded file: …".
+func (r *RunnerAdapter) streamAdkEvents(
+	ctx context.Context, yield func(thread.Event, error) bool,
+	req *fagent.RunRequest, prep *runPrep,
+) {
+	loopState := &runLoopState{
+		evtCtx: EventContext{
+			ThreadID:  req.SessionID,
+			RunID:     messageIDFromRequest(req),
+			AgentName: prep.agentName,
+			Provider:  prep.modelCfg.Provider,
+			Model:     prep.modelCfg.Model,
+		},
+		agentPositions: prep.agentPositions,
+		currentAuthor:  prep.agentName,
+		assistantMsgID: generateID(),
+		loopIterations: map[string]int{},
+		nodeStartedAt:  time.Now(),
+	}
+
+	for adkEvt, adkErr := range prep.adkRunner.Run(ctx, req.UserID, req.SessionID, prep.userMsg, agent.RunConfig{
+		StreamingMode:             prep.streamingMode,
+		SaveInputBlobsAsArtifacts: prep.saveInputBlobs,
+	}, prep.runOpts...) {
+		if !forwardAdkEvent(yield, loopState, adkEvt, adkErr) {
+			return
 		}
+	}
 
-		// Build run options. WithStateDelta (ADK-Go v1.0.0) injects per-invocation
-		// state at run start using the "temp:" prefix so it is never persisted or
-		// surfaced as a StateChangeReported event (translateStateDelta filters temp: keys).
-		var runOpts []adkrunner.RunOption
-		if req.InvocationID != "" {
-			runOpts = append(runOpts, adkrunner.WithStateDelta(map[string]any{
-				"temp:invocation_id": req.InvocationID,
-			}))
+	// Terminal cleanup: close out the final tracked node and any dangling
+	// streaming message. yieldAll's cancel check is a no-op here — nothing
+	// runs after this — but we keep it for consistency.
+	_ = yieldAll(yield, loopState.onLoopEnd())
+}
+
+// forwardAdkEvent handles one (event, err) pair from the ADK runner:
+// emits any error-boundary cleanup events then the error itself, or
+// translates the event into zero-or-more thread events and yields each.
+// Returns false when the consumer cancelled iteration.
+func forwardAdkEvent(
+	yield func(thread.Event, error) bool, loopState *runLoopState,
+	adkEvt *session.Event, adkErr error,
+) bool {
+	if adkErr != nil {
+		if !yieldAll(yield, loopState.onAdkError()) {
+			return false
 		}
-
-		// SaveInputBlobsAsArtifacts only takes effect when the runner has an
-		// artifact service wired; gate on artifactsEnabled for cleanliness.
-		// See .READ/adk-go/runner/runner.go:270-309 — when true, inline blobs
-		// on the user message get persisted as artifacts and replaced with
-		// text placeholders the model reads as "Uploaded file: …".
-		saveInputBlobs := artifactsEnabled && artAutoSaveBlobs
-		streamingMode := r.resolveStreamingMode(agentCfg)
-		for adkEvt, adkErr := range adkRunner.Run(ctx, req.UserID, req.SessionID, userMsg, agent.RunConfig{
-			StreamingMode:             streamingMode,
-			SaveInputBlobsAsArtifacts: saveInputBlobs,
-		}, runOpts...) {
-			if adkErr != nil {
-				if !yieldAll(yield, loopState.onAdkError()) {
-					return
-				}
-				if !yield(nil, adkErr) {
-					return
-				}
-				continue
-			}
-
-			if isAgentTransition(adkEvt, loopState.currentAuthor) {
-				if !yieldAll(yield, loopState.onTransition(adkEvt.Author)) {
-					return
-				}
-			}
-
-			for _, de := range TranslateEvent(adkEvt, loopState.evtCtx) {
-				var events []thread.Event
-				switch e := de.(type) {
-				case *thread.AssistantContentStreamed:
-					events = loopState.onAssistantContentStreamed(e)
-				case *thread.AssistantMessageAdded:
-					events = loopState.onAssistantMessageAdded(e)
-				default:
-					events = []thread.Event{de}
-				}
-				if !yieldAll(yield, events) {
-					return
-				}
-			}
+		return yield(nil, adkErr)
+	}
+	if isAgentTransition(adkEvt, loopState.currentAuthor) {
+		if !yieldAll(yield, loopState.onTransition(adkEvt.Author)) {
+			return false
 		}
-
-		// Terminal cleanup: close out the final tracked node and any dangling
-		// streaming message. yieldAll's cancel check is a no-op here — nothing
-		// runs after this — but we keep it for consistency.
-		_ = yieldAll(yield, loopState.onLoopEnd())
-
-		// 16. Persist session to memory for future cross-session recall.
-		if memoryEnabled {
-			r.persistSessionToMemory(ctx, sessionSvc, req)
+	}
+	for _, de := range TranslateEvent(adkEvt, loopState.evtCtx) {
+		if !yieldAll(yield, lifecycleEvents(loopState, de)) {
+			return false
 		}
+	}
+	return true
+}
+
+// lifecycleEvents routes a translated event through runLoopState's
+// streaming-assistant bookkeeping; non-streaming events pass through
+// unchanged.
+func lifecycleEvents(loopState *runLoopState, de thread.Event) []thread.Event {
+	switch e := de.(type) {
+	case *thread.AssistantContentStreamed:
+		return loopState.onAssistantContentStreamed(e)
+	case *thread.AssistantMessageAdded:
+		return loopState.onAssistantMessageAdded(e)
+	default:
+		return []thread.Event{de}
 	}
 }
 
@@ -588,51 +678,83 @@ func (r *RunnerAdapter) buildCoordinatorSubAgents(
 // resume), the events that should be yielded before the agent runs, and
 // any persistence error.
 func (r *RunnerAdapter) loadOrSeedThread(ctx context.Context, req *fagent.RunRequest) (*thread.ThreadAggregate, string, []thread.Event, error) {
+	toolCallID, attachmentRefs := extractThreadContext(req)
+	if toolCallID != "" {
+		return r.loadForConfirmationResume(ctx, req.SessionID, toolCallID)
+	}
+	if req.Message != nil {
+		return r.seedNewUserMessage(ctx, req, attachmentRefs)
+	}
+	return r.loadExistingThread(ctx, req.SessionID)
+}
+
+// extractThreadContext pulls the tool-call ID and attachment refs out of
+// the request's free-form Context map. Missing or wrong-typed entries
+// produce zero values.
+func extractThreadContext(req *fagent.RunRequest) (string, []thread.Attachment) {
+	if req.Context == nil {
+		return "", nil
+	}
 	var toolCallID string
 	var attachmentRefs []thread.Attachment
-	if req.Context != nil {
-		if refs, ok := req.Context["attachmentRefs"].([]thread.Attachment); ok {
-			attachmentRefs = refs
-		}
-		if id, ok := req.Context["toolCallId"].(string); ok {
-			toolCallID = id
-		}
+	if refs, ok := req.Context["attachmentRefs"].([]thread.Attachment); ok {
+		attachmentRefs = refs
 	}
-
-	if toolCallID != "" {
-		// Confirmation/elicitation resume: the user's response is already
-		// captured in the InputProvided event (emitted by the orchestrator
-		// before calling Run). Skip persisting a duplicate UserMessageAdded
-		// to avoid polluting the session with a plain-text user event that
-		// would cause ADK's RequestConfirmationRequestProcessor to bail.
-		agg, lErr := r.threadMgr.Load(ctx, req.SessionID)
-		if lErr != nil {
-			return nil, "", nil, fmt.Errorf("failed to load thread for tool response: %w", lErr)
-		}
-		return agg, toolCallID, nil, nil
+	if id, ok := req.Context["toolCallId"].(string); ok {
+		toolCallID = id
 	}
+	return toolCallID, attachmentRefs
+}
 
-	if req.Message != nil {
-		messageID := req.Message.ID
-		if messageID == "" {
-			messageID = generateID()
-		}
-		userContent := extractUserText(req.Message)
-		agg, uEvent, sideEffects, pErr := r.threadMgr.AddUserMessage(ctx, req.SessionID, messageID, userContent, req.UserID, attachmentRefs...)
-		if pErr != nil {
-			return nil, "", nil, fmt.Errorf("failed to persist user message: %w", pErr)
-		}
-		var initial []thread.Event
-		if uEvent != nil {
-			initial = append(initial, uEvent)
-		}
-		initial = append(initial, sideEffects...)
-		return agg, "", initial, nil
+// loadForConfirmationResume covers the confirmation/elicitation resume
+// branch: the user's response is already captured in the InputProvided
+// event (emitted by the orchestrator before Run). Persisting a duplicate
+// UserMessageAdded here would pollute the session with a plain-text user
+// event that causes ADK's RequestConfirmationRequestProcessor to bail.
+func (r *RunnerAdapter) loadForConfirmationResume(
+	ctx context.Context, sessionID, toolCallID string,
+) (*thread.ThreadAggregate, string, []thread.Event, error) {
+	agg, err := r.threadMgr.Load(ctx, sessionID)
+	if err != nil {
+		return nil, "", nil, fmt.Errorf("failed to load thread for tool response: %w", err)
 	}
+	return agg, toolCallID, nil, nil
+}
 
-	agg, lErr := r.threadMgr.Load(ctx, req.SessionID)
-	if lErr != nil && !errors.Is(lErr, thread.ErrThreadNotFound) {
-		return nil, "", nil, fmt.Errorf("failed to load thread: %w", lErr)
+// seedNewUserMessage persists the incoming user message and returns the
+// aggregate plus the message-added event and any side-effects that must
+// be yielded before the agent runs.
+func (r *RunnerAdapter) seedNewUserMessage(
+	ctx context.Context, req *fagent.RunRequest, attachmentRefs []thread.Attachment,
+) (*thread.ThreadAggregate, string, []thread.Event, error) {
+	messageID := req.Message.ID
+	if messageID == "" {
+		messageID = generateID()
+	}
+	userContent := extractUserText(req.Message)
+	agg, uEvent, sideEffects, err := r.threadMgr.AddUserMessage(
+		ctx, req.SessionID, messageID, userContent, req.UserID, attachmentRefs...,
+	)
+	if err != nil {
+		return nil, "", nil, fmt.Errorf("failed to persist user message: %w", err)
+	}
+	var initial []thread.Event
+	if uEvent != nil {
+		initial = append(initial, uEvent)
+	}
+	initial = append(initial, sideEffects...)
+	return agg, "", initial, nil
+}
+
+// loadExistingThread covers the no-message, no-tool-call path: optionally
+// hydrate an existing thread. ErrThreadNotFound is not an error — this is
+// a fresh conversation.
+func (r *RunnerAdapter) loadExistingThread(
+	ctx context.Context, sessionID string,
+) (*thread.ThreadAggregate, string, []thread.Event, error) {
+	agg, err := r.threadMgr.Load(ctx, sessionID)
+	if err != nil && !errors.Is(err, thread.ErrThreadNotFound) {
+		return nil, "", nil, fmt.Errorf("failed to load thread: %w", err)
 	}
 	return agg, "", nil, nil
 }
@@ -814,96 +936,119 @@ func (r *RunnerAdapter) resolveTools(
 	agentCfg *fagent.Config,
 	req *fagent.RunRequest,
 ) []adktool.Tool {
-	var execTools []fagent.ExecutableTool
-
-	// 1. Collect agent-level static tools from Config.
-	if agentCfg != nil {
-		for _, t := range agentCfg.Tools {
-			if et, ok := t.(fagent.ExecutableTool); ok {
-				execTools = append(execTools, et)
-			}
-		}
-	}
-
-	// 2. Build per-request tool factory.
-	var toolFactory ToolSetFactory
-	if r.newToolSetFactory != nil {
-		var pluginSettings map[string]map[string]string
-		if r.pluginSettingsResolver != nil && userID != "" {
-			pluginSettings, _ = r.pluginSettingsResolver.GetAllPluginSettingsForUser(ctx, userID)
-		}
-
-		var extra map[string]string
-		if r.extraConfigFn != nil {
-			extra = r.extraConfigFn(ctx, userID, agentName)
-		}
-
-		toolFactory = r.newToolSetFactory(ToolFactoryConfig{
-			ModelAPIKey:    modelCfg.APIKey,
-			ModelID:        modelCfg.Model,
-			PluginSettings: pluginSettings,
-			Extra:          extra,
-		})
-	}
-
-	// 3. Get enabled tool sets via the tool requirements service.
+	execTools := collectStaticTools(agentCfg)
+	toolFactory := r.buildToolFactory(ctx, userID, agentName, modelCfg)
 	if r.toolReqs != nil && toolFactory != nil {
-		enabledToolSetIDs, err := r.toolReqs.GetEnabledToolSets(ctx, userID, agentName)
-		if err != nil {
-			enabledToolSetIDs = []string{}
-		}
+		execTools = append(execTools, r.resolveGenericToolSets(ctx, userID, agentName, toolFactory)...)
+		execTools = append(execTools, r.resolveMCPTools(ctx, userID, agentName)...)
+		execTools = append(execTools, r.resolveA2ATools(ctx, userID, agentName)...)
+	}
+	return WrapExecutableTools(execTools, threadID, userID)
+}
 
-		for _, toolSetID := range enabledToolSetIDs {
-			if strings.HasPrefix(toolSetID, "mcp-") {
-				continue // MCP handled below.
-			}
-			if strings.HasPrefix(toolSetID, "a2a-") {
-				continue // A2A handled below.
-			}
-			tools, tErr := toolFactory.CreateExecutableToolsFromSet(ctx, toolSetID)
-			if tErr != nil {
-				continue
-			}
-			// Filter out individual tools blocked by per-tool permissions.
-			// Without this, blocking a single tool (e.g. "add") inside an
-			// enabled tool set (e.g. "calculator-set") has no effect—the tool
-			// still gets sent to the LLM and executed.
-			for _, t := range tools {
-				if r.toolReqs.HasPermission(ctx, userID, agentName, toolSetID, t.Name()) {
-					execTools = append(execTools, t)
-				}
-			}
-		}
-
-		// Resolve MCP tools.
-		if r.mcpResolver != nil && userID != "" {
-			mcpTools := r.mcpResolver.ResolveEnabledTools(ctx, userID,
-				func(toolSetID string) bool {
-					return r.toolReqs.HasToolSetPermission(ctx, userID, agentName, toolSetID)
-				},
-				func(toolSetID, toolID string) bool {
-					return r.toolReqs.HasPermission(ctx, userID, agentName, toolSetID, toolID)
-				},
-			)
-			execTools = append(execTools, mcpTools...)
-		}
-
-		// Resolve A2A tools.
-		if r.a2aResolver != nil && userID != "" {
-			a2aTools := r.a2aResolver.ResolveEnabledTools(ctx, userID,
-				func(toolSetID string) bool {
-					return r.toolReqs.HasToolSetPermission(ctx, userID, agentName, toolSetID)
-				},
-				func(toolSetID, toolID string) bool {
-					return r.toolReqs.HasPermission(ctx, userID, agentName, toolSetID, toolID)
-				},
-			)
-			execTools = append(execTools, a2aTools...)
+// collectStaticTools pulls ExecutableTool instances off agentCfg.Tools —
+// the agent-declared tools that don't need permission/tool-set resolution.
+func collectStaticTools(agentCfg *fagent.Config) []fagent.ExecutableTool {
+	if agentCfg == nil {
+		return nil
+	}
+	var out []fagent.ExecutableTool
+	for _, t := range agentCfg.Tools {
+		if et, ok := t.(fagent.ExecutableTool); ok {
+			out = append(out, et)
 		}
 	}
+	return out
+}
 
-	// Wrap foundation tools as adk-go tools.
-	return WrapExecutableTools(execTools, threadID, userID)
+// buildToolFactory constructs the per-request ToolSetFactory used to
+// instantiate tools from tool-set IDs. Nil when no factory has been
+// registered on the adapter.
+func (r *RunnerAdapter) buildToolFactory(
+	ctx context.Context, userID, agentName string, modelCfg *fagent.ModelConfig,
+) ToolSetFactory {
+	if r.newToolSetFactory == nil {
+		return nil
+	}
+	var pluginSettings map[string]map[string]string
+	if r.pluginSettingsResolver != nil && userID != "" {
+		pluginSettings, _ = r.pluginSettingsResolver.GetAllPluginSettingsForUser(ctx, userID)
+	}
+	var extra map[string]string
+	if r.extraConfigFn != nil {
+		extra = r.extraConfigFn(ctx, userID, agentName)
+	}
+	return r.newToolSetFactory(ToolFactoryConfig{
+		ModelAPIKey:    modelCfg.APIKey,
+		ModelID:        modelCfg.Model,
+		PluginSettings: pluginSettings,
+		Extra:          extra,
+	})
+}
+
+// resolveGenericToolSets materialises the non-MCP, non-A2A tool sets for
+// this agent, filtering out tools blocked by per-tool permissions. Without
+// that filter, blocking a single tool inside an enabled tool set would
+// have no effect — the tool would still reach the LLM.
+func (r *RunnerAdapter) resolveGenericToolSets(
+	ctx context.Context, userID, agentName string, toolFactory ToolSetFactory,
+) []fagent.ExecutableTool {
+	enabledToolSetIDs, err := r.toolReqs.GetEnabledToolSets(ctx, userID, agentName)
+	if err != nil {
+		return nil
+	}
+	var out []fagent.ExecutableTool
+	for _, toolSetID := range enabledToolSetIDs {
+		if strings.HasPrefix(toolSetID, "mcp-") || strings.HasPrefix(toolSetID, "a2a-") {
+			continue // handled by resolveMCPTools / resolveA2ATools.
+		}
+		tools, tErr := toolFactory.CreateExecutableToolsFromSet(ctx, toolSetID)
+		if tErr != nil {
+			continue
+		}
+		for _, t := range tools {
+			if r.toolReqs.HasPermission(ctx, userID, agentName, toolSetID, t.Name()) {
+				out = append(out, t)
+			}
+		}
+	}
+	return out
+}
+
+// resolveMCPTools asks the MCP resolver for the user's enabled MCP tools,
+// with tool-set / per-tool permission callbacks wired in.
+func (r *RunnerAdapter) resolveMCPTools(
+	ctx context.Context, userID, agentName string,
+) []fagent.ExecutableTool {
+	if r.mcpResolver == nil || userID == "" {
+		return nil
+	}
+	return r.mcpResolver.ResolveEnabledTools(ctx, userID,
+		func(toolSetID string) bool {
+			return r.toolReqs.HasToolSetPermission(ctx, userID, agentName, toolSetID)
+		},
+		func(toolSetID, toolID string) bool {
+			return r.toolReqs.HasPermission(ctx, userID, agentName, toolSetID, toolID)
+		},
+	)
+}
+
+// resolveA2ATools asks the A2A resolver for the user's enabled A2A tools,
+// with the same permission callback shape as MCP.
+func (r *RunnerAdapter) resolveA2ATools(
+	ctx context.Context, userID, agentName string,
+) []fagent.ExecutableTool {
+	if r.a2aResolver == nil || userID == "" {
+		return nil
+	}
+	return r.a2aResolver.ResolveEnabledTools(ctx, userID,
+		func(toolSetID string) bool {
+			return r.toolReqs.HasToolSetPermission(ctx, userID, agentName, toolSetID)
+		},
+		func(toolSetID, toolID string) bool {
+			return r.toolReqs.HasPermission(ctx, userID, agentName, toolSetID, toolID)
+		},
+	)
 }
 
 // buildSystemPrompt assembles the system prompt from agent config and injectors.
@@ -919,48 +1064,77 @@ func (r *RunnerAdapter) buildSystemPrompt(
 	agentCfg *fagent.Config,
 	inv *fagent.Invocation,
 ) string {
-	var systemPrompt string
-	if agentCfg != nil {
-		systemPrompt = agentCfg.SystemPrompt
+	sp := resolveStaticPrompt(agentCfg, inv)
+	sp += r.appendInjectorPrompts(ctx, agentName, threadID)
+	sp += r.appendUserContext(ctx, userID)
+	return sp
+}
 
-		// Resolve InstructionFunc (runtime-generated prompt additions).
-		if agentCfg.InstructionFunc != nil && inv != nil {
-			if dynamic, err := agentCfg.InstructionFunc(inv); err == nil && dynamic != "" {
-				systemPrompt += "\n\n" + dynamic
-			}
-		}
+// resolveStaticPrompt returns the agent's base SystemPrompt with any
+// InstructionFunc output appended. InstructionFunc errors and empty
+// strings are ignored — the static prompt still wins.
+func resolveStaticPrompt(agentCfg *fagent.Config, inv *fagent.Invocation) string {
+	if agentCfg == nil {
+		return ""
 	}
+	sp := agentCfg.SystemPrompt
+	if agentCfg.InstructionFunc == nil || inv == nil {
+		return sp
+	}
+	dynamic, err := agentCfg.InstructionFunc(inv)
+	if err != nil || dynamic == "" {
+		return sp
+	}
+	return sp + "\n\n" + dynamic
+}
 
-	// Collect prompt additions from PromptInjectors (knowledge bases, skills, etc.).
+// appendInjectorPrompts collects prompt additions from PromptInjectors
+// (knowledge bases, skills, etc.) and joins them onto the prompt with
+// blank-line separators.
+func (r *RunnerAdapter) appendInjectorPrompts(ctx context.Context, agentName, threadID string) string {
+	var sb strings.Builder
 	for _, injector := range r.promptInjectors {
 		if addition := injector.BuildPromptAddition(ctx, agentName, threadID); addition != "" {
-			systemPrompt += "\n\n" + addition
+			sb.WriteString("\n\n")
+			sb.WriteString(addition)
 		}
 	}
+	return sb.String()
+}
 
-	// Inject user context (structured Markdown, matching custom adapter).
-	if r.profileProvider != nil && userID != "" {
-		profile, err := r.profileProvider.GetProfile(ctx, userID)
-		if err == nil && len(profile) > 0 {
-			var sb strings.Builder
-			sb.WriteString("\n\n## User Context\n")
-			for key, val := range profile {
-				switch v := val.(type) {
-				case string:
-					if v != "" {
-						sb.WriteString(fmt.Sprintf("- **%s**: %s\n", formatLabel(key), v))
-					}
-				case []string:
-					if len(v) > 0 {
-						sb.WriteString(fmt.Sprintf("- **%s**: %s\n", formatLabel(key), strings.Join(v, ", ")))
-					}
-				}
-			}
-			systemPrompt += sb.String()
+// appendUserContext renders the authenticated user's profile as a
+// structured-Markdown "## User Context" block. Empty profile, missing
+// provider, or a resolver error all produce an empty string.
+func (r *RunnerAdapter) appendUserContext(ctx context.Context, userID string) string {
+	if r.profileProvider == nil || userID == "" {
+		return ""
+	}
+	profile, err := r.profileProvider.GetProfile(ctx, userID)
+	if err != nil || len(profile) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString("\n\n## User Context\n")
+	for key, val := range profile {
+		writeProfileField(&sb, key, val)
+	}
+	return sb.String()
+}
+
+// writeProfileField renders a single profile entry as a Markdown bullet
+// when the value is a non-empty string or string slice. Other types and
+// empty values are dropped.
+func writeProfileField(sb *strings.Builder, key string, val any) {
+	switch v := val.(type) {
+	case string:
+		if v != "" {
+			fmt.Fprintf(sb, "- **%s**: %s\n", formatLabel(key), v)
+		}
+	case []string:
+		if len(v) > 0 {
+			fmt.Fprintf(sb, "- **%s**: %s\n", formatLabel(key), strings.Join(v, ", "))
 		}
 	}
-
-	return systemPrompt
 }
 
 // formatLabel converts a snake_case key to a Title Case label.

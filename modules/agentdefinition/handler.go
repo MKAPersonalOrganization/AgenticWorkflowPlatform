@@ -2,11 +2,20 @@ package agentdefinition
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
 	"aicompass/foundation/auth"
 	"aicompass/foundation/logger"
+)
+
+// Sentinel errors surfaced to the YAML-import caller. Kept as vars so the
+// helper can return them without an fmt.Errorf allocation — the handler
+// only looks at .Error() to write the 400 body.
+var (
+	errProvideEitherURLOrYAML = errors.New("Provide either url or yaml, not both")
+	errYAMLBodyEmpty          = errors.New("YAML body is empty")
 )
 
 // storeHandler encapsulates HTTP handlers for agent CRUD and sharing operations.
@@ -214,205 +223,215 @@ func toAgentResponse(a *AgentDefinition) agentResponse {
 
 // ── CRUD Handlers ──
 
-// create handles POST /v1/agent-definitions
-func (h *storeHandler) create(w http.ResponseWriter, r *http.Request) {
+// requireUser fetches the authenticated user from the request context.
+// Writes a 401 Unauthorized response and returns nil when no user is
+// attached — the caller returns immediately.
+func requireUser(w http.ResponseWriter, r *http.Request) *auth.User {
 	user := auth.GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
+		return nil
 	}
+	return user
+}
 
-	var req agentRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+// requirePathID reads a required path variable and writes a 400
+// Bad Request with the given message when it is empty. Returns "" in
+// that case so the caller returns immediately.
+func requirePathID(w http.ResponseWriter, r *http.Request, name, missingMsg string) string {
+	v := r.PathValue(name)
+	if v == "" {
+		http.Error(w, missingMsg, http.StatusBadRequest)
+	}
+	return v
+}
+
+// decodeJSONBody decodes the request body into v. On malformed JSON it
+// writes a 400 "Invalid request body" and returns false so the caller
+// can return without further work.
+func decodeJSONBody(w http.ResponseWriter, r *http.Request, v any) bool {
+	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+		return false
 	}
+	return true
+}
 
+// respondJSON writes a JSON body with an explicit status code. Pass
+// status=0 to skip WriteHeader (Go's default 200 OK).
+func respondJSON(w http.ResponseWriter, status int, body any) {
+	w.Header().Set("Content-Type", "application/json")
+	if status != 0 {
+		w.WriteHeader(status)
+	}
+	_ = json.NewEncoder(w).Encode(body)
+}
+
+// decodeAgentRequest decodes + validates the shared create/update body.
+// Missing Name writes a 400 and returns false.
+func decodeAgentRequest(w http.ResponseWriter, r *http.Request) (*agentRequest, bool) {
+	var req agentRequest
+	if !decodeJSONBody(w, r, &req) {
+		return nil, false
+	}
 	if req.Name == "" {
 		http.Error(w, "Agent name is required", http.StatusBadRequest)
+		return nil, false
+	}
+	return &req, true
+}
+
+// pickUpdateIcon preserves the existing icon when the update request
+// doesn't supply one, matching the documented create/update contract.
+func pickUpdateIcon(reqIcon, existingIcon string) string {
+	if reqIcon != "" {
+		return reqIcon
+	}
+	return existingIcon
+}
+
+// create handles POST /v1/agent-definitions
+func (h *storeHandler) create(w http.ResponseWriter, r *http.Request) {
+	user := requireUser(w, r)
+	if user == nil {
 		return
 	}
-
+	req, ok := decodeAgentRequest(w, r)
+	if !ok {
+		return
+	}
 	agent := req.toAgentDefinition(user.ID, "", agentIconOrDefault(req.Icon))
-
 	if err := h.svc.create(r.Context(), agent); err != nil {
 		h.log.Error(r.Context(), "failed to create agent", "error", err)
 		writeJSONError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	resp := toAgentResponse(agent)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(resp)
+	respondJSON(w, http.StatusCreated, toAgentResponse(agent))
 }
 
 // importYAML handles POST /v1/agent-definitions/import-yaml
 func (h *storeHandler) importYAML(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
+	user := requireUser(w, r)
 	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-
 	var req struct {
 		YAML string `json:"yaml"`
 		URL  string `json:"url"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
-
-	urlTrim := strings.TrimSpace(req.URL)
-	yamlTrim := strings.TrimSpace(req.YAML)
-	var raw []byte
-	if urlTrim != "" && yamlTrim != "" {
-		writeJSONError(w, "Provide either url or yaml, not both", http.StatusBadRequest)
+	raw, fetchErr := h.resolveYAMLPayload(r, req.URL, req.YAML)
+	if fetchErr != nil {
+		writeJSONError(w, fetchErr.Error(), http.StatusBadRequest)
 		return
 	}
-	if urlTrim != "" {
-		var err error
-		raw, err = fetchYAMLFromURL(r.Context(), urlTrim)
-		if err != nil {
-			h.log.Error(r.Context(), "import yaml fetch url", "error", err)
-			writeJSONError(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-	} else {
-		raw = []byte(req.YAML)
-	}
-	if strings.TrimSpace(string(raw)) == "" {
-		writeJSONError(w, "YAML body is empty", http.StatusBadRequest)
-		return
-	}
-
 	id, isComposed, err := h.svc.ImportFromCatalogYAML(r.Context(), user.ID, raw)
 	if err != nil {
 		h.log.Error(r.Context(), "import yaml", "error", err)
 		writeJSONError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]any{
+	respondJSON(w, http.StatusCreated, map[string]any{
 		"id":         id,
 		"isComposed": isComposed,
 	})
 }
 
+// resolveYAMLPayload returns the raw YAML bytes sourced from either
+// req.URL (fetched lazily) or the inline req.YAML body, enforcing the
+// "either/or" rule and rejecting empty payloads. Fetch failures are
+// logged here so the caller only needs to translate them into a 400.
+func (h *storeHandler) resolveYAMLPayload(r *http.Request, urlArg, yamlArg string) ([]byte, error) {
+	urlTrim := strings.TrimSpace(urlArg)
+	yamlTrim := strings.TrimSpace(yamlArg)
+	if urlTrim != "" && yamlTrim != "" {
+		return nil, errProvideEitherURLOrYAML
+	}
+	raw := []byte(yamlArg)
+	if urlTrim != "" {
+		fetched, err := fetchYAMLFromURL(r.Context(), urlTrim)
+		if err != nil {
+			h.log.Error(r.Context(), "import yaml fetch url", "error", err)
+			return nil, err
+		}
+		raw = fetched
+	}
+	if strings.TrimSpace(string(raw)) == "" {
+		return nil, errYAMLBodyEmpty
+	}
+	return raw, nil
+}
+
 // update handles PUT /v1/agent-definitions/{id}
 func (h *storeHandler) update(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
+	user := requireUser(w, r)
 	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-
-	agentID := r.PathValue("id")
+	agentID := requirePathID(w, r, "id", "Agent ID is required")
 	if agentID == "" {
-		http.Error(w, "Agent ID is required", http.StatusBadRequest)
 		return
 	}
-
-	var req agentRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	req, ok := decodeAgentRequest(w, r)
+	if !ok {
 		return
 	}
-
-	if req.Name == "" {
-		http.Error(w, "Agent name is required", http.StatusBadRequest)
-		return
-	}
-
-	// Fetch the existing agent to preserve the icon if the request doesn't provide one.
+	// Preserve the existing icon when the update doesn't supply one.
 	existing, err := h.svc.getByID(r.Context(), agentID, user.ID)
 	if err != nil {
 		h.log.Error(r.Context(), "agent not found", "error", err)
 		http.Error(w, "Agent not found", http.StatusNotFound)
 		return
 	}
-
-	iconValue := existing.Icon
-	if req.Icon != "" {
-		iconValue = req.Icon
-	}
-
-	agent := req.toAgentDefinition(user.ID, agentID, iconValue)
-
+	agent := req.toAgentDefinition(user.ID, agentID, pickUpdateIcon(req.Icon, existing.Icon))
 	if err := h.svc.update(r.Context(), agent); err != nil {
 		h.log.Error(r.Context(), "failed to update agent", "error", err)
 		writeJSONError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
 	updated, err := h.svc.getByID(r.Context(), agentID, user.ID)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to fetch updated agent", "error", err)
 		http.Error(w, "Failed to fetch updated agent", http.StatusInternalServerError)
 		return
 	}
-
-	resp := toAgentResponse(updated)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	respondJSON(w, 0, toAgentResponse(updated))
 }
 
 // delete handles DELETE /v1/agent-definitions/{id}
 func (h *storeHandler) delete(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
+	user := requireUser(w, r)
 	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-
-	agentID := r.PathValue("id")
+	agentID := requirePathID(w, r, "id", "Agent ID is required")
 	if agentID == "" {
-		http.Error(w, "Agent ID is required", http.StatusBadRequest)
 		return
 	}
-
 	if err := h.svc.delete(r.Context(), agentID, user.ID); err != nil {
 		h.log.Error(r.Context(), "failed to delete agent", "error", err)
 		http.Error(w, "Failed to delete agent", http.StatusInternalServerError)
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
+	respondJSON(w, 0, map[string]string{"status": "deleted"})
 }
 
 // deleteAll handles DELETE /v1/agent-definitions
 func (h *storeHandler) deleteAll(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
+	user := requireUser(w, r)
 	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-
 	agents, err := h.svc.listByUser(r.Context(), user.ID)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to list agents for bulk delete", "error", err)
 		http.Error(w, "Failed to list agents", http.StatusInternalServerError)
 		return
 	}
-
-	deleted := 0
-	failed := 0
-	for i := range agents {
-		if err := h.svc.delete(r.Context(), agents[i].ID, user.ID); err != nil {
-			h.log.Error(r.Context(), "failed to delete agent during bulk delete",
-				"agentID", agents[i].ID, "error", err)
-			failed++
-		} else {
-			deleted++
-		}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	deleted, failed := h.deleteAllAgents(r, agents, user.ID)
+	respondJSON(w, 0, map[string]interface{}{
 		"status":  "completed",
 		"deleted": deleted,
 		"failed":  failed,
@@ -420,89 +439,85 @@ func (h *storeHandler) deleteAll(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// deleteAllAgents fans a single bulk-delete request over the user's
+// agents, logging each failure and returning (deleted, failed) counts.
+func (h *storeHandler) deleteAllAgents(r *http.Request, agents []AgentDefinition, userID string) (int, int) {
+	deleted, failed := 0, 0
+	for i := range agents {
+		if err := h.svc.delete(r.Context(), agents[i].ID, userID); err != nil {
+			h.log.Error(r.Context(), "failed to delete agent during bulk delete",
+				"agentID", agents[i].ID, "error", err)
+			failed++
+			continue
+		}
+		deleted++
+	}
+	return deleted, failed
+}
+
 // list handles GET /v1/agent-definitions
 func (h *storeHandler) list(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
+	user := requireUser(w, r)
 	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-
 	agents, err := h.svc.listByUser(r.Context(), user.ID)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to list agents", "error", err)
 		http.Error(w, "Failed to list agents", http.StatusInternalServerError)
 		return
 	}
-
-	resp := listResponse{
-		Agents: make([]agentResponse, 0, len(agents)),
-	}
-	for i := range agents {
-		resp.Agents = append(resp.Agents, toAgentResponse(&agents[i]))
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	respondJSON(w, 0, listResponse{Agents: agentsToResponses(agents)})
 }
 
 // get handles GET /v1/agent-definitions/{id}
 func (h *storeHandler) get(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
+	user := requireUser(w, r)
 	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-
-	agentID := r.PathValue("id")
+	agentID := requirePathID(w, r, "id", "Agent ID is required")
 	if agentID == "" {
-		http.Error(w, "Agent ID is required", http.StatusBadRequest)
 		return
 	}
-
 	agent, err := h.svc.getByID(r.Context(), agentID, user.ID)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to get agent", "error", err)
 		http.Error(w, "Agent not found", http.StatusNotFound)
 		return
 	}
-
-	resp := toAgentResponse(agent)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	respondJSON(w, 0, toAgentResponse(agent))
 }
 
 // search handles GET /v1/agent-definitions/search?q=...
 func (h *storeHandler) search(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
+	user := requireUser(w, r)
 	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-
 	query := r.URL.Query().Get("q")
 	if query == "" {
 		h.list(w, r)
 		return
 	}
-
 	agents, err := h.svc.search(r.Context(), user.ID, query)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to search agents", "error", err)
 		http.Error(w, "Failed to search agents", http.StatusInternalServerError)
 		return
 	}
+	respondJSON(w, http.StatusOK, listResponse{Agents: agentsToResponses(agents)})
+}
 
-	resp := listResponse{
-		Agents: make([]agentResponse, 0, len(agents)),
-	}
+// agentsToResponses maps a slice of AgentDefinition values to their
+// JSON-response shape. Extracted so list/search/consumers share a single
+// implementation.
+func agentsToResponses(agents []AgentDefinition) []agentResponse {
+	out := make([]agentResponse, 0, len(agents))
 	for i := range agents {
-		resp.Agents = append(resp.Agents, toAgentResponse(&agents[i]))
+		out = append(out, toAgentResponse(&agents[i]))
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(resp)
+	return out
 }
 
 // availableStateKeysResponse is the envelope for the template-variable
@@ -521,90 +536,64 @@ type availableStateKeysResponse struct {
 
 // availableStateKeys handles GET /v1/agent-definitions/{id}/available-state-keys
 func (h *storeHandler) availableStateKeys(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
+	user := requireUser(w, r)
 	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-
-	agentID := r.PathValue("id")
+	agentID := requirePathID(w, r, "id", "Agent ID is required")
 	if agentID == "" {
-		http.Error(w, "Agent ID is required", http.StatusBadRequest)
 		return
 	}
-
 	keys, err := h.svc.GetAvailableStateKeys(r.Context(), user.ID, agentID)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to get available state keys", "error", err)
 		http.Error(w, "Failed to get available state keys", http.StatusInternalServerError)
 		return
 	}
-
 	if keys == nil {
 		keys = []StateKeySuggestion{}
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(availableStateKeysResponse{Keys: keys})
+	respondJSON(w, 0, availableStateKeysResponse{Keys: keys})
 }
 
 // consumers handles GET /v1/agent-definitions/{id}/consumers
 func (h *storeHandler) consumers(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
+	user := requireUser(w, r)
 	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-
-	agentID := r.PathValue("id")
+	agentID := requirePathID(w, r, "id", "Agent ID is required")
 	if agentID == "" {
-		http.Error(w, "Agent ID is required", http.StatusBadRequest)
 		return
 	}
-
 	consumers, err := h.svc.GetConsumers(r.Context(), user.ID, agentID)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to get consumers", "error", err)
 		http.Error(w, "Failed to get consumers", http.StatusInternalServerError)
 		return
 	}
-
-	resp := listResponse{
-		Agents: make([]agentResponse, 0, len(consumers)),
-	}
-	for i := range consumers {
-		resp.Agents = append(resp.Agents, toAgentResponse(&consumers[i]))
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(resp)
+	respondJSON(w, http.StatusOK, listResponse{Agents: agentsToResponses(consumers)})
 }
 
 // ── Sharing Handlers ──
 
 // shareAgent handles POST /v1/agent-definitions/{id}/share
 func (h *storeHandler) shareAgent(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
+	user := requireUser(w, r)
 	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-
-	agentID := r.PathValue("id")
+	agentID := requirePathID(w, r, "id", "Agent ID is required")
 	if agentID == "" {
-		http.Error(w, "Agent ID is required", http.StatusBadRequest)
 		return
 	}
-
 	token, err := h.svc.share(r.Context(), agentID, user.ID)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to share agent", "error", err)
 		writeJSONError(w, "Failed to share agent", http.StatusInternalServerError)
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	respondJSON(w, 0, map[string]string{
 		"shareToken": token,
 		"shareUrl":   "/shared/agents/" + token,
 	})
@@ -612,44 +601,41 @@ func (h *storeHandler) shareAgent(w http.ResponseWriter, r *http.Request) {
 
 // unshareAgent handles DELETE /v1/agent-definitions/{id}/share
 func (h *storeHandler) unshareAgent(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
+	user := requireUser(w, r)
 	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-
-	agentID := r.PathValue("id")
+	agentID := requirePathID(w, r, "id", "Agent ID is required")
 	if agentID == "" {
-		http.Error(w, "Agent ID is required", http.StatusBadRequest)
 		return
 	}
-
 	if err := h.svc.unshare(r.Context(), agentID, user.ID); err != nil {
 		h.log.Error(r.Context(), "failed to unshare agent", "error", err)
 		writeJSONError(w, "Failed to unshare agent", http.StatusInternalServerError)
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "unshared"})
+	respondJSON(w, 0, map[string]string{"status": "unshared"})
 }
 
 // getSharedAgent handles GET /v1/shared/agents/{token}
 func (h *storeHandler) getSharedAgent(w http.ResponseWriter, r *http.Request) {
-	token := r.PathValue("token")
+	token := requirePathID(w, r, "token", "Share token is required")
 	if token == "" {
-		http.Error(w, "Share token is required", http.StatusBadRequest)
 		return
 	}
-
 	agent, err := h.svc.getShared(r.Context(), token)
 	if err != nil {
 		http.Error(w, "Shared agent not found", http.StatusNotFound)
 		return
 	}
+	respondJSON(w, 0, toSharedAgentResponse(agent))
+}
 
-	// Return a sanitized response (no user ID, no internal fields).
-	resp := agentResponse{
+// toSharedAgentResponse returns a sanitised public view of an agent —
+// no user ID, no internal fields — for the unauthenticated
+// /shared/agents/{token} endpoint.
+func toSharedAgentResponse(agent *AgentDefinition) agentResponse {
+	return agentResponse{
 		ID:                       agent.ID,
 		Name:                     agent.Name,
 		Description:              agent.Description,
@@ -665,35 +651,25 @@ func (h *storeHandler) getSharedAgent(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:                agent.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt:                agent.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
 }
 
 // forkSharedAgent handles POST /v1/shared/agents/{token}/fork
 func (h *storeHandler) forkSharedAgent(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetUserFromContext(r.Context())
+	user := requireUser(w, r)
 	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-
-	token := r.PathValue("token")
+	token := requirePathID(w, r, "token", "Share token is required")
 	if token == "" {
-		http.Error(w, "Share token is required", http.StatusBadRequest)
 		return
 	}
-
 	forked, err := h.svc.forkShared(r.Context(), token, user.ID)
 	if err != nil {
 		h.log.Error(r.Context(), "failed to fork shared agent", "error", err)
 		writeJSONError(w, "Failed to fork agent", http.StatusInternalServerError)
 		return
 	}
-
-	resp := toAgentResponse(forked)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(resp)
+	respondJSON(w, http.StatusCreated, toAgentResponse(forked))
 }
 
 // writeJSONError writes a JSON error response.

@@ -547,56 +547,75 @@ func (s *Service) SendStreamingMessage(ctx context.Context, connectorID, userID,
 //   - artifact-update, files only  → file chunks (no card wrapper)
 //   - artifact-update, text+files  → artifact card chunk + file chunks
 func extractEventChunks(event a2atypes.Event) ([]StreamChunk, error) {
-	if event == nil {
-		return nil, nil
-	}
 	switch v := event.(type) {
+	case nil:
+		return nil, nil
 	case *a2atypes.Message:
-		// Non-streaming final response (e.g. agents using sendMessage).
-		// Extract text deltas + file chunks from all parts.
-		return splitPartsToChunks(v.Parts, ""), nil
-
+		return chunksFromMessage(v), nil
 	case *a2atypes.TaskStatusUpdateEvent:
-		state := v.Status.State
-		// failed/rejected → propagate as error (mirrors AgentStack throw).
-		if state == a2atypes.TaskStateFailed || state == a2atypes.TaskStateRejected {
-			msg := "remote agent task failed"
-			if v.Status.Message != nil {
-				if t := extractTextFromParts(v.Status.Message.Parts); t != "" {
-					msg = t
-				}
-			}
-			return nil, fmt.Errorf("%s", msg)
-		}
-		// Only working-state events carry incremental streaming deltas.
-		if state != a2atypes.TaskStateWorking || v.Status.Message == nil {
-			return nil, nil
-		}
-		return splitPartsToChunks(v.Status.Message.Parts, ""), nil
-
+		return chunksFromStatusUpdate(v)
 	case *a2atypes.TaskArtifactUpdateEvent:
-		// Mirror handleArtifactUpdate: split text vs file parts.
-		// Partial append chunks are skipped — wait for LastChunk.
-		if v.Artifact == nil {
-			return nil, nil
-		}
-		if v.Append && !v.LastChunk {
-			return nil, nil
-		}
-		return buildArtifactChunks(v.Artifact), nil
-
+		return chunksFromArtifactUpdate(v), nil
 	case *a2atypes.Task:
-		// Blocking response: text delta from status message + artifact chunks.
-		var chunks []StreamChunk
-		if v.Status.Message != nil {
-			chunks = append(chunks, splitPartsToChunks(v.Status.Message.Parts, "")...)
-		}
-		for _, a := range v.Artifacts {
-			chunks = append(chunks, buildArtifactChunks(a)...)
-		}
-		return chunks, nil
+		return chunksFromTask(v), nil
 	}
 	return nil, nil
+}
+
+// chunksFromMessage handles the non-streaming final-response shape (agents
+// using sendMessage): extract text deltas + file chunks from all parts.
+func chunksFromMessage(m *a2atypes.Message) []StreamChunk {
+	return splitPartsToChunks(m.Parts, "")
+}
+
+// chunksFromStatusUpdate handles task-status transitions:
+// failed/rejected propagate as errors; only working-state updates with a
+// carrying message emit streaming chunks.
+func chunksFromStatusUpdate(v *a2atypes.TaskStatusUpdateEvent) ([]StreamChunk, error) {
+	state := v.Status.State
+	if state == a2atypes.TaskStateFailed || state == a2atypes.TaskStateRejected {
+		return nil, fmt.Errorf("%s", statusFailureMessage(v))
+	}
+	if state != a2atypes.TaskStateWorking || v.Status.Message == nil {
+		return nil, nil
+	}
+	return splitPartsToChunks(v.Status.Message.Parts, ""), nil
+}
+
+// statusFailureMessage extracts a human-readable failure message from a
+// failed/rejected status event, falling back to a generic string.
+func statusFailureMessage(v *a2atypes.TaskStatusUpdateEvent) string {
+	const fallback = "remote agent task failed"
+	if v.Status.Message == nil {
+		return fallback
+	}
+	if t := extractTextFromParts(v.Status.Message.Parts); t != "" {
+		return t
+	}
+	return fallback
+}
+
+// chunksFromArtifactUpdate mirrors handleArtifactUpdate: skip partial
+// append chunks (wait for LastChunk) and split the final artifact into
+// text-card + file chunks.
+func chunksFromArtifactUpdate(v *a2atypes.TaskArtifactUpdateEvent) []StreamChunk {
+	if v.Artifact == nil || (v.Append && !v.LastChunk) {
+		return nil
+	}
+	return buildArtifactChunks(v.Artifact)
+}
+
+// chunksFromTask handles the blocking-response shape: text delta from
+// the status message plus any attached artifacts.
+func chunksFromTask(v *a2atypes.Task) []StreamChunk {
+	var chunks []StreamChunk
+	if v.Status.Message != nil {
+		chunks = append(chunks, splitPartsToChunks(v.Status.Message.Parts, "")...)
+	}
+	for _, a := range v.Artifacts {
+		chunks = append(chunks, buildArtifactChunks(a)...)
+	}
+	return chunks
 }
 
 // buildArtifactChunks mirrors handleArtifactUpdate from AgentStack client.ts:
@@ -643,38 +662,59 @@ func splitPartsTyped(parts a2atypes.ContentParts) (textChunks []StreamChunk, fil
 		if part == nil {
 			continue
 		}
-		switch c := part.Content.(type) {
-		case a2atypes.Text:
-			if string(c) != "" {
-				textChunks = append(textChunks, StreamChunk{Content: string(c)})
-			}
-		case a2atypes.URL:
-			if string(c) != "" {
-				fileChunks = append(fileChunks, StreamChunk{
-					IsFile:   true,
-					FileURL:  string(c),
-					FileName: part.Filename,
-					MimeType: part.MediaType,
-				})
-			}
-		case a2atypes.Raw:
-			if len(c) > 0 {
-				mimeType := part.MediaType
-				if mimeType == "" {
-					mimeType = "application/octet-stream"
-				}
-				dataURL := "data:" + mimeType + ";base64," + encodeBase64([]byte(c))
-				fileChunks = append(fileChunks, StreamChunk{
-					IsFile:   true,
-					FileURL:  dataURL,
-					FileName: part.Filename,
-					MimeType: mimeType,
-				})
-			}
-			// Data parts (structured JSON) are skipped — no UI representation yet.
+		text, file := classifyPart(part)
+		if text != nil {
+			textChunks = append(textChunks, *text)
+		}
+		if file != nil {
+			fileChunks = append(fileChunks, *file)
 		}
 	}
 	return
+}
+
+// classifyPart routes a single Part to either the text-chunk or file-chunk
+// shape based on the underlying Content type. Data parts (structured
+// JSON) and empty values return (nil, nil) — no UI representation yet.
+func classifyPart(part *a2atypes.Part) (text *StreamChunk, file *StreamChunk) {
+	switch c := part.Content.(type) {
+	case a2atypes.Text:
+		if string(c) == "" {
+			return nil, nil
+		}
+		return &StreamChunk{Content: string(c)}, nil
+	case a2atypes.URL:
+		if string(c) == "" {
+			return nil, nil
+		}
+		return nil, &StreamChunk{
+			IsFile:   true,
+			FileURL:  string(c),
+			FileName: part.Filename,
+			MimeType: part.MediaType,
+		}
+	case a2atypes.Raw:
+		if len(c) == 0 {
+			return nil, nil
+		}
+		return nil, rawPartToFileChunk(part, []byte(c))
+	}
+	return nil, nil
+}
+
+// rawPartToFileChunk renders an inline Raw part as a data-URL file chunk,
+// defaulting the mime type when the part didn't declare one.
+func rawPartToFileChunk(part *a2atypes.Part, raw []byte) *StreamChunk {
+	mimeType := part.MediaType
+	if mimeType == "" {
+		mimeType = "application/octet-stream"
+	}
+	return &StreamChunk{
+		IsFile:   true,
+		FileURL:  "data:" + mimeType + ";base64," + encodeBase64(raw),
+		FileName: part.Filename,
+		MimeType: mimeType,
+	}
 }
 
 // encodeBase64 encodes bytes to standard base64 string.
@@ -741,39 +781,40 @@ func (a *authInterceptor) After(_ context.Context, _ *a2aclient.Response) error 
 }
 
 func extractResponseText(result a2atypes.SendMessageResult) string {
-	if result == nil {
-		return ""
-	}
-
 	var texts []string
-
 	switch r := result.(type) {
+	case nil:
+		return ""
 	case *a2atypes.Task:
-		// Extract from task status message
-		if r.Status.Message != nil {
-			for _, part := range r.Status.Message.Parts {
-				if text, ok := part.Content.(a2atypes.Text); ok {
-					texts = append(texts, string(text))
-				}
-			}
-		}
-		// Extract from artifacts
-		for _, artifact := range r.Artifacts {
-			for _, part := range artifact.Parts {
-				if text, ok := part.Content.(a2atypes.Text); ok {
-					texts = append(texts, string(text))
-				}
-			}
-		}
+		texts = textsFromTask(r)
 	case *a2atypes.Message:
-		for _, part := range r.Parts {
-			if text, ok := part.Content.(a2atypes.Text); ok {
-				texts = append(texts, string(text))
-			}
+		texts = textsFromParts(r.Parts)
+	}
+	return strings.Join(texts, "\n")
+}
+
+// textsFromTask collects every text part reachable from a Task — the
+// status message plus every artifact.
+func textsFromTask(r *a2atypes.Task) []string {
+	var texts []string
+	if r.Status.Message != nil {
+		texts = append(texts, textsFromParts(r.Status.Message.Parts)...)
+	}
+	for _, artifact := range r.Artifacts {
+		texts = append(texts, textsFromParts(artifact.Parts)...)
+	}
+	return texts
+}
+
+// textsFromParts returns the non-empty string values of every Text part.
+func textsFromParts(parts []*a2atypes.Part) []string {
+	var texts []string
+	for _, part := range parts {
+		if text, ok := part.Content.(a2atypes.Text); ok {
+			texts = append(texts, string(text))
 		}
 	}
-
-	return strings.Join(texts, "\n")
+	return texts
 }
 
 // --------------------------------------------------------------------------
@@ -925,29 +966,41 @@ func titleFromURL(rawURL string) string {
 
 // validateExternalURL blocks requests to internal/private networks (SSRF protection).
 func validateExternalURL(parsed *url.URL) error {
-	host := parsed.Hostname()
-
-	// Block obvious localhost
-	if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "0.0.0.0" {
+	if isLocalhostHost(parsed.Hostname()) {
 		return fmt.Errorf("cannot connect to localhost addresses")
 	}
-
-	// Resolve and check IP
-	ips, err := net.LookupIP(host)
+	ips, err := net.LookupIP(parsed.Hostname())
 	if err != nil {
 		return nil // allow — DNS may not resolve yet
 	}
-
 	for _, ip := range ips {
-		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
-			return fmt.Errorf("cannot connect to private/internal network addresses")
-		}
-		// Block cloud metadata endpoints
-		if ip.String() == "169.254.169.254" {
-			return fmt.Errorf("cannot connect to cloud metadata endpoint")
+		if blockErr := blockedIPError(ip); blockErr != nil {
+			return blockErr
 		}
 	}
+	return nil
+}
 
+// isLocalhostHost returns true for the set of hostnames that bypass DNS
+// and always point at the loopback interface.
+func isLocalhostHost(host string) bool {
+	switch host {
+	case "localhost", "127.0.0.1", "::1", "0.0.0.0":
+		return true
+	}
+	return false
+}
+
+// blockedIPError returns a non-nil error when the IP belongs to a
+// loopback/private/link-local range or to the AWS/GCP/Azure cloud
+// metadata endpoint; otherwise nil.
+func blockedIPError(ip net.IP) error {
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return fmt.Errorf("cannot connect to private/internal network addresses")
+	}
+	if ip.String() == "169.254.169.254" {
+		return fmt.Errorf("cannot connect to cloud metadata endpoint")
+	}
 	return nil
 }
 
