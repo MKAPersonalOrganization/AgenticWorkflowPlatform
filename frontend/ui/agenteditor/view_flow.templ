@@ -14,6 +14,8 @@ templ flowView() {
 							class="relative flex flex-col flex-1 overflow-hidden"
 							:class="expanded ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[calc(90vh-8rem)]'"
 							@keydown.window="if ($event.key === '?' && $event.target.tagName !== 'INPUT' && $event.target.tagName !== 'TEXTAREA' && $event.target.tagName !== 'SELECT' && view === 'flow') { $event.preventDefault(); $store.flow._showHelp = !$store.flow._showHelp; }"
+							@keydown.window.prevent.ctrl.s="if (view === 'flow' && !pipelineSaving && pipelineName.trim()) saveFromFlowView()"
+							@keydown.window.prevent.meta.s="if (view === 'flow' && !pipelineSaving && pipelineName.trim()) saveFromFlowView()"
 						>
 						<!-- Header -->
 						<div class="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/50 shrink-0">
@@ -42,45 +44,45 @@ templ flowView() {
 									</template>
 								</div>
 							</template>
-							<div class="flex items-center gap-1">
-								<template x-if="isPipelineValid">
-									<span class="flex items-center gap-1 text-[10px] text-success">
-										@icon.CircleCheck(icon.Props{Class: "size-3.5"})
-										{ i18n.T(ctx, "Valid") }
+							<!-- Chrome: Right-panel visibility toggle (secondary, kept subtle so it doesn't compete with Save). -->
+							<button
+								@click="togglePropertyPanel()"
+								:title="propertyPanelVisible ? 'Hide Properties' : 'Show Properties'"
+								class="flex items-center justify-center w-7 h-7 rounded text-xs transition-all duration-150"
+								:class="propertyPanelVisible ? 'text-primary bg-primary/15 hover:bg-primary/25' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'"
+							>
+								@icon.PanelRight(icon.Props{Class: "size-3.5"})
+							</button>
+							<!-- Action area: validity indicator + primary Save. The gate (validity) sits directly adjacent to the action it blocks. -->
+							<div class="flex items-center gap-2 ml-2 pl-2 border-l border-border/50">
+								<div class="flex items-center gap-1">
+									<template x-if="isPipelineValid">
+										<span class="flex items-center gap-1 text-[10px] text-success">
+											@icon.CircleCheck(icon.Props{Class: "size-3.5"})
+											{ i18n.T(ctx, "Valid") }
+										</span>
+									</template>
+									<template x-if="!isPipelineValid">
+										<span class="flex items-center gap-1 text-[10px] text-warning">
+											@icon.TriangleAlert(icon.Props{Class: "size-3.5"})
+											<span x-text="pipelineErrors.length + ' issue' + (pipelineErrors.length !== 1 ? 's' : '')"></span>
+										</span>
+									</template>
+								</div>
+								@button.Button(button.Props{
+									Variant: button.VariantDefault,
+									Class:   "h-8 px-4 text-xs gap-1.5",
+									Attributes: templ.Attributes{
+										"@click":    "saveFromFlowView()",
+										":disabled": "pipelineSaving || !pipelineName.trim()",
+										":title":    "(editingPipeline ? 'Save' : 'Create') + ' (' + (navigator.platform.toLowerCase().includes('mac') ? '⌘S' : 'Ctrl+S') + ')'",
+									},
+								}) {
+									<span x-show="!pipelineSaving" x-text="editingPipeline ? 'Save' : 'Create'"></span>
+									<span x-show="pipelineSaving" class="flex items-center gap-1.5">
+										<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
 									</span>
-								</template>
-								<template x-if="!isPipelineValid">
-									<span class="flex items-center gap-1 text-[10px] text-warning">
-										@icon.TriangleAlert(icon.Props{Class: "size-3.5"})
-										<span x-text="pipelineErrors.length + ' issue' + (pipelineErrors.length !== 1 ? 's' : '')"></span>
-									</span>
-								</template>
-							</div>
-							<!-- Save button -->
-							@button.Button(button.Props{
-								Variant: button.VariantDefault,
-								Class:   "h-8 px-4 text-xs gap-1.5",
-								Attributes: templ.Attributes{
-									"@click":    "saveFromFlowView()",
-									":disabled": "pipelineSaving || !pipelineName.trim()",
-								},
-							}) {
-								<span x-show="!pipelineSaving" x-text="editingPipeline ? 'Save' : 'Create'"></span>
-								<span x-show="pipelineSaving" class="flex items-center gap-1.5">
-									<span class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full"></span>
-								</span>
-							}
-							<!-- Panel visibility toggles (VS Code style) -->
-							<div class="flex items-center gap-0.5 ml-2 pl-2 border-l border-border/50">
-								<!-- Right Panel toggle (Properties) -->
-								<button
-									@click="togglePropertyPanel()"
-									:title="propertyPanelVisible ? 'Hide Properties' : 'Show Properties'"
-									class="flex items-center justify-center w-7 h-7 rounded text-xs transition-all duration-150"
-									:class="propertyPanelVisible ? 'text-primary bg-primary/15 hover:bg-primary/25' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'"
-								>
-									@icon.PanelRight(icon.Props{Class: "size-3.5"})
-								</button>
+								}
 							</div>
 						</div>
 						<!-- Name + description bar -->
