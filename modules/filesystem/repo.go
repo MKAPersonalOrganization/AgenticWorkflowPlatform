@@ -32,11 +32,11 @@ type repository interface {
 
 	// ── Permissions ─────────────────────────────────────────────────────
 	GrantPermission(ctx context.Context, perm FSPermission) error
-	RevokePermission(ctx context.Context, filesystemID uuid.UUID, userID, agentID string) error
+	RevokePermission(ctx context.Context, filesystemID uuid.UUID, userID UserID, agentID AgentID) error
 	ListPermissions(ctx context.Context, filesystemID uuid.UUID, userID string) ([]FSPermission, error)
-	HasPermission(ctx context.Context, filesystemID uuid.UUID, userID, agentID string) (bool, error)
+	HasPermission(ctx context.Context, filesystemID uuid.UUID, userID UserID, agentID AgentID) (bool, error)
 	// ListPermittedFilesystems returns filesystems that an agent has been granted access to.
-	ListPermittedFilesystems(ctx context.Context, userID, agentID string) ([]FileSystem, error)
+	ListPermittedFilesystems(ctx context.Context, userID UserID, agentID AgentID) ([]FileSystem, error)
 }
 
 // ─── PostgreSQL Implementation ──────────────────────────────────────────────
@@ -174,7 +174,7 @@ func (r *postgresRepo) GrantPermission(ctx context.Context, perm FSPermission) e
 	return err
 }
 
-func (r *postgresRepo) RevokePermission(ctx context.Context, filesystemID uuid.UUID, userID, agentID string) error {
+func (r *postgresRepo) RevokePermission(ctx context.Context, filesystemID uuid.UUID, userID UserID, agentID AgentID) error {
 	const q = `DELETE FROM filesystem_permissions WHERE filesystem_id = $1 AND user_id = $2 AND agent_id = $3`
 	res, err := r.db.ExecContext(ctx, q, filesystemID, userID, agentID)
 	if err != nil {
@@ -194,14 +194,14 @@ func (r *postgresRepo) ListPermissions(ctx context.Context, filesystemID uuid.UU
 	return out, err
 }
 
-func (r *postgresRepo) HasPermission(ctx context.Context, filesystemID uuid.UUID, userID, agentID string) (bool, error) {
+func (r *postgresRepo) HasPermission(ctx context.Context, filesystemID uuid.UUID, userID UserID, agentID AgentID) (bool, error) {
 	var count int
 	const q = `SELECT COUNT(*) FROM filesystem_permissions WHERE filesystem_id = $1 AND user_id = $2 AND agent_id = $3`
 	err := r.db.GetContext(ctx, &count, q, filesystemID, userID, agentID)
 	return count > 0, err
 }
 
-func (r *postgresRepo) ListPermittedFilesystems(ctx context.Context, userID, agentID string) ([]FileSystem, error) {
+func (r *postgresRepo) ListPermittedFilesystems(ctx context.Context, userID UserID, agentID AgentID) ([]FileSystem, error) {
 	var out []FileSystem
 	const q = `
 		SELECT f.filesystem_id, f.user_id, f.name, f.description, f.fs_type, f.config, f.created_at, f.updated_at

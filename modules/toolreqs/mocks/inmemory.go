@@ -27,26 +27,26 @@ func NewInMemoryRepository() toolreqs.Repository {
 // =============================================================================
 
 // GetPermission retrieves a specific agent-tool permission within a tool set.
-func (r *InMemoryRepository) GetPermission(_ context.Context, userID, agentID, toolSetID, toolID string) (*toolreqs.Permission, error) {
+func (r *InMemoryRepository) GetPermission(_ context.Context, userID toolreqs.UserID, agentID toolreqs.AgentID, toolSetID toolreqs.ToolSetID, toolID toolreqs.ToolID) (*toolreqs.Permission, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
-	userPerms, exists := r.permissions[userID]
+	userPerms, exists := r.permissions[string(userID)]
 	if !exists {
 		return nil, fmt.Errorf("no permissions found for user %s", userID)
 	}
 
-	agentPerms, exists := userPerms[agentID]
+	agentPerms, exists := userPerms[string(agentID)]
 	if !exists {
 		return nil, fmt.Errorf("no permissions found for agent %s", agentID)
 	}
 
-	toolSetPerms, exists := agentPerms[toolSetID]
+	toolSetPerms, exists := agentPerms[string(toolSetID)]
 	if !exists {
 		return nil, fmt.Errorf("no permissions found for agent %s in tool set %s", agentID, toolSetID)
 	}
 
-	perm, exists := toolSetPerms[toolID]
+	perm, exists := toolSetPerms[string(toolID)]
 	if !exists {
 		return nil, fmt.Errorf("no permission found for agent %s, tool set %s, tool %s", agentID, toolSetID, toolID)
 	}
@@ -56,21 +56,21 @@ func (r *InMemoryRepository) GetPermission(_ context.Context, userID, agentID, t
 }
 
 // ListPermissions returns all individual tool permissions for an agent within a tool set.
-func (r *InMemoryRepository) ListPermissions(_ context.Context, userID, agentID, toolSetID string) ([]toolreqs.Permission, error) {
+func (r *InMemoryRepository) ListPermissions(_ context.Context, userID toolreqs.UserID, agentID toolreqs.AgentID, toolSetID toolreqs.ToolSetID) ([]toolreqs.Permission, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
-	userPerms, exists := r.permissions[userID]
+	userPerms, exists := r.permissions[string(userID)]
 	if !exists {
 		return []toolreqs.Permission{}, nil
 	}
 
-	agentPerms, exists := userPerms[agentID]
+	agentPerms, exists := userPerms[string(agentID)]
 	if !exists {
 		return []toolreqs.Permission{}, nil
 	}
 
-	toolSetPerms, exists := agentPerms[toolSetID]
+	toolSetPerms, exists := agentPerms[string(toolSetID)]
 	if !exists {
 		return []toolreqs.Permission{}, nil
 	}
@@ -105,37 +105,37 @@ func (r *InMemoryRepository) SavePermission(_ context.Context, permission *toolr
 }
 
 // DeletePermission removes a specific agent-tool permission within a tool set.
-func (r *InMemoryRepository) DeletePermission(_ context.Context, userID, agentID, toolSetID, toolID string) error {
+func (r *InMemoryRepository) DeletePermission(_ context.Context, userID toolreqs.UserID, agentID toolreqs.AgentID, toolSetID toolreqs.ToolSetID, toolID toolreqs.ToolID) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	userPerms, exists := r.permissions[userID]
+	userPerms, exists := r.permissions[string(userID)]
 	if !exists {
 		return fmt.Errorf("no permissions found for user %s", userID)
 	}
 
-	agentPerms, exists := userPerms[agentID]
+	agentPerms, exists := userPerms[string(agentID)]
 	if !exists {
 		return fmt.Errorf("no permissions found for agent %s", agentID)
 	}
 
-	toolSetPerms, exists := agentPerms[toolSetID]
+	toolSetPerms, exists := agentPerms[string(toolSetID)]
 	if !exists {
 		return fmt.Errorf("no permissions found for agent %s in tool set %s", agentID, toolSetID)
 	}
 
-	if _, exists := toolSetPerms[toolID]; !exists {
+	if _, exists := toolSetPerms[string(toolID)]; !exists {
 		return fmt.Errorf("no permission found for agent %s, tool set %s, tool %s", agentID, toolSetID, toolID)
 	}
 
-	delete(toolSetPerms, toolID)
+	delete(toolSetPerms, string(toolID))
 
 	if len(toolSetPerms) == 0 {
-		delete(agentPerms, toolSetID)
+		delete(agentPerms, string(toolSetID))
 		if len(agentPerms) == 0 {
-			delete(userPerms, agentID)
+			delete(userPerms, string(agentID))
 			if len(userPerms) == 0 {
-				delete(r.permissions, userID)
+				delete(r.permissions, string(userID))
 			}
 		}
 	}
@@ -148,21 +148,21 @@ func (r *InMemoryRepository) DeletePermission(_ context.Context, userID, agentID
 // =============================================================================
 
 // GetToolSetPermission retrieves a specific agent-toolset permission.
-func (r *InMemoryRepository) GetToolSetPermission(_ context.Context, userID, agentID, toolSetID string) (*toolreqs.ToolSetPermission, error) {
+func (r *InMemoryRepository) GetToolSetPermission(_ context.Context, userID toolreqs.UserID, agentID toolreqs.AgentID, toolSetID toolreqs.ToolSetID) (*toolreqs.ToolSetPermission, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
-	userPerms, exists := r.toolSetPermissions[userID]
+	userPerms, exists := r.toolSetPermissions[string(userID)]
 	if !exists {
 		return nil, fmt.Errorf("no tool set permissions found for user %s", userID)
 	}
 
-	agentPerms, exists := userPerms[agentID]
+	agentPerms, exists := userPerms[string(agentID)]
 	if !exists {
 		return nil, fmt.Errorf("no tool set permissions found for agent %s", agentID)
 	}
 
-	perm, exists := agentPerms[toolSetID]
+	perm, exists := agentPerms[string(toolSetID)]
 	if !exists {
 		return nil, fmt.Errorf("no tool set permission found for agent %s and tool set %s", agentID, toolSetID)
 	}
@@ -172,16 +172,16 @@ func (r *InMemoryRepository) GetToolSetPermission(_ context.Context, userID, age
 }
 
 // ListToolSetPermissions returns all tool set permissions for an agent.
-func (r *InMemoryRepository) ListToolSetPermissions(_ context.Context, userID, agentID string) ([]toolreqs.ToolSetPermission, error) {
+func (r *InMemoryRepository) ListToolSetPermissions(_ context.Context, userID toolreqs.UserID, agentID toolreqs.AgentID) ([]toolreqs.ToolSetPermission, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
-	userPerms, exists := r.toolSetPermissions[userID]
+	userPerms, exists := r.toolSetPermissions[string(userID)]
 	if !exists {
 		return []toolreqs.ToolSetPermission{}, nil
 	}
 
-	agentPerms, exists := userPerms[agentID]
+	agentPerms, exists := userPerms[string(agentID)]
 	if !exists {
 		return []toolreqs.ToolSetPermission{}, nil
 	}
@@ -214,30 +214,30 @@ func (r *InMemoryRepository) SaveToolSetPermission(_ context.Context, permission
 }
 
 // DeleteToolSetPermission removes a specific agent-toolset permission.
-func (r *InMemoryRepository) DeleteToolSetPermission(_ context.Context, userID, agentID, toolSetID string) error {
+func (r *InMemoryRepository) DeleteToolSetPermission(_ context.Context, userID toolreqs.UserID, agentID toolreqs.AgentID, toolSetID toolreqs.ToolSetID) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	userPerms, exists := r.toolSetPermissions[userID]
+	userPerms, exists := r.toolSetPermissions[string(userID)]
 	if !exists {
 		return fmt.Errorf("no tool set permissions found for user %s", userID)
 	}
 
-	agentPerms, exists := userPerms[agentID]
+	agentPerms, exists := userPerms[string(agentID)]
 	if !exists {
 		return fmt.Errorf("no tool set permissions found for agent %s", agentID)
 	}
 
-	if _, exists := agentPerms[toolSetID]; !exists {
+	if _, exists := agentPerms[string(toolSetID)]; !exists {
 		return fmt.Errorf("no tool set permission found for agent %s and tool set %s", agentID, toolSetID)
 	}
 
-	delete(agentPerms, toolSetID)
+	delete(agentPerms, string(toolSetID))
 
 	if len(agentPerms) == 0 {
-		delete(userPerms, agentID)
+		delete(userPerms, string(agentID))
 		if len(userPerms) == 0 {
-			delete(r.toolSetPermissions, userID)
+			delete(r.toolSetPermissions, string(userID))
 		}
 	}
 

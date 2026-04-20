@@ -52,14 +52,14 @@ func TestPostgresRepository(t *testing.T) {
 	db.Exec("INSERT INTO tools (id, name, tool_set_id) VALUES ('t-perm-1', 'Perm Tool 1', 'ts-perm-1') ON CONFLICT (id) DO NOTHING")
 
 	t.Run("Tool Set Permissions", func(t *testing.T) {
-		userID := "test-user"
-		agentID := "agent-1"
-		toolSetID := "ts-perm-1"
+		userID := UserID("test-user")
+		agentID := AgentID("agent-1")
+		toolSetID := ToolSetID("ts-perm-1")
 
 		perm := &ToolSetPermission{
-			UserID:    userID,
-			AgentID:   agentID,
-			ToolSetID: toolSetID,
+			UserID:    string(userID),
+			AgentID:   string(agentID),
+			ToolSetID: string(toolSetID),
 			Config:    `{"limit": 10}`,
 			CreatedAt: time.Now().Truncate(time.Microsecond),
 			UpdatedAt: time.Now().Truncate(time.Microsecond),
@@ -85,16 +85,16 @@ func TestPostgresRepository(t *testing.T) {
 	})
 
 	t.Run("Tool Permissions", func(t *testing.T) {
-		userID := "test-user"
-		agentID := "agent-1"
-		toolSetID := "ts-perm-1"
-		toolID := "t-perm-1"
+		userID := UserID("test-user")
+		agentID := AgentID("agent-1")
+		toolSetID := ToolSetID("ts-perm-1")
+		toolID := ToolID("t-perm-1")
 
 		perm := &Permission{
-			UserID:    userID,
-			AgentID:   agentID,
-			ToolSetID: toolSetID,
-			ToolID:    toolID,
+			UserID:    string(userID),
+			AgentID:   string(agentID),
+			ToolSetID: string(toolSetID),
+			ToolID:    string(toolID),
 			Config:    `{"timeout": "5s"}`,
 			CreatedAt: time.Now().Truncate(time.Microsecond),
 			UpdatedAt: time.Now().Truncate(time.Microsecond),

@@ -13,31 +13,31 @@ type stubRepo struct {
 	byUser []AgentDefinition
 }
 
-func (s *stubRepo) Create(context.Context, *AgentDefinition) error { return nil }
-func (s *stubRepo) Update(context.Context, *AgentDefinition) error { return nil }
-func (s *stubRepo) Delete(context.Context, string, string) error   { return nil }
-func (s *stubRepo) Search(context.Context, string, string) ([]AgentDefinition, error) {
+func (s *stubRepo) Create(context.Context, *AgentDefinition) error  { return nil }
+func (s *stubRepo) Update(context.Context, *AgentDefinition) error  { return nil }
+func (s *stubRepo) Delete(context.Context, AgentID, UserID) error   { return nil }
+func (s *stubRepo) Search(context.Context, UserID, string) ([]AgentDefinition, error) {
 	return nil, nil
 }
-func (s *stubRepo) ListAddedCatalogIDs(context.Context, string) ([]string, error) { return nil, nil }
-func (s *stubRepo) ExistsByCatalogID(context.Context, string, string) (bool, error) {
+func (s *stubRepo) ListAddedCatalogIDs(context.Context, UserID) ([]string, error) { return nil, nil }
+func (s *stubRepo) ExistsByCatalogID(context.Context, UserID, CatalogID) (bool, error) {
 	return false, nil
 }
 func (s *stubRepo) GetByShareToken(context.Context, string) (*AgentDefinition, error) {
 	return nil, nil
 }
-func (s *stubRepo) UpdateShareToken(context.Context, string, string, string, string) error {
+func (s *stubRepo) UpdateShareToken(context.Context, AgentID, UserID, string, string) error {
 	return nil
 }
-func (s *stubRepo) SetParent(context.Context, string, string, string) error { return nil }
-func (s *stubRepo) DeleteByParent(context.Context, string, string) error    { return nil }
-func (s *stubRepo) GetByID(_ context.Context, id, _ string) (*AgentDefinition, error) {
-	if def, ok := s.byID[id]; ok {
+func (s *stubRepo) SetParent(context.Context, AgentID, AgentID, UserID) error { return nil }
+func (s *stubRepo) DeleteByParent(context.Context, AgentID, UserID) error     { return nil }
+func (s *stubRepo) GetByID(_ context.Context, id AgentID, _ UserID) (*AgentDefinition, error) {
+	if def, ok := s.byID[string(id)]; ok {
 		return def, nil
 	}
 	return nil, errors.New("not found")
 }
-func (s *stubRepo) ListByUser(context.Context, string) ([]AgentDefinition, error) {
+func (s *stubRepo) ListByUser(context.Context, UserID) ([]AgentDefinition, error) {
 	return s.byUser, nil
 }
 

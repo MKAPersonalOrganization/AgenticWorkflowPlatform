@@ -9,6 +9,17 @@ import (
 
 // ─── Filesystem Types ───────────────────────────────────────────────────────
 
+// UserID and AgentID are typed string aliases for the user- and agent-scoped
+// identifiers threaded through the filesystem interfaces. They exist to
+// prevent silent swaps at call sites: a bare `(ctx, userID, agentID, ...)`
+// signature is a textbook connascence-of-position hazard (Khononov Ch. 6 /
+// Page-Jones Listing 6.7). Wrapping each ID in its own nominal type makes
+// `fs.HasAgentPermission(ctx, id, agentID, userID)` a compile error.
+type (
+	UserID  string
+	AgentID string
+)
+
 // FSType represents the backend type of a filesystem.
 type FSType string
 

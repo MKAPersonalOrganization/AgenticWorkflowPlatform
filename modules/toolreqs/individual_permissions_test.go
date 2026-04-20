@@ -36,7 +36,7 @@ func TestIndividualToolRequirementConfig(t *testing.T) {
 	userID := "test-user"
 
 	// Test: Set individual tool requirement config to "allow"
-	err := store.SetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID, toolreqs.ToolRequirementConfig{
+	err := store.SetToolRequirementConfig(ctx, toolreqs.UserID(userID), toolreqs.AgentID(agentID), toolreqs.ToolSetID(toolSetID), toolreqs.ToolID(toolID), toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
 	if err != nil {
@@ -50,7 +50,7 @@ func TestIndividualToolRequirementConfig(t *testing.T) {
 	}
 
 	// Test: Get requirement config
-	cfg, err := store.GetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID)
+	cfg, err := store.GetToolRequirementConfig(ctx, toolreqs.UserID(userID), toolreqs.AgentID(agentID), toolreqs.ToolSetID(toolSetID), toolreqs.ToolID(toolID))
 	if err != nil {
 		t.Fatalf("Failed to get tool requirement config: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestIndividualToolRequirementConfig(t *testing.T) {
 	}
 
 	// Test: Block the tool
-	err = store.SetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID, toolreqs.ToolRequirementConfig{
+	err = store.SetToolRequirementConfig(ctx, toolreqs.UserID(userID), toolreqs.AgentID(agentID), toolreqs.ToolSetID(toolSetID), toolreqs.ToolID(toolID), toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionBlock,
 	})
 	if err != nil {
@@ -85,7 +85,7 @@ func TestToolSetRequirementInheritance(t *testing.T) {
 	// Test: Tool inherits permission from tool set when no explicit config exists
 
 	// Allow the tool set
-	err := store.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
+	err := store.SetToolSetRequirementConfig(ctx, toolreqs.UserID(userID), toolreqs.AgentID(agentID), toolreqs.ToolSetID(toolSetID), toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
 	if err != nil {
@@ -99,7 +99,7 @@ func TestToolSetRequirementInheritance(t *testing.T) {
 	}
 
 	// Block the tool set
-	err = store.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
+	err = store.SetToolSetRequirementConfig(ctx, toolreqs.UserID(userID), toolreqs.AgentID(agentID), toolreqs.ToolSetID(toolSetID), toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionBlock,
 	})
 	if err != nil {
@@ -123,7 +123,7 @@ func TestToolRequirementOverridesToolSet(t *testing.T) {
 	toolID := "divide"
 
 	// Block the tool set
-	err := store.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
+	err := store.SetToolSetRequirementConfig(ctx, toolreqs.UserID(userID), toolreqs.AgentID(agentID), toolreqs.ToolSetID(toolSetID), toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionBlock,
 	})
 	if err != nil {
@@ -131,7 +131,7 @@ func TestToolRequirementOverridesToolSet(t *testing.T) {
 	}
 
 	// Explicitly allow the individual tool
-	err = store.SetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID, toolreqs.ToolRequirementConfig{
+	err = store.SetToolRequirementConfig(ctx, toolreqs.UserID(userID), toolreqs.AgentID(agentID), toolreqs.ToolSetID(toolSetID), toolreqs.ToolID(toolID), toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
 	if err != nil {
@@ -161,7 +161,7 @@ func TestRequireConfirmationConfig(t *testing.T) {
 	toolID := "divide"
 
 	// Set require_confirmation on the tool
-	err := store.SetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID, toolreqs.ToolRequirementConfig{
+	err := store.SetToolRequirementConfig(ctx, toolreqs.UserID(userID), toolreqs.AgentID(agentID), toolreqs.ToolSetID(toolSetID), toolreqs.ToolID(toolID), toolreqs.ToolRequirementConfig{
 		Action:              toolreqs.RequirementActionRequireConfirmation,
 		RequireConfirmation: true,
 		ConfirmationHint:    "Division can produce unexpected results",
@@ -177,7 +177,7 @@ func TestRequireConfirmationConfig(t *testing.T) {
 	}
 
 	// Config should have confirmation details
-	cfg, err := store.GetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID)
+	cfg, err := store.GetToolRequirementConfig(ctx, toolreqs.UserID(userID), toolreqs.AgentID(agentID), toolreqs.ToolSetID(toolSetID), toolreqs.ToolID(toolID))
 	if err != nil {
 		t.Fatalf("Failed to get config: %v", err)
 	}
@@ -211,7 +211,7 @@ func TestListToolRequirementConfigs(t *testing.T) {
 	}
 
 	for toolID, action := range tools {
-		err := store.SetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID, toolreqs.ToolRequirementConfig{
+		err := store.SetToolRequirementConfig(ctx, toolreqs.UserID(userID), toolreqs.AgentID(agentID), toolreqs.ToolSetID(toolSetID), toolreqs.ToolID(toolID), toolreqs.ToolRequirementConfig{
 			Action: action,
 		})
 		if err != nil {
@@ -220,7 +220,7 @@ func TestListToolRequirementConfigs(t *testing.T) {
 	}
 
 	// List all configs in the tool set
-	configs, err := store.ListToolRequirementConfigs(ctx, userID, agentID, toolSetID)
+	configs, err := store.ListToolRequirementConfigs(ctx, toolreqs.UserID(userID), toolreqs.AgentID(agentID), toolreqs.ToolSetID(toolSetID))
 	if err != nil {
 		t.Fatalf("Failed to list configs: %v", err)
 	}
@@ -249,21 +249,21 @@ func TestGetAllowedToolSets(t *testing.T) {
 	agentID := "math-instructor"
 
 	// Allow two tool sets, block one
-	err := store.SetToolSetRequirementConfig(ctx, userID, agentID, "calc-set", toolreqs.ToolRequirementConfig{
+	err := store.SetToolSetRequirementConfig(ctx, toolreqs.UserID(userID), toolreqs.AgentID(agentID), "calc-set", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
 	if err != nil {
 		t.Fatalf("Failed to allow calc-set: %v", err)
 	}
 
-	err = store.SetToolSetRequirementConfig(ctx, userID, agentID, "graph-set", toolreqs.ToolRequirementConfig{
+	err = store.SetToolSetRequirementConfig(ctx, toolreqs.UserID(userID), toolreqs.AgentID(agentID), "graph-set", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
 	if err != nil {
 		t.Fatalf("Failed to allow graph-set: %v", err)
 	}
 
-	err = store.SetToolSetRequirementConfig(ctx, userID, agentID, "blocked-set", toolreqs.ToolRequirementConfig{
+	err = store.SetToolSetRequirementConfig(ctx, toolreqs.UserID(userID), toolreqs.AgentID(agentID), "blocked-set", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionBlock,
 	})
 	if err != nil {

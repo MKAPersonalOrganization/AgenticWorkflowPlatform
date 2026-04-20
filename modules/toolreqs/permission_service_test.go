@@ -35,7 +35,7 @@ func TestToolSetRequirementConfigService(t *testing.T) {
 	toolSetID := "calculator-set"
 
 	// Allow a tool set via requirement config
-	if err := store.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
+	if err := store.SetToolSetRequirementConfig(ctx, toolreqs.UserID(userID), toolreqs.AgentID(agentID), toolreqs.ToolSetID(toolSetID), toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	}); err != nil {
 		t.Fatalf("Failed to allow tool set: %v", err)
@@ -75,14 +75,14 @@ func TestToolSetBlockingViaRequirementConfig(t *testing.T) {
 	toolSetID := "calculator-set"
 
 	// First allow the tool set
-	if err := store.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
+	if err := store.SetToolSetRequirementConfig(ctx, toolreqs.UserID(userID), toolreqs.AgentID(agentID), toolreqs.ToolSetID(toolSetID), toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	}); err != nil {
 		t.Fatalf("Failed to allow tool set: %v", err)
 	}
 
 	// Then block it
-	if err := store.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, toolreqs.ToolRequirementConfig{
+	if err := store.SetToolSetRequirementConfig(ctx, toolreqs.UserID(userID), toolreqs.AgentID(agentID), toolreqs.ToolSetID(toolSetID), toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionBlock,
 	}); err != nil {
 		t.Fatalf("Failed to block tool set: %v", err)

@@ -751,26 +751,40 @@ func (n *CompositionNode) Walk(fn func(*CompositionNode)) {
 // Repository
 // ──────────────────────────────────────────────────────────────────────────────
 
+// AgentID, UserID, and CatalogID are named string types so the compiler
+// catches argument-order mistakes that plain (id, userID string) pairs
+// otherwise permit. Each call site converts explicitly, e.g.
+// ``repo.Delete(ctx, AgentID(id), UserID(userID))`` — the conversion
+// cost is paid once at the boundary and buys swap-proof signatures
+// throughout. This is the "Connascence of Position → Connascence of
+// Name" reduction from Khononov, Balancing Coupling in Software
+// Design, Ch. 6.
+type (
+	AgentID   string
+	UserID    string
+	CatalogID string
+)
+
 // AgentDefinitionRepository defines the storage contract for user-created agents.
 type AgentDefinitionRepository interface {
 	Create(ctx context.Context, agent *AgentDefinition) error
 	Update(ctx context.Context, agent *AgentDefinition) error
-	Delete(ctx context.Context, id, userID string) error
-	GetByID(ctx context.Context, id, userID string) (*AgentDefinition, error)
-	ListByUser(ctx context.Context, userID string) ([]AgentDefinition, error)
-	Search(ctx context.Context, userID, query string) ([]AgentDefinition, error)
-	ListAddedCatalogIDs(ctx context.Context, userID string) ([]string, error)
-	ExistsByCatalogID(ctx context.Context, userID, catalogID string) (bool, error)
+	Delete(ctx context.Context, id AgentID, userID UserID) error
+	GetByID(ctx context.Context, id AgentID, userID UserID) (*AgentDefinition, error)
+	ListByUser(ctx context.Context, userID UserID) ([]AgentDefinition, error)
+	Search(ctx context.Context, userID UserID, query string) ([]AgentDefinition, error)
+	ListAddedCatalogIDs(ctx context.Context, userID UserID) ([]string, error)
+	ExistsByCatalogID(ctx context.Context, userID UserID, catalogID CatalogID) (bool, error)
 
 	// GetByShareToken retrieves a shared agent by its share token (no user scoping).
 	GetByShareToken(ctx context.Context, token string) (*AgentDefinition, error)
 
 	// UpdateShareToken sets or clears the share token for an agent.
-	UpdateShareToken(ctx context.Context, id, userID, token, visibility string) error
+	UpdateShareToken(ctx context.Context, id AgentID, userID UserID, token, visibility string) error
 
 	// SetParent sets the parent_id on a sub-agent to establish workflow ownership.
-	SetParent(ctx context.Context, agentID, parentID, userID string) error
+	SetParent(ctx context.Context, agentID AgentID, parentID AgentID, userID UserID) error
 
 	// DeleteByParent deletes all agents owned by a workflow (parent_id = parentID).
-	DeleteByParent(ctx context.Context, parentID, userID string) error
+	DeleteByParent(ctx context.Context, parentID AgentID, userID UserID) error
 }

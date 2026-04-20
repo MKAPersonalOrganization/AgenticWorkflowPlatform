@@ -31,7 +31,7 @@ func (p *UserAwareProvider) GetForUser(ctx context.Context, name, userID string)
 		return nil, fmt.Errorf("an agent ID must be provided")
 	}
 
-	agentDef, err := p.repo.GetByID(ctx, name, userID)
+	agentDef, err := p.repo.GetByID(ctx, AgentID(name), UserID(userID))
 	if err != nil {
 		return nil, fmt.Errorf("agent %q not found for user %s: %w", name, userID, err)
 	}
@@ -49,7 +49,7 @@ func (p *UserAwareProvider) ListForUser(ctx context.Context, userID string) ([]a
 		return nil, nil
 	}
 
-	definitions, err := p.repo.ListByUser(ctx, userID)
+	definitions, err := p.repo.ListByUser(ctx, UserID(userID))
 	if err != nil {
 		return nil, fmt.Errorf("listing agents: %w", err)
 	}
@@ -89,7 +89,7 @@ func (p *UserAwareProvider) agentFromDefinition(def *AgentDefinition) agent.Agen
 			if ref.AgentID == "" {
 				continue
 			}
-			subDef, err := p.repo.GetByID(context.Background(), ref.AgentID, def.UserID)
+			subDef, err := p.repo.GetByID(context.Background(), AgentID(ref.AgentID), UserID(def.UserID))
 			if err != nil {
 				continue
 			}

@@ -56,8 +56,8 @@ func NewPermissionStore(log *logger.Logger, repo Repository, rdb redis.Cmdable) 
 // =============================================================================
 
 // GetToolSetPermission retrieves a specific agent's tool set permission.
-func (s *PermissionStore) GetToolSetPermission(ctx context.Context, userID, agentID, toolSetID string) (*ToolSetPermission, error) {
-	if cached, ok := s.toolSetCache.Get(userID, agentID, toolSetID); ok {
+func (s *PermissionStore) GetToolSetPermission(ctx context.Context, userID UserID, agentID AgentID, toolSetID ToolSetID) (*ToolSetPermission, error) {
+	if cached, ok := s.toolSetCache.Get(string(userID), string(agentID), string(toolSetID)); ok {
 		permCopy := *cached
 		return &permCopy, nil
 	}
@@ -67,13 +67,13 @@ func (s *PermissionStore) GetToolSetPermission(ctx context.Context, userID, agen
 		return nil, err
 	}
 
-	s.toolSetCache.Set(userID, permission, agentID, toolSetID)
+	s.toolSetCache.Set(string(userID), permission, string(agentID), string(toolSetID))
 	return permission, nil
 }
 
 // GetPermission retrieves a specific agent's tool permission within a tool set.
-func (s *PermissionStore) GetPermission(ctx context.Context, userID, agentID, toolSetID, toolID string) (*Permission, error) {
-	if cached, ok := s.toolCache.Get(userID, agentID, toolSetID, toolID); ok {
+func (s *PermissionStore) GetPermission(ctx context.Context, userID UserID, agentID AgentID, toolSetID ToolSetID, toolID ToolID) (*Permission, error) {
+	if cached, ok := s.toolCache.Get(string(userID), string(agentID), string(toolSetID), string(toolID)); ok {
 		permCopy := *cached
 		return &permCopy, nil
 	}
@@ -83,7 +83,7 @@ func (s *PermissionStore) GetPermission(ctx context.Context, userID, agentID, to
 		return nil, err
 	}
 
-	s.toolCache.Set(userID, permission, agentID, toolSetID, toolID)
+	s.toolCache.Set(string(userID), permission, string(agentID), string(toolSetID), string(toolID))
 	return permission, nil
 }
 
@@ -94,7 +94,7 @@ func (s *PermissionStore) GetPermission(ctx context.Context, userID, agentID, to
 // GetToolRequirementConfig retrieves the requirement configuration for a
 // specific tool within a tool set for the given user/agent. Returns a zero
 // config when no explicit configuration exists.
-func (s *PermissionStore) GetToolRequirementConfig(ctx context.Context, userID, agentID, toolSetID, toolID string) (ToolRequirementConfig, error) {
+func (s *PermissionStore) GetToolRequirementConfig(ctx context.Context, userID UserID, agentID AgentID, toolSetID ToolSetID, toolID ToolID) (ToolRequirementConfig, error) {
 	perm, err := s.GetPermission(ctx, userID, agentID, toolSetID, toolID)
 	if err != nil {
 		return ToolRequirementConfig{}, nil
@@ -104,16 +104,16 @@ func (s *PermissionStore) GetToolRequirementConfig(ctx context.Context, userID, 
 
 // SetToolRequirementConfig updates the requirement configuration for a
 // specific tool within a tool set.
-func (s *PermissionStore) SetToolRequirementConfig(ctx context.Context, userID, agentID, toolSetID, toolID string, cfg ToolRequirementConfig) error {
+func (s *PermissionStore) SetToolRequirementConfig(ctx context.Context, userID UserID, agentID AgentID, toolSetID ToolSetID, toolID ToolID, cfg ToolRequirementConfig) error {
 	now := time.Now()
 
 	existing, err := s.repo.GetPermission(ctx, userID, agentID, toolSetID, toolID)
 	if err != nil {
 		existing = &Permission{
-			UserID:    userID,
-			AgentID:   agentID,
-			ToolSetID: toolSetID,
-			ToolID:    toolID,
+			UserID:    string(userID),
+			AgentID:   string(agentID),
+			ToolSetID: string(toolSetID),
+			ToolID:    string(toolID),
 			CreatedAt: now,
 		}
 	}
@@ -125,7 +125,7 @@ func (s *PermissionStore) SetToolRequirementConfig(ctx context.Context, userID, 
 		return fmt.Errorf("failed to save tool requirement config: %w", err)
 	}
 
-	s.toolCache.Set(userID, existing, agentID, toolSetID, toolID)
+	s.toolCache.Set(string(userID), existing, string(agentID), string(toolSetID), string(toolID))
 
 	s.log.Info(ctx, "Tool requirement config updated",
 		"user_id", userID, "agent_id", agentID,
@@ -136,7 +136,7 @@ func (s *PermissionStore) SetToolRequirementConfig(ctx context.Context, userID, 
 
 // GetToolSetRequirementConfig retrieves the requirement configuration for an
 // entire tool set for the given user/agent.
-func (s *PermissionStore) GetToolSetRequirementConfig(ctx context.Context, userID, agentID, toolSetID string) (ToolRequirementConfig, error) {
+func (s *PermissionStore) GetToolSetRequirementConfig(ctx context.Context, userID UserID, agentID AgentID, toolSetID ToolSetID) (ToolRequirementConfig, error) {
 	perm, err := s.GetToolSetPermission(ctx, userID, agentID, toolSetID)
 	if err != nil {
 		return ToolRequirementConfig{}, nil
@@ -146,15 +146,15 @@ func (s *PermissionStore) GetToolSetRequirementConfig(ctx context.Context, userI
 
 // SetToolSetRequirementConfig updates the requirement configuration for an
 // entire tool set.
-func (s *PermissionStore) SetToolSetRequirementConfig(ctx context.Context, userID, agentID, toolSetID string, cfg ToolRequirementConfig) error {
+func (s *PermissionStore) SetToolSetRequirementConfig(ctx context.Context, userID UserID, agentID AgentID, toolSetID ToolSetID, cfg ToolRequirementConfig) error {
 	now := time.Now()
 
 	existing, err := s.repo.GetToolSetPermission(ctx, userID, agentID, toolSetID)
 	if err != nil {
 		existing = &ToolSetPermission{
-			UserID:    userID,
-			AgentID:   agentID,
-			ToolSetID: toolSetID,
+			UserID:    string(userID),
+			AgentID:   string(agentID),
+			ToolSetID: string(toolSetID),
 			CreatedAt: now,
 		}
 	}
@@ -166,7 +166,7 @@ func (s *PermissionStore) SetToolSetRequirementConfig(ctx context.Context, userI
 		return fmt.Errorf("failed to save tool set requirement config: %w", err)
 	}
 
-	s.toolSetCache.Set(userID, existing, agentID, toolSetID)
+	s.toolSetCache.Set(string(userID), existing, string(agentID), string(toolSetID))
 
 	s.log.Info(ctx, "Tool set requirement config updated",
 		"user_id", userID, "agent_id", agentID, "tool_set_id", toolSetID,
@@ -176,7 +176,7 @@ func (s *PermissionStore) SetToolSetRequirementConfig(ctx context.Context, userI
 
 // ListToolRequirementConfigs returns all tool requirement configs for a
 // specific tool set of an agent.
-func (s *PermissionStore) ListToolRequirementConfigs(ctx context.Context, userID, agentID, toolSetID string) (map[string]ToolRequirementConfig, error) {
+func (s *PermissionStore) ListToolRequirementConfigs(ctx context.Context, userID UserID, agentID AgentID, toolSetID ToolSetID) (map[string]ToolRequirementConfig, error) {
 	perms, err := s.repo.ListPermissions(ctx, userID, agentID, toolSetID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list tool permissions: %w", err)
@@ -197,8 +197,12 @@ func (s *PermissionStore) ListToolRequirementConfigs(ctx context.Context, userID
 // =============================================================================
 
 // GetToolRequirementConfigJSON returns the requirement config JSON for a tool.
+// Accepts plain strings because this satisfies chatcontracts.ToolRequirementConfigService,
+// which sits in a neutral package and doesn't import toolreqs — the typed IDs
+// are re-imposed inside the method so internal call sites still get the
+// positional-swap guardrails.
 func (s *PermissionStore) GetToolRequirementConfigJSON(ctx context.Context, userID, agentID, toolSetID, toolID string) (string, error) {
-	cfg, err := s.GetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID)
+	cfg, err := s.GetToolRequirementConfig(ctx, UserID(userID), AgentID(agentID), ToolSetID(toolSetID), ToolID(toolID))
 	if err != nil {
 		return "{}", err
 	}
@@ -208,12 +212,12 @@ func (s *PermissionStore) GetToolRequirementConfigJSON(ctx context.Context, user
 // SetToolRequirementConfigJSON saves the requirement config from raw JSON.
 func (s *PermissionStore) SetToolRequirementConfigJSON(ctx context.Context, userID, agentID, toolSetID, toolID string, configJSON string) error {
 	cfg := ParseToolRequirementConfig(configJSON)
-	return s.SetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolID, cfg)
+	return s.SetToolRequirementConfig(ctx, UserID(userID), AgentID(agentID), ToolSetID(toolSetID), ToolID(toolID), cfg)
 }
 
 // GetToolSetRequirementConfigJSON returns the requirement config JSON for a tool set.
 func (s *PermissionStore) GetToolSetRequirementConfigJSON(ctx context.Context, userID, agentID, toolSetID string) (string, error) {
-	cfg, err := s.GetToolSetRequirementConfig(ctx, userID, agentID, toolSetID)
+	cfg, err := s.GetToolSetRequirementConfig(ctx, UserID(userID), AgentID(agentID), ToolSetID(toolSetID))
 	if err != nil {
 		return "{}", err
 	}
@@ -223,13 +227,13 @@ func (s *PermissionStore) GetToolSetRequirementConfigJSON(ctx context.Context, u
 // SetToolSetRequirementConfigJSON saves the requirement config for a tool set from raw JSON.
 func (s *PermissionStore) SetToolSetRequirementConfigJSON(ctx context.Context, userID, agentID, toolSetID string, configJSON string) error {
 	cfg := ParseToolRequirementConfig(configJSON)
-	return s.SetToolSetRequirementConfig(ctx, userID, agentID, toolSetID, cfg)
+	return s.SetToolSetRequirementConfig(ctx, UserID(userID), AgentID(agentID), ToolSetID(toolSetID), cfg)
 }
 
 // ListToolRequirementConfigsJSON returns all tool requirement configs as
 // toolID → JSON strings.
 func (s *PermissionStore) ListToolRequirementConfigsJSON(ctx context.Context, userID, agentID, toolSetID string) (map[string]string, error) {
-	configs, err := s.ListToolRequirementConfigs(ctx, userID, agentID, toolSetID)
+	configs, err := s.ListToolRequirementConfigs(ctx, UserID(userID), AgentID(agentID), ToolSetID(toolSetID))
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +250,7 @@ func (s *PermissionStore) ListToolRequirementConfigsJSON(ctx context.Context, us
 
 // IsToolSetAllowed reports whether a tool set is enabled for this user/agent.
 // Tools are denied by default (fail-closed) unless explicitly allowed.
-func (s *PermissionStore) IsToolSetAllowed(ctx context.Context, userID, agentID, toolSetID string) bool {
+func (s *PermissionStore) IsToolSetAllowed(ctx context.Context, userID UserID, agentID AgentID, toolSetID ToolSetID) bool {
 	permission, err := s.GetToolSetPermission(ctx, userID, agentID, toolSetID)
 	if err != nil {
 		return false
@@ -257,7 +261,7 @@ func (s *PermissionStore) IsToolSetAllowed(ctx context.Context, userID, agentID,
 
 // IsToolAllowed reports whether a specific tool is enabled. Falls back to
 // tool-set level when no explicit individual config exists.
-func (s *PermissionStore) IsToolAllowed(ctx context.Context, userID, agentID, toolSetID, toolID string) bool {
+func (s *PermissionStore) IsToolAllowed(ctx context.Context, userID UserID, agentID AgentID, toolSetID ToolSetID, toolID ToolID) bool {
 	permission, err := s.GetPermission(ctx, userID, agentID, toolSetID, toolID)
 	if err != nil {
 		return s.IsToolSetAllowed(ctx, userID, agentID, toolSetID)
@@ -268,7 +272,7 @@ func (s *PermissionStore) IsToolAllowed(ctx context.Context, userID, agentID, to
 
 // AllowedToolSets returns all tool set IDs that are not explicitly blocked.
 // Tools are denied by default (fail-closed).
-func (s *PermissionStore) AllowedToolSets(ctx context.Context, userID, agentID string) ([]string, error) {
+func (s *PermissionStore) AllowedToolSets(ctx context.Context, userID UserID, agentID AgentID) ([]string, error) {
 	permissions, err := s.repo.ListToolSetPermissions(ctx, userID, agentID)
 	if err != nil {
 		s.log.Warn(ctx, "Failed to load tool set permissions", "user_id", userID, "agent_id", agentID, "error", err)
@@ -292,7 +296,7 @@ func (s *PermissionStore) AllowedToolSets(ctx context.Context, userID, agentID s
 // ToolSetsWithConfirmation returns all tool set IDs that have
 // require_confirmation action for the given user/agent. Used when the
 // tool-set ID is unknown and the caller needs to scan candidates.
-func (s *PermissionStore) ToolSetsWithConfirmation(ctx context.Context, userID, agentID string) ([]string, error) {
+func (s *PermissionStore) ToolSetsWithConfirmation(ctx context.Context, userID UserID, agentID AgentID) ([]string, error) {
 	permissions, err := s.repo.ListToolSetPermissions(ctx, userID, agentID)
 	if err != nil {
 		s.log.Warn(ctx, "Failed to load tool set permissions", "user_id", userID, "agent_id", agentID, "error", err)

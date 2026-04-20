@@ -12,7 +12,9 @@ import (
 // =============================================================================
 
 // blockChecker is the narrow interface needed by [BlockMiddleware].
-// It is implemented by [Service].
+// It is implemented by [Service]. Uses plain strings because the Service
+// satisfies the adkgo.BlockEnforcer port, which is string-typed; typed-ID
+// re-casts happen inside Service.HasPermission.
 type blockChecker interface {
 	HasPermission(ctx context.Context, userID, agentID, toolSetID, toolID string) bool
 }
@@ -27,7 +29,7 @@ type blockChecker interface {
 //
 // The middleware extracts user_id from context metadata (populated by the
 // middlewareBridge) and calls HasPermission to verify the tool is still allowed.
-func BlockMiddleware(checker blockChecker, agentID string) agent.Middleware {
+func BlockMiddleware(checker blockChecker, agentID AgentID) agent.Middleware {
 	return func(next agent.Handler) agent.Handler {
 		return agent.HandlerFunc(func(c *agent.Context) error {
 			if !c.IsTool() {
@@ -46,7 +48,7 @@ func BlockMiddleware(checker blockChecker, agentID string) agent.Middleware {
 			toolSetID, _ := c.Metadata["tool_set_id"].(string)
 
 			if userID != "" && checker != nil {
-				if !checker.HasPermission(c.Context, userID, agentID, toolSetID, toolName) {
+				if !checker.HasPermission(c.Context, userID, string(agentID), toolSetID, toolName) {
 					c.Result = map[string]any{
 						"result":  fmt.Sprintf("Tool '%s' is blocked by your configuration.", toolName),
 						"blocked": true,
@@ -68,7 +70,7 @@ func BlockMiddleware(checker blockChecker, agentID string) agent.Middleware {
 // toolMembershipChecker answers "is tool X a member of tool set Y?".
 // Implemented by [Service] via the tool registry.
 type toolMembershipChecker interface {
-	IsToolInToolSet(ctx context.Context, toolSetID, toolName string) (bool, error)
+	IsToolInToolSet(ctx context.Context, toolSetID ToolSetID, toolName string) (bool, error)
 }
 
 // CheckConfirmation determines whether a tool call needs user
@@ -87,7 +89,7 @@ func CheckConfirmation(
 	ctx context.Context,
 	store *PermissionStore,
 	membership toolMembershipChecker,
-	userID, agentID, toolSetID, toolName string,
+	userID UserID, agentID AgentID, toolSetID ToolSetID, toolName string,
 	_ map[string]any,
 ) (bool, string) {
 	if userID == "" || store == nil {
@@ -111,15 +113,15 @@ func requiresConfirmation(cfg ToolRequirementConfig) bool {
 	return cfg.Action == RequirementActionRequireConfirmation || cfg.RequireConfirmation
 }
 
-func toolLevelConfirmation(ctx context.Context, store *PermissionStore, userID, agentID, toolSetID, toolName string) (bool, string) {
-	cfg, err := store.GetToolRequirementConfig(ctx, userID, agentID, toolSetID, toolName)
+func toolLevelConfirmation(ctx context.Context, store *PermissionStore, userID UserID, agentID AgentID, toolSetID ToolSetID, toolName string) (bool, string) {
+	cfg, err := store.GetToolRequirementConfig(ctx, userID, agentID, toolSetID, ToolID(toolName))
 	if err != nil || !requiresConfirmation(cfg) {
 		return false, ""
 	}
 	return true, cfg.ConfirmationHint
 }
 
-func toolSetLevelConfirmation(ctx context.Context, store *PermissionStore, userID, agentID, toolSetID string) (bool, string) {
+func toolSetLevelConfirmation(ctx context.Context, store *PermissionStore, userID UserID, agentID AgentID, toolSetID ToolSetID) (bool, string) {
 	cfg, err := store.GetToolSetRequirementConfig(ctx, userID, agentID, toolSetID)
 	if err != nil || !requiresConfirmation(cfg) {
 		return false, ""
@@ -130,7 +132,7 @@ func toolSetLevelConfirmation(ctx context.Context, store *PermissionStore, userI
 // fallbackToolSetScan walks every confirmation-flagged tool set the user owns
 // and asks the membership checker whether the tool belongs there. Used only
 // when the caller could not identify the tool set up-front.
-func fallbackToolSetScan(ctx context.Context, store *PermissionStore, membership toolMembershipChecker, userID, agentID, toolName string) (bool, string) {
+func fallbackToolSetScan(ctx context.Context, store *PermissionStore, membership toolMembershipChecker, userID UserID, agentID AgentID, toolName string) (bool, string) {
 	if membership == nil {
 		return false, ""
 	}
@@ -139,11 +141,11 @@ func fallbackToolSetScan(ctx context.Context, store *PermissionStore, membership
 		return false, ""
 	}
 	for _, tsID := range confToolSets {
-		cfg, err := store.GetToolSetRequirementConfig(ctx, userID, agentID, tsID)
+		cfg, err := store.GetToolSetRequirementConfig(ctx, userID, agentID, ToolSetID(tsID))
 		if err != nil || !requiresConfirmation(cfg) {
 			continue
 		}
-		inSet, lookupErr := membership.IsToolInToolSet(ctx, tsID, toolName)
+		inSet, lookupErr := membership.IsToolInToolSet(ctx, ToolSetID(tsID), toolName)
 		if lookupErr == nil && inSet {
 			return true, cfg.ConfirmationHint
 		}

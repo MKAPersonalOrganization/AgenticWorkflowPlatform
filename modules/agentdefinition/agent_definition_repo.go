@@ -230,7 +230,7 @@ func (r *postgresAgentDefinitionRepository) Update(ctx context.Context, agent *A
 	return nil
 }
 
-func (r *postgresAgentDefinitionRepository) Delete(ctx context.Context, id, userID string) error {
+func (r *postgresAgentDefinitionRepository) Delete(ctx context.Context, id AgentID, userID UserID) error {
 	query := `DELETE FROM user_agents WHERE id = $1 AND user_id = $2`
 
 	result, err := r.db.ExecContext(ctx, query, id, userID)
@@ -249,7 +249,7 @@ func (r *postgresAgentDefinitionRepository) Delete(ctx context.Context, id, user
 	return nil
 }
 
-func (r *postgresAgentDefinitionRepository) GetByID(ctx context.Context, id, userID string) (*AgentDefinition, error) {
+func (r *postgresAgentDefinitionRepository) GetByID(ctx context.Context, id AgentID, userID UserID) (*AgentDefinition, error) {
 	query := `SELECT ` + agentSelectColumns + `
 FROM user_agents WHERE id = $1 AND user_id = $2`
 
@@ -261,7 +261,7 @@ FROM user_agents WHERE id = $1 AND user_id = $2`
 	return &agent, nil
 }
 
-func (r *postgresAgentDefinitionRepository) ListByUser(ctx context.Context, userID string) ([]AgentDefinition, error) {
+func (r *postgresAgentDefinitionRepository) ListByUser(ctx context.Context, userID UserID) ([]AgentDefinition, error) {
 	query := `SELECT ` + agentSelectColumns + `
 FROM user_agents WHERE user_id = $1 ORDER BY created_at ASC`
 
@@ -275,7 +275,7 @@ FROM user_agents WHERE user_id = $1 ORDER BY created_at ASC`
 	return agents, nil
 }
 
-func (r *postgresAgentDefinitionRepository) Search(ctx context.Context, userID, query string) ([]AgentDefinition, error) {
+func (r *postgresAgentDefinitionRepository) Search(ctx context.Context, userID UserID, query string) ([]AgentDefinition, error) {
 	sqlQuery := `SELECT ` + agentSelectColumns + `
 FROM user_agents
 WHERE user_id = $1 AND (name ILIKE $2 OR description ILIKE $2)
@@ -293,7 +293,7 @@ ORDER BY created_at ASC`
 	return agents, nil
 }
 
-func (r *postgresAgentDefinitionRepository) ListAddedCatalogIDs(ctx context.Context, userID string) ([]string, error) {
+func (r *postgresAgentDefinitionRepository) ListAddedCatalogIDs(ctx context.Context, userID UserID) ([]string, error) {
 	query := `SELECT DISTINCT source_catalog_id FROM user_agents WHERE user_id = $1 AND source_catalog_id != ''`
 
 	var ids []string
@@ -303,7 +303,7 @@ func (r *postgresAgentDefinitionRepository) ListAddedCatalogIDs(ctx context.Cont
 	return ids, nil
 }
 
-func (r *postgresAgentDefinitionRepository) ExistsByCatalogID(ctx context.Context, userID, catalogID string) (bool, error) {
+func (r *postgresAgentDefinitionRepository) ExistsByCatalogID(ctx context.Context, userID UserID, catalogID CatalogID) (bool, error) {
 	var exists bool
 	query := `SELECT EXISTS(SELECT 1 FROM user_agents WHERE user_id = $1 AND source_catalog_id = $2)`
 	if err := r.db.QueryRowContext(ctx, query, userID, catalogID).Scan(&exists); err != nil {
@@ -327,7 +327,7 @@ FROM user_agents WHERE share_token = $1 AND visibility = 'shared'`
 	return &agent, nil
 }
 
-func (r *postgresAgentDefinitionRepository) UpdateShareToken(ctx context.Context, id, userID, token, visibility string) error {
+func (r *postgresAgentDefinitionRepository) UpdateShareToken(ctx context.Context, id AgentID, userID UserID, token, visibility string) error {
 	query := `UPDATE user_agents SET share_token = $1, visibility = $2, updated_at = $3
 WHERE id = $4 AND user_id = $5`
 
@@ -346,7 +346,7 @@ WHERE id = $4 AND user_id = $5`
 }
 
 // SetParent sets the parent_id on a sub-agent to establish workflow ownership.
-func (r *postgresAgentDefinitionRepository) SetParent(ctx context.Context, agentID, parentID, userID string) error {
+func (r *postgresAgentDefinitionRepository) SetParent(ctx context.Context, agentID AgentID, parentID AgentID, userID UserID) error {
 	query := `UPDATE user_agents SET parent_id = $1, updated_at = $2
 WHERE id = $3 AND user_id = $4`
 	_, err := r.db.ExecContext(ctx, query, parentID, time.Now().UTC(), agentID, userID)
@@ -357,7 +357,7 @@ WHERE id = $3 AND user_id = $4`
 }
 
 // DeleteByParent deletes all agents owned by a workflow (parent_id = parentID).
-func (r *postgresAgentDefinitionRepository) DeleteByParent(ctx context.Context, parentID, userID string) error {
+func (r *postgresAgentDefinitionRepository) DeleteByParent(ctx context.Context, parentID AgentID, userID UserID) error {
 	query := `DELETE FROM user_agents WHERE parent_id = $1 AND user_id = $2`
 	_, err := r.db.ExecContext(ctx, query, parentID, userID)
 	if err != nil {

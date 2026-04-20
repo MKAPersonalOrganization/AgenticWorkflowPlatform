@@ -28,7 +28,7 @@ func NewPostgresRepository(db *sqlx.DB) *PostgresRepository {
 // =============================================================================
 
 // GetPermission retrieves a specific agent-tool permission within a tool set.
-func (r *PostgresRepository) GetPermission(ctx context.Context, userID, agentID, toolSetID, toolID string) (*Permission, error) {
+func (r *PostgresRepository) GetPermission(ctx context.Context, userID UserID, agentID AgentID, toolSetID ToolSetID, toolID ToolID) (*Permission, error) {
 	const q = `
 		SELECT
 			user_id, agent_id, tool_set_id, tool_id,
@@ -71,7 +71,7 @@ func (r *PostgresRepository) GetPermission(ctx context.Context, userID, agentID,
 }
 
 // ListPermissions returns all individual tool permissions for an agent within a tool set.
-func (r *PostgresRepository) ListPermissions(ctx context.Context, userID, agentID, toolSetID string) ([]Permission, error) {
+func (r *PostgresRepository) ListPermissions(ctx context.Context, userID UserID, agentID AgentID, toolSetID ToolSetID) ([]Permission, error) {
 	const q = `
 		SELECT
 			user_id, agent_id, tool_set_id, tool_id,
@@ -145,7 +145,7 @@ func (r *PostgresRepository) SavePermission(ctx context.Context, permission *Per
 }
 
 // DeletePermission removes a specific agent-tool permission.
-func (r *PostgresRepository) DeletePermission(ctx context.Context, userID, agentID, toolSetID, toolID string) error {
+func (r *PostgresRepository) DeletePermission(ctx context.Context, userID UserID, agentID AgentID, toolSetID ToolSetID, toolID ToolID) error {
 	const q = `
 		DELETE FROM agent_tool_permissions
 		WHERE user_id = $1 AND agent_id = $2 AND tool_set_id = $3 AND tool_id = $4
@@ -163,7 +163,7 @@ func (r *PostgresRepository) DeletePermission(ctx context.Context, userID, agent
 // =============================================================================
 
 // GetToolSetPermission retrieves a specific agent-toolset permission.
-func (r *PostgresRepository) GetToolSetPermission(ctx context.Context, userID, agentID, toolSetID string) (*ToolSetPermission, error) {
+func (r *PostgresRepository) GetToolSetPermission(ctx context.Context, userID UserID, agentID AgentID, toolSetID ToolSetID) (*ToolSetPermission, error) {
 	const q = `
 		SELECT
 			user_id, agent_id, tool_set_id,
@@ -204,7 +204,7 @@ func (r *PostgresRepository) GetToolSetPermission(ctx context.Context, userID, a
 }
 
 // ListToolSetPermissions returns all tool set permissions for an agent.
-func (r *PostgresRepository) ListToolSetPermissions(ctx context.Context, userID, agentID string) ([]ToolSetPermission, error) {
+func (r *PostgresRepository) ListToolSetPermissions(ctx context.Context, userID UserID, agentID AgentID) ([]ToolSetPermission, error) {
 	const q = `
 		SELECT
 			user_id, agent_id, tool_set_id,
@@ -275,7 +275,7 @@ func (r *PostgresRepository) SaveToolSetPermission(ctx context.Context, permissi
 }
 
 // DeleteToolSetPermission removes a specific agent-toolset permission.
-func (r *PostgresRepository) DeleteToolSetPermission(ctx context.Context, userID, agentID, toolSetID string) error {
+func (r *PostgresRepository) DeleteToolSetPermission(ctx context.Context, userID UserID, agentID AgentID, toolSetID ToolSetID) error {
 	const q = `
 		DELETE FROM agent_tool_set_permissions
 		WHERE user_id = $1 AND agent_id = $2 AND tool_set_id = $3

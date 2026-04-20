@@ -160,8 +160,8 @@ func (s *service) vfsFor(ctx context.Context, fs FileSystem) (VFS, error) {
 
 // ── File Operations ─────────────────────────────────────────────────────────
 
-func (s *service) listDir(ctx context.Context, fsID uuid.UUID, userID, dirPath string) ([]DirEntry, error) {
-	fs, err := s.getFilesystem(ctx, fsID, userID)
+func (s *service) listDir(ctx context.Context, fsID uuid.UUID, userID UserID, dirPath string) ([]DirEntry, error) {
+	fs, err := s.getFilesystem(ctx, fsID, string(userID))
 	if err != nil {
 		return nil, err
 	}
@@ -172,8 +172,8 @@ func (s *service) listDir(ctx context.Context, fsID uuid.UUID, userID, dirPath s
 	return vfs.ReadDir(ctx, dirPath)
 }
 
-func (s *service) mkdir(ctx context.Context, fsID uuid.UUID, userID, dirPath string) error {
-	fs, err := s.getFilesystem(ctx, fsID, userID)
+func (s *service) mkdir(ctx context.Context, fsID uuid.UUID, userID UserID, dirPath string) error {
+	fs, err := s.getFilesystem(ctx, fsID, string(userID))
 	if err != nil {
 		return err
 	}
@@ -184,8 +184,8 @@ func (s *service) mkdir(ctx context.Context, fsID uuid.UUID, userID, dirPath str
 	return vfs.Mkdir(ctx, dirPath)
 }
 
-func (s *service) uploadFile(ctx context.Context, fsID uuid.UUID, userID, filePath string, content io.Reader, contentType string, size int64) (*FileStat, error) {
-	fs, err := s.getFilesystem(ctx, fsID, userID)
+func (s *service) uploadFile(ctx context.Context, fsID uuid.UUID, userID UserID, filePath string, content io.Reader, contentType string, size int64) (*FileStat, error) {
+	fs, err := s.getFilesystem(ctx, fsID, string(userID))
 	if err != nil {
 		return nil, err
 	}
@@ -196,8 +196,8 @@ func (s *service) uploadFile(ctx context.Context, fsID uuid.UUID, userID, filePa
 	return vfs.CreateFile(ctx, filePath, content, contentType, size)
 }
 
-func (s *service) readFile(ctx context.Context, fsID uuid.UUID, userID, filePath string) (io.ReadCloser, *FileStat, error) {
-	fs, err := s.getFilesystem(ctx, fsID, userID)
+func (s *service) readFile(ctx context.Context, fsID uuid.UUID, userID UserID, filePath string) (io.ReadCloser, *FileStat, error) {
+	fs, err := s.getFilesystem(ctx, fsID, string(userID))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -208,8 +208,8 @@ func (s *service) readFile(ctx context.Context, fsID uuid.UUID, userID, filePath
 	return vfs.ReadFile(ctx, filePath)
 }
 
-func (s *service) removeEntry(ctx context.Context, fsID uuid.UUID, userID, entryPath string) error {
-	fs, err := s.getFilesystem(ctx, fsID, userID)
+func (s *service) removeEntry(ctx context.Context, fsID uuid.UUID, userID UserID, entryPath string) error {
+	fs, err := s.getFilesystem(ctx, fsID, string(userID))
 	if err != nil {
 		return err
 	}
@@ -229,8 +229,8 @@ func (s *service) removeEntry(ctx context.Context, fsID uuid.UUID, userID, entry
 	return vfs.Remove(ctx, entryPath)
 }
 
-func (s *service) renameEntry(ctx context.Context, fsID uuid.UUID, userID string, req RenameRequest) error {
-	fs, err := s.getFilesystem(ctx, fsID, userID)
+func (s *service) renameEntry(ctx context.Context, fsID uuid.UUID, userID UserID, req RenameRequest) error {
+	fs, err := s.getFilesystem(ctx, fsID, string(userID))
 	if err != nil {
 		return err
 	}
@@ -243,23 +243,23 @@ func (s *service) renameEntry(ctx context.Context, fsID uuid.UUID, userID string
 
 // ── Permissions ─────────────────────────────────────────────────────────────
 
-func (s *service) grantPermission(ctx context.Context, fsID uuid.UUID, userID, agentID string) error {
+func (s *service) grantPermission(ctx context.Context, fsID uuid.UUID, userID UserID, agentID AgentID) error {
 	// Verify the user owns this filesystem.
-	if _, err := s.getFilesystem(ctx, fsID, userID); err != nil {
+	if _, err := s.getFilesystem(ctx, fsID, string(userID)); err != nil {
 		return err
 	}
 
 	return s.repo.GrantPermission(ctx, FSPermission{
 		ID:           uuid.New(),
 		FilesystemID: fsID,
-		UserID:       userID,
-		AgentID:      agentID,
+		UserID:       string(userID),
+		AgentID:      string(agentID),
 		GrantedAt:    time.Now().UTC(),
 	})
 }
 
-func (s *service) revokePermission(ctx context.Context, fsID uuid.UUID, userID, agentID string) error {
-	if _, err := s.getFilesystem(ctx, fsID, userID); err != nil {
+func (s *service) revokePermission(ctx context.Context, fsID uuid.UUID, userID UserID, agentID AgentID) error {
+	if _, err := s.getFilesystem(ctx, fsID, string(userID)); err != nil {
 		return err
 	}
 	return s.repo.RevokePermission(ctx, fsID, userID, agentID)
@@ -274,17 +274,17 @@ func (s *service) listPermissions(ctx context.Context, fsID uuid.UUID, userID st
 
 // ── Agent Tool Interface ────────────────────────────────────────────────────
 
-func (s *service) listPermittedFilesystems(ctx context.Context, userID, agentID string) ([]FileSystem, error) {
+func (s *service) listPermittedFilesystems(ctx context.Context, userID UserID, agentID AgentID) ([]FileSystem, error) {
 	return s.repo.ListPermittedFilesystems(ctx, userID, agentID)
 }
 
-func (s *service) hasAgentPermission(ctx context.Context, fsID uuid.UUID, userID, agentID string) (bool, error) {
+func (s *service) hasAgentPermission(ctx context.Context, fsID uuid.UUID, userID UserID, agentID AgentID) (bool, error) {
 	return s.repo.HasPermission(ctx, fsID, userID, agentID)
 }
 
-func (s *service) listAgentFilesystems(ctx context.Context, userID, agentID string) ([]AgentFilesystem, error) {
+func (s *service) listAgentFilesystems(ctx context.Context, userID UserID, agentID AgentID) ([]AgentFilesystem, error) {
 	// 1. Get all filesystems owned by the user
-	allFS, err := s.repo.ListFilesystems(ctx, userID)
+	allFS, err := s.repo.ListFilesystems(ctx, string(userID))
 	if err != nil {
 		return nil, err
 	}

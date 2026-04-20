@@ -20,7 +20,7 @@ func NewFSPluginAdapter(source filesystem.AgentFS) *FSPluginAdapter {
 }
 
 func (a *FSPluginAdapter) ListPermittedFilesystems(ctx context.Context, userID, agentID string) ([]fsplugin.FileSystem, error) {
-	fss, err := a.source.ListPermittedFilesystems(ctx, userID, agentID)
+	fss, err := a.source.ListPermittedFilesystems(ctx, filesystem.UserID(userID), filesystem.AgentID(agentID))
 	if err != nil {
 		return nil, err
 	}
@@ -38,11 +38,11 @@ func (a *FSPluginAdapter) ListPermittedFilesystems(ctx context.Context, userID, 
 }
 
 func (a *FSPluginAdapter) HasAgentPermission(ctx context.Context, fsID uuid.UUID, userID, agentID string) (bool, error) {
-	return a.source.HasAgentPermission(ctx, fsID, userID, agentID)
+	return a.source.HasAgentPermission(ctx, fsID, filesystem.UserID(userID), filesystem.AgentID(agentID))
 }
 
 func (a *FSPluginAdapter) ListDir(ctx context.Context, fsID uuid.UUID, userID, dirPath string) ([]fsplugin.DirEntry, error) {
-	entries, err := a.source.ListDir(ctx, fsID, userID, dirPath)
+	entries, err := a.source.ListDir(ctx, fsID, filesystem.UserID(userID), dirPath)
 	if err != nil {
 		return nil, err
 	}
@@ -60,11 +60,11 @@ func (a *FSPluginAdapter) ListDir(ctx context.Context, fsID uuid.UUID, userID, d
 }
 
 func (a *FSPluginAdapter) Mkdir(ctx context.Context, fsID uuid.UUID, userID, dirPath string) error {
-	return a.source.Mkdir(ctx, fsID, userID, dirPath)
+	return a.source.Mkdir(ctx, fsID, filesystem.UserID(userID), dirPath)
 }
 
 func (a *FSPluginAdapter) ReadFile(ctx context.Context, fsID uuid.UUID, userID, filePath string) (io.ReadCloser, *fsplugin.FileStat, error) {
-	rc, stat, err := a.source.ReadFile(ctx, fsID, userID, filePath)
+	rc, stat, err := a.source.ReadFile(ctx, fsID, filesystem.UserID(userID), filePath)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -72,7 +72,7 @@ func (a *FSPluginAdapter) ReadFile(ctx context.Context, fsID uuid.UUID, userID, 
 }
 
 func (a *FSPluginAdapter) WriteFile(ctx context.Context, fsID uuid.UUID, userID, filePath string, content io.Reader, contentType string, size int64) (*fsplugin.FileStat, error) {
-	stat, err := a.source.WriteFile(ctx, fsID, userID, filePath, content, contentType, size)
+	stat, err := a.source.WriteFile(ctx, fsID, filesystem.UserID(userID), filePath, content, contentType, size)
 	if err != nil {
 		return nil, err
 	}
@@ -80,11 +80,11 @@ func (a *FSPluginAdapter) WriteFile(ctx context.Context, fsID uuid.UUID, userID,
 }
 
 func (a *FSPluginAdapter) Remove(ctx context.Context, fsID uuid.UUID, userID, entryPath string) error {
-	return a.source.Remove(ctx, fsID, userID, entryPath)
+	return a.source.Remove(ctx, fsID, filesystem.UserID(userID), entryPath)
 }
 
 func (a *FSPluginAdapter) Stat(ctx context.Context, fsID uuid.UUID, userID, filePath string) (*fsplugin.FileStat, error) {
-	stat, err := a.source.Stat(ctx, fsID, userID, filePath)
+	stat, err := a.source.Stat(ctx, fsID, filesystem.UserID(userID), filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (a *FSPluginAdapter) Stat(ctx context.Context, fsID uuid.UUID, userID, file
 }
 
 func (a *FSPluginAdapter) Rename(ctx context.Context, fsID uuid.UUID, userID, oldPath, newPath string) error {
-	return a.source.Rename(ctx, fsID, userID, oldPath, newPath)
+	return a.source.Rename(ctx, fsID, filesystem.UserID(userID), oldPath, newPath)
 }
 
 func mapFileStat(s *filesystem.FileStat) *fsplugin.FileStat {

@@ -61,14 +61,14 @@ func TestToolSetRequirementConfigs(t *testing.T) {
 
 	t.Log("Testing explicit tool set requirement config changes...")
 
-	err := store.SetToolSetRequirementConfig(ctx, userID, "math-expert", "calculator-set", toolreqs.ToolRequirementConfig{
+	err := store.SetToolSetRequirementConfig(ctx, toolreqs.UserID(userID), "math-expert", "calculator-set", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
 	if err != nil {
 		t.Fatalf("Failed to allow calculator-set for math-expert: %v", err)
 	}
 
-	err = store.SetToolSetRequirementConfig(ctx, userID, "math-expert", "cognitive-set", toolreqs.ToolRequirementConfig{
+	err = store.SetToolSetRequirementConfig(ctx, toolreqs.UserID(userID), "math-expert", "cognitive-set", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
 	if err != nil {
@@ -85,7 +85,7 @@ func TestToolSetRequirementConfigs(t *testing.T) {
 	}
 
 	// Block calculator-set
-	err = store.SetToolSetRequirementConfig(ctx, userID, "math-expert", "calculator-set", toolreqs.ToolRequirementConfig{
+	err = store.SetToolSetRequirementConfig(ctx, toolreqs.UserID(userID), "math-expert", "calculator-set", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionBlock,
 	})
 	if err != nil {
@@ -119,7 +119,7 @@ func TestToolSetRequirementConfigs(t *testing.T) {
 	}
 
 	// Allow a new tool set
-	err = store.SetToolSetRequirementConfig(ctx, userID, "math-expert", "chemistry-set", toolreqs.ToolRequirementConfig{
+	err = store.SetToolSetRequirementConfig(ctx, toolreqs.UserID(userID), "math-expert", "chemistry-set", toolreqs.ToolRequirementConfig{
 		Action: toolreqs.RequirementActionAllow,
 	})
 	if err != nil {

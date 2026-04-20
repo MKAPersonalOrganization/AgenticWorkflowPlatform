@@ -193,7 +193,7 @@ func (h *catalogHandler) addToMyAgents(w http.ResponseWriter, r *http.Request) {
 	if hasCustomName {
 		agentName = req.Name
 	} else {
-		existing, _ := h.agentRepo.ListByUser(r.Context(), user.ID)
+		existing, _ := h.agentRepo.ListByUser(r.Context(), agentdefinition.UserID(user.ID))
 		count := 0
 		for i := range existing {
 			if existing[i].Name == agentName ||

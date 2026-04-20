@@ -9,6 +9,20 @@ import (
 // Requirement configuration — per-user, per-agent, per-tool requirements
 // =============================================================================
 
+// UserID, AgentID, ToolSetID, ToolID are nominal string types for the four
+// identifiers threaded through PermissionStore, Repository, Service, and
+// middleware. The repository/service surface routinely takes three or four
+// string positional parameters in a row — a textbook connascence-of-position
+// hazard (Khononov Ch. 6 / Page-Jones Listing 6.7). Distinct types make a
+// `store.GetPermission(ctx, toolID, agentID, userID, toolSetID)` swap a
+// compile error rather than a subtle runtime lookup miss.
+type (
+	UserID    string
+	AgentID   string
+	ToolSetID string
+	ToolID    string
+)
+
 // RequirementAction controls whether a tool is allowed, blocked, or requires
 // user confirmation before execution. Stored per-user, per-agent,
 // per-tool (or per-tool-set) and consulted at runtime by [Service].

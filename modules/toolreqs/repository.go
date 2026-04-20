@@ -16,28 +16,28 @@ type Repository interface {
 	// ── Individual Tool Permissions within Tool Sets ──
 
 	// GetPermission retrieves a specific agent-tool permission.
-	GetPermission(ctx context.Context, userID, agentID, toolSetID, toolID string) (*Permission, error)
+	GetPermission(ctx context.Context, userID UserID, agentID AgentID, toolSetID ToolSetID, toolID ToolID) (*Permission, error)
 
 	// ListPermissions returns all individual tool permissions for an agent within a tool set.
-	ListPermissions(ctx context.Context, userID, agentID, toolSetID string) ([]Permission, error)
+	ListPermissions(ctx context.Context, userID UserID, agentID AgentID, toolSetID ToolSetID) ([]Permission, error)
 
 	// SavePermission saves or updates an individual tool permission.
 	SavePermission(ctx context.Context, permission *Permission) error
 
 	// DeletePermission removes a specific agent-tool permission.
-	DeletePermission(ctx context.Context, userID, agentID, toolSetID, toolID string) error
+	DeletePermission(ctx context.Context, userID UserID, agentID AgentID, toolSetID ToolSetID, toolID ToolID) error
 
 	// ── Tool Set Permissions ──
 
 	// GetToolSetPermission retrieves a specific agent-toolset permission.
-	GetToolSetPermission(ctx context.Context, userID, agentID, toolSetID string) (*ToolSetPermission, error)
+	GetToolSetPermission(ctx context.Context, userID UserID, agentID AgentID, toolSetID ToolSetID) (*ToolSetPermission, error)
 
 	// ListToolSetPermissions returns all tool set permissions for an agent.
-	ListToolSetPermissions(ctx context.Context, userID, agentID string) ([]ToolSetPermission, error)
+	ListToolSetPermissions(ctx context.Context, userID UserID, agentID AgentID) ([]ToolSetPermission, error)
 
 	// SaveToolSetPermission saves or updates a tool set permission.
 	SaveToolSetPermission(ctx context.Context, permission *ToolSetPermission) error
 
 	// DeleteToolSetPermission removes a specific agent-toolset permission.
-	DeleteToolSetPermission(ctx context.Context, userID, agentID, toolSetID string) error
+	DeleteToolSetPermission(ctx context.Context, userID UserID, agentID AgentID, toolSetID ToolSetID) error
 }

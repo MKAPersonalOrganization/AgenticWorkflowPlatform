@@ -183,7 +183,7 @@ func (h *handler) listDirectory(w http.ResponseWriter, r *http.Request) {
 		dirPath = "/"
 	}
 
-	entries, err := h.svc.listDir(r.Context(), id, user.ID, dirPath)
+	entries, err := h.svc.listDir(r.Context(), id, UserID(user.ID), dirPath)
 	if err != nil {
 		status := errorToStatus(err)
 		writeError(w, status, err.Error())
@@ -215,7 +215,7 @@ func (h *handler) createDirectory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.mkdir(r.Context(), id, user.ID, req.Path); err != nil {
+	if err := h.svc.mkdir(r.Context(), id, UserID(user.ID), req.Path); err != nil {
 		status := errorToStatus(err)
 		writeError(w, status, err.Error())
 		return
@@ -262,7 +262,7 @@ func (h *handler) uploadFile(w http.ResponseWriter, r *http.Request) {
 		contentType = "application/octet-stream"
 	}
 
-	stat, err := h.svc.uploadFile(r.Context(), id, user.ID, filePath, file, contentType, header.Size)
+	stat, err := h.svc.uploadFile(r.Context(), id, UserID(user.ID), filePath, file, contentType, header.Size)
 	if err != nil {
 		status := errorToStatus(err)
 		writeError(w, status, err.Error())
@@ -291,7 +291,7 @@ func (h *handler) readFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rc, stat, err := h.svc.readFile(r.Context(), id, user.ID, filePath)
+	rc, stat, err := h.svc.readFile(r.Context(), id, UserID(user.ID), filePath)
 	if err != nil {
 		status := errorToStatus(err)
 		writeError(w, status, err.Error())
@@ -329,7 +329,7 @@ func (h *handler) removeEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.removeEntry(r.Context(), id, user.ID, entryPath); err != nil {
+	if err := h.svc.removeEntry(r.Context(), id, UserID(user.ID), entryPath); err != nil {
 		status := errorToStatus(err)
 		writeError(w, status, err.Error())
 		return
@@ -357,7 +357,7 @@ func (h *handler) renameEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.renameEntry(r.Context(), id, user.ID, req); err != nil {
+	if err := h.svc.renameEntry(r.Context(), id, UserID(user.ID), req); err != nil {
 		status := errorToStatus(err)
 		writeError(w, status, err.Error())
 		return
@@ -387,7 +387,7 @@ func (h *handler) grantPermission(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.grantPermission(r.Context(), id, user.ID, req.AgentID); err != nil {
+	if err := h.svc.grantPermission(r.Context(), id, UserID(user.ID), AgentID(req.AgentID)); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -414,7 +414,7 @@ func (h *handler) revokePermission(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.revokePermission(r.Context(), id, user.ID, agentID); err != nil {
+	if err := h.svc.revokePermission(r.Context(), id, UserID(user.ID), AgentID(agentID)); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -460,7 +460,7 @@ func (h *handler) listAgentFilesystems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	list, err := h.svc.listAgentFilesystems(r.Context(), user.ID, agentID)
+	list, err := h.svc.listAgentFilesystems(r.Context(), UserID(user.ID), AgentID(agentID))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list agent filesystems")
 		return
@@ -490,9 +490,9 @@ func (h *handler) toggleAgentPermission(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if req.Enabled {
-		err = h.svc.grantPermission(r.Context(), fsID, user.ID, agentID)
+		err = h.svc.grantPermission(r.Context(), fsID, UserID(user.ID), AgentID(agentID))
 	} else {
-		err = h.svc.revokePermission(r.Context(), fsID, user.ID, agentID)
+		err = h.svc.revokePermission(r.Context(), fsID, UserID(user.ID), AgentID(agentID))
 	}
 
 	if err != nil {

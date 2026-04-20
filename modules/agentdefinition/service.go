@@ -181,7 +181,7 @@ func (s *Service) ImportComposedFromCatalogEntry(ctx context.Context, userID str
 
 	// Establish ownership: set parent_id on all sub-agents so cascade delete works.
 	for _, subID := range idMap {
-		if err := s.repo.SetParent(ctx, subID, composed.ID, userID); err != nil {
+		if err := s.repo.SetParent(ctx, AgentID(subID), AgentID(composed.ID), UserID(userID)); err != nil {
 			s.log.Warn(ctx, "failed to set parent_id on sub-agent",
 				"subAgentID", subID, "parentID", composed.ID, "error", err)
 		}
@@ -216,7 +216,7 @@ func (s *Service) delete(ctx context.Context, id, userID string) error {
 	s.log.Info(ctx, "deleting agent definition", "agentID", id, "userID", userID)
 
 	// Fetch the agent to check if it owns sub-agents via graph references.
-	agent, err := s.repo.GetByID(ctx, id, userID)
+	agent, err := s.repo.GetByID(ctx, AgentID(id), UserID(userID))
 	if err != nil {
 		return fmt.Errorf("fetching agent: %w", err)
 	}
@@ -225,7 +225,7 @@ func (s *Service) delete(ctx context.Context, id, userID string) error {
 	if agent.Graph != nil {
 		subAgentIDs := agent.Graph.CollectAgentIDs()
 		for _, subID := range subAgentIDs {
-			if err := s.repo.Delete(ctx, subID, userID); err != nil {
+			if err := s.repo.Delete(ctx, AgentID(subID), UserID(userID)); err != nil {
 				s.log.Warn(ctx, "failed to delete sub-agent during cascade",
 					"subAgentID", subID, "error", err)
 			}
@@ -233,24 +233,24 @@ func (s *Service) delete(ctx context.Context, id, userID string) error {
 	}
 
 	// Also delete any agents with parent_id = this agent's ID (ownership-based delete).
-	if err := s.repo.DeleteByParent(ctx, id, userID); err != nil {
+	if err := s.repo.DeleteByParent(ctx, AgentID(id), UserID(userID)); err != nil {
 		s.log.Warn(ctx, "failed to delete sub-agents by parent_id",
 			"parentID", id, "error", err)
 	}
 
-	return s.repo.Delete(ctx, id, userID)
+	return s.repo.Delete(ctx, AgentID(id), UserID(userID))
 }
 
 // getByID retrieves a single agent by ID.
 func (s *Service) getByID(ctx context.Context, id, userID string) (*AgentDefinition, error) {
-	return s.repo.GetByID(ctx, id, userID)
+	return s.repo.GetByID(ctx, AgentID(id), UserID(userID))
 }
 
 // listByUser returns all agents created by a specific user.
 // Agents that are referenced as sub-agents inside a workflow graph are
 // excluded so they don't appear as standalone entries in the list.
 func (s *Service) listByUser(ctx context.Context, userID string) ([]AgentDefinition, error) {
-	agents, err := s.repo.ListByUser(ctx, userID)
+	agents, err := s.repo.ListByUser(ctx, UserID(userID))
 	if err != nil {
 		return nil, err
 	}
@@ -327,11 +327,11 @@ const (
 //   - library        — any other OutputKey declared across the user's agents,
 //     so references still resolve if the workflow isn't wired yet
 func (s *Service) GetAvailableStateKeys(ctx context.Context, userID, agentID string) ([]StateKeySuggestion, error) {
-	agent, err := s.repo.GetByID(ctx, agentID, userID)
+	agent, err := s.repo.GetByID(ctx, AgentID(agentID), UserID(userID))
 	if err != nil {
 		return nil, err
 	}
-	all, err := s.repo.ListByUser(ctx, userID)
+	all, err := s.repo.ListByUser(ctx, UserID(userID))
 	if err != nil {
 		return nil, err
 	}
@@ -492,7 +492,7 @@ func (a *stateKeyAccumulator) sorted() []StateKeySuggestion {
 // GetConsumers returns all agents that reference the given agent ID in their graph.
 // This identifies workflows that use this agent as a sub-agent.
 func (s *Service) GetConsumers(ctx context.Context, userID, agentID string) ([]AgentDefinition, error) {
-	agents, err := s.repo.ListByUser(ctx, userID)
+	agents, err := s.repo.ListByUser(ctx, UserID(userID))
 	if err != nil {
 		return nil, err
 	}
@@ -520,7 +520,7 @@ func (s *Service) GetConsumers(ctx context.Context, userID, agentID string) ([]A
 // search finds agents matching a query string within a user's agents.
 // Sub-agents consumed by workflows are excluded from results.
 func (s *Service) search(ctx context.Context, userID, query string) ([]AgentDefinition, error) {
-	agents, err := s.repo.Search(ctx, userID, query)
+	agents, err := s.repo.Search(ctx, UserID(userID), query)
 	if err != nil {
 		return nil, err
 	}
@@ -559,7 +559,7 @@ func excludeSubAgents(agents []AgentDefinition) []AgentDefinition {
 // share generates a share token for an agent, making it discoverable.
 func (s *Service) share(ctx context.Context, id, userID string) (string, error) {
 	// Check the agent exists and is owned by the user.
-	agent, err := s.repo.GetByID(ctx, id, userID)
+	agent, err := s.repo.GetByID(ctx, AgentID(id), UserID(userID))
 	if err != nil {
 		return "", fmt.Errorf("agent not found: %w", err)
 	}
@@ -574,7 +574,7 @@ func (s *Service) share(ctx context.Context, id, userID string) (string, error) 
 		return "", fmt.Errorf("generating share token: %w", err)
 	}
 
-	if err := s.repo.UpdateShareToken(ctx, id, userID, token, "shared"); err != nil {
+	if err := s.repo.UpdateShareToken(ctx, AgentID(id), UserID(userID), token, "shared"); err != nil {
 		return "", fmt.Errorf("sharing agent: %w", err)
 	}
 
@@ -584,7 +584,7 @@ func (s *Service) share(ctx context.Context, id, userID string) (string, error) 
 
 // unshare revokes the share token for an agent.
 func (s *Service) unshare(ctx context.Context, id, userID string) error {
-	if err := s.repo.UpdateShareToken(ctx, id, userID, "", "private"); err != nil {
+	if err := s.repo.UpdateShareToken(ctx, AgentID(id), UserID(userID), "", "private"); err != nil {
 		return fmt.Errorf("unsharing agent: %w", err)
 	}
 	s.log.Info(ctx, "agent unshared", "agentID", id, "userID", userID)
@@ -625,7 +625,7 @@ func (s *Service) forkShared(ctx context.Context, token, targetUserID string) (*
 		idMap := make(map[string]string, len(agentIDs))
 
 		for _, origID := range agentIDs {
-			subAgent, subErr := s.repo.GetByID(ctx, origID, source.UserID)
+			subAgent, subErr := s.repo.GetByID(ctx, AgentID(origID), UserID(source.UserID))
 			if subErr != nil {
 				// Sub-agent may have been deleted — skip.
 				continue
@@ -685,7 +685,7 @@ func (s *Service) validateAgentTools(ctx context.Context, agent *AgentDefinition
 			return fmt.Errorf("agent_tools[%d]: duplicate agent_id %q", i, ref.AgentID)
 		}
 		seen[ref.AgentID] = true
-		if _, err := s.repo.GetByID(ctx, ref.AgentID, agent.UserID); err != nil {
+		if _, err := s.repo.GetByID(ctx, AgentID(ref.AgentID), UserID(agent.UserID)); err != nil {
 			return fmt.Errorf("agent_tools[%d]: agent %q not found: %w", i, ref.AgentID, err)
 		}
 	}
@@ -736,7 +736,7 @@ func (s *Service) validateAgentNode(ctx context.Context, node *CompositionNode, 
 	if len(node.Children) > 0 {
 		return fmt.Errorf("node %q: agent node cannot have children", node.ID)
 	}
-	if _, err := s.repo.GetByID(ctx, node.AgentID, userID); err != nil {
+	if _, err := s.repo.GetByID(ctx, AgentID(node.AgentID), UserID(userID)); err != nil {
 		return fmt.Errorf("node %q: agent %q not found: %w", node.ID, node.AgentID, err)
 	}
 	return nil
