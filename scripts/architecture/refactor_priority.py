@@ -15,6 +15,18 @@ Inputs (all JSON from sibling tools in scripts/architecture/):
   --cyclomatic    cyclomatic.py --json (optional; multi-language)
   --package-deps  package_deps.py --json (optional; Go packages,
                   structural coupling via goda)
+  --coverage      coverage.py --json (optional; Go per-file + per-package
+                  test coverage — pairs with bugfix_density for "high
+                  fix + low coverage" risk)
+  --commit-kinds  commit_kinds.py --json (optional; conventional-commit
+                  prefix distribution — tells you WHY a file churns
+                  (feat/fix/refactor/chore), complementing bugfix_density
+                  which only catches fix-flavored subjects)
+  --dead-code     dead_code.py --json (optional; unreachable functions
+                  via golang.org/x/tools/cmd/deadcode + unused
+                  fields/consts via staticcheck U1000 — surfaces
+                  delete-targets that coverage can only see as
+                  "untested")
 
 Outputs:
   stdout          compact table of files with ≥1 signal, sorted by number
@@ -195,6 +207,141 @@ def load_cyclomatic(path: str | None, min_verdict: str = "LOW") -> dict[str, dic
     return out
 
 
+def load_coverage(path: str | None, min_verdict: str = "MEDIUM"
+                  ) -> tuple[dict[str, dict], list[dict]]:
+    """Load the test-coverage report (from coverage.py).
+
+    Returns ``(by_file, packages)``:
+
+    - ``by_file``: per-file map of coverage findings, filtered to the
+      verdicts at or below ``min_verdict``. The default of MEDIUM skips
+      healthy files (LOW = 50-79%, FINE ≥ 80%) so only genuine risk
+      signals join the collation — same filtering philosophy as
+      ``load_lcom4`` (skip cohesive types) and ``load_cyclomatic``
+      (skip FINE verdicts).
+
+    - ``packages``: per-package records carried through unchanged for
+      the dedicated "Package coverage" orientation section. Like
+      package_deps, coverage is naturally two-granularity — smearing
+      the package figure across every file in it would drown out the
+      real signal (the *file* with 0/961 untested stmts).
+
+    Returns ``({}, [])`` when no path is supplied.
+    """
+    if not path:
+        return {}, []
+    # Worst → best. "NO_TESTS" sits alongside HIGH as a critical tier
+    # because a file in a package with no test files is functionally
+    # untested regardless of how many statements it has.
+    severity_rank = {"FINE": 0, "LOW": 1, "MEDIUM": 2, "HIGH": 3, "NO_TESTS": 3}
+    floor = severity_rank.get(min_verdict, 2)
+
+    d = json.loads(Path(path).read_text())
+    files_section = d.get("files") or {}
+    file_entries = files_section.get("all") or files_section.get("ranked") or []
+    out: dict[str, dict] = {}
+    for e in file_entries:
+        verdict = e.get("verdict", "FINE")
+        if severity_rank.get(verdict, 0) < floor:
+            continue
+        total = e.get("total_statements", 0) or 0
+        covered = e.get("covered_statements", 0) or 0
+        out[e["path"]] = {
+            "path": e["path"],
+            "package": e.get("package", ""),
+            "verdict": verdict,
+            "coverage_pct": e.get("coverage_pct", 0.0),
+            "covered_statements": covered,
+            "total_statements": total,
+            "uncovered_statements": max(0, total - covered),
+            "in_profile": e.get("in_profile", False),
+        }
+
+    packages_section = d.get("packages") or {}
+    pkg_entries = packages_section.get("all") or packages_section.get("ranked") or []
+
+    return out, pkg_entries
+
+
+def load_commit_kinds(path: str | None, min_verdict: str = "LOW"
+                       ) -> dict[str, dict]:
+    """Load the conventional-commit classification report.
+
+    Like the LCOM4 / cyclomatic / coverage loaders, we filter out
+    healthy verdicts (FINE + QUIET + NONE) by default so only files
+    with at least one elevated classification contribute to the
+    collation.
+
+    QUIET = fewer than ``min_commits`` in the window (signal-less);
+    NONE  = enough commits but messages carry no conventional prefix
+            (signal-less for our purposes, though worth knowing about
+            for convention hygiene);
+    FINE  = classifiable but predominantly feat/chore/docs;
+    LOW   = ≥ 10% fix or ≥ 30% refactor;
+    MEDIUM= ≥ 30% fix (≥ 5 commits);
+    HIGH  = ≥ 50% fix (≥ 5 commits) — bug magnet.
+    """
+    if not path:
+        return {}
+    severity_rank = {
+        "QUIET": 0, "NONE": 0, "FINE": 0,
+        "LOW": 1, "MEDIUM": 2, "HIGH": 3,
+    }
+    floor = severity_rank.get(min_verdict, 1)
+    d = json.loads(Path(path).read_text())
+    entries = d.get("all") or d.get("ranked") or []
+    out: dict[str, dict] = {}
+    for e in entries:
+        verdict = e.get("verdict", "FINE")
+        if severity_rank.get(verdict, 0) < floor:
+            continue
+        out[e["path"]] = {
+            "path": e["path"],
+            "verdict": verdict,
+            "total_commits": e.get("total_commits", 0),
+            "kinds": e.get("kinds", {}),
+            "dominant": e.get("dominant", "other"),
+            "fix_pct": e.get("fix_pct", 0.0),
+            "feat_pct": e.get("feat_pct", 0.0),
+            "refactor_pct": e.get("refactor_pct", 0.0),
+            "entropy_bits": e.get("entropy_bits", 0.0),
+            "prefix_match_rate": e.get("prefix_match_rate", 0.0),
+        }
+    return out
+
+
+def load_dead_code(path: str | None, min_verdict: str = "LOW"
+                    ) -> dict[str, dict]:
+    """Load the dead-code report (deadcode + staticcheck U1000).
+
+    Unlike the other loaders, there's no "healthy" verdict to filter —
+    any dead code is a delete-target. Default min_verdict=LOW includes
+    every file with ≥ 1 finding. Use MEDIUM to surface only files with
+    ≥ 3 findings (clustered dead code, more likely a forgotten
+    subsystem than an isolated stale helper).
+    """
+    if not path:
+        return {}
+    severity_rank = {"FINE": 0, "LOW": 1, "MEDIUM": 2, "HIGH": 3}
+    floor = severity_rank.get(min_verdict, 1)
+    d = json.loads(Path(path).read_text())
+    entries = d.get("all") or d.get("ranked") or []
+    out: dict[str, dict] = {}
+    for e in entries:
+        verdict = e.get("verdict", "FINE")
+        if severity_rank.get(verdict, 0) < floor:
+            continue
+        out[e["path"]] = {
+            "path": e["path"],
+            "verdict": verdict,
+            "total_findings": e.get("total_findings", 0),
+            "deadcode_count": e.get("deadcode_count", 0),
+            "unused_count": e.get("unused_count", 0),
+            "findings": e.get("findings", []),
+        }
+    return out
+
+
 def load_package_deps(path: str | None) -> dict:
     """Load the structural package-coupling report (from goda).
 
@@ -260,15 +407,22 @@ def collate(
     bugfix_by_file: dict[str, dict],
     lcom4_by_file: dict[str, dict] | None = None,
     cyclomatic_by_file: dict[str, dict] | None = None,
+    coverage_by_file: dict[str, dict] | None = None,
+    commit_kinds_by_file: dict[str, dict] | None = None,
+    dead_code_by_file: dict[str, dict] | None = None,
 ) -> list[dict]:
     """Merge per-file data from every signal. No ranking, no scoring — just
     a record listing which analyses touched each file and what they measured.
     """
     lcom4_by_file = lcom4_by_file or {}
     cyclomatic_by_file = cyclomatic_by_file or {}
+    coverage_by_file = coverage_by_file or {}
+    commit_kinds_by_file = commit_kinds_by_file or {}
+    dead_code_by_file = dead_code_by_file or {}
     all_paths = (
         set(hotspots_by_file) | set(trends_by_file) | set(coupling_by_file)
         | set(bugfix_by_file) | set(lcom4_by_file) | set(cyclomatic_by_file)
+        | set(coverage_by_file) | set(commit_kinds_by_file) | set(dead_code_by_file)
     )
     records: list[dict] = []
     for path in all_paths:
@@ -278,6 +432,9 @@ def collate(
         bf = bugfix_by_file.get(path)
         lc = lcom4_by_file.get(path)
         cy = cyclomatic_by_file.get(path)
+        cov = coverage_by_file.get(path)
+        ck = commit_kinds_by_file.get(path)
+        dc = dead_code_by_file.get(path)
 
         present_in: list[str] = []
         if hs: present_in.append("hotspot")
@@ -286,6 +443,9 @@ def collate(
         if bf: present_in.append("bugfix")
         if lc: present_in.append("lcom4")
         if cy: present_in.append("cyclomatic")
+        if cov: present_in.append("coverage")
+        if ck: present_in.append("commit_kinds")
+        if dc: present_in.append("dead_code")
 
         records.append({
             "path": path,
@@ -297,6 +457,9 @@ def collate(
             "bugfix": bf,
             "lcom4": lc,
             "cyclomatic": cy,
+            "coverage": cov,
+            "commit_kinds": ck,
+            "dead_code": dc,
         })
 
     # Order: files present in more analyses first (a factual count, not a
@@ -331,7 +494,8 @@ def print_stdout(records: list[dict], packages: list[dict],
     print(f"\n── Files with ≥1 signal ({len(records)} total) ──")
     hdr = (f"{'Sig':<3}  {'Commits':>7}  {'Fix%':>5}  "
            f"{'Trend':<12}  {'Δmean':>6}  {'MaxI':>4}  "
-           f"{'Cpl':>3}  {'LCOM4':>5}  {'CCN':>5}  Path")
+           f"{'Cpl':>3}  {'LCOM4':>5}  {'CCN':>5}  {'Cov%':>5}  "
+           f"{'Dom':<8}  {'Dead':>4}  Path")
     print(hdr)
     print("-" * len(hdr))
     for r in records:
@@ -355,9 +519,19 @@ def print_stdout(records: list[dict], packages: list[dict],
         # spread are visible at a glance (e.g. "66/3" tells a very
         # different story from "66/1").
         ccn_txt = f"{cy['max_ccn']}/{cy['high_ccn_count']}" if cy else ""
+        cov = r.get("coverage")
+        if cov:
+            cov_txt = "NoTst" if cov["verdict"] == "NO_TESTS" else f"{cov['coverage_pct']:.0f}"
+        else:
+            cov_txt = ""
+        ck = r.get("commit_kinds")
+        dom_txt = _trunc(ck["dominant"], 8) if ck else ""
+        dc = r.get("dead_code")
+        dead_txt = str(dc["total_findings"]) if dc else ""
         print(f"{r['signal_count']:<3}  {str(commits):>7}  {fix_pct:>5}  "
               f"{_trunc(trend_verdict, 12):<12}  {dmean:>6}  {maxi:>4}  "
-              f"{str(cpl):>3}  {lcom4_txt:>5}  {ccn_txt:>5}  {r['path']}")
+              f"{str(cpl):>3}  {lcom4_txt:>5}  {ccn_txt:>5}  {cov_txt:>5}  "
+              f"{dom_txt:<8}  {dead_txt:>4}  {r['path']}")
 
 
 def to_markdown(records: list[dict], packages: list[dict], meta: dict,
@@ -365,6 +539,7 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
                 plot_paths: dict[str, Path] | None = None,
                 md_dir: Path | None = None,
                 package_deps: dict | None = None,
+                coverage_packages: list[dict] | None = None,
                 summary: bool = False) -> str:
     """Render the markdown data report.
 
@@ -424,6 +599,10 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
     lines.append("| Dups | `cyclomatic.py` | Number of duplicate (cloned) code blocks touching this file. Only populated when cyclomatic.py is run with `--duplicates`. Clones of ≥ 6 lines across files or within a file. |")
     if package_deps and package_deps.get("entries"):
         lines.append("| fan_in / fan_out / cut_pkgs | `package_deps.py` | Intra-module import fan-in, fan-out, and **cut-packages** (how many packages would become unreachable if this one vanished). Structural coupling — complements `file_coupling.py` which is temporal. Go-only; requires the `goda` binary. |")
+    if coverage_packages is not None:
+        lines.append("| coverage % / untested | `coverage.py` | Go test-coverage per file: fraction of statements exercised by `go test`, with the raw count of uncovered statements. Verdict tiers: FINE ≥ 80%, LOW 50–79%, MEDIUM 20–49%, HIGH < 20%, NO_TESTS = file sits in a package with no `*_test.go` file. Only files at MEDIUM or worse are listed (healthy files aren't a signal). |")
+    lines.append("| commit kinds | `commit_kinds.py` | Conventional-commit prefix distribution per file (feat/fix/refactor/chore/…). Dominant kind + fix/feat/refactor percentages + Shannon entropy of the kind mix. Tells you WHY a file churns — feat-dominant is active growth, fix-dominant is a bug magnet, refactor-dominant is pile-on risk. Only files at LOW verdict or worse are listed. |")
+    lines.append("| dead findings | `dead_code.py` | Count of dead-code findings per file: unreachable functions (deadcode call-graph) + unused fields/consts/methods (staticcheck U1000). Every finding is a delete-target. Distinct from coverage — coverage measures what's untested; dead_code measures what's unreachable. |")
     lines.append("")
 
     # Top packages — orientation (churn view from go_hotspots).
@@ -529,6 +708,48 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
                     lines.append(f"- imports: {shown}{more}")
                 lines.append("")
 
+    # Package coverage — which packages have no `*_test.go`, and which
+    # have tests but minimal coverage. Complements the two orientation
+    # tables above: churn (hotspot) + structure (package deps) +
+    # testedness (coverage) form the triangle the reader uses to pick
+    # what to touch.
+    if coverage_packages:
+        ranked = [
+            p for p in coverage_packages
+            if p.get("verdict") in ("HIGH", "MEDIUM", "NO_TESTS")
+            and p.get("total_statements", 0) > 0
+        ]
+        ranked.sort(
+            key=lambda p: (
+                -(p.get("total_statements", 0) - p.get("covered_statements", 0)),
+                p.get("coverage_pct", 0),
+            )
+        )
+        if ranked:
+            lines.append("## Package coverage — test exercise (orientation)\n")
+            lines.append(
+                "`go test` coverage per package, worst-first by *uncovered statement "
+                "count* (not by percentage — a 0%/10-stmt package is less of a signal "
+                "than a 20%/1,000-stmt package). Only packages at MEDIUM or worse "
+                "are listed; healthy packages (FINE ≥ 80%, LOW 50–79%) are omitted. "
+                "Pairs with the `bugfix_density` column below: high-fix + low-coverage "
+                "is the cleanest \"this file breaks because nothing catches it\" signal."
+            )
+            lines.append("")
+            lines.append("| Verdict | Package | Cov % | covered/total | files | untested files |")
+            lines.append("|:-:|---|---:|---:|---:|---:|")
+            for p in ranked[:15]:
+                cov_cell = (
+                    "—" if p.get("verdict") == "NO_TESTS"
+                    else f"{p.get('coverage_pct', 0):.1f}"
+                )
+                lines.append(
+                    f"| {p.get('verdict', 'n/a')} | `{p.get('path', '?')}` | {cov_cell} | "
+                    f"{p.get('covered_statements', 0):,}/{p.get('total_statements', 0):,} | "
+                    f"{p.get('file_count', 0)} | {p.get('files_untested', 0)} |"
+                )
+            lines.append("")
+
     # Embed the cross-signal scatter here — it's the big-picture view that
     # belongs right after the orientation table. Only included when the
     # renderer was actually run (plot_paths has the key).
@@ -577,8 +798,8 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
         lines.append(f"\n![signal matrix]({_img_src(plot_paths['matrix'])})\n")
 
     lines.append(f"## File overview ({len(visible)} files)\n")
-    lines.append("| File | Signals | Commits | Fix count | Fix % | Trend verdict | Δmean | Max indent | Hotspot score | Coupling partners | LCOM4 (Δ) | CCN / Mod / High | Dups |")
-    lines.append("|---|:-:|---:|---:|---:|:-:|---:|---:|---:|---:|:-:|:-:|:-:|")
+    lines.append("| File | Signals | Commits | Fix count | Fix % | Trend verdict | Δmean | Max indent | Hotspot score | Coupling partners | LCOM4 (Δ) | CCN / Mod / High | Dups | Cov % (untested) | Kind mix | Dead |")
+    lines.append("|---|:-:|---:|---:|---:|:-:|---:|---:|---:|---:|:-:|:-:|:-:|:-:|:-:|:-:|")
     for r in visible:
         commits = (r["bugfix"]["total_commits"] if r["bugfix"]
                    else (r["trend"]["commits"] if r["trend"] else ""))
@@ -608,10 +829,37 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
         else:
             ccn_cell = ""
             dup_cell = ""
+        cov = r.get("coverage")
+        if cov:
+            if cov["verdict"] == "NO_TESTS":
+                cov_cell = f"NO_TESTS ({cov['total_statements']})"
+            else:
+                cov_cell = f"{cov['coverage_pct']:.0f}% ({cov['uncovered_statements']})"
+        else:
+            cov_cell = ""
+        ck = r.get("commit_kinds")
+        if ck:
+            # "feat 9 / fix 3 / refactor 2 (H:1.3)" — show the three
+            # decision-relevant kinds + entropy to indicate mixedness.
+            parts = [f"{k} {ck['kinds'].get(k, 0)}" for k in ("feat", "fix", "refactor")
+                     if ck['kinds'].get(k, 0)]
+            kind_cell = (" / ".join(parts) or ck.get("dominant", "?")) + \
+                f" (H:{ck.get('entropy_bits', 0):.1f})"
+        else:
+            kind_cell = ""
+        dc = r.get("dead_code")
+        if dc:
+            # "10 (d:10 u:0)" — total findings + dead/unused split so
+            # the reader can tell call-graph hits from field/const hits.
+            dead_cell = (f"{dc['total_findings']} "
+                         f"(d:{dc['deadcode_count']} u:{dc['unused_count']})")
+        else:
+            dead_cell = ""
         lines.append(
             f"| `{r['path']}` | {r['signal_count']} | "
             f"{commits} | {fix_n} | {fix_p} | {verdict} | "
-            f"{dmean} | {maxi} | {hs_score} | {cpl} | {lcom4_cell} | {ccn_cell} | {dup_cell} |"
+            f"{dmean} | {maxi} | {hs_score} | {cpl} | {lcom4_cell} | {ccn_cell} | "
+            f"{dup_cell} | {cov_cell} | {kind_cell} | {dead_cell} |"
         )
     lines.append("")
 
@@ -767,6 +1015,63 @@ def _detail_block(r: dict) -> list[str]:
                     out.append(f"  - {{{', '.join(g)}}}")
                 else:
                     out.append(f"  - {{{', '.join(g[:4])}, … +{len(g) - 4} more}}")
+        out.append("")
+
+    if r.get("coverage"):
+        cov = r["coverage"]
+        if cov["verdict"] == "NO_TESTS":
+            out.append(
+                f"**coverage** — verdict **NO_TESTS**: the file's package "
+                f"(`{cov.get('package', '?')}`) has no `*_test.go` file, "
+                f"so nothing in `go test` exercises it. "
+                f"({cov['total_statements']} statements, none covered.)"
+            )
+        else:
+            prof_hint = (
+                "" if cov.get("in_profile", True)
+                else "  ·  not in profile (tests exist in package but never reached this file)"
+            )
+            out.append(
+                f"**coverage** — verdict **{cov['verdict']}**: "
+                f"{cov['coverage_pct']:.1f}% of statements covered "
+                f"({cov['covered_statements']}/{cov['total_statements']}, "
+                f"{cov['uncovered_statements']} uncovered){prof_hint}."
+            )
+        out.append("")
+
+    if r.get("commit_kinds"):
+        ck = r["commit_kinds"]
+        # "feat 9 (64%), fix 3 (21%), refactor 2 (14%)" — show only
+        # non-zero kinds so the reader doesn't skim past empties.
+        total = ck.get("total_commits", 0) or 1
+        parts = [f"{k} {n} ({100 * n / total:.0f}%)"
+                 for k, n in ck.get("kinds", {}).items() if n]
+        out.append(
+            f"**commit_kinds** — verdict **{ck.get('verdict', 'n/a')}** "
+            f"({ck.get('total_commits', 0)} commits, "
+            f"dominant `{ck.get('dominant', '?')}`, "
+            f"entropy {ck.get('entropy_bits', 0):.2f} bits, "
+            f"prefix-match {ck.get('prefix_match_rate', 0):.0f}%): "
+            + ", ".join(parts) + "."
+        )
+        out.append("")
+
+    if r.get("dead_code"):
+        dc = r["dead_code"]
+        out.append(
+            f"**dead_code** — verdict **{dc.get('verdict', 'n/a')}**: "
+            f"{dc.get('total_findings', 0)} finding(s) "
+            f"({dc.get('deadcode_count', 0)} unreachable via deadcode, "
+            f"{dc.get('unused_count', 0)} unused via staticcheck U1000)."
+        )
+        # Surface a handful of finding sites so the reader can jump
+        # straight to the delete target.
+        for f in (dc.get("findings") or [])[:5]:
+            out.append(f"- `{f.get('tool', '?')}` L{f.get('line', '?')} "
+                       f"— {f.get('kind', 'unused')} `{f.get('symbol', '?')}`")
+        more = len(dc.get("findings") or []) - 5
+        if more > 0:
+            out.append(f"- … +{more} more")
         out.append("")
 
     if r["cyclomatic"]:
@@ -1190,6 +1495,21 @@ def main() -> int:
     ap.add_argument("--cyclomatic", help="cyclomatic.py --json output (optional; multi-language)")
     ap.add_argument("--package-deps", help="package_deps.py --json output "
                                            "(optional; structural Go package coupling via goda)")
+    ap.add_argument("--coverage", help="coverage.py --json output "
+                                       "(optional; Go test coverage per file + per package)")
+    ap.add_argument("--coverage-min-verdict", choices=["LOW", "MEDIUM", "HIGH"],
+                    default="MEDIUM",
+                    help="coverage floor for file-level inclusion (default MEDIUM: skip FINE ≥ 80%% and LOW 50-79%%)")
+    ap.add_argument("--commit-kinds", help="commit_kinds.py --json output "
+                                           "(optional; conventional-commit prefix classification)")
+    ap.add_argument("--commit-kinds-min-verdict", choices=["LOW", "MEDIUM", "HIGH"],
+                    default="LOW",
+                    help="commit_kinds floor (default LOW: includes any fix-heavy or refactor-heavy file)")
+    ap.add_argument("--dead-code", help="dead_code.py --json output "
+                                        "(optional; unreachable + unused Go symbols)")
+    ap.add_argument("--dead-code-min-verdict", choices=["LOW", "MEDIUM", "HIGH"],
+                    default="LOW",
+                    help="dead_code floor (default LOW: includes any file with ≥ 1 finding)")
     ap.add_argument("--out-md", type=str, help="write markdown data report to this path")
     ap.add_argument("--out-json", type=str, help="write merged data JSON to this path")
     ap.add_argument("--cooccur-floor", type=int, default=3,
@@ -1225,12 +1545,22 @@ def main() -> int:
         lcom4_by_file = load_lcom4(args.lcom4)
         cyclomatic_by_file = load_cyclomatic(args.cyclomatic)
         package_deps = load_package_deps(args.package_deps)
+        coverage_by_file, coverage_packages = load_coverage(
+            args.coverage, args.coverage_min_verdict,
+        )
+        commit_kinds_by_file = load_commit_kinds(
+            args.commit_kinds, args.commit_kinds_min_verdict,
+        )
+        dead_code_by_file = load_dead_code(
+            args.dead_code, args.dead_code_min_verdict,
+        )
     except FileNotFoundError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
 
     records = collate(hotspots_by_file, trends_by_file, coupling_by_file,
-                      bugfix_by_file, lcom4_by_file, cyclomatic_by_file)
+                      bugfix_by_file, lcom4_by_file, cyclomatic_by_file,
+                      coverage_by_file, commit_kinds_by_file, dead_code_by_file)
     print_stdout(records, packages, summary=args.summary)
 
     meta = {
@@ -1249,6 +1579,8 @@ def main() -> int:
             # Additive — keep the nested structure so consumers can
             # tell file-level records from package-level entries.
             merged_out["package_deps"] = package_deps
+        if coverage_packages:
+            merged_out["coverage_packages"] = coverage_packages
         Path(args.out_json).write_text(json.dumps(merged_out, indent=2, default=str))
         print(f"\nJSON: {args.out_json}")
 
@@ -1285,6 +1617,7 @@ def main() -> int:
             plot_paths=plot_paths,
             md_dir=md_path.parent.resolve(),
             package_deps=package_deps,
+            coverage_packages=coverage_packages,
             summary=args.summary,
         ))
         print(f"Markdown: {args.out_md}")

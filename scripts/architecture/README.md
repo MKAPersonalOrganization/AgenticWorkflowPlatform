@@ -15,6 +15,9 @@ reader. Scripts here are standalone — no cross-imports.
 | **Coupling (temporal)** | `file_coupling.py`    | Which files co-change at unexpected rates?                       |
 | **Coupling (structural)** | `package_deps.py`   | Which Go packages concentrate fan-in/fan-out/cut-through ([goda](https://github.com/loov/goda))? |
 | **Bug density**     | `bugfix_density.py`       | Which files absorb a disproportionate share of fix commits?      |
+| **Test coverage**   | `coverage.py`             | Which Go files / packages are actually exercised by the existing test suite? Pairs with bugfix_density — high-fix + low-coverage is the clearest risk combo. |
+| **Commit kinds**    | `commit_kinds.py`         | Conventional-commit prefix distribution (feat/fix/refactor/chore/…) per file. Tells you WHY a file churns — feat-dominant is active growth, fix-dominant is a bug magnet, refactor-dominant is pile-on risk. Complements bugfix_density's keyword matcher. |
+| **Dead code**       | `dead_code.py`            | Unreachable functions (via `golang.org/x/tools/cmd/deadcode` call-graph traversal) + unused fields/consts/methods (via `staticcheck -checks U1000`). Surfaces delete-targets distinct from "untested" code. |
 | **Code-Maat dashboard** | `maat_visualize.py`   | CSV-driven visualization of an external Code-Maat report set.    |
 
 ## Synthesis (cross-signal)
@@ -33,11 +36,17 @@ reader. Scripts here are standalone — no cross-imports.
 
 ## External binaries
 
-Two signals shell out to Go tools installed via `go install`:
+Several signals shell out to Go tools installed via `go install`:
 
 - `cyclomatic.py` — uses [lizard](https://github.com/terryyin/lizard) (Python dep, in `requirements.txt`).
 - `package_deps.py` — requires the `goda` binary on `$PATH`:
   `go install github.com/loov/goda@latest`.
+- `coverage.py` — requires `go` on `$PATH` (the module's own toolchain).
+- `dead_code.py` — requires `deadcode` + `staticcheck` on `$PATH` or `$GOPATH/bin`:
+  ```
+  go install golang.org/x/tools/cmd/deadcode@latest
+  go install honnef.co/go/tools/cmd/staticcheck@latest
+  ```
 
 ## Running
 

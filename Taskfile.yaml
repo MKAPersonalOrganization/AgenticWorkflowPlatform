@@ -260,7 +260,7 @@ tasks:
   # Writes REFACTORING_PLAN.md at repo root.
 
   refactor:plan:
-    desc: "Generate an evidence-based refactoring plan from all three analyzers. Env: SINCE (default '6 months ago'), TOP_PACKAGES (default 4), FULL=1 to include per-file Detail blocks (default: summary only)."
+    desc: "Generate an evidence-based refactoring plan across every available signal (hotspots, trend, coupling, bugfix, coverage, commit-kinds, dead-code). Env: SINCE (default '6 months ago'), TOP_PACKAGES (default 4), FULL=1 to include per-file Detail blocks (default: summary only), SKIP_COVERAGE=1 to skip `go test -cover`, SKIP_DEADCODE=1 to skip deadcode+staticcheck."
     deps: [hotspots:setup]
     vars:
       SINCE: '{{.SINCE | default "6 months ago"}}'
@@ -306,10 +306,37 @@ tasks:
         .hotspots/.venv/bin/python3 scripts/architecture/file_coupling.py . \
           --since "{{.SINCE}}" -n 40 --min-cooc 6 -o .hotspots/coupling.json
       - |
-        echo "▶ 5/5  Bug/fix density (ground-truth rot signal)..."
+        echo "▶ 5/6  Bug/fix density (ground-truth rot signal)..."
         .hotspots/.venv/bin/python3 scripts/architecture/bugfix_density.py \
           --since "{{.SINCE}}" --min-commits 3 --top 20 \
           -o .hotspots/bugfix.json
+      - |
+        echo "▶ 6/8  Test coverage (go test -cover across ./...)..."
+        # Set SKIP_COVERAGE=1 to skip the Go test run (slowest step, ~7s
+        # fresh on this repo). Previous coverage.json is reused by the
+        # synthesizer when present; absent is also fine.
+        if [ -z "${SKIP_COVERAGE}" ]; then
+          .hotspots/.venv/bin/python3 scripts/architecture/coverage.py \
+            --json .hotspots/coverage.json --top 15 --by both || \
+            echo "warning: coverage.py failed — synthesizer will run without it"
+        else
+          echo "  (skipped — SKIP_COVERAGE set; reusing existing .hotspots/coverage.json if present)"
+        fi
+      - |
+        echo "▶ 7/8  Commit-kind classification (feat/fix/refactor/chore/…)..."
+        .hotspots/.venv/bin/python3 scripts/architecture/commit_kinds.py \
+          --since "{{.SINCE}}" --min-commits 3 --top 20 \
+          --json .hotspots/commit_kinds.json
+      - |
+        echo "▶ 8/8  Dead code (deadcode + staticcheck U1000)..."
+        # Set SKIP_DEADCODE=1 to skip (staticcheck is ~20s on this repo).
+        if [ -z "${SKIP_DEADCODE}" ]; then
+          .hotspots/.venv/bin/python3 scripts/architecture/dead_code.py \
+            --json .hotspots/dead_code.json --top 15 || \
+            echo "warning: dead_code.py failed — synthesizer will run without it"
+        else
+          echo "  (skipped — SKIP_DEADCODE set; reusing existing .hotspots/dead_code.json if present)"
+        fi
       - |
         echo "▶ synthesize..."
         HS_FLAGS="--hotspots .hotspots/hotspots_repo.json"
@@ -317,11 +344,18 @@ tasks:
           [ "$f" = ".hotspots/hotspots_repo.json" ] && continue
           HS_FLAGS="$HS_FLAGS --hotspots $f"
         done
+        COV_FLAG=""
+        [ -f .hotspots/coverage.json ]      && COV_FLAG="--coverage .hotspots/coverage.json"
+        CK_FLAG=""
+        [ -f .hotspots/commit_kinds.json ]  && CK_FLAG="--commit-kinds .hotspots/commit_kinds.json"
+        DC_FLAG=""
+        [ -f .hotspots/dead_code.json ]     && DC_FLAG="--dead-code .hotspots/dead_code.json"
         .hotspots/.venv/bin/python3 scripts/architecture/refactor_priority.py \
           $HS_FLAGS \
           --trends .hotspots/trends.json \
           --coupling .hotspots/coupling.json \
           --bugfix .hotspots/bugfix.json \
+          $COV_FLAG $CK_FLAG $DC_FLAG \
           --out-md REFACTORING_PLAN.md \
           --out-json .hotspots/refactor_plan.json \
           --window "{{.SINCE}}" \
