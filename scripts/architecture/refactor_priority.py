@@ -27,6 +27,11 @@ Inputs (all JSON from sibling tools in scripts/architecture/):
                   fields/consts via staticcheck U1000 — surfaces
                   delete-targets that coverage can only see as
                   "untested")
+  --balanced-coupling  balanced_coupling.py --json (optional;
+                  Khononov's Ch. 10 composite = max(|Strength −
+                  Distance| + 1, 1 + 10 − Volatility) per edge. Each
+                  file inherits its package's worst outgoing balance,
+                  plus a dedicated "worst edges" orientation section.)
 
 Outputs:
   stdout          compact table of files with ≥1 signal, sorted by number
@@ -310,6 +315,60 @@ def load_commit_kinds(path: str | None, min_verdict: str = "LOW"
     return out
 
 
+def load_balanced_coupling(path: str | None, min_balance: int = 7
+                           ) -> tuple[dict[str, dict], list[dict]]:
+    """Load the balanced-coupling report (balanced_coupling.py).
+
+    Returns ``(by_package, edges)``:
+
+    - ``by_package``: per-source-package summary rolled up from the
+      edge list. Each entry carries the worst-balance outgoing edge
+      plus distributional stats (mean, count of edges ≥ min_balance).
+      Files inherit their package's summary in the collator because
+      balanced-coupling is structurally a package-level signal.
+
+    - ``edges``: the pass-through list of scored edges, filtered to
+      those at or above ``min_balance``. The reader uses this for the
+      dedicated "worst edges" orientation section.
+
+    The default floor of 7 matches how the book treats the composite
+    — edges at ≥ 7 are the attention-worthy ones; below that the
+    Strength/Distance gap is small enough that the pair is either
+    naturally tight (short distance, strong coupling) or naturally
+    loose (weak coupling, far apart) and no signal fires.
+    """
+    if not path:
+        return {}, []
+    d = json.loads(Path(path).read_text())
+    all_edges = d.get("edges", [])
+    flagged = [e for e in all_edges if e.get("balance", 0) >= min_balance]
+
+    by_pkg: dict[str, dict] = {}
+    # Group every edge by its source package so we can compute max/mean
+    # over the whole outgoing set, not just the flagged subset.
+    bucketed: dict[str, list[dict]] = {}
+    for e in all_edges:
+        bucketed.setdefault(e["source"], []).append(e)
+    for pkg, es in bucketed.items():
+        if not es:
+            continue
+        worst = max(es, key=lambda e: (e.get("balance", 0), e.get("strength", 0)))
+        bals = [e.get("balance", 0) for e in es]
+        by_pkg[pkg] = {
+            "package": pkg,
+            "outgoing_edges": len(es),
+            "worst_balance": worst.get("balance", 0),
+            "mean_balance": round(sum(bals) / len(bals), 2) if bals else 0.0,
+            "worst_target": worst.get("target"),
+            "worst_strength": worst.get("strength"),
+            "worst_distance": worst.get("distance"),
+            "worst_volatility": worst.get("volatility"),
+            "worst_tier": worst.get("strength_tier"),
+            "flagged_edges": sum(1 for b in bals if b >= min_balance),
+        }
+    return by_pkg, flagged
+
+
 def load_dead_code(path: str | None, min_verdict: str = "LOW"
                     ) -> dict[str, dict]:
     """Load the dead-code report (deadcode + staticcheck U1000).
@@ -410,6 +469,8 @@ def collate(
     coverage_by_file: dict[str, dict] | None = None,
     commit_kinds_by_file: dict[str, dict] | None = None,
     dead_code_by_file: dict[str, dict] | None = None,
+    balanced_by_pkg: dict[str, dict] | None = None,
+    module_prefix: str = "",
 ) -> list[dict]:
     """Merge per-file data from every signal. No ranking, no scoring — just
     a record listing which analyses touched each file and what they measured.
@@ -419,6 +480,7 @@ def collate(
     coverage_by_file = coverage_by_file or {}
     commit_kinds_by_file = commit_kinds_by_file or {}
     dead_code_by_file = dead_code_by_file or {}
+    balanced_by_pkg = balanced_by_pkg or {}
     all_paths = (
         set(hotspots_by_file) | set(trends_by_file) | set(coupling_by_file)
         | set(bugfix_by_file) | set(lcom4_by_file) | set(cyclomatic_by_file)
@@ -435,6 +497,14 @@ def collate(
         cov = coverage_by_file.get(path)
         ck = commit_kinds_by_file.get(path)
         dc = dead_code_by_file.get(path)
+        # Balanced coupling is naturally package-level. A file inherits
+        # its package's worst outgoing edge — non-Go files and files
+        # in packages outside the scored set get None.
+        bc = None
+        if balanced_by_pkg and module_prefix and path.endswith(".go"):
+            parent = path.rsplit("/", 1)[0] if "/" in path else ""
+            pkg_key = f"{module_prefix}/{parent}" if parent else module_prefix
+            bc = balanced_by_pkg.get(pkg_key)
 
         present_in: list[str] = []
         if hs: present_in.append("hotspot")
@@ -446,6 +516,7 @@ def collate(
         if cov: present_in.append("coverage")
         if ck: present_in.append("commit_kinds")
         if dc: present_in.append("dead_code")
+        if bc: present_in.append("balanced_coupling")
 
         records.append({
             "path": path,
@@ -460,6 +531,7 @@ def collate(
             "coverage": cov,
             "commit_kinds": ck,
             "dead_code": dc,
+            "balanced_coupling": bc,
         })
 
     # Order: files present in more analyses first (a factual count, not a
@@ -495,7 +567,7 @@ def print_stdout(records: list[dict], packages: list[dict],
     hdr = (f"{'Sig':<3}  {'Commits':>7}  {'Fix%':>5}  "
            f"{'Trend':<12}  {'Δmean':>6}  {'MaxI':>4}  "
            f"{'Cpl':>3}  {'LCOM4':>5}  {'CCN':>5}  {'Cov%':>5}  "
-           f"{'Dom':<8}  {'Dead':>4}  Path")
+           f"{'Dom':<8}  {'Dead':>4}  {'Bal':>3}  Path")
     print(hdr)
     print("-" * len(hdr))
     for r in records:
@@ -528,10 +600,12 @@ def print_stdout(records: list[dict], packages: list[dict],
         dom_txt = _trunc(ck["dominant"], 8) if ck else ""
         dc = r.get("dead_code")
         dead_txt = str(dc["total_findings"]) if dc else ""
+        bc = r.get("balanced_coupling")
+        bal_txt = str(bc["worst_balance"]) if bc else ""
         print(f"{r['signal_count']:<3}  {str(commits):>7}  {fix_pct:>5}  "
               f"{_trunc(trend_verdict, 12):<12}  {dmean:>6}  {maxi:>4}  "
               f"{str(cpl):>3}  {lcom4_txt:>5}  {ccn_txt:>5}  {cov_txt:>5}  "
-              f"{dom_txt:<8}  {dead_txt:>4}  {r['path']}")
+              f"{dom_txt:<8}  {dead_txt:>4}  {bal_txt:>3}  {r['path']}")
 
 
 def to_markdown(records: list[dict], packages: list[dict], meta: dict,
@@ -540,6 +614,7 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
                 md_dir: Path | None = None,
                 package_deps: dict | None = None,
                 coverage_packages: list[dict] | None = None,
+                balanced_edges: list[dict] | None = None,
                 summary: bool = False) -> str:
     """Render the markdown data report.
 
@@ -603,6 +678,8 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
         lines.append("| coverage % / untested | `coverage.py` | Go test-coverage per file: fraction of statements exercised by `go test`, with the raw count of uncovered statements. Verdict tiers: FINE ≥ 80%, LOW 50–79%, MEDIUM 20–49%, HIGH < 20%, NO_TESTS = file sits in a package with no `*_test.go` file. Only files at MEDIUM or worse are listed (healthy files aren't a signal). |")
     lines.append("| commit kinds | `commit_kinds.py` | Conventional-commit prefix distribution per file (feat/fix/refactor/chore/…). Dominant kind + fix/feat/refactor percentages + Shannon entropy of the kind mix. Tells you WHY a file churns — feat-dominant is active growth, fix-dominant is a bug magnet, refactor-dominant is pile-on risk. Only files at LOW verdict or worse are listed. |")
     lines.append("| dead findings | `dead_code.py` | Count of dead-code findings per file: unreachable functions (deadcode call-graph) + unused fields/consts/methods (staticcheck U1000). Every finding is a delete-target. Distinct from coverage — coverage measures what's untested; dead_code measures what's unreachable. |")
+    if balanced_edges is not None:
+        lines.append("| balanced coupling | `balanced_coupling.py` | Khononov's composite per package edge — `max(\\|Strength − Distance\\| + 1, 1 + 10 − Volatility)`. Each file inherits its package's worst outgoing balance (1 = healthy, 10 = worst). High Balance means either (a) Strength/Distance mismatch (e.g. strong coupling into a distant stranger) or (b) strong coupling into an unusually stable target — both are attention-worthy. |")
     lines.append("")
 
     # Top packages — orientation (churn view from go_hotspots).
@@ -750,6 +827,39 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
                 )
             lines.append("")
 
+    # Balanced-coupling orientation — the book's composite surfaces
+    # the edges where Strength and Distance are most mismatched, and
+    # the volatility floor flags cases where a strong coupling into a
+    # rock-stable target is creating a hidden assumption. Sits next to
+    # the other orientation tables so the three — churn, coupling
+    # shape, coupling balance — can be scanned in one pass.
+    if balanced_edges:
+        ranked = sorted(
+            balanced_edges,
+            key=lambda e: (-e.get("balance", 0), -e.get("strength", 0), -e.get("distance", 0)),
+        )[:15]
+        if ranked:
+            lines.append("## Balanced coupling — worst edges (orientation)\n")
+            lines.append(
+                "Khononov's Ch. 10 composite per dependency edge: "
+                "`Balance = max(|Strength − Distance| + 1, 1 + 10 − Volatility)`. "
+                "Higher Balance = higher refactor signal. `dom` shows which "
+                "term of the `max(…)` won — `structural` means the "
+                "Strength/Distance gap is the driver; `volatility` means the "
+                "target is so stable that the score is floor-dominated."
+            )
+            lines.append("")
+            lines.append("| Bal | S | D | V | Dom | Tier | Source → Target |")
+            lines.append("|---:|---:|---:|---:|:-:|:-:|---|")
+            for e in ranked:
+                lines.append(
+                    f"| **{e.get('balance', 0)}** | {e.get('strength', 0)} | "
+                    f"{e.get('distance', 0)} | {e.get('volatility', 0)} | "
+                    f"{e.get('dominant', '?')} | {e.get('strength_tier', '?')} | "
+                    f"`{e.get('source', '?')}` → `{e.get('target', '?')}` |"
+                )
+            lines.append("")
+
     # Embed the cross-signal scatter here — it's the big-picture view that
     # belongs right after the orientation table. Only included when the
     # renderer was actually run (plot_paths has the key).
@@ -798,8 +908,8 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
         lines.append(f"\n![signal matrix]({_img_src(plot_paths['matrix'])})\n")
 
     lines.append(f"## File overview ({len(visible)} files)\n")
-    lines.append("| File | Signals | Commits | Fix count | Fix % | Trend verdict | Δmean | Max indent | Hotspot score | Coupling partners | LCOM4 (Δ) | CCN / Mod / High | Dups | Cov % (untested) | Kind mix | Dead |")
-    lines.append("|---|:-:|---:|---:|---:|:-:|---:|---:|---:|---:|:-:|:-:|:-:|:-:|:-:|:-:|")
+    lines.append("| File | Signals | Commits | Fix count | Fix % | Trend verdict | Δmean | Max indent | Hotspot score | Coupling partners | LCOM4 (Δ) | CCN / Mod / High | Dups | Cov % (untested) | Kind mix | Dead | Bal (S/D/V) |")
+    lines.append("|---|:-:|---:|---:|---:|:-:|---:|---:|---:|---:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|")
     for r in visible:
         commits = (r["bugfix"]["total_commits"] if r["bugfix"]
                    else (r["trend"]["commits"] if r["trend"] else ""))
@@ -855,11 +965,21 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
                          f"(d:{dc['deadcode_count']} u:{dc['unused_count']})")
         else:
             dead_cell = ""
+        bc = r.get("balanced_coupling")
+        if bc:
+            # "10 (7/7/1)" — worst balance + the S/D/V triple that
+            # produced it, so the reader can tell "strong coupling
+            # into a distant stranger" from "strong coupling into a
+            # stable pillar" at a glance.
+            bal_cell = (f"{bc['worst_balance']} "
+                        f"({bc.get('worst_strength', 0)}/{bc.get('worst_distance', 0)}/{bc.get('worst_volatility', 0)})")
+        else:
+            bal_cell = ""
         lines.append(
             f"| `{r['path']}` | {r['signal_count']} | "
             f"{commits} | {fix_n} | {fix_p} | {verdict} | "
             f"{dmean} | {maxi} | {hs_score} | {cpl} | {lcom4_cell} | {ccn_cell} | "
-            f"{dup_cell} | {cov_cell} | {kind_cell} | {dead_cell} |"
+            f"{dup_cell} | {cov_cell} | {kind_cell} | {dead_cell} | {bal_cell} |"
         )
     lines.append("")
 
@@ -1053,6 +1173,22 @@ def _detail_block(r: dict) -> list[str]:
             f"entropy {ck.get('entropy_bits', 0):.2f} bits, "
             f"prefix-match {ck.get('prefix_match_rate', 0):.0f}%): "
             + ", ".join(parts) + "."
+        )
+        out.append("")
+
+    if r.get("balanced_coupling"):
+        bc = r["balanced_coupling"]
+        out.append(
+            f"**balanced_coupling** — package's worst outgoing edge: "
+            f"Balance **{bc.get('worst_balance', 0)}** "
+            f"(S={bc.get('worst_strength', 0)}, "
+            f"D={bc.get('worst_distance', 0)}, "
+            f"V={bc.get('worst_volatility', 0)}, "
+            f"tier={bc.get('worst_tier', '?')}) "
+            f"→ `{bc.get('worst_target', '?')}`. "
+            f"{bc.get('outgoing_edges', 0)} outgoing edges total, "
+            f"mean balance {bc.get('mean_balance', 0):.2f}, "
+            f"{bc.get('flagged_edges', 0)} at or above threshold."
         )
         out.append("")
 
@@ -1510,6 +1646,13 @@ def main() -> int:
     ap.add_argument("--dead-code-min-verdict", choices=["LOW", "MEDIUM", "HIGH"],
                     default="LOW",
                     help="dead_code floor (default LOW: includes any file with ≥ 1 finding)")
+    ap.add_argument("--balanced-coupling", help="balanced_coupling.py --json output "
+                                                "(optional; Khononov's Strength × Distance × "
+                                                "Volatility composite per package edge)")
+    ap.add_argument("--balanced-min", type=int, default=7,
+                    help="balanced-coupling floor for inclusion in the worst-edges "
+                         "orientation table (default 7; edges below this are collated "
+                         "into per-package summaries but not listed individually)")
     ap.add_argument("--out-md", type=str, help="write markdown data report to this path")
     ap.add_argument("--out-json", type=str, help="write merged data JSON to this path")
     ap.add_argument("--cooccur-floor", type=int, default=3,
@@ -1554,13 +1697,28 @@ def main() -> int:
         dead_code_by_file = load_dead_code(
             args.dead_code, args.dead_code_min_verdict,
         )
+        balanced_by_pkg, balanced_edges = load_balanced_coupling(
+            args.balanced_coupling, args.balanced_min,
+        )
     except FileNotFoundError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
 
+    # Resolve module prefix once so collate can convert file paths →
+    # package import paths for balanced-coupling lookups.
+    module_prefix = ""
+    go_mod = Path("go.mod")
+    if go_mod.exists():
+        for line in go_mod.read_text().splitlines():
+            s = line.strip()
+            if s.startswith("module "):
+                module_prefix = s.split(None, 1)[1].strip()
+                break
+
     records = collate(hotspots_by_file, trends_by_file, coupling_by_file,
                       bugfix_by_file, lcom4_by_file, cyclomatic_by_file,
-                      coverage_by_file, commit_kinds_by_file, dead_code_by_file)
+                      coverage_by_file, commit_kinds_by_file, dead_code_by_file,
+                      balanced_by_pkg, module_prefix)
     print_stdout(records, packages, summary=args.summary)
 
     meta = {
@@ -1581,6 +1739,11 @@ def main() -> int:
             merged_out["package_deps"] = package_deps
         if coverage_packages:
             merged_out["coverage_packages"] = coverage_packages
+        if balanced_edges or balanced_by_pkg:
+            merged_out["balanced_coupling"] = {
+                "edges": balanced_edges,
+                "by_package": list(balanced_by_pkg.values()),
+            }
         Path(args.out_json).write_text(json.dumps(merged_out, indent=2, default=str))
         print(f"\nJSON: {args.out_json}")
 
@@ -1618,6 +1781,7 @@ def main() -> int:
             md_dir=md_path.parent.resolve(),
             package_deps=package_deps,
             coverage_packages=coverage_packages,
+            balanced_edges=balanced_edges,
             summary=args.summary,
         ))
         print(f"Markdown: {args.out_md}")

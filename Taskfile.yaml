@@ -328,7 +328,7 @@ tasks:
           --since "{{.SINCE}}" --min-commits 3 --top 20 \
           --json .hotspots/commit_kinds.json
       - |
-        echo "▶ 8/8  Dead code (deadcode + staticcheck U1000)..."
+        echo "▶ 8/11 Dead code (deadcode + staticcheck U1000)..."
         # Set SKIP_DEADCODE=1 to skip (staticcheck is ~20s on this repo).
         if [ -z "${SKIP_DEADCODE}" ]; then
           .hotspots/.venv/bin/python3 scripts/architecture/dead_code.py \
@@ -336,6 +336,28 @@ tasks:
             echo "warning: dead_code.py failed — synthesizer will run without it"
         else
           echo "  (skipped — SKIP_DEADCODE set; reusing existing .hotspots/dead_code.json if present)"
+        fi
+      - |
+        echo "▶ 9/11 Coupling distance (Khononov Ch. 8, import-graph based)..."
+        .hotspots/.venv/bin/python3 scripts/architecture/coupling_distance.py \
+          --json .hotspots/coupling_distance.json --top 15 >/dev/null || \
+          echo "warning: coupling_distance.py failed"
+      - |
+        echo "▶ 10/11 Coupling strength (Khononov Ch. 7, AST-based)..."
+        .hotspots/.venv/bin/python3 scripts/architecture/coupling_strength.py \
+          --json .hotspots/coupling_strength.json --top 15 >/dev/null || \
+          echo "warning: coupling_strength.py failed"
+      - |
+        echo "▶ 11/11 Balanced coupling (Khononov Ch. 10 composite)..."
+        if [ -f .hotspots/coupling_distance.json ] && [ -f .hotspots/coupling_strength.json ]; then
+          .hotspots/.venv/bin/python3 scripts/architecture/balanced_coupling.py \
+            --distance .hotspots/coupling_distance.json \
+            --strength .hotspots/coupling_strength.json \
+            --since "{{.SINCE}}" \
+            --json .hotspots/balanced_coupling.json --top 15 >/dev/null || \
+            echo "warning: balanced_coupling.py failed"
+        else
+          echo "  (skipped — coupling_distance.json or coupling_strength.json missing)"
         fi
       - |
         echo "▶ synthesize..."
@@ -350,12 +372,14 @@ tasks:
         [ -f .hotspots/commit_kinds.json ]  && CK_FLAG="--commit-kinds .hotspots/commit_kinds.json"
         DC_FLAG=""
         [ -f .hotspots/dead_code.json ]     && DC_FLAG="--dead-code .hotspots/dead_code.json"
+        BC_FLAG=""
+        [ -f .hotspots/balanced_coupling.json ] && BC_FLAG="--balanced-coupling .hotspots/balanced_coupling.json"
         .hotspots/.venv/bin/python3 scripts/architecture/refactor_priority.py \
           $HS_FLAGS \
           --trends .hotspots/trends.json \
           --coupling .hotspots/coupling.json \
           --bugfix .hotspots/bugfix.json \
-          $COV_FLAG $CK_FLAG $DC_FLAG \
+          $COV_FLAG $CK_FLAG $DC_FLAG $BC_FLAG \
           --out-md REFACTORING_PLAN.md \
           --out-json .hotspots/refactor_plan.json \
           --window "{{.SINCE}}" \
