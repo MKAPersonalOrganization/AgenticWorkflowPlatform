@@ -84,19 +84,26 @@ templ BottomBar(props ...TopBarProps) {
 	}
 	<footer class="h-6 shrink-0 flex items-center justify-end px-2 bg-sidebar border-t border-sidebar-border/50 z-40">
 		if p.User != nil {
-			<button
-				type="button"
-				@click="$dispatch('toggle-debug-panel')"
-				title={ i18n.T(ctx, "Toggle Debugger (Ctrl+Shift+D)") }
-				aria-label={ i18n.T(ctx, "Toggle Debugger") }
-				class="inline-flex items-center justify-center size-5 rounded text-muted-foreground/70 hover:text-foreground hover:bg-sidebar-accent/60 transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-			>
-				<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3">
-					<path d="m18 16 4-4-4-4"></path>
-					<path d="m6 8-4 4 4 4"></path>
-					<path d="m14.5 4-5 16"></path>
-				</svg>
-			</button>
+			<!--
+				Hidden on /agent-designer: the designer page has no debug
+				panel, so the toggle would dispatch an event nothing
+				listens for. Matches the TopBar's context-aware swap.
+			-->
+			<div x-data="{ onDesigner: window.location.pathname.startsWith('/agent-designer') }" x-show="!onDesigner">
+				<button
+					type="button"
+					@click="$dispatch('toggle-debug-panel')"
+					title={ i18n.T(ctx, "Toggle Debugger (Ctrl+Shift+D)") }
+					aria-label={ i18n.T(ctx, "Toggle Debugger") }
+					class="inline-flex items-center justify-center size-5 rounded text-muted-foreground/70 hover:text-foreground hover:bg-sidebar-accent/60 transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3">
+						<path d="m18 16 4-4-4-4"></path>
+						<path d="m6 8-4 4 4 4"></path>
+						<path d="m14.5 4-5 16"></path>
+					</svg>
+				</button>
+			</div>
 		}
 	</footer>
 }
