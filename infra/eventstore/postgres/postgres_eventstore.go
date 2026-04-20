@@ -48,99 +48,125 @@ func (s *PostgresEventStore) AppendWithVersion(ctx context.Context, streamID str
 	if len(events) == 0 {
 		return 0, nil
 	}
-
 	tx, err := s.db.BeginTxx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return 0, fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback() //nolint:errcheck
 
-	// Acquire advisory lock for this stream within the transaction
-	lockKey := advisoryLockKey(streamID)
-	if _, err := tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock($1)", lockKey); err != nil {
+	if _, err := tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock($1)", advisoryLockKey(streamID)); err != nil {
 		return 0, fmt.Errorf("acquire advisory lock: %w", err)
 	}
-
-	// Get or create stream, check expected version
-	var currentVersion int64
-	err = tx.GetContext(ctx, &currentVersion,
-		"SELECT stream_version FROM event_streams WHERE stream_id = $1 FOR UPDATE", streamID)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		// Stream doesn't exist
-		if expectedVersion >= 0 {
-			// Caller expected a specific version but stream doesn't exist
-			return 0, es.ErrConcurrencyConflict
-		}
-		// Create the stream (NoStream or Any)
-		if _, err := tx.ExecContext(ctx,
-			"INSERT INTO event_streams (stream_id, stream_version) VALUES ($1, 0)",
-			streamID); err != nil {
-			return 0, fmt.Errorf("create stream: %w", err)
-		}
-		currentVersion = 0
-	} else if err != nil {
-		return 0, fmt.Errorf("get stream version: %w", err)
-	} else {
-		// Stream exists
-		if expectedVersion == -2 {
-			// NoStream: stream must not exist
-			return 0, es.ErrConcurrencyConflict
-		}
-		if expectedVersion >= 0 && currentVersion != expectedVersion {
-			return 0, es.ErrConcurrencyConflict
-		}
+	currentVersion, err := resolveStreamVersion(ctx, tx, streamID, expectedVersion)
+	if err != nil {
+		return 0, err
 	}
-
-	// Append events using a single batch INSERT for performance
-	newVersion := currentVersion
-	if len(events) == 1 {
-		// Single event - simple INSERT
-		newVersion++
-		data, err := json.Marshal(events[0])
-		if err != nil {
-			return 0, fmt.Errorf("marshal event: %w", err)
-		}
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO events (stream_id, stream_version, event_type, data)
-			 VALUES ($1, $2, $3, $4)`,
-			streamID, newVersion, events[0].EventType(), data); err != nil {
-			return 0, fmt.Errorf("insert event: %w", err)
-		}
-	} else {
-		// Multiple events - batch INSERT to minimize round trips while holding advisory lock
-		valueStrings := make([]string, 0, len(events))
-		valueArgs := make([]interface{}, 0, len(events)*4)
-		for i, event := range events {
-			newVersion++
-			data, err := json.Marshal(event)
-			if err != nil {
-				return 0, fmt.Errorf("marshal event %d: %w", i, err)
-			}
-			paramBase := i * 4
-			valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, $%d)",
-				paramBase+1, paramBase+2, paramBase+3, paramBase+4))
-			valueArgs = append(valueArgs, streamID, newVersion, event.EventType(), data)
-		}
-		query := fmt.Sprintf(
-			`INSERT INTO events (stream_id, stream_version, event_type, data) VALUES %s`,
-			joinStrings(valueStrings, ", "))
-		if _, err := tx.ExecContext(ctx, query, valueArgs...); err != nil {
-			return 0, fmt.Errorf("batch insert events: %w", err)
-		}
+	newVersion, err := appendEventRows(ctx, tx, streamID, currentVersion, events)
+	if err != nil {
+		return 0, err
 	}
-
-	// Update stream version
 	if _, err := tx.ExecContext(ctx,
 		"UPDATE event_streams SET stream_version = $1, updated_at = NOW() WHERE stream_id = $2",
 		newVersion, streamID); err != nil {
 		return 0, fmt.Errorf("update stream version: %w", err)
 	}
-
 	if err := tx.Commit(); err != nil {
 		return 0, fmt.Errorf("commit tx: %w", err)
 	}
+	return newVersion, nil
+}
 
+// resolveStreamVersion locks the stream row and returns the current
+// version, enforcing the caller's expectedVersion precondition:
+//
+//	>= 0  exact match (optimistic concurrency)
+//	-2    NoStream (stream must NOT exist)
+//	-1    Any (no concurrency check)
+//
+// When the stream doesn't exist and expectedVersion is NoStream/Any, it
+// is created lazily and 0 is returned.
+func resolveStreamVersion(ctx context.Context, tx dbExecutor, streamID string, expectedVersion int64) (int64, error) {
+	var currentVersion int64
+	err := tx.GetContext(ctx, &currentVersion,
+		"SELECT stream_version FROM event_streams WHERE stream_id = $1 FOR UPDATE", streamID)
+	if errors.Is(err, sql.ErrNoRows) {
+		if expectedVersion >= 0 {
+			return 0, es.ErrConcurrencyConflict
+		}
+		if _, err := tx.ExecContext(ctx,
+			"INSERT INTO event_streams (stream_id, stream_version) VALUES ($1, 0)",
+			streamID); err != nil {
+			return 0, fmt.Errorf("create stream: %w", err)
+		}
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("get stream version: %w", err)
+	}
+	if expectedVersion == -2 {
+		return 0, es.ErrConcurrencyConflict
+	}
+	if expectedVersion >= 0 && currentVersion != expectedVersion {
+		return 0, es.ErrConcurrencyConflict
+	}
+	return currentVersion, nil
+}
+
+// dbExecutor is the intersection of *sqlx.Tx methods used by the append
+// helpers. Extracting it lets resolveStreamVersion / appendEventRows be
+// tested with a mock later without pulling in a full Tx.
+type dbExecutor interface {
+	GetContext(ctx context.Context, dest any, query string, args ...any) error
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+// appendEventRows inserts the event batch and returns the new stream
+// version. Single events go through a simple INSERT; batches use a
+// parameterised multi-row INSERT to cut round-trips while the advisory
+// lock is held.
+func appendEventRows(ctx context.Context, tx dbExecutor, streamID string, currentVersion int64, events []es.Event) (int64, error) {
+	if len(events) == 1 {
+		return appendSingleEvent(ctx, tx, streamID, currentVersion, events[0])
+	}
+	return appendEventBatch(ctx, tx, streamID, currentVersion, events)
+}
+
+func appendSingleEvent(ctx context.Context, tx dbExecutor, streamID string, currentVersion int64, event es.Event) (int64, error) {
+	newVersion := currentVersion + 1
+	data, err := json.Marshal(event)
+	if err != nil {
+		return 0, fmt.Errorf("marshal event: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO events (stream_id, stream_version, event_type, data)
+		 VALUES ($1, $2, $3, $4)`,
+		streamID, newVersion, event.EventType(), data); err != nil {
+		return 0, fmt.Errorf("insert event: %w", err)
+	}
+	return newVersion, nil
+}
+
+func appendEventBatch(ctx context.Context, tx dbExecutor, streamID string, currentVersion int64, events []es.Event) (int64, error) {
+	newVersion := currentVersion
+	valueStrings := make([]string, 0, len(events))
+	valueArgs := make([]interface{}, 0, len(events)*4)
+	for i, event := range events {
+		newVersion++
+		data, err := json.Marshal(event)
+		if err != nil {
+			return 0, fmt.Errorf("marshal event %d: %w", i, err)
+		}
+		paramBase := i * 4
+		valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, $%d)",
+			paramBase+1, paramBase+2, paramBase+3, paramBase+4))
+		valueArgs = append(valueArgs, streamID, newVersion, event.EventType(), data)
+	}
+	query := fmt.Sprintf(
+		`INSERT INTO events (stream_id, stream_version, event_type, data) VALUES %s`,
+		joinStrings(valueStrings, ", "))
+	if _, err := tx.ExecContext(ctx, query, valueArgs...); err != nil {
+		return 0, fmt.Errorf("batch insert events: %w", err)
+	}
 	return newVersion, nil
 }
 

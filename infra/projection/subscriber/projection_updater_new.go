@@ -191,38 +191,12 @@ func (u *ProjectionUpdater) pollLoop(ctx context.Context) error {
 		return fmt.Errorf("projection updater: no projection names registered")
 	}
 
-	// Load the checkpoint for each registered projection.
-	checkpoints := make(map[string]int64, len(names))
-	minPosition := int64(0)
-	first := true
-	for _, name := range names {
-		pos, err := u.checkpointStore.GetGlobalPosition(ctx, name)
-		if err != nil {
-			u.log.Info(ctx, "no checkpoint found for projection, starting from 0", "projection", name)
-			pos = 0
-		} else {
-			u.log.Info(ctx, "resuming projection from checkpoint", "projection", name, "global_position", pos)
-		}
-		checkpoints[name] = pos
-		if first || pos < minPosition {
-			minPosition = pos
-			first = false
-		}
-	}
-
-	backoff := u.pollInterval
+	checkpoints, minPosition := u.loadCheckpoints(ctx, names)
 	eventsSinceCheckpoint := 0
-	const checkpointInterval = 100
+	backoff := u.pollInterval
 
-	// saveCheckpoints saves every projection's checkpoint using a fresh context.
 	saveCheckpoints := func() {
-		saveCtx, saveCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer saveCancel()
-		for _, name := range names {
-			if saveErr := u.checkpointStore.SaveGlobalPosition(saveCtx, name, checkpoints[name]); saveErr != nil {
-				u.log.Error(saveCtx, "failed to save final checkpoint", "projection", name, "ERROR", saveErr)
-			}
-		}
+		u.saveAllCheckpoints(names, checkpoints)
 	}
 
 	ticker := time.NewTicker(u.pollInterval)
@@ -245,61 +219,122 @@ func (u *ProjectionUpdater) pollLoop(ctx context.Context) error {
 			return nil
 
 		case <-ticker.C:
-			events, err := u.eventStore.ReadAllFromPosition(ctx, minPosition, u.batchSize)
-			if err != nil {
-				u.log.Error(ctx, "failed to poll events", "ERROR", err)
-				ticker.Reset(backoff)
-				backoff = min(backoff*2, u.maxBackoff)
-				continue
-			}
-
-			if len(events) == 0 {
-				ticker.Reset(backoff)
-				backoff = min(backoff*2, u.idleBackoff)
-				continue
-			}
-
-			backoff = u.pollInterval
-			ticker.Reset(u.pollInterval)
-
-			for _, ep := range events {
-				if err := u.router.Dispatch(ctx, ep.Event); err != nil {
-					u.log.Error(ctx, "failed to dispatch event",
-						"eventType", ep.EventType,
-						"globalPosition", ep.GlobalPosition,
-						"ERROR", err)
-				}
-
-				// Advance every projection's checkpoint to the latest position.
-				for _, name := range names {
-					if ep.GlobalPosition > checkpoints[name] {
-						checkpoints[name] = ep.GlobalPosition
-					}
-				}
-				eventsSinceCheckpoint++
-
-				// Periodic checkpoint save.
-				if eventsSinceCheckpoint >= checkpointInterval {
-					for _, name := range names {
-						if saveErr := u.checkpointStore.SaveGlobalPosition(ctx, name, checkpoints[name]); saveErr != nil {
-							u.log.Error(ctx, "failed to save checkpoint", "projection", name, "ERROR", saveErr)
-						}
-					}
-					u.log.Info(ctx, "checkpoints saved", "min_position", minPosition)
-					eventsSinceCheckpoint = 0
-				}
-			}
-
-			// Update minPosition for the next poll.
-			newMin := checkpoints[names[0]]
-			for _, name := range names[1:] {
-				if checkpoints[name] < newMin {
-					newMin = checkpoints[name]
-				}
-			}
-			minPosition = newMin
+			minPosition, backoff = u.pollTick(ctx, names, checkpoints, minPosition, &eventsSinceCheckpoint, backoff, ticker)
 		}
 	}
+}
+
+// loadCheckpoints fetches each projection's stored global position (or
+// starts at 0 when missing) and returns the checkpoint map plus the
+// minimum position across all projections — the starting point for the
+// next event read.
+func (u *ProjectionUpdater) loadCheckpoints(ctx context.Context, names []string) (map[string]int64, int64) {
+	checkpoints := make(map[string]int64, len(names))
+	var minPosition int64
+	first := true
+	for _, name := range names {
+		pos, err := u.checkpointStore.GetGlobalPosition(ctx, name)
+		if err != nil {
+			u.log.Info(ctx, "no checkpoint found for projection, starting from 0", "projection", name)
+			pos = 0
+		} else {
+			u.log.Info(ctx, "resuming projection from checkpoint", "projection", name, "global_position", pos)
+		}
+		checkpoints[name] = pos
+		if first || pos < minPosition {
+			minPosition = pos
+			first = false
+		}
+	}
+	return checkpoints, minPosition
+}
+
+// saveAllCheckpoints persists every projection's current checkpoint
+// using a fresh 5s-timeout context so shutdown flushes aren't blocked
+// by a cancelled parent. Errors are logged, not returned.
+func (u *ProjectionUpdater) saveAllCheckpoints(names []string, checkpoints map[string]int64) {
+	saveCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	for _, name := range names {
+		if err := u.checkpointStore.SaveGlobalPosition(saveCtx, name, checkpoints[name]); err != nil {
+			u.log.Error(saveCtx, "failed to save final checkpoint", "projection", name, "ERROR", err)
+		}
+	}
+}
+
+// pollTick runs one iteration of the ticker loop: read a batch, apply
+// error/idle backoff, dispatch + checkpoint each event, and recompute
+// minPosition for the next read. Returns the updated (minPosition,
+// backoff). eventsSinceCheckpoint is a pointer because the caller
+// tracks it across iterations for final-flush decisions.
+func (u *ProjectionUpdater) pollTick(
+	ctx context.Context, names []string, checkpoints map[string]int64,
+	minPosition int64, eventsSinceCheckpoint *int, backoff time.Duration,
+	ticker *time.Ticker,
+) (int64, time.Duration) {
+	events, err := u.eventStore.ReadAllFromPosition(ctx, minPosition, u.batchSize)
+	if err != nil {
+		u.log.Error(ctx, "failed to poll events", "ERROR", err)
+		newBackoff := min(backoff*2, u.maxBackoff)
+		ticker.Reset(newBackoff)
+		return minPosition, newBackoff
+	}
+	if len(events) == 0 {
+		newBackoff := min(backoff*2, u.idleBackoff)
+		ticker.Reset(newBackoff)
+		return minPosition, newBackoff
+	}
+
+	ticker.Reset(u.pollInterval)
+	for _, ep := range events {
+		u.dispatchAndCheckpoint(ctx, ep, names, checkpoints, eventsSinceCheckpoint, minPosition)
+	}
+	return minCheckpoint(names, checkpoints), u.pollInterval
+}
+
+// dispatchAndCheckpoint runs one event through the router and advances
+// every projection's checkpoint. Periodically flushes checkpoints to
+// the store (every checkpointInterval events) so a crash loses at most
+// one batch of work.
+func (u *ProjectionUpdater) dispatchAndCheckpoint(
+	ctx context.Context, ep pgstore.EventWithPosition, names []string,
+	checkpoints map[string]int64, eventsSinceCheckpoint *int, minPosition int64,
+) {
+	const checkpointInterval = 100
+	if err := u.router.Dispatch(ctx, ep.Event); err != nil {
+		u.log.Error(ctx, "failed to dispatch event",
+			"eventType", ep.EventType,
+			"globalPosition", ep.GlobalPosition,
+			"ERROR", err)
+	}
+	for _, name := range names {
+		if ep.GlobalPosition > checkpoints[name] {
+			checkpoints[name] = ep.GlobalPosition
+		}
+	}
+	*eventsSinceCheckpoint++
+	if *eventsSinceCheckpoint < checkpointInterval {
+		return
+	}
+	for _, name := range names {
+		if err := u.checkpointStore.SaveGlobalPosition(ctx, name, checkpoints[name]); err != nil {
+			u.log.Error(ctx, "failed to save checkpoint", "projection", name, "ERROR", err)
+		}
+	}
+	u.log.Info(ctx, "checkpoints saved", "min_position", minPosition)
+	*eventsSinceCheckpoint = 0
+}
+
+// minCheckpoint returns the smallest checkpoint across all projections
+// — the position the next poll should read from.
+func minCheckpoint(names []string, checkpoints map[string]int64) int64 {
+	m := checkpoints[names[0]]
+	for _, name := range names[1:] {
+		if checkpoints[name] < m {
+			m = checkpoints[name]
+		}
+	}
+	return m
 }
 
 // min returns the smaller of two durations.
