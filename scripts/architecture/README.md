@@ -18,6 +18,9 @@ reader. Scripts here are standalone — no cross-imports.
 | **Test coverage**   | `coverage.py`             | Which Go files / packages are actually exercised by the existing test suite? Pairs with bugfix_density — high-fix + low-coverage is the clearest risk combo. |
 | **Commit kinds**    | `commit_kinds.py`         | Conventional-commit prefix distribution (feat/fix/refactor/chore/…) per file. Tells you WHY a file churns — feat-dominant is active growth, fix-dominant is a bug magnet, refactor-dominant is pile-on risk. Complements bugfix_density's keyword matcher. |
 | **Dead code**       | `dead_code.py`            | Unreachable functions (via `golang.org/x/tools/cmd/deadcode` call-graph traversal) + unused fields/consts/methods (via `staticcheck -checks U1000`). Surfaces delete-targets distinct from "untested" code. |
+| **Coupling distance** | `coupling_distance.py` | Organisational distance 1–10 per import edge (same package → external dependency), from *Balancing Coupling in Software Design* (Khononov) Ch. 8. Deterministic import-graph mapping. |
+| **Coupling strength** | `coupling_strength.py` | Integration strength 1–10 per edge (Contract / Model / Common / Intrusive) from Khononov Ch. 7. AST-parses each caller's cross-package references and classifies against the target's exported surface. |
+| **Balanced coupling** | `balanced_coupling.py` | Khononov's Ch. 10 composite: `max(\|Strength − Distance\| + 1, 1 + 10 − Volatility)`. Per-package volatility computed inline from `git log` (defaults to a 6-month window). Depends on the two signals above plus git history. |
 | **Code-Maat dashboard** | `maat_visualize.py`   | CSV-driven visualization of an external Code-Maat report set.    |
 
 ## Synthesis (cross-signal)
