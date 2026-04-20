@@ -137,26 +137,74 @@ func (s *service) createPaymentIntent(ctx context.Context, userID, email string)
 	if acct.IsActivated() {
 		return "", ErrAlreadyActivated
 	}
-
-	if pendingPI := acct.PendingStripePaymentID(); pendingPI != "" {
-		pi, getErr := paymentintent.Get(pendingPI, piGetParams(ctx))
-		if getErr != nil {
-			s.log.Info(ctx, "billing: stale pending PI, will create new", "user_id", userID, "stripe_pi", pendingPI, "error", getErr)
-		} else if pi.Status == stripe.PaymentIntentStatusRequiresPaymentMethod ||
-			pi.Status == stripe.PaymentIntentStatusRequiresConfirmation ||
-			pi.Status == stripe.PaymentIntentStatusRequiresAction {
-			s.log.Info(ctx, "billing: reusing pending payment intent", "user_id", userID, "stripe_pi", pi.ID, "status", string(pi.Status))
-			return pi.ClientSecret, nil
-		}
+	if reused, ok := s.reusePendingPaymentIntent(ctx, userID, acct.PendingStripePaymentID()); ok {
+		return reused, nil
 	}
 
 	customerID, err := s.ensureStripeCustomer(ctx, userID, email, acct.StripeCustomerID)
 	if err != nil {
 		return "", err
 	}
-
 	paymentID := uuid.New().String()
 
+	pi, err := paymentintent.New(newSubscriptionPIParams(ctx, customerID, email, paymentID, userID))
+	if err != nil {
+		s.logStripeError(ctx, "billing: stripe create payment intent", err, "user_id", userID)
+		return "", fmt.Errorf("billing: stripe create payment intent: %w", err)
+	}
+
+	if err := acct.InitiatePayment(paymentID, pi.ID, customerID, AmountCents, DefaultCurrency, "Monthly subscription", paymentID); err != nil {
+		if errors.Is(err, ErrAlreadyActivated) {
+			return "", err
+		}
+		return "", fmt.Errorf("billing: initiate payment: %w", err)
+	}
+	if err := s.repo.Save(ctx, acct); err != nil {
+		return "", fmt.Errorf("billing: save aggregate: %w", err)
+	}
+
+	s.log.Info(ctx, "billing: payment initiated",
+		"user_id", userID, "payment_id", paymentID, "stripe_pi", pi.ID,
+		"stripe_customer", customerID, "amount_cents", AmountCents, "currency", DefaultCurrency)
+	return pi.ClientSecret, nil
+}
+
+// reusePendingPaymentIntent checks whether an earlier payment-intent is
+// still in a reusable state on Stripe (RequiresPaymentMethod/Confirmation/
+// Action). Returns the existing client_secret + ok when it is; ok=false
+// means the caller should create a new PI.
+func (s *service) reusePendingPaymentIntent(ctx context.Context, userID, pendingPI string) (string, bool) {
+	if pendingPI == "" {
+		return "", false
+	}
+	pi, err := paymentintent.Get(pendingPI, piGetParams(ctx))
+	if err != nil {
+		s.log.Info(ctx, "billing: stale pending PI, will create new", "user_id", userID, "stripe_pi", pendingPI, "error", err)
+		return "", false
+	}
+	if !isReusablePIStatus(pi.Status) {
+		return "", false
+	}
+	s.log.Info(ctx, "billing: reusing pending payment intent", "user_id", userID, "stripe_pi", pi.ID, "status", string(pi.Status))
+	return pi.ClientSecret, true
+}
+
+// isReusablePIStatus returns true for the Stripe statuses where the
+// existing PaymentIntent can still be confirmed by the frontend.
+func isReusablePIStatus(status stripe.PaymentIntentStatus) bool {
+	switch status {
+	case stripe.PaymentIntentStatusRequiresPaymentMethod,
+		stripe.PaymentIntentStatusRequiresConfirmation,
+		stripe.PaymentIntentStatusRequiresAction:
+		return true
+	}
+	return false
+}
+
+// newSubscriptionPIParams builds the Stripe PaymentIntent params for
+// the monthly subscription charge, including idempotency + the metadata
+// the webhook flow relies on to resolve the user.
+func newSubscriptionPIParams(ctx context.Context, customerID, email, paymentID, userID string) *stripe.PaymentIntentParams {
 	params := &stripe.PaymentIntentParams{
 		Amount:   stripe.Int64(AmountCents),
 		Currency: stripe.String(DefaultCurrency),
@@ -175,29 +223,7 @@ func (s *service) createPaymentIntent(ctx context.Context, userID, email string)
 	}
 	params.SetIdempotencyKey(paymentID)
 	params.Context = ctx
-
-	pi, err := paymentintent.New(params)
-	if err != nil {
-		s.logStripeError(ctx, "billing: stripe create payment intent", err, "user_id", userID)
-		return "", fmt.Errorf("billing: stripe create payment intent: %w", err)
-	}
-
-	if err := acct.InitiatePayment(paymentID, pi.ID, customerID, AmountCents, DefaultCurrency, "Monthly subscription", paymentID); err != nil {
-		if errors.Is(err, ErrAlreadyActivated) {
-			return "", err
-		}
-		return "", fmt.Errorf("billing: initiate payment: %w", err)
-	}
-
-	if err := s.repo.Save(ctx, acct); err != nil {
-		return "", fmt.Errorf("billing: save aggregate: %w", err)
-	}
-
-	s.log.Info(ctx, "billing: payment initiated",
-		"user_id", userID, "payment_id", paymentID, "stripe_pi", pi.ID,
-		"stripe_customer", customerID, "amount_cents", AmountCents, "currency", DefaultCurrency)
-
-	return pi.ClientSecret, nil
+	return params
 }
 
 func (s *service) confirmPaymentWithDetails(
@@ -322,23 +348,13 @@ func (s *service) handleRefund(ctx context.Context, charge *stripe.Charge) error
 	if charge == nil {
 		return fmt.Errorf("billing: charge.refunded received nil charge")
 	}
-	var piID string
-	if charge.PaymentIntent != nil {
-		piID = charge.PaymentIntent.ID
-	}
+	piID := chargePaymentIntentID(charge)
 	if piID == "" {
 		return fmt.Errorf("billing: charge.refunded missing payment intent for charge %s", charge.ID)
 	}
-	userID := charge.Metadata[MetadataKeyUserID]
-	if userID == "" && charge.PaymentIntent != nil && charge.PaymentIntent.Metadata != nil {
-		userID = charge.PaymentIntent.Metadata[MetadataKeyUserID]
-	}
-	if userID == "" {
-		pi, err := paymentintent.Get(piID, piGetParams(ctx))
-		if err != nil {
-			return fmt.Errorf("billing: charge.refunded failed to fetch PI %s: %w", piID, err)
-		}
-		userID = pi.Metadata[MetadataKeyUserID]
+	userID, err := s.resolveUserIDFromCharge(ctx, charge, piID)
+	if err != nil {
+		return err
 	}
 	if userID == "" {
 		return fmt.Errorf("billing: charge.refunded missing user_id in metadata for charge %s (pi: %s)", charge.ID, piID)
@@ -348,55 +364,94 @@ func (s *service) handleRefund(ctx context.Context, charge *stripe.Charge) error
 		return fmt.Errorf("billing: load account for refund: %w", err)
 	}
 
-	var refundAmount int64
-	var refundID, refundReason, refundStatus string
-	if charge.Refunds != nil && len(charge.Refunds.Data) > 0 {
-		latestRefund := charge.Refunds.Data[0]
-		refundAmount = latestRefund.Amount
-		refundID = latestRefund.ID
-		refundReason = string(latestRefund.Reason)
-		refundStatus = string(latestRefund.Status)
-	} else {
-		refundAmount = charge.AmountRefunded
-		refundID = fmt.Sprintf("re_auto_%s", charge.ID)
-		refundReason = "stripe_dashboard_refund"
-	}
-	if refundAmount <= 0 {
+	refund := extractRefundDetails(charge)
+	if refund.amount <= 0 {
 		s.log.Info(ctx, "billing: charge.refunded with zero amount, skipping", "user_id", userID, "charge_id", charge.ID)
 		return nil
 	}
-	if err := acct.RefundPaymentWithDetails(piID, refundID, charge.ID, "", refundAmount, string(charge.Currency), refundReason, refundStatus); err != nil {
+	if err := acct.RefundPaymentWithDetails(piID, refund.id, charge.ID, "", refund.amount, string(charge.Currency), refund.reason, refund.status); err != nil {
 		return fmt.Errorf("billing: refund payment: %w", err)
 	}
 	if err := s.repo.Save(ctx, acct); err != nil {
 		return fmt.Errorf("billing: save after refund: %w", err)
 	}
 	s.log.Info(ctx, "billing: refund processed from Stripe webhook",
-		"user_id", userID, "charge_id", charge.ID, "refund_id", refundID,
-		"amount_cents", refundAmount, "refund_reason", refundReason, "refund_status", refundStatus)
+		"user_id", userID, "charge_id", charge.ID, "refund_id", refund.id,
+		"amount_cents", refund.amount, "refund_reason", refund.reason, "refund_status", refund.status)
 	return nil
+}
+
+// chargePaymentIntentID extracts the PaymentIntent ID from a Stripe
+// Charge, returning "" when the charge has no attached intent.
+func chargePaymentIntentID(charge *stripe.Charge) string {
+	if charge.PaymentIntent == nil {
+		return ""
+	}
+	return charge.PaymentIntent.ID
+}
+
+// resolveUserIDFromCharge walks the three places the user_id can live
+// on a Charge webhook: the charge metadata, the embedded PaymentIntent
+// metadata, and (as a fallback) a fresh PaymentIntent.Get lookup. Only
+// the Stripe fetch path returns an error; empty userID is a caller
+// concern.
+func (s *service) resolveUserIDFromCharge(ctx context.Context, charge *stripe.Charge, piID string) (string, error) {
+	if id := charge.Metadata[MetadataKeyUserID]; id != "" {
+		return id, nil
+	}
+	if charge.PaymentIntent != nil && charge.PaymentIntent.Metadata != nil {
+		if id := charge.PaymentIntent.Metadata[MetadataKeyUserID]; id != "" {
+			return id, nil
+		}
+	}
+	pi, err := paymentintent.Get(piID, piGetParams(ctx))
+	if err != nil {
+		return "", fmt.Errorf("billing: charge.refunded failed to fetch PI %s: %w", piID, err)
+	}
+	return pi.Metadata[MetadataKeyUserID], nil
+}
+
+// refundDetails captures the four fields handleRefund needs off either
+// the first Refund in the charge's refund list or the charge-level
+// dashboard-refund fallback.
+type refundDetails struct {
+	amount int64
+	id     string
+	reason string
+	status string
+}
+
+// extractRefundDetails reads the latest refund off charge.Refunds.Data
+// if present, falling back to charge.AmountRefunded + a synthetic ID for
+// dashboard-driven refunds that don't attach a Refund object.
+func extractRefundDetails(charge *stripe.Charge) refundDetails {
+	if charge.Refunds != nil && len(charge.Refunds.Data) > 0 {
+		latest := charge.Refunds.Data[0]
+		return refundDetails{
+			amount: latest.Amount,
+			id:     latest.ID,
+			reason: string(latest.Reason),
+			status: string(latest.Status),
+		}
+	}
+	return refundDetails{
+		amount: charge.AmountRefunded,
+		id:     fmt.Sprintf("re_auto_%s", charge.ID),
+		reason: "stripe_dashboard_refund",
+	}
 }
 
 func (s *service) handleDispute(ctx context.Context, dispute *stripe.Dispute, stripeEventID string) error {
 	if dispute == nil {
 		return fmt.Errorf("billing: dispute.created received nil dispute")
 	}
-	var chargeID string
-	if dispute.Charge != nil {
-		chargeID = dispute.Charge.ID
-	}
+	chargeID := disputeChargeID(dispute)
 	if chargeID == "" {
 		return fmt.Errorf("billing: dispute missing charge ID for dispute %s", dispute.ID)
 	}
-	userID := resolveUserIDFromDispute(dispute)
-	if userID == "" {
-		if dispute.PaymentIntent != nil && dispute.PaymentIntent.ID != "" {
-			pi, err := paymentintent.Get(dispute.PaymentIntent.ID, piGetParams(ctx))
-			if err != nil {
-				return fmt.Errorf("billing: dispute failed to fetch PI: %w", err)
-			}
-			userID = pi.Metadata[MetadataKeyUserID]
-		}
+	userID, err := s.resolveDisputeUserID(ctx, dispute, "billing: dispute failed to fetch PI")
+	if err != nil {
+		return err
 	}
 	if userID == "" {
 		return fmt.Errorf("billing: dispute missing user_id for dispute %s (charge: %s)", dispute.ID, chargeID)
@@ -422,13 +477,9 @@ func (s *service) handleDisputeClosed(ctx context.Context, dispute *stripe.Dispu
 	if dispute == nil {
 		return fmt.Errorf("billing: dispute.closed received nil dispute")
 	}
-	userID := resolveUserIDFromDispute(dispute)
-	if userID == "" && dispute.PaymentIntent != nil && dispute.PaymentIntent.ID != "" {
-		pi, err := paymentintent.Get(dispute.PaymentIntent.ID, piGetParams(ctx))
-		if err != nil {
-			return fmt.Errorf("billing: dispute.closed failed to fetch PI: %w", err)
-		}
-		userID = pi.Metadata[MetadataKeyUserID]
+	userID, err := s.resolveDisputeUserID(ctx, dispute, "billing: dispute.closed failed to fetch PI")
+	if err != nil {
+		return err
 	}
 	if userID == "" {
 		return fmt.Errorf("billing: dispute.closed missing user_id for dispute %s", dispute.ID)
@@ -449,20 +500,38 @@ func (s *service) handleDisputeClosed(ctx context.Context, dispute *stripe.Dispu
 	return nil
 }
 
+// disputeChargeID extracts the Charge ID from a Dispute webhook,
+// returning "" when Stripe sent the dispute without the charge pointer.
+func disputeChargeID(dispute *stripe.Dispute) string {
+	if dispute.Charge == nil {
+		return ""
+	}
+	return dispute.Charge.ID
+}
+
+// resolveDisputeUserID returns the user_id for a dispute, preferring the
+// metadata already on the dispute and falling back to a PaymentIntent
+// lookup. fetchErrPrefix is used to prefix any Stripe fetch error so the
+// two dispute handlers surface distinct log strings.
+func (s *service) resolveDisputeUserID(ctx context.Context, dispute *stripe.Dispute, fetchErrPrefix string) (string, error) {
+	if userID := resolveUserIDFromDispute(dispute); userID != "" {
+		return userID, nil
+	}
+	if dispute.PaymentIntent == nil || dispute.PaymentIntent.ID == "" {
+		return "", nil
+	}
+	pi, err := paymentintent.Get(dispute.PaymentIntent.ID, piGetParams(ctx))
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", fetchErrPrefix, err)
+	}
+	return pi.Metadata[MetadataKeyUserID], nil
+}
+
 func (s *service) handleInvoicePaymentFailed(ctx context.Context, invoice *stripe.Invoice, stripeEventID string) error {
 	if invoice == nil {
 		return fmt.Errorf("billing: invoice.payment_failed received nil invoice")
 	}
-	var userID string
-	if invoice.Customer != nil && invoice.Customer.Metadata != nil {
-		userID = invoice.Customer.Metadata[MetadataKeyUserID]
-	}
-	if userID == "" && invoice.Parent != nil &&
-		invoice.Parent.SubscriptionDetails != nil &&
-		invoice.Parent.SubscriptionDetails.Subscription != nil &&
-		invoice.Parent.SubscriptionDetails.Subscription.Metadata != nil {
-		userID = invoice.Parent.SubscriptionDetails.Subscription.Metadata[MetadataKeyUserID]
-	}
+	userID := resolveUserIDFromInvoice(invoice)
 	if userID == "" {
 		s.log.Error(ctx, "billing: invoice.payment_failed missing user_id", "invoice_id", invoice.ID, "stripe_event", stripeEventID)
 		return fmt.Errorf("billing: invoice.payment_failed missing user_id for invoice %s", invoice.ID)
@@ -471,10 +540,7 @@ func (s *service) handleInvoicePaymentFailed(ctx context.Context, invoice *strip
 	if err != nil {
 		return fmt.Errorf("billing: load account for invoice failure: %w", err)
 	}
-	var nextAttempt *int64
-	if invoice.NextPaymentAttempt > 0 {
-		nextAttempt = &invoice.NextPaymentAttempt
-	}
+	nextAttempt := optionalNextAttempt(invoice.NextPaymentAttempt)
 	if err := acct.RecordInvoicePaymentFailure(invoice.ID, stripeEventID, invoice.AmountDue, string(invoice.Currency), invoice.AttemptCount, nextAttempt, ""); err != nil {
 		return fmt.Errorf("billing: record invoice failure: %w", err)
 	}
@@ -486,6 +552,44 @@ func (s *service) handleInvoicePaymentFailed(ctx context.Context, invoice *strip
 		"attempt_count", invoice.AttemptCount, "consecutive_failures", acct.ConsecutiveInvoiceFailures,
 		"stripe_event", stripeEventID)
 	return nil
+}
+
+// resolveUserIDFromInvoice walks both metadata locations on an invoice:
+// the customer metadata first, then the parent subscription's metadata
+// (populated by Stripe Billing subscriptions).
+func resolveUserIDFromInvoice(invoice *stripe.Invoice) string {
+	if invoice.Customer != nil && invoice.Customer.Metadata != nil {
+		if id := invoice.Customer.Metadata[MetadataKeyUserID]; id != "" {
+			return id
+		}
+	}
+	sub := invoiceParentSubscription(invoice)
+	if sub != nil && sub.Metadata != nil {
+		return sub.Metadata[MetadataKeyUserID]
+	}
+	return ""
+}
+
+// invoiceParentSubscription peels the nullable pointer chain off
+// invoice.Parent.SubscriptionDetails.Subscription so callers don't have
+// to re-check four levels of nil.
+func invoiceParentSubscription(invoice *stripe.Invoice) *stripe.Subscription {
+	if invoice.Parent == nil {
+		return nil
+	}
+	if invoice.Parent.SubscriptionDetails == nil {
+		return nil
+	}
+	return invoice.Parent.SubscriptionDetails.Subscription
+}
+
+// optionalNextAttempt converts Stripe's 0-means-absent Unix timestamp
+// into a nullable pointer the domain layer can persist as NULL.
+func optionalNextAttempt(nextAttempt int64) *int64 {
+	if nextAttempt <= 0 {
+		return nil
+	}
+	return &nextAttempt
 }
 
 func calculateBillingPeriodEnd(now time.Time, ledger []LedgerEntry) time.Time {
