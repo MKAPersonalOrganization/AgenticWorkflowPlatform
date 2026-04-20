@@ -21,6 +21,9 @@ reader. Scripts here are standalone — no cross-imports.
 | **Coupling distance** | `coupling_distance.py` | Organisational distance 1–10 per import edge (same package → external dependency), from *Balancing Coupling in Software Design* (Khononov) Ch. 8. Deterministic import-graph mapping. |
 | **Coupling strength** | `coupling_strength.py` | Integration strength 1–10 per edge (Contract / Model / Common / Intrusive) from Khononov Ch. 7. AST-parses each caller's cross-package references and classifies against the target's exported surface. |
 | **Balanced coupling** | `balanced_coupling.py` | Khononov's Ch. 10 composite: `max(\|Strength − Distance\| + 1, 1 + 10 − Volatility)`. Per-package volatility computed inline from `git log` (defaults to a 6-month window). Depends on the two signals above plus git history. |
+| **Connascence of Position** | `connascence_position.py` | Khononov Ch. 6 / Page-Jones's static-connascence top tier per exported Go signature. Flags ≥ 4 positional params, ≥ 2 adjacent same-type params (Listing 6.7), same-type multi-value returns (Listing 6.8). Each finding is a refactor target to options-struct / named-return. |
+| **Assertion density** | `assertion_density.py` | Per-test-file count of assertion calls (`t.Error*`, `testify`, `gomega`) + ratio to test LOC + per-func mean. Pairs with `coverage.py` — "high coverage + low assertion density" is fake-tested. |
+| **gosec security scan** | `gosec.py` | Wraps [securego/gosec](https://github.com/securego/gosec); per-file findings with severity + confidence + CWE tags. The only production-risk lens in the suite (unhandled errors, weak crypto, SQL-concat, TLS config, …). |
 | **Code-Maat dashboard** | `maat_visualize.py`   | CSV-driven visualization of an external Code-Maat report set.    |
 
 ## Synthesis (cross-signal)
@@ -49,6 +52,10 @@ Several signals shell out to Go tools installed via `go install`:
   ```
   go install golang.org/x/tools/cmd/deadcode@latest
   go install honnef.co/go/tools/cmd/staticcheck@latest
+  ```
+- `gosec.py` — requires `gosec` on `$PATH` or `$GOPATH/bin`:
+  ```
+  go install github.com/securego/gosec/v2/cmd/gosec@latest
   ```
 
 ## Running

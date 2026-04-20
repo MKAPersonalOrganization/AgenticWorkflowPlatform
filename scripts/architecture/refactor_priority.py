@@ -32,6 +32,16 @@ Inputs (all JSON from sibling tools in scripts/architecture/):
                   Distance| + 1, 1 + 10 − Volatility) per edge. Each
                   file inherits its package's worst outgoing balance,
                   plus a dedicated "worst edges" orientation section.)
+  --connascence-position  connascence_position.py --json (optional;
+                  Khononov Ch. 6 "Connascence of Position" detector
+                  for exported Go signatures with ≥ N positional
+                  params or same-type runs).
+  --assertion-density  assertion_density.py --json (optional;
+                  per-test-file assertions/LOC. Joined to production
+                  files via their package — a FINE-coverage package
+                  with HIGH assertion_density is "fake-tested".)
+  --gosec         gosec.py --json (optional; per-file security
+                  findings via securego/gosec. Severity-tiered.)
 
 Outputs:
   stdout          compact table of files with ≥1 signal, sorted by number
@@ -315,6 +325,90 @@ def load_commit_kinds(path: str | None, min_verdict: str = "LOW"
     return out
 
 
+def load_connascence_position(path: str | None, min_verdict: str = "LOW"
+                              ) -> dict[str, dict]:
+    """Load Connascence-of-Position findings per file.
+
+    Mirrors the other ``load_*`` verdict-floor pattern: default skips
+    FINE files (no positional-connascence issues) and returns a file→
+    record map consumable by ``collate``.
+    """
+    if not path:
+        return {}
+    severity = {"FINE": 0, "LOW": 1, "MEDIUM": 2, "HIGH": 3}
+    floor = severity.get(min_verdict, 1)
+    d = json.loads(Path(path).read_text())
+    out: dict[str, dict] = {}
+    for e in d.get("all") or d.get("ranked") or []:
+        v = e.get("verdict", "FINE")
+        if severity.get(v, 0) < floor:
+            continue
+        out[e["path"]] = {
+            "path": e["path"],
+            "verdict": v,
+            "finding_count": e.get("finding_count", 0),
+            "findings": e.get("findings", []),
+        }
+    return out
+
+
+def load_assertion_density(path: str | None, min_verdict: str = "MEDIUM"
+                           ) -> dict[str, dict]:
+    """Load per-package assertion density.
+
+    Unlike the other signals, assertion_density records are keyed by
+    *test* files, not production files. The analytically-useful join
+    is at the **package** level — so we roll up to the package and the
+    collator will map each production file to its package's density.
+    """
+    if not path:
+        return {}
+    severity = {"FINE": 0, "LOW": 1, "MEDIUM": 2, "HIGH": 3, "NO_TESTS": 3}
+    floor = severity.get(min_verdict, 2)
+    d = json.loads(Path(path).read_text())
+    packages_section = d.get("packages") or {}
+    all_pkgs = packages_section.get("all") or packages_section.get("ranked") or []
+    out: dict[str, dict] = {}
+    for p in all_pkgs:
+        v = p.get("verdict", "FINE")
+        if severity.get(v, 0) < floor:
+            continue
+        out[p["package"]] = {
+            "package": p["package"],
+            "verdict": v,
+            "test_funcs": p.get("test_funcs", 0),
+            "test_loc": p.get("test_loc", 0),
+            "assertions": p.get("assertions", 0),
+            "assertions_per_func": p.get("assertions_per_func", 0.0),
+            "assertions_per_loc": p.get("assertions_per_loc", 0.0),
+        }
+    return out
+
+
+def load_gosec(path: str | None, min_verdict: str = "MEDIUM"
+               ) -> dict[str, dict]:
+    """Load gosec security findings per file."""
+    if not path:
+        return {}
+    severity = {"FINE": 0, "LOW": 1, "MEDIUM": 2, "HIGH": 3}
+    floor = severity.get(min_verdict, 2)
+    d = json.loads(Path(path).read_text())
+    out: dict[str, dict] = {}
+    for e in d.get("all") or d.get("ranked") or []:
+        v = e.get("verdict", "FINE")
+        if severity.get(v, 0) < floor:
+            continue
+        out[e["path"]] = {
+            "path": e["path"],
+            "verdict": v,
+            "total_findings": e.get("total_findings", 0),
+            "severity_counts": e.get("severity_counts", {}),
+            "confidence_counts": e.get("confidence_counts", {}),
+            "findings": e.get("findings", []),
+        }
+    return out
+
+
 def load_balanced_coupling(path: str | None, min_balance: int = 7
                            ) -> tuple[dict[str, dict], list[dict]]:
     """Load the balanced-coupling report (balanced_coupling.py).
@@ -470,6 +564,9 @@ def collate(
     commit_kinds_by_file: dict[str, dict] | None = None,
     dead_code_by_file: dict[str, dict] | None = None,
     balanced_by_pkg: dict[str, dict] | None = None,
+    cop_by_file: dict[str, dict] | None = None,
+    assertion_by_pkg: dict[str, dict] | None = None,
+    gosec_by_file: dict[str, dict] | None = None,
     module_prefix: str = "",
 ) -> list[dict]:
     """Merge per-file data from every signal. No ranking, no scoring — just
@@ -481,10 +578,14 @@ def collate(
     commit_kinds_by_file = commit_kinds_by_file or {}
     dead_code_by_file = dead_code_by_file or {}
     balanced_by_pkg = balanced_by_pkg or {}
+    cop_by_file = cop_by_file or {}
+    assertion_by_pkg = assertion_by_pkg or {}
+    gosec_by_file = gosec_by_file or {}
     all_paths = (
         set(hotspots_by_file) | set(trends_by_file) | set(coupling_by_file)
         | set(bugfix_by_file) | set(lcom4_by_file) | set(cyclomatic_by_file)
         | set(coverage_by_file) | set(commit_kinds_by_file) | set(dead_code_by_file)
+        | set(cop_by_file) | set(gosec_by_file)
     )
     records: list[dict] = []
     for path in all_paths:
@@ -505,6 +606,14 @@ def collate(
             parent = path.rsplit("/", 1)[0] if "/" in path else ""
             pkg_key = f"{module_prefix}/{parent}" if parent else module_prefix
             bc = balanced_by_pkg.get(pkg_key)
+        # Connascence of Position is per-file; gosec is per-file.
+        cop = cop_by_file.get(path)
+        gs = gosec_by_file.get(path)
+        # Assertion density is per-package (from test-file rollup).
+        ad = None
+        if assertion_by_pkg and path.endswith(".go"):
+            parent = path.rsplit("/", 1)[0] if "/" in path else "."
+            ad = assertion_by_pkg.get(parent or ".")
 
         present_in: list[str] = []
         if hs: present_in.append("hotspot")
@@ -517,6 +626,9 @@ def collate(
         if ck: present_in.append("commit_kinds")
         if dc: present_in.append("dead_code")
         if bc: present_in.append("balanced_coupling")
+        if cop: present_in.append("conn_position")
+        if ad: present_in.append("assertion_density")
+        if gs: present_in.append("gosec")
 
         records.append({
             "path": path,
@@ -532,6 +644,9 @@ def collate(
             "commit_kinds": ck,
             "dead_code": dc,
             "balanced_coupling": bc,
+            "conn_position": cop,
+            "assertion_density": ad,
+            "gosec": gs,
         })
 
     # Order: files present in more analyses first (a factual count, not a
@@ -567,7 +682,8 @@ def print_stdout(records: list[dict], packages: list[dict],
     hdr = (f"{'Sig':<3}  {'Commits':>7}  {'Fix%':>5}  "
            f"{'Trend':<12}  {'Δmean':>6}  {'MaxI':>4}  "
            f"{'Cpl':>3}  {'LCOM4':>5}  {'CCN':>5}  {'Cov%':>5}  "
-           f"{'Dom':<8}  {'Dead':>4}  {'Bal':>3}  Path")
+           f"{'Dom':<8}  {'Dead':>4}  {'Bal':>3}  "
+           f"{'Pos':>3}  {'Sec':>3}  {'A/f':>4}  Path")
     print(hdr)
     print("-" * len(hdr))
     for r in records:
@@ -602,10 +718,17 @@ def print_stdout(records: list[dict], packages: list[dict],
         dead_txt = str(dc["total_findings"]) if dc else ""
         bc = r.get("balanced_coupling")
         bal_txt = str(bc["worst_balance"]) if bc else ""
+        cop = r.get("conn_position")
+        pos_txt = str(cop["finding_count"]) if cop else ""
+        gs = r.get("gosec")
+        sec_txt = str(gs["total_findings"]) if gs else ""
+        ad = r.get("assertion_density")
+        asrt_txt = f"{ad['assertions_per_func']:.1f}" if ad else ""
         print(f"{r['signal_count']:<3}  {str(commits):>7}  {fix_pct:>5}  "
               f"{_trunc(trend_verdict, 12):<12}  {dmean:>6}  {maxi:>4}  "
               f"{str(cpl):>3}  {lcom4_txt:>5}  {ccn_txt:>5}  {cov_txt:>5}  "
-              f"{dom_txt:<8}  {dead_txt:>4}  {bal_txt:>3}  {r['path']}")
+              f"{dom_txt:<8}  {dead_txt:>4}  {bal_txt:>3}  "
+              f"{pos_txt:>3}  {sec_txt:>3}  {asrt_txt:>4}  {r['path']}")
 
 
 def to_markdown(records: list[dict], packages: list[dict], meta: dict,
@@ -680,6 +803,9 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
     lines.append("| dead findings | `dead_code.py` | Count of dead-code findings per file: unreachable functions (deadcode call-graph) + unused fields/consts/methods (staticcheck U1000). Every finding is a delete-target. Distinct from coverage — coverage measures what's untested; dead_code measures what's unreachable. |")
     if balanced_edges is not None:
         lines.append("| balanced coupling | `balanced_coupling.py` | Khononov's composite per package edge — `max(\\|Strength − Distance\\| + 1, 1 + 10 − Volatility)`. Each file inherits its package's worst outgoing balance (1 = healthy, 10 = worst). High Balance means either (a) Strength/Distance mismatch (e.g. strong coupling into a distant stranger) or (b) strong coupling into an unusually stable target — both are attention-worthy. |")
+    lines.append("| conn. position (Pos) | `connascence_position.py` | Count of exported Go signatures in the file that trigger Connascence of Position (Khononov Ch. 6): ≥ 4 positional params, ≥ 2 adjacent same-type params (the book's Listing 6.7 pattern), or multi-value returns with same-type runs (Listing 6.8). Each finding is a refactor candidate to an options-struct / named-return. |")
+    lines.append("| assertion density (A/f) | `assertion_density.py` | Package-level mean `assertions_per_test_func` (stdlib + testify + gomega). Pairs with coverage: high coverage + low assertion_density = fake-tested. Inherited from the test files of the file's package. |")
+    lines.append("| gosec (Sec) | `gosec.py` | Count of security findings per file via [securego/gosec](https://github.com/securego/gosec). Severity-tiered (HIGH / MEDIUM / LOW × confidence). Covers unhandled errors, weak crypto, SQL-concat, TLS config, hard-coded creds, and more. |")
     lines.append("")
 
     # Top packages — orientation (churn view from go_hotspots).
@@ -908,8 +1034,8 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
         lines.append(f"\n![signal matrix]({_img_src(plot_paths['matrix'])})\n")
 
     lines.append(f"## File overview ({len(visible)} files)\n")
-    lines.append("| File | Signals | Commits | Fix count | Fix % | Trend verdict | Δmean | Max indent | Hotspot score | Coupling partners | LCOM4 (Δ) | CCN / Mod / High | Dups | Cov % (untested) | Kind mix | Dead | Bal (S/D/V) |")
-    lines.append("|---|:-:|---:|---:|---:|:-:|---:|---:|---:|---:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|")
+    lines.append("| File | Signals | Commits | Fix count | Fix % | Trend verdict | Δmean | Max indent | Hotspot score | Coupling partners | LCOM4 (Δ) | CCN / Mod / High | Dups | Cov % (untested) | Kind mix | Dead | Bal (S/D/V) | Pos | Sec | A/f |")
+    lines.append("|---|:-:|---:|---:|---:|:-:|---:|---:|---:|---:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|")
     for r in visible:
         commits = (r["bugfix"]["total_commits"] if r["bugfix"]
                    else (r["trend"]["commits"] if r["trend"] else ""))
@@ -975,11 +1101,28 @@ def to_markdown(records: list[dict], packages: list[dict], meta: dict,
                         f"({bc.get('worst_strength', 0)}/{bc.get('worst_distance', 0)}/{bc.get('worst_volatility', 0)})")
         else:
             bal_cell = ""
+        cop = r.get("conn_position")
+        pos_cell = f"{cop['finding_count']} ({cop.get('verdict', '?')})" if cop else ""
+        gs = r.get("gosec")
+        if gs:
+            sev = gs.get("severity_counts", {})
+            h, m, l = sev.get("HIGH", 0), sev.get("MEDIUM", 0), sev.get("LOW", 0)
+            sec_cell = f"{gs['total_findings']} (H:{h} M:{m} L:{l})"
+        else:
+            sec_cell = ""
+        ad = r.get("assertion_density")
+        if ad:
+            asrt_cell = (f"{ad['assertions_per_func']:.1f}/f "
+                         f"({ad.get('test_funcs', 0)} tests, "
+                         f"verdict={ad.get('verdict', '?')})")
+        else:
+            asrt_cell = ""
         lines.append(
             f"| `{r['path']}` | {r['signal_count']} | "
             f"{commits} | {fix_n} | {fix_p} | {verdict} | "
             f"{dmean} | {maxi} | {hs_score} | {cpl} | {lcom4_cell} | {ccn_cell} | "
-            f"{dup_cell} | {cov_cell} | {kind_cell} | {dead_cell} | {bal_cell} |"
+            f"{dup_cell} | {cov_cell} | {kind_cell} | {dead_cell} | {bal_cell} | "
+            f"{pos_cell} | {sec_cell} | {asrt_cell} |"
         )
     lines.append("")
 
@@ -1173,6 +1316,60 @@ def _detail_block(r: dict) -> list[str]:
             f"entropy {ck.get('entropy_bits', 0):.2f} bits, "
             f"prefix-match {ck.get('prefix_match_rate', 0):.0f}%): "
             + ", ".join(parts) + "."
+        )
+        out.append("")
+
+    if r.get("gosec"):
+        gs = r["gosec"]
+        sev = gs.get("severity_counts", {})
+        out.append(
+            f"**gosec** — verdict **{gs.get('verdict', 'n/a')}**: "
+            f"{gs.get('total_findings', 0)} finding(s) "
+            f"(H={sev.get('HIGH', 0)}, M={sev.get('MEDIUM', 0)}, "
+            f"L={sev.get('LOW', 0)})."
+        )
+        for f in (gs.get("findings") or [])[:5]:
+            rule = f.get("rule_id", "")
+            cwe = f.get("cwe_id", "")
+            det = f.get("details", "")
+            det_trunc = det if len(det) <= 100 else det[:97] + "…"
+            out.append(f"- L{f.get('line', '?')} "
+                       f"[{f.get('severity', '?')}/{f.get('confidence', '?')}]  "
+                       f"`{rule}`"
+                       + (f" (CWE-{cwe})" if cwe else "")
+                       + f" — {det_trunc}")
+        more = len(gs.get("findings") or []) - 5
+        if more > 0:
+            out.append(f"- … +{more} more")
+        out.append("")
+
+    if r.get("conn_position"):
+        cop = r["conn_position"]
+        out.append(
+            f"**connascence_position** — verdict **{cop.get('verdict', 'n/a')}**: "
+            f"{cop.get('finding_count', 0)} exported signature(s) with "
+            f"Connascence of Position (Khononov Ch. 6)."
+        )
+        for f in (cop.get("findings") or [])[:5]:
+            triggers = ", ".join(f.get("triggers", []))
+            out.append(f"- L{f.get('line', '?')} `{f.get('name', '?')}` — "
+                       f"params={f.get('positional_count', 0)} "
+                       f"returns={f.get('return_count', 0)} "
+                       f"[{triggers}]")
+        more = len(cop.get("findings") or []) - 5
+        if more > 0:
+            out.append(f"- … +{more} more")
+        out.append("")
+
+    if r.get("assertion_density"):
+        ad = r["assertion_density"]
+        out.append(
+            f"**assertion_density** — package-level verdict **{ad.get('verdict', 'n/a')}**: "
+            f"{ad.get('test_funcs', 0)} test funcs, "
+            f"{ad.get('assertions', 0)} assertions "
+            f"({ad.get('assertions_per_func', 0):.2f}/func, "
+            f"{ad.get('assertions_per_loc', 0):.3f}/test-LOC, "
+            f"{ad.get('test_loc', 0)} test LOC)."
         )
         out.append("")
 
@@ -1653,6 +1850,20 @@ def main() -> int:
                     help="balanced-coupling floor for inclusion in the worst-edges "
                          "orientation table (default 7; edges below this are collated "
                          "into per-package summaries but not listed individually)")
+    ap.add_argument("--connascence-position", help="connascence_position.py --json output "
+                                                   "(Khononov Ch. 6 positional-args detector)")
+    ap.add_argument("--conn-position-min-verdict", choices=["LOW", "MEDIUM", "HIGH"],
+                    default="LOW",
+                    help="conn-position floor (default LOW)")
+    ap.add_argument("--assertion-density", help="assertion_density.py --json output "
+                                                "(per-test-file assertion counts)")
+    ap.add_argument("--assertion-min-verdict", choices=["LOW", "MEDIUM", "HIGH"],
+                    default="MEDIUM",
+                    help="assertion-density floor for package inclusion (default MEDIUM)")
+    ap.add_argument("--gosec", help="gosec.py --json output (Go security linter findings)")
+    ap.add_argument("--gosec-min-verdict", choices=["LOW", "MEDIUM", "HIGH"],
+                    default="MEDIUM",
+                    help="gosec floor (default MEDIUM: skip LOW-severity files)")
     ap.add_argument("--out-md", type=str, help="write markdown data report to this path")
     ap.add_argument("--out-json", type=str, help="write merged data JSON to this path")
     ap.add_argument("--cooccur-floor", type=int, default=3,
@@ -1700,6 +1911,13 @@ def main() -> int:
         balanced_by_pkg, balanced_edges = load_balanced_coupling(
             args.balanced_coupling, args.balanced_min,
         )
+        cop_by_file = load_connascence_position(
+            args.connascence_position, args.conn_position_min_verdict,
+        )
+        assertion_by_pkg = load_assertion_density(
+            args.assertion_density, args.assertion_min_verdict,
+        )
+        gosec_by_file = load_gosec(args.gosec, args.gosec_min_verdict)
     except FileNotFoundError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
@@ -1718,7 +1936,8 @@ def main() -> int:
     records = collate(hotspots_by_file, trends_by_file, coupling_by_file,
                       bugfix_by_file, lcom4_by_file, cyclomatic_by_file,
                       coverage_by_file, commit_kinds_by_file, dead_code_by_file,
-                      balanced_by_pkg, module_prefix)
+                      balanced_by_pkg, cop_by_file, assertion_by_pkg,
+                      gosec_by_file, module_prefix)
     print_stdout(records, packages, summary=args.summary)
 
     meta = {

@@ -260,7 +260,7 @@ tasks:
   # Writes REFACTORING_PLAN.md at repo root.
 
   refactor:plan:
-    desc: "Generate an evidence-based refactoring plan across every available signal (hotspots, trend, coupling, bugfix, coverage, commit-kinds, dead-code). Env: SINCE (default '6 months ago'), TOP_PACKAGES (default 4), FULL=1 to include per-file Detail blocks (default: summary only), SKIP_COVERAGE=1 to skip `go test -cover`, SKIP_DEADCODE=1 to skip deadcode+staticcheck."
+    desc: "Generate an evidence-based refactoring plan across every available signal (hotspots, trend, coupling, bugfix, coverage, commit-kinds, dead-code, coupling distance/strength/balance, connascence of position, assertion density, gosec security). Env: SINCE (default '6 months ago'), TOP_PACKAGES (default 4), FULL=1 to include per-file Detail blocks, SKIP_COVERAGE=1 to skip `go test -cover`, SKIP_DEADCODE=1 to skip deadcode+staticcheck, SKIP_GOSEC=1 to skip gosec (slow)."
     deps: [hotspots:setup]
     vars:
       SINCE: '{{.SINCE | default "6 months ago"}}'
@@ -348,7 +348,7 @@ tasks:
           --json .hotspots/coupling_strength.json --top 15 >/dev/null || \
           echo "warning: coupling_strength.py failed"
       - |
-        echo "▶ 11/11 Balanced coupling (Khononov Ch. 10 composite)..."
+        echo "▶ 11/14 Balanced coupling (Khononov Ch. 10 composite)..."
         if [ -f .hotspots/coupling_distance.json ] && [ -f .hotspots/coupling_strength.json ]; then
           .hotspots/.venv/bin/python3 scripts/architecture/balanced_coupling.py \
             --distance .hotspots/coupling_distance.json \
@@ -358,6 +358,26 @@ tasks:
             echo "warning: balanced_coupling.py failed"
         else
           echo "  (skipped — coupling_distance.json or coupling_strength.json missing)"
+        fi
+      - |
+        echo "▶ 12/14 Connascence of Position (Khononov Ch. 6)..."
+        .hotspots/.venv/bin/python3 scripts/architecture/connascence_position.py \
+          --json .hotspots/connascence_position.json --top 15 >/dev/null || \
+          echo "warning: connascence_position.py failed"
+      - |
+        echo "▶ 13/14 Assertion density (test-quality signal)..."
+        .hotspots/.venv/bin/python3 scripts/architecture/assertion_density.py \
+          --json .hotspots/assertion_density.json --top 15 >/dev/null || \
+          echo "warning: assertion_density.py failed"
+      - |
+        echo "▶ 14/14 gosec security scan..."
+        # Set SKIP_GOSEC=1 to skip (it takes ~2min on this repo).
+        if [ -z "${SKIP_GOSEC}" ]; then
+          .hotspots/.venv/bin/python3 scripts/architecture/gosec.py \
+            --json .hotspots/gosec.json --top 15 >/dev/null || \
+            echo "warning: gosec.py failed — maybe gosec not installed"
+        else
+          echo "  (skipped — SKIP_GOSEC set; reusing existing .hotspots/gosec.json if present)"
         fi
       - |
         echo "▶ synthesize..."
@@ -374,12 +394,18 @@ tasks:
         [ -f .hotspots/dead_code.json ]     && DC_FLAG="--dead-code .hotspots/dead_code.json"
         BC_FLAG=""
         [ -f .hotspots/balanced_coupling.json ] && BC_FLAG="--balanced-coupling .hotspots/balanced_coupling.json"
+        CP_FLAG=""
+        [ -f .hotspots/connascence_position.json ] && CP_FLAG="--connascence-position .hotspots/connascence_position.json"
+        AD_FLAG=""
+        [ -f .hotspots/assertion_density.json ] && AD_FLAG="--assertion-density .hotspots/assertion_density.json"
+        GS_FLAG=""
+        [ -f .hotspots/gosec.json ] && GS_FLAG="--gosec .hotspots/gosec.json"
         .hotspots/.venv/bin/python3 scripts/architecture/refactor_priority.py \
           $HS_FLAGS \
           --trends .hotspots/trends.json \
           --coupling .hotspots/coupling.json \
           --bugfix .hotspots/bugfix.json \
-          $COV_FLAG $CK_FLAG $DC_FLAG $BC_FLAG \
+          $COV_FLAG $CK_FLAG $DC_FLAG $BC_FLAG $CP_FLAG $AD_FLAG $GS_FLAG \
           --out-md REFACTORING_PLAN.md \
           --out-json .hotspots/refactor_plan.json \
           --window "{{.SINCE}}" \
