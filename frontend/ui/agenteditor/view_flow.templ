@@ -2,16 +2,13 @@ package agenteditor
 
 import (
 	"aicompass/frontend/components/button"
-	"aicompass/frontend/components/dialog"
 	"aicompass/frontend/components/icon"
 	"aicompass/frontend/ui/i18n"
 )
 
-// flowView is the workflow-tree editor: an IDE-style three-pane layout
-// (node palette, tree canvas, property panel) with a bottom panel for
-// evaluation output. The largest single view in AgentDesignerDialog —
-// kept isolated so its VS Code-style panel plumbing doesn't bleed into
-// the other views' simpler structures.
+// flowView is the workflow-tree editor: an IDE-style two-pane layout
+// (tree canvas + property panel). Kept isolated so its VS Code-style
+// panel plumbing doesn't bleed into the other views' simpler structures.
 templ flowView() {
 					<div
 							class="relative flex flex-col flex-1 overflow-hidden"
@@ -75,15 +72,6 @@ templ flowView() {
 							}
 							<!-- Panel visibility toggles (VS Code style) -->
 							<div class="flex items-center gap-0.5 ml-2 pl-2 border-l border-border/50">
-								<!-- Bottom Panel toggle (Terminal/Results) -->
-								<button
-									@click="bottomPanelActive = !bottomPanelActive"
-									:title="bottomPanelActive ? 'Hide Bottom Panel' : 'Show Bottom Panel'"
-									class="flex items-center justify-center w-7 h-7 rounded text-xs transition-all duration-150"
-									:class="bottomPanelActive ? 'text-foreground bg-accent hover:bg-accent/60' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'"
-								>
-									@icon.PanelBottom(icon.Props{Class: "size-3.5"})
-								</button>
 								<!-- Right Panel toggle (Properties) -->
 								<button
 									@click="togglePropertyPanel()"
@@ -148,210 +136,6 @@ templ flowView() {
 						<!-- IDE LAYOUT (VS Code / IntelliJ pattern)     -->
 						<!-- ═══════════════════════════════════════════ -->
 						<div class="flex flex-1 overflow-hidden min-h-0">
-							<!-- Activity Bar (far left) - Primary actions only -->
-							<div class="shrink-0 w-12 flex flex-col items-center py-2 bg-sidebar border-e border-sidebar-border/50 gap-1">
-								<!-- Test Explorer toggle -->
-								<button
-									@click="evalPanelActive = !evalPanelActive"
-									:title="evalPanelActive ? 'Hide Test Explorer' : 'Show Test Explorer'"
-									class="flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-150 hover:bg-accent hover:text-foreground"
-									:class="evalPanelActive ? 'text-foreground border-l-2 border-foreground bg-accent/50' : 'text-muted-foreground'"
-								>
-									@icon.TestTube(icon.Props{Class: "size-5"})
-								</button>
-
-                                                        </div>
-
-							<!-- Left Panel: Test Explorer -->
-							<template x-if="evalPanelActive">
-								<div
-									class="shrink-0 w-64 overflow-hidden"
-									x-transition:enter="transition-all duration-200 ease-out"
-									x-transition:enter-start="opacity-0 -translate-x-full"
-									x-transition:enter-end="opacity-100 translate-x-0"
-									x-transition:leave="transition-all duration-150 ease-in"
-									x-transition:leave-start="opacity-100 translate-x-0"
-									x-transition:leave-end="opacity-0 -translate-x-full"
-								>
-                                                                <!-- Test Explorer Panel (inlined) -->
-                                                                <div class="flex flex-col h-full bg-background border-r border-border/50 overflow-hidden">
-                                                                        <!-- Panel Header -->
-                                                                        <div class="flex items-center gap-2 px-3 py-2 border-b border-border/50 shrink-0">
-                                                                                <span class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-foreground">
-                                                                                        @icon.TestTube(icon.Props{Class: "size-3"})
-                                                                                        Test Explorer
-                                                                                </span>
-                                                                                <span class="flex-1"></span>
-                                                                                @dialog.Trigger(dialog.TriggerProps{
-                                                                                        For: "evalsets-manager-dialog",
-                                                                                }) {
-                                                                                        @button.Button(button.Props{
-                                                                                                Size:    button.SizeIcon,
-                                                                                                Variant: button.VariantGhost,
-                                                                                                Class:   "size-6",
-                                                                                                Attributes: templ.Attributes{
-                                                                                                        "title": "Manage Eval Sets",
-                                                                                                },
-                                                                                        }) {
-                                                                                                @icon.Settings(icon.Props{Class: "size-3"})
-                                                                                        }
-                                                                                }
-                                                                                <button
-                                                                                        @click="loadEvalSets()"
-                                                                                        title="Refresh"
-                                                                                        class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-muted-foreground hover:text-foreground hover:transition-colors"
-                                                                                >
-                                                                                        @icon.RefreshCw(icon.Props{Class: "size-3"})
-                                                                                </button>
-
-                                                                        </div>
-                                                                        <!-- Panel Content -->
-                                                                        <div class="flex-1 overflow-y-auto p-2 space-y-1">
-                                                                                <!-- Loading State -->
-                                                                                <template x-if="evalSetsLoading">
-                                                                                        <div class="flex items-center justify-center py-8">
-                                                                                                <span class="animate-spin size-4 border-2 border-muted-foreground border-t-transparent rounded-full"></span>
-                                                                                        </div>
-                                                                                </template>
-
-                                                                                <!-- Empty State -->
-                                                                                <template x-if="!evalSetsLoading && evalSets.length === 0">
-                                                                                        <div class="text-center py-8 text-muted-foreground">
-                                                                                                @icon.TestTube(icon.Props{Class: "size-8 opacity-20 mx-auto mb-2"})
-                                                                                                <p class="text-xs">No eval sets found</p>
-                                                                                                <p class="text-[10px] mt-1">Create one to start testing</p>
-                                                                                        </div>
-                                                                                </template>
-
-                                                                                <!-- Eval Sets Tree -->
-                                                                                <template x-for="es in evalSets" :key="es.id">
-                                                                                        <div class="space-y-0.5">
-                                                                                                <!-- EvalSet Header -->
-                                                                                                <div
-                                                                                                        class="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs cursor-pointer hover:group"
-                                                                                                        @click="es.expanded = !es.expanded"
-                                                                                                >
-                                                                                                        <span
-                                                                                                                class="transition-transform duration-150 text-muted-foreground text-[8px]"
-                                                                                                                :class="es.expanded ? 'rotate-90' : ''"
-                                                                                                        >▶</span>
-                                                                                                        @icon.FileText(icon.Props{Class: "size-3.5 text-muted-foreground"})
-                                                                                                        <span class="flex-1 truncate font-medium" x-text="es.name"></span>
-                                                                                                        <span class="text-[9px] text-muted-foreground" x-text="es.case_count"></span>
-                                                                                                </div>
-
-                                                                                                <!-- Cases List (expandable) -->
-                                                                                                <div x-show="es.expanded" class="ml-4 space-y-0.5" x-transition>
-                                                                                                        <button
-                                                                                                                @click="runEvalSet(es.id)"
-                                                                                                                :disabled="evalRunning || !currentAgentId"
-                                                                                                                class="w-full flex items-center gap-1.5 px-2 py-1 rounded text-[11px] cursor-pointer hover:disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                                                                                        >
-                                                                                                                @icon.Play(icon.Props{Class: "size-3 text-success"})
-                                                                                                                <span class="text-success">Run All</span>
-                                                                                                        </button>
-
-                                                                                                        <!-- Toggle to show/hide individual cases -->
-                                                                                                        <template x-if="es.cases && es.cases.length > 0">
-                                                                                                                <button
-                                                                                                                        @click="es.casesExpanded = !es.casesExpanded"
-                                                                                                                        class="w-full flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-muted-foreground hover:text-foreground hover:transition-colors"
-                                                                                                                >
-                                                                                                                        <span class="transition-transform duration-150 text-[8px]" :class="es.casesExpanded ? 'rotate-90' : ''">▶</span>
-                                                                                                                        <span x-text="(es.cases?.length || 0) + ' cases'"></span>
-                                                                                                                </button>
-                                                                                                        </template>
-
-                                                                                                        <!-- Individual cases -->
-                                                                                                        <div x-show="es.casesExpanded" class="ml-2 space-y-0.5" x-transition>
-                                                                                                                <template x-for="tc in es.cases" :key="tc.id">
-                                                                                                                        <div class="space-y-0.5">
-                                                                                                                                <!-- Case row (clickable to expand results) -->
-                                                                                                                                <div
-                                                                                                                                        @click="tc.resultsExpanded = !tc.resultsExpanded"
-                                                                                                                                        class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] cursor-pointer hover:transition-colors"
-                                                                                                                                >
-                                                                                                                                        <!-- Expand indicator -->
-                                                                                                                                        <template x-if="getCaseResult(tc.id)?.metrics?.length > 0">
-                                                                                                                                                <span class="transition-transform duration-150 text-[8px]" :class="tc.resultsExpanded ? 'rotate-90' : ''">▶</span>
-                                                                                                                                        </template>
-                                                                                                                                        <template x-if="!getCaseResult(tc.id)?.metrics?.length">
-                                                                                                                                                <span class="w-2"></span>
-                                                                                                                                        </template>
-                                                                                                                                        <!-- Status icon from testResults -->
-                                                                                                                                        <template x-if="getCaseResult(tc.id)?.status === 'passed'">
-                                                                                                                                                @icon.CircleCheck(icon.Props{Class: "size-3 text-success flex-shrink-0"})
-                                                                                                                                        </template>
-                                                                                                                                        <template x-if="getCaseResult(tc.id)?.status === 'failed' || getCaseResult(tc.id)?.status === 'error'">
-                                                                                                                                                @icon.CircleX(icon.Props{Class: "size-3 text-destructive flex-shrink-0"})
-                                                                                                                                        </template>
-                                                                                                                                        <template x-if="getCaseResult(tc.id)?.status === 'running'">
-                                                                                                                                                <span class="animate-spin size-3 border border-info border-t-transparent rounded-full flex-shrink-0"></span>
-                                                                                                                                        </template>
-                                                                                                                                        <template x-if="!getCaseResult(tc.id)">
-                                                                                                                                                @icon.Circle(icon.Props{Class: "size-3 text-muted-foreground flex-shrink-0"})
-                                                                                                                                        </template>
-                                                                                                                                        <!-- Case name -->
-                                                                                                                                        <span class="flex-1 truncate text-muted-foreground" x-text="tc.name"></span>
-                                                                                                                                        <!-- Score badge -->
-                                                                                                                                        <template x-if="getCaseResult(tc.id)?.score != null">
-                                                                                                                                                <span
-                                                                                                                                                        class="text-[9px] font-mono px-1 rounded"
-                                                                                                                                                        :class="getCaseResult(tc.id).score >= 0.8 ? 'text-success' : getCaseResult(tc.id).score >= 0.5 ? 'text-warning' : 'text-destructive'"
-                                                                                                                                                        x-text="getCaseResult(tc.id).score.toFixed(2)"
-                                                                                                                                                ></span>
-                                                                                                                                        </template>
-                                                                                                                                </div>
-
-                                                                                                                                <!-- Expandable metrics -->
-                                                                                                                                <template x-if="tc.resultsExpanded && getCaseResult(tc.id)?.metrics?.length > 0">
-                                                                                                                                        <div class="ml-4 space-y-0.5">
-                                                                                                                                                <template x-for="metric in getCaseResult(tc.id).metrics" :key="metric.metric_id">
-                                                                                                                                                        <div class="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground">
-                                                                                                                                                                <template x-if="metric.status === 'passed'">
-                                                                                                                                                                        @icon.CircleCheck(icon.Props{Class: "size-2.5 text-success flex-shrink-0"})
-                                                                                                                                                                </template>
-                                                                                                                                                                <template x-if="metric.status !== 'passed'">
-                                                                                                                                                                        @icon.CircleX(icon.Props{Class: "size-2.5 text-destructive flex-shrink-0"})
-                                                                                                                                                                </template>
-                                                                                                                                                                <span class="flex-1 truncate font-mono" x-text="metric.metric_id"></span>
-                                                                                                                                                                <span class="font-mono" x-text="metric.score?.toFixed(2) ?? '-'"></span>
-                                                                                                                                                        </div>
-                                                                                                                                                </template>
-                                                                                                                                        </div>
-                                                                                                                                </template>
-                                                                                                                        </div>
-                                                                                                                </template>
-                                                                                                        </div>
-                                                                                                </div>
-                                                                                        </div>
-                                                                                </template>
-                                                                        </div>
-
-                                                                        <!-- Panel Footer -->
-                                                                        <div class="px-3 py-2 border-t border-border/50 shrink-0 space-y-1.5">
-                                                                                <button
-                                                                                        @click="runAllEvalSets()"
-                                                                                        :disabled="evalRunning || !currentAgentId || evalSets.length === 0"
-                                                                                        class="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                                                                        :class="!evalRunning && currentAgentId && evalSets.length > 0 ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm' : 'bg-muted text-muted-foreground'"
-                                                                                >
-                                                                                        @icon.Play(icon.Props{Class: "size-3.5"})
-                                                                                        Run All Tests
-                                                                                </button>
-                                                                                <button
-                                                                                        @click="exportTestResults()"
-                                                                                        :disabled="testResults.length === 0"
-                                                                                        class="w-full flex items-center justify-center gap-2 px-3 py-1 rounded text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                                                                        :class="testResults.length > 0 ? 'bg-muted text-muted-foreground hover:bg-muted/80' : 'bg-muted text-muted-foreground'"
-                                                                                >
-                                                                                        @icon.Download(icon.Props{Class: "size-3"})
-                                                                                        Export Results
-                                                                                </button>
-                                                                        </div>
-                                                                </div>
-								</div>
-							</template>
 
 							<!-- Main Content Area (Tree + Bottom Panel) -->
 							<div class="flex-1 flex flex-col overflow-hidden min-w-0">
@@ -759,88 +543,6 @@ templ flowView() {
 								</div>
 							</template>
 
-
-						<!-- ═══════════════════════════════════════════ -->
-						<!-- BOTTOM PANEL (VS Code pattern)             -->
-						<!-- ═══════════════════════════════════════════ -->
-                                                <!-- ═══════════════════════════════════════════ -->
-                                                <!-- BOTTOM PANEL (VS Code pattern)             -->
-                                                <!-- ═══════════════════════════════════════════ -->
-                                                <div
-                                                        x-show="bottomPanelActive"
-                                                        class="flex flex-col border-t border-border/50 bg-background overflow-hidden transition-all duration-300 ease-in-out"
-                                                        :style="bottomPanelCollapsed ? 'height:32px' : 'height:220px'"
-                                                        x-transition:enter="transition-all duration-200 ease-out"
-                                                        x-transition:enter-start="opacity-0 translate-y-full"
-                                                        x-transition:enter-end="opacity-100 translate-y-0"
-                                                        x-transition:leave="transition-all duration-150 ease-in"
-                                                        x-transition:leave-start="opacity-100 translate-y-0"
-                                                        x-transition:leave-end="opacity-0 translate-y-full"
-                                                >
-                                                        <!-- Tab Bar -->
-                                                        <div class="flex items-center gap-0 px-2 shrink-0 border-b border-border/50" style="height:32px;">
-                                                                <template x-for="tab in bottomTabs" :key="tab.id">
-                                                                        <button
-                                                                                @click="activeBottomTab = tab.id"
-                                                                                class="flex items-center gap-1.5 px-3 h-full text-[10px] font-medium border-b-2 transition-colors"
-                                                                                :class="activeBottomTab === tab.id ? 'border-foreground text-foreground bg-background/50' : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'"
-                                                                        >
-                                                                                <span x-html="tab.icon"></span>
-                                                                                <span x-text="tab.label"></span>
-                                                                                <template x-if="tab.badge">
-                                                                                        <span class="text-[8px] px-1 rounded bg-muted-foreground/20" x-text="tab.badge"></span>
-                                                                                </template>
-                                                                        </button>
-                                                                </template>
-                                                                <span class="flex-1"></span>
-                                                                <button
-                                                                        @click="bottomPanelCollapsed = !bottomPanelCollapsed"
-                                                                        :title="bottomPanelCollapsed ? 'Expand' : 'Minimize'"
-                                                                        class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-muted-foreground hover:text-foreground hover:transition-colors"
-                                                                >
-                                                                        <span class="transition-transform duration-200 inline-flex" :class="bottomPanelCollapsed ? '' : 'rotate-180'">
-                                                                                @icon.ChevronDown(icon.Props{Class: "size-3"})
-                                                                        </span>
-                                                                </button>
-                                                                <button
-                                                                        @click="bottomPanelActive = false"
-                                                                        title="Close"
-                                                                        class="flex items-center justify-center w-6 h-6 rounded text-[10px] text-muted-foreground hover:text-destructive hover:transition-colors"
-                                                                >
-                                                                        @icon.X(icon.Props{Class: "size-3"})
-                                                                </button>
-                                                        </div>
-
-                                                        <!-- Tab Content -->
-                                                        <div x-show="!bottomPanelCollapsed" class="flex-1 overflow-hidden min-h-0">
-                                                                <!-- Terminal Tab -->
-                                                                <template x-if="activeBottomTab === 'terminal'">
-                                                                        <div x-ref="terminalPanel" class="h-full overflow-y-auto p-3 font-mono text-[10px] space-y-0.5 bg-muted/40 text-foreground">
-                                                                                <template x-if="evalLogs.length === 0">
-                                                                                        <div class="flex flex-col items-center justify-center h-full text-muted-foreground">
-                                                                                                @icon.Terminal(icon.Props{Class: "size-8 opacity-30 mb-2"})
-                                                                                                <span class="text-xs">No terminal output yet</span>
-                                                                                                <span class="text-[10px]">Run an evaluation to see logs here</span>
-                                                                                        </div>
-                                                                                </template>
-                                                                                <template x-for="(log, idx) in evalLogs" :key="idx">
-                                                                                        <div class="whitespace-pre-wrap" x-text="log"></div>
-                                                                                </template>
-                                                                        </div>
-                                                                </template>
-
-                                                                <!-- Output Tab -->
-                                                                <template x-if="activeBottomTab === 'output'">
-                                                                        <div class="h-full overflow-y-auto p-3 font-mono text-[10px] space-y-1">
-                                                                                <div class="text-muted-foreground text-center py-8">
-                                                                                        @icon.Info(icon.Props{Class: "size-8 opacity-30 mx-auto mb-2"})
-                                                                                        <p>Evaluation output will appear here</p>
-                                                                                </div>
-                                                                        </div>
-                                                                </template>
-
-                                                        </div>
-                                                </div>
 
 							</div><!-- /Main Content Area -->
 						</div><!-- /IDE LAYOUT -->

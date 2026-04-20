@@ -5,7 +5,6 @@ import (
 	"aicompass/frontend/ui/agents"
 	"aicompass/frontend/ui/convsearch"
 	"aicompass/frontend/components/dialog"
-	"aicompass/frontend/ui/evals"
 	"aicompass/frontend/ui/filesystem"
 	"aicompass/frontend/ui/i18n"
 	"aicompass/frontend/ui/nav"
@@ -139,9 +138,6 @@ templ BaseLayout(props LayoutProps) {
 					<!-- Agent Designer is a full page at /agent-designer (not a dialog). -->
 					@tools.ToolsDialog()
 					@a2acomp.A2ADialog()
-					@evals.EvalSetsDialog()
-					@evals.MetricConfigDialog()
-					@evals.EvaluationDialog()
 					@convsearch.SearchDialog()
 					@filesystem.FilesystemDialog()
 					<!--

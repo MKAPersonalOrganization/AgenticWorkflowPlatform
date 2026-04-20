@@ -72,11 +72,6 @@ import (
 	billingmod "aicompass/modules/billing"
 	chatmod "aicompass/modules/chat"
 	"aicompass/modules/chat/handlers/common"
-	evalmod "aicompass/modules/evaluation"
-	evalhallucinationmod "aicompass/modules/evaluation/hallucination"
-	evalresponsemod "aicompass/modules/evaluation/response"
-	evalrubricmod "aicompass/modules/evaluation/rubric"
-	evalsafetymod "aicompass/modules/evaluation/safety"
 	filesystemmod "aicompass/modules/filesystem"
 	knowledgemod "aicompass/modules/knowledge"
 	mcpmod "aicompass/modules/mcp"
@@ -395,11 +390,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Initialize resources module
 	resourcesModule := resourcesmod.New(db, artifactService)
 
-	// Initialize evaluation module with nil invoker for now
-	// Will be properly initialized after agent provider is set up
-	var evaluationModule *evalmod.Module
-	var evalRunner evalmod.AgentInvoker
-
 	// Initialize filesystem module (VFS backed by S3/MinIO)
 	filesystemModule, err := filesystemmod.New(db, filesystemmod.S3Config{
 		Endpoint:        cfg.Artifacts.S3Endpoint,
@@ -509,19 +499,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 	agentProvider := agentdefmod.NewUserAwareProvider(
 		agentDefModule.Repo(),
 	)
-
-	// Create eval runner for real agent invocation during evaluations.
-	evalRunner = adkgo.NewEvalRunner(agentProvider, aiSettingsModule, aiSettingsModule)
-
-	// Now initialize the evaluation module with the eval runner.
-	evaluationModule = evalmod.New(db, evalRunner)
-
-	// Register all evaluation metrics from subpackages.
-	// This must happen after the evaluation module is created to avoid circular imports.
-	evalresponsemod.RegisterEvaluators(evalmod.Register)
-	evalrubricmod.RegisterEvaluators(evalmod.Register)
-	evalsafetymod.RegisterEvaluators(evalmod.Register)
-	evalhallucinationmod.RegisterEvaluators(evalmod.Register)
 
 	// -------------------------------------------------------------------------
 	// Initialize Chat Module (core chat bounded context — ADR 014)
@@ -698,7 +675,6 @@ func run(ctx context.Context, log *logger.Logger) error {
 		mcp:            mcpModule,
 		a2a:            a2aModule,
 		resources:      resourcesModule,
-		evaluation:     evaluationModule,
 		filesystem:     filesystemModule,
 		billing:        billingModule,
 		permissions:    permissionsmod.New(log, workspacePermissionsService, &WorkspaceProviderAdapter{svc: edgequakeService}, agentProvider, cfg.Edgequake.TenantID),
@@ -829,9 +805,6 @@ type routeModules struct {
 	resources interface {
 		RegisterRoutes(chi.Router, *auth.Middleware)
 	}
-	evaluation interface {
-		RegisterRoutes(chi.Router, *auth.Middleware)
-	}
 	filesystem interface {
 		RegisterRoutes(chi.Router, *auth.Middleware)
 	}
@@ -860,7 +833,6 @@ func registerRoutes(
 ) {
 	// Module routes
 	mods.resources.RegisterRoutes(r, authMW)
-	mods.evaluation.RegisterRoutes(r, authMW)
 	mods.filesystem.RegisterRoutes(r, authMW)
 	mods.permissions.RegisterRoutes(r, authMW)
 	mods.agentDef.RegisterRoutes(r, authMW)
