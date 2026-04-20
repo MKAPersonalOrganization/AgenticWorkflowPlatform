@@ -66,57 +66,6 @@ func TestIsAuthError(t *testing.T) {
 
 // TestIsHTTPClientError verifies that 4xx errors (excluding 401) are classified
 // as permanent client errors using http.StatusText output.
-func TestIsHTTPClientError(t *testing.T) {
-	tests := []struct {
-		name string
-		err  error
-		want bool
-	}{
-		{
-			name: "400_bad_request",
-			err:  fmt.Errorf("request failed: %s", http.StatusText(http.StatusBadRequest)),
-			want: true,
-		},
-		{
-			name: "403_forbidden",
-			err:  fmt.Errorf("request failed: %s", http.StatusText(http.StatusForbidden)),
-			want: true,
-		},
-		{
-			name: "404_not_found",
-			err:  fmt.Errorf("request failed: %s", http.StatusText(http.StatusNotFound)),
-			want: true,
-		},
-		{
-			name: "429_too_many",
-			err:  fmt.Errorf("request failed: %s", http.StatusText(http.StatusTooManyRequests)),
-			want: true,
-		},
-		{
-			name: "401_should_NOT_match_client_error",
-			err:  fmt.Errorf("request failed: %s", http.StatusText(http.StatusUnauthorized)),
-			want: false, // 401 is auth, not generic client error
-		},
-		{
-			name: "502_should_NOT_match_client_error",
-			err:  fmt.Errorf("request failed: %s", http.StatusText(http.StatusBadGateway)),
-			want: false,
-		},
-		{
-			name: "nil_error",
-			err:  nil,
-			want: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := isHTTPClientError(tt.err); got != tt.want {
-				t.Errorf("isHTTPClientError() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 // TestIsTransientError verifies that 5xx and network errors are classified as transient.
 func TestIsTransientError(t *testing.T) {
 	tests := []struct {
@@ -194,25 +143,6 @@ func TestStatusTextMatchesGoSDK(t *testing.T) {
 	t.Run("auth", func(t *testing.T) {
 		if authStatusText != "Unauthorized" {
 			t.Fatalf("authStatusText = %q, want %q", authStatusText, "Unauthorized")
-		}
-	})
-
-	t.Run("client_errors_are_status_text", func(t *testing.T) {
-		expectedTexts := map[string]bool{
-			"Bad Request":          true,
-			"Forbidden":            true,
-			"Not Found":            true,
-			"Method Not Allowed":   true,
-			"Not Acceptable":       true,
-			"Conflict":             true,
-			"Gone":                 true,
-			"Unprocessable Entity": true,
-			"Too Many Requests":    true,
-		}
-		for _, text := range clientErrorStatusTexts {
-			if !expectedTexts[text] {
-				t.Errorf("unexpected client error text: %q", text)
-			}
 		}
 	})
 

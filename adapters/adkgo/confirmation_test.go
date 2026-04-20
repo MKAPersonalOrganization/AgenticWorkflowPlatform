@@ -328,28 +328,6 @@ func TestBuildConfirmationResponse(t *testing.T) {
 // 5. Session reconstruction: confirmation FunctionResponses are fixed
 // ──────────────────────────────────────────────────────────────────────────────
 
-func TestCollectConfirmationCallIDs(t *testing.T) {
-	argsJSON, _ := json.Marshal(map[string]any{
-		"originalFunctionCall": map[string]any{"name": "delete_file"},
-		"toolConfirmation":     map[string]any{"hint": "confirm?"},
-	})
-	msgs := []thread.Message{
-		{ID: "msg-1", Role: "user", Content: "delete the file"},
-		{ID: "msg-2", Role: "assistant", ToolCalls: []thread.ToolCall{
-			{ID: confirmationCallID, Name: toolconfirmation.FunctionCallName, Arguments: string(argsJSON)},
-		}},
-		{ID: "msg-3", Role: "tool", ToolCallID: confirmationCallID, ToolName: "delete_file", Content: "yes"},
-	}
-
-	ids := collectConfirmationCallIDs(msgs)
-	if !ids[confirmationCallID] {
-		t.Errorf("expected %q in confirmation call IDs", confirmationCallID)
-	}
-	if ids[originalToolCallID] {
-		t.Error("original tool call ID should NOT be in confirmation call IDs")
-	}
-}
-
 func TestGetConfirmationWrapperID(t *testing.T) {
 	argsJSON, _ := json.Marshal(map[string]any{
 		"originalFunctionCall": map[string]any{"id": originalToolCallID, "name": "delete_file"},

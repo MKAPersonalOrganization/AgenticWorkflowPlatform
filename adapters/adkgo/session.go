@@ -85,23 +85,6 @@ func BuildSessionFromThread(
 	return getResp.Session, nil
 }
 
-// collectConfirmationCallIDs scans assistant messages for tool calls named
-// "adk_request_confirmation" and returns a set of their IDs.
-func collectConfirmationCallIDs(msgs []thread.Message) map[string]bool {
-	ids := make(map[string]bool)
-	for _, msg := range msgs {
-		if msg.Role != "assistant" {
-			continue
-		}
-		for _, tc := range msg.ToolCalls {
-			if tc.Name == toolconfirmation.FunctionCallName {
-				ids[tc.ID] = true
-			}
-		}
-	}
-	return ids
-}
-
 // confirmationMappings holds the mapping between confirmation-related IDs.
 // originalToWrapper maps original tool call ID -> confirmation wrapper ID.
 type confirmationMappings struct {

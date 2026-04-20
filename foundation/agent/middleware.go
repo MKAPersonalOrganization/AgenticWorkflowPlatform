@@ -85,20 +85,6 @@ func Chain(mws ...Middleware) Middleware {
 	}
 }
 
-// NewAgentContext creates a Context for an agent operation.
-func NewAgentContext(ctx context.Context, agent Agent, messages []Message, streaming bool) *Context {
-	return &Context{
-		Context: ctx,
-		Kind:    OperationAgent,
-		Agent: &AgentOp{
-			Agent:     agent,
-			Messages:  messages,
-			Streaming: streaming,
-		},
-		Metadata: make(map[string]any),
-	}
-}
-
 // NewToolContext creates a Context for a tool invocation.
 func NewToolContext(ctx context.Context, tool Tool, arguments map[string]any) *Context {
 	return &Context{

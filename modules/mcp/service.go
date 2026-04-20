@@ -1216,27 +1216,6 @@ var (
 	// authStatusText is http.StatusText(401) = "Unauthorized".
 	authStatusText = http.StatusText(http.StatusUnauthorized)
 
-	// clientErrorStatusTexts are the 4xx status texts we treat as permanent
-	// client errors (excluding 401, which triggers OAuth).
-	clientErrorStatusTexts = func() []string {
-		codes := []int{
-			http.StatusBadRequest,
-			http.StatusForbidden,
-			http.StatusNotFound,
-			http.StatusMethodNotAllowed,
-			http.StatusNotAcceptable,
-			http.StatusConflict,
-			http.StatusGone,
-			http.StatusUnprocessableEntity,
-			http.StatusTooManyRequests,
-		}
-		texts := make([]string, len(codes))
-		for i, c := range codes {
-			texts[i] = http.StatusText(c)
-		}
-		return texts
-	}()
-
 	// transientStatusTexts are the 5xx status texts that warrant a retry.
 	transientStatusTexts = func() []string {
 		codes := []int{
@@ -1264,20 +1243,6 @@ func isAuthError(err error) bool {
 		return false
 	}
 	return strings.Contains(err.Error(), authStatusText)
-}
-
-// isHTTPClientError checks for 4xx HTTP errors (excluding 401 which triggers OAuth).
-func isHTTPClientError(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	for _, text := range clientErrorStatusTexts {
-		if strings.Contains(msg, text) {
-			return true
-		}
-	}
-	return false
 }
 
 // isTransientError determines whether an error is likely transient and worth

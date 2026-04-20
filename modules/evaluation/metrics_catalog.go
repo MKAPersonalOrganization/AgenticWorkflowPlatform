@@ -211,13 +211,3 @@ func GetMetricByID(id string) (MetricDefinition, bool) {
 	return MetricDefinition{}, false
 }
 
-// GetMetricsByType returns all metrics of the given type.
-func GetMetricsByType(t MetricType) []MetricDefinition {
-	var result []MetricDefinition
-	for _, m := range metricCatalog {
-		if m.Type == t {
-			result = append(result, m)
-		}
-	}
-	return result
-}

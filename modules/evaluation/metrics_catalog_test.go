@@ -76,37 +76,6 @@ func TestGetMetricByID_Unknown(t *testing.T) {
 	}
 }
 
-func TestGetMetricsByType(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		metricType MetricType
-		wantCount  int
-	}{
-		{MetricTrajectory, 1},
-		{MetricResponse, 3},
-		{MetricSafety, 1},
-		{MetricHallucination, 1},
-		{MetricRubric, 2},
-		{MetricSimulation, 1},
-		{MetricMultiTurn, 3},
-	}
-
-	for _, tt := range tests {
-		t.Run(string(tt.metricType), func(t *testing.T) {
-			t.Parallel()
-			result := GetMetricsByType(tt.metricType)
-			if len(result) != tt.wantCount {
-				t.Errorf("expected %d metrics of type %s, got %d", tt.wantCount, tt.metricType, len(result))
-			}
-			for _, m := range result {
-				if m.Type != tt.metricType {
-					t.Errorf("expected type %s, got %s", tt.metricType, m.Type)
-				}
-			}
-		})
-	}
-}
-
 func TestMetricDefinition_HasBoundedRange(t *testing.T) {
 	t.Parallel()
 	m, _ := GetMetricByID("tool_trajectory_avg_score")

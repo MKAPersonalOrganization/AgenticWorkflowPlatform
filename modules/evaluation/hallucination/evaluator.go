@@ -242,33 +242,3 @@ func roundScore(s float64) float64 {
 	return float64(int(s*100+0.5)) / 100
 }
 
-// IsContentWord returns true if the word carries semantic content.
-func IsContentWord(word string) bool {
-	if len(word) < 3 {
-		return false
-	}
-	stopWords := map[string]bool{
-		"the": true, "and": true, "for": true, "are": true, "but": true,
-		"not": true, "you": true, "all": true, "can": true, "had": true,
-		"her": true, "was": true, "one": true, "our": true, "out": true,
-		"has": true, "have": true, "been": true, "were": true, "they": true,
-		"this": true, "that": true, "with": true, "from": true, "will": true,
-		"each": true, "make": true, "like": true, "just": true, "over": true,
-		"such": true, "more": true, "than": true, "also": true, "some": true,
-		"into": true, "time": true, "very": true, "when": true, "come": true,
-		"could": true, "them": true, "then": true, "these": true, "she": true,
-	}
-	return !stopWords[word]
-}
-
-// HasMeaningfulContent returns true if the text has substantive content words.
-func HasMeaningfulContent(text string) bool {
-	tokens := tokenize(text)
-	contentCount := 0
-	for _, t := range tokens {
-		if IsContentWord(t) {
-			contentCount++
-		}
-	}
-	return contentCount >= 2
-}

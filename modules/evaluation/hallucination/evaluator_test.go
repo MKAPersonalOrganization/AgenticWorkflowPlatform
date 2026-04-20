@@ -317,29 +317,3 @@ func TestEvaluators_Registered(t *testing.T) {
 	}
 }
 
-// ─── Content Word Tests ─────────────────────────────────────────────────────
-
-func TestIsContentWord(t *testing.T) {
-	t.Parallel()
-	if IsContentWord("the") {
-		t.Error("expected 'the' to not be a content word")
-	}
-	if IsContentWord("weather") {
-		// This should be true
-	} else {
-		t.Error("expected 'weather' to be a content word")
-	}
-	if IsContentWord("a") {
-		t.Error("expected 'a' to not be a content word")
-	}
-}
-
-func TestHasMeaningfulContent(t *testing.T) {
-	t.Parallel()
-	if HasMeaningfulContent("the and for are") {
-		t.Error("expected stop words only to not have meaningful content")
-	}
-	if !HasMeaningfulContent("Tokyo weather sunny 25 degrees") {
-		t.Error("expected substantive text to have meaningful content")
-	}
-}
