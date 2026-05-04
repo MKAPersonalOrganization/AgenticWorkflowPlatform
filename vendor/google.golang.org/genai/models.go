@@ -171,7 +171,7 @@ func computeTokensParametersToVertex(ac *InternalAPIClient, fromObject map[strin
 			return nil, err
 		}
 
-		fromContents, err = applyConverterToSliceWithRoot(fromContents.([]any), contentToVertex, rootObject)
+		fromContents, err = InternalApplyConverterToSliceWithRoot(fromContents.([]any), contentToVertex, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -240,7 +240,7 @@ func contentToMldev(fromObject map[string]any, parentObject map[string]any, root
 
 	fromParts := InternalGetValueByPath(fromObject, []string{"parts"})
 	if fromParts != nil {
-		fromParts, err = applyConverterToSliceWithRoot(fromParts.([]any), partToMldev, rootObject)
+		fromParts, err = InternalApplyConverterToSliceWithRoot(fromParts.([]any), partToMldev, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -261,7 +261,7 @@ func contentToVertex(fromObject map[string]any, parentObject map[string]any, roo
 
 	fromParts := InternalGetValueByPath(fromObject, []string{"parts"})
 	if fromParts != nil {
-		fromParts, err = applyConverterToSliceWithRoot(fromParts.([]any), partToVertex, rootObject)
+		fromParts, err = InternalApplyConverterToSliceWithRoot(fromParts.([]any), partToVertex, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -331,7 +331,7 @@ func countTokensConfigToVertex(fromObject map[string]any, parentObject map[strin
 
 	fromTools := InternalGetValueByPath(fromObject, []string{"tools"})
 	if fromTools != nil {
-		fromTools, err = applyConverterToSliceWithRoot(fromTools.([]any), toolToVertex, rootObject)
+		fromTools, err = InternalApplyConverterToSliceWithRoot(fromTools.([]any), toolToVertex, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -372,7 +372,7 @@ func countTokensParametersToMldev(ac *InternalAPIClient, fromObject map[string]a
 			return nil, err
 		}
 
-		fromContents, err = applyConverterToSliceWithRoot(fromContents.([]any), contentToMldev, rootObject)
+		fromContents, err = InternalApplyConverterToSliceWithRoot(fromContents.([]any), contentToMldev, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -411,7 +411,7 @@ func countTokensParametersToVertex(ac *InternalAPIClient, fromObject map[string]
 			return nil, err
 		}
 
-		fromContents, err = applyConverterToSliceWithRoot(fromContents.([]any), contentToVertex, rootObject)
+		fromContents, err = InternalApplyConverterToSliceWithRoot(fromContents.([]any), contentToVertex, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -632,7 +632,7 @@ func editImageParametersToVertex(ac *InternalAPIClient, fromObject map[string]an
 
 	fromReferenceImages := InternalGetValueByPath(fromObject, []string{"referenceImages"})
 	if fromReferenceImages != nil {
-		fromReferenceImages, err = applyConverterToSliceWithRoot(fromReferenceImages.([]any), referenceImageAPIToVertex, rootObject)
+		fromReferenceImages, err = InternalApplyConverterToSliceWithRoot(fromReferenceImages.([]any), referenceImageAPIToVertex, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -661,7 +661,7 @@ func editImageResponseFromVertex(fromObject map[string]any, parentObject map[str
 
 	fromGeneratedImages := InternalGetValueByPath(fromObject, []string{"predictions"})
 	if fromGeneratedImages != nil {
-		fromGeneratedImages, err = applyConverterToSliceWithRoot(fromGeneratedImages.([]any), generatedImageFromVertex, rootObject)
+		fromGeneratedImages, err = InternalApplyConverterToSliceWithRoot(fromGeneratedImages.([]any), generatedImageFromVertex, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -698,6 +698,14 @@ func embedContentConfigToMldev(fromObject map[string]any, parentObject map[strin
 		return nil, fmt.Errorf("autoTruncate parameter is not supported in Gemini API")
 	}
 
+	if InternalGetValueByPath(fromObject, []string{"documentOcr"}) != nil {
+		return nil, fmt.Errorf("documentOcr parameter is not supported in Gemini API")
+	}
+
+	if InternalGetValueByPath(fromObject, []string{"audioTrackExtraction"}) != nil {
+		return nil, fmt.Errorf("audioTrackExtraction parameter is not supported in Gemini API")
+	}
+
 	return toObject, nil
 }
 
@@ -716,7 +724,7 @@ func embedContentConfigToVertex(fromObject map[string]any, parentObject map[stri
 	} else if discriminatorTaskType.(string) == "EMBED_CONTENT" {
 		fromTaskType := InternalGetValueByPath(fromObject, []string{"taskType"})
 		if fromTaskType != nil {
-			InternalSetValueByPath(parentObject, []string{"taskType"}, fromTaskType)
+			InternalSetValueByPath(parentObject, []string{"embedContentConfig", "taskType"}, fromTaskType)
 		}
 	}
 
@@ -732,7 +740,7 @@ func embedContentConfigToVertex(fromObject map[string]any, parentObject map[stri
 	} else if discriminatorTitle.(string) == "EMBED_CONTENT" {
 		fromTitle := InternalGetValueByPath(fromObject, []string{"title"})
 		if fromTitle != nil {
-			InternalSetValueByPath(parentObject, []string{"title"}, fromTitle)
+			InternalSetValueByPath(parentObject, []string{"embedContentConfig", "title"}, fromTitle)
 		}
 	}
 
@@ -748,7 +756,7 @@ func embedContentConfigToVertex(fromObject map[string]any, parentObject map[stri
 	} else if discriminatorOutputDimensionality.(string) == "EMBED_CONTENT" {
 		fromOutputDimensionality := InternalGetValueByPath(fromObject, []string{"outputDimensionality"})
 		if fromOutputDimensionality != nil {
-			InternalSetValueByPath(parentObject, []string{"outputDimensionality"}, fromOutputDimensionality)
+			InternalSetValueByPath(parentObject, []string{"embedContentConfig", "outputDimensionality"}, fromOutputDimensionality)
 		}
 	}
 
@@ -775,7 +783,29 @@ func embedContentConfigToVertex(fromObject map[string]any, parentObject map[stri
 	} else if discriminatorAutoTruncate.(string) == "EMBED_CONTENT" {
 		fromAutoTruncate := InternalGetValueByPath(fromObject, []string{"autoTruncate"})
 		if fromAutoTruncate != nil {
-			InternalSetValueByPath(parentObject, []string{"autoTruncate"}, fromAutoTruncate)
+			InternalSetValueByPath(parentObject, []string{"embedContentConfig", "autoTruncate"}, fromAutoTruncate)
+		}
+	}
+
+	var discriminatorDocumentOcr any = InternalGetValueByPath(rootObject, []string{"embeddingApiType"})
+	if discriminatorDocumentOcr == nil {
+		discriminatorDocumentOcr = "PREDICT"
+	}
+	if discriminatorDocumentOcr.(string) == "EMBED_CONTENT" {
+		fromDocumentOcr := InternalGetValueByPath(fromObject, []string{"documentOcr"})
+		if fromDocumentOcr != nil {
+			InternalSetValueByPath(parentObject, []string{"embedContentConfig", "documentOcr"}, fromDocumentOcr)
+		}
+	}
+
+	var discriminatorAudioTrackExtraction any = InternalGetValueByPath(rootObject, []string{"embeddingApiType"})
+	if discriminatorAudioTrackExtraction == nil {
+		discriminatorAudioTrackExtraction = "PREDICT"
+	}
+	if discriminatorAudioTrackExtraction.(string) == "EMBED_CONTENT" {
+		fromAudioTrackExtraction := InternalGetValueByPath(fromObject, []string{"audioTrackExtraction"})
+		if fromAudioTrackExtraction != nil {
+			InternalSetValueByPath(parentObject, []string{"embedContentConfig", "audioTrackExtraction"}, fromAudioTrackExtraction)
 		}
 	}
 
@@ -923,7 +953,7 @@ func embedContentResponseFromVertex(fromObject map[string]any, parentObject map[
 
 	fromEmbeddings := InternalGetValueByPath(fromObject, []string{"predictions[]", "embeddings"})
 	if fromEmbeddings != nil {
-		fromEmbeddings, err = applyConverterToSliceWithRoot(fromEmbeddings.([]any), contentEmbeddingFromVertex, rootObject)
+		fromEmbeddings, err = InternalApplyConverterToSliceWithRoot(fromEmbeddings.([]any), contentEmbeddingFromVertex, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -1076,7 +1106,7 @@ func functionDeclarationToVertex(fromObject map[string]any, parentObject map[str
 	}
 
 	if InternalGetValueByPath(fromObject, []string{"behavior"}) != nil {
-		return nil, fmt.Errorf("behavior parameter is not supported in Vertex AI")
+		return nil, fmt.Errorf("behavior parameter is not supported in Gemini Enterprise Agent Platform (previously known as Vertex AI)")
 	}
 
 	return toObject, nil
@@ -1185,7 +1215,7 @@ func generateContentConfigToMldev(ac *InternalAPIClient, fromObject map[string]a
 
 	fromSafetySettings := InternalGetValueByPath(fromObject, []string{"safetySettings"})
 	if fromSafetySettings != nil {
-		fromSafetySettings, err = applyConverterToSliceWithRoot(fromSafetySettings.([]any), safetySettingToMldev, rootObject)
+		fromSafetySettings, err = InternalApplyConverterToSliceWithRoot(fromSafetySettings.([]any), safetySettingToMldev, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -1205,7 +1235,7 @@ func generateContentConfigToMldev(ac *InternalAPIClient, fromObject map[string]a
 			return nil, err
 		}
 
-		fromTools, err = applyConverterToSliceWithRoot(fromTools.([]any), toolToMldev, rootObject)
+		fromTools, err = InternalApplyConverterToSliceWithRoot(fromTools.([]any), toolToMldev, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -1413,7 +1443,7 @@ func generateContentConfigToVertex(ac *InternalAPIClient, fromObject map[string]
 			return nil, err
 		}
 
-		fromTools, err = applyConverterToSliceWithRoot(fromTools.([]any), toolToVertex, rootObject)
+		fromTools, err = InternalApplyConverterToSliceWithRoot(fromTools.([]any), toolToVertex, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -1463,11 +1493,6 @@ func generateContentConfigToVertex(ac *InternalAPIClient, fromObject map[string]
 			return nil, err
 		}
 
-		fromSpeechConfig, err = speechConfigToVertex(fromSpeechConfig.(map[string]any), toObject, rootObject)
-		if err != nil {
-			return nil, err
-		}
-
 		InternalSetValueByPath(toObject, []string{"speechConfig"}, fromSpeechConfig)
 	}
 
@@ -1492,7 +1517,7 @@ func generateContentConfigToVertex(ac *InternalAPIClient, fromObject map[string]
 	}
 
 	if InternalGetValueByPath(fromObject, []string{"enableEnhancedCivicAnswers"}) != nil {
-		return nil, fmt.Errorf("enableEnhancedCivicAnswers parameter is not supported in Vertex AI")
+		return nil, fmt.Errorf("enableEnhancedCivicAnswers parameter is not supported in Gemini Enterprise Agent Platform (previously known as Vertex AI)")
 	}
 
 	fromModelArmorConfig := InternalGetValueByPath(fromObject, []string{"modelArmorConfig"})
@@ -1528,7 +1553,7 @@ func generateContentParametersToMldev(ac *InternalAPIClient, fromObject map[stri
 			return nil, err
 		}
 
-		fromContents, err = applyConverterToSliceWithRoot(fromContents.([]any), contentToMldev, rootObject)
+		fromContents, err = InternalApplyConverterToSliceWithRoot(fromContents.([]any), contentToMldev, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -1569,7 +1594,7 @@ func generateContentParametersToVertex(ac *InternalAPIClient, fromObject map[str
 			return nil, err
 		}
 
-		fromContents, err = applyConverterToSliceWithRoot(fromContents.([]any), contentToVertex, rootObject)
+		fromContents, err = InternalApplyConverterToSliceWithRoot(fromContents.([]any), contentToVertex, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -1600,7 +1625,7 @@ func generateContentResponseFromMldev(fromObject map[string]any, parentObject ma
 
 	fromCandidates := InternalGetValueByPath(fromObject, []string{"candidates"})
 	if fromCandidates != nil {
-		fromCandidates, err = applyConverterToSliceWithRoot(fromCandidates.([]any), candidateFromMldev, rootObject)
+		fromCandidates, err = InternalApplyConverterToSliceWithRoot(fromCandidates.([]any), candidateFromMldev, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -1921,7 +1946,7 @@ func generateImagesResponseFromMldev(fromObject map[string]any, parentObject map
 
 	fromGeneratedImages := InternalGetValueByPath(fromObject, []string{"predictions"})
 	if fromGeneratedImages != nil {
-		fromGeneratedImages, err = applyConverterToSliceWithRoot(fromGeneratedImages.([]any), generatedImageFromMldev, rootObject)
+		fromGeneratedImages, err = InternalApplyConverterToSliceWithRoot(fromGeneratedImages.([]any), generatedImageFromMldev, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -1952,7 +1977,7 @@ func generateImagesResponseFromVertex(fromObject map[string]any, parentObject ma
 
 	fromGeneratedImages := InternalGetValueByPath(fromObject, []string{"predictions"})
 	if fromGeneratedImages != nil {
-		fromGeneratedImages, err = applyConverterToSliceWithRoot(fromGeneratedImages.([]any), generatedImageFromVertex, rootObject)
+		fromGeneratedImages, err = InternalApplyConverterToSliceWithRoot(fromGeneratedImages.([]any), generatedImageFromVertex, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -2043,7 +2068,7 @@ func generateVideosConfigToMldev(fromObject map[string]any, parentObject map[str
 
 	fromReferenceImages := InternalGetValueByPath(fromObject, []string{"referenceImages"})
 	if fromReferenceImages != nil {
-		fromReferenceImages, err = applyConverterToSliceWithRoot(fromReferenceImages.([]any), videoGenerationReferenceImageToMldev, rootObject)
+		fromReferenceImages, err = InternalApplyConverterToSliceWithRoot(fromReferenceImages.([]any), videoGenerationReferenceImageToMldev, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -2061,6 +2086,15 @@ func generateVideosConfigToMldev(fromObject map[string]any, parentObject map[str
 
 	if InternalGetValueByPath(fromObject, []string{"labels"}) != nil {
 		return nil, fmt.Errorf("labels parameter is not supported in Gemini API")
+	}
+
+	fromWebhookConfig := InternalGetValueByPath(fromObject, []string{"webhookConfig"})
+	if fromWebhookConfig != nil {
+		InternalSetValueByPath(parentObject, []string{"webhookConfig"}, fromWebhookConfig)
+	}
+
+	if InternalGetValueByPath(fromObject, []string{"resizeMode"}) != nil {
+		return nil, fmt.Errorf("resizeMode parameter is not supported in Gemini API")
 	}
 
 	return toObject, nil
@@ -2141,7 +2175,7 @@ func generateVideosConfigToVertex(fromObject map[string]any, parentObject map[st
 
 	fromReferenceImages := InternalGetValueByPath(fromObject, []string{"referenceImages"})
 	if fromReferenceImages != nil {
-		fromReferenceImages, err = applyConverterToSliceWithRoot(fromReferenceImages.([]any), videoGenerationReferenceImageToVertex, rootObject)
+		fromReferenceImages, err = InternalApplyConverterToSliceWithRoot(fromReferenceImages.([]any), videoGenerationReferenceImageToVertex, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -2167,6 +2201,15 @@ func generateVideosConfigToVertex(fromObject map[string]any, parentObject map[st
 	fromLabels := InternalGetValueByPath(fromObject, []string{"labels"})
 	if fromLabels != nil {
 		InternalSetValueByPath(parentObject, []string{"labels"}, fromLabels)
+	}
+
+	if InternalGetValueByPath(fromObject, []string{"webhookConfig"}) != nil {
+		return nil, fmt.Errorf("webhookConfig parameter is not supported in Gemini Enterprise Agent Platform (previously known as Vertex AI)")
+	}
+
+	fromResizeMode := InternalGetValueByPath(fromObject, []string{"resizeMode"})
+	if fromResizeMode != nil {
+		InternalSetValueByPath(parentObject, []string{"parameters", "resizeMode"}, fromResizeMode)
 	}
 
 	return toObject, nil
@@ -2363,7 +2406,7 @@ func generateVideosResponseFromMldev(fromObject map[string]any, parentObject map
 
 	fromGeneratedVideos := InternalGetValueByPath(fromObject, []string{"generatedSamples"})
 	if fromGeneratedVideos != nil {
-		fromGeneratedVideos, err = applyConverterToSliceWithRoot(fromGeneratedVideos.([]any), generatedVideoFromMldev, rootObject)
+		fromGeneratedVideos, err = InternalApplyConverterToSliceWithRoot(fromGeneratedVideos.([]any), generatedVideoFromMldev, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -2389,7 +2432,7 @@ func generateVideosResponseFromVertex(fromObject map[string]any, parentObject ma
 
 	fromGeneratedVideos := InternalGetValueByPath(fromObject, []string{"videos"})
 	if fromGeneratedVideos != nil {
-		fromGeneratedVideos, err = applyConverterToSliceWithRoot(fromGeneratedVideos.([]any), generatedVideoFromVertex, rootObject)
+		fromGeneratedVideos, err = InternalApplyConverterToSliceWithRoot(fromGeneratedVideos.([]any), generatedVideoFromVertex, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -2677,11 +2720,6 @@ func generationConfigToVertex(fromObject map[string]any, parentObject map[string
 
 	fromSpeechConfig := InternalGetValueByPath(fromObject, []string{"speechConfig"})
 	if fromSpeechConfig != nil {
-		fromSpeechConfig, err = speechConfigToVertex(fromSpeechConfig.(map[string]any), toObject, rootObject)
-		if err != nil {
-			return nil, err
-		}
-
 		InternalSetValueByPath(toObject, []string{"speechConfig"}, fromSpeechConfig)
 	}
 
@@ -2711,7 +2749,7 @@ func generationConfigToVertex(fromObject map[string]any, parentObject map[string
 	}
 
 	if InternalGetValueByPath(fromObject, []string{"enableEnhancedCivicAnswers"}) != nil {
-		return nil, fmt.Errorf("enableEnhancedCivicAnswers parameter is not supported in Vertex AI")
+		return nil, fmt.Errorf("enableEnhancedCivicAnswers parameter is not supported in Gemini Enterprise Agent Platform (previously known as Vertex AI)")
 	}
 
 	return toObject, nil
@@ -3078,7 +3116,7 @@ func listModelsResponseFromMldev(fromObject map[string]any, parentObject map[str
 			return nil, err
 		}
 
-		fromModels, err = applyConverterToSliceWithRoot(fromModels.([]any), modelFromMldev, rootObject)
+		fromModels, err = InternalApplyConverterToSliceWithRoot(fromModels.([]any), modelFromMldev, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -3109,7 +3147,7 @@ func listModelsResponseFromVertex(fromObject map[string]any, parentObject map[st
 			return nil, err
 		}
 
-		fromModels, err = applyConverterToSliceWithRoot(fromModels.([]any), modelFromVertex, rootObject)
+		fromModels, err = InternalApplyConverterToSliceWithRoot(fromModels.([]any), modelFromVertex, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -3237,7 +3275,7 @@ func modelFromVertex(fromObject map[string]any, parentObject map[string]any, roo
 
 	fromEndpoints := InternalGetValueByPath(fromObject, []string{"deployedModels"})
 	if fromEndpoints != nil {
-		fromEndpoints, err = applyConverterToSliceWithRoot(fromEndpoints.([]any), endpointFromVertex, rootObject)
+		fromEndpoints, err = InternalApplyConverterToSliceWithRoot(fromEndpoints.([]any), endpointFromVertex, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -3268,22 +3306,6 @@ func modelFromVertex(fromObject map[string]any, parentObject map[string]any, roo
 	fromCheckpoints := InternalGetValueByPath(fromObject, []string{"checkpoints"})
 	if fromCheckpoints != nil {
 		InternalSetValueByPath(toObject, []string{"checkpoints"}, fromCheckpoints)
-	}
-
-	return toObject, nil
-}
-
-func multiSpeakerVoiceConfigToVertex(fromObject map[string]any, parentObject map[string]any, rootObject map[string]any) (toObject map[string]any, err error) {
-	toObject = make(map[string]any)
-
-	fromSpeakerVoiceConfigs := InternalGetValueByPath(fromObject, []string{"speakerVoiceConfigs"})
-	if fromSpeakerVoiceConfigs != nil {
-		fromSpeakerVoiceConfigs, err = applyConverterToSliceWithRoot(fromSpeakerVoiceConfigs.([]any), speakerVoiceConfigToVertex, rootObject)
-		if err != nil {
-			return nil, err
-		}
-
-		InternalSetValueByPath(toObject, []string{"speakerVoiceConfigs"}, fromSpeakerVoiceConfigs)
 	}
 
 	return toObject, nil
@@ -3439,15 +3461,15 @@ func partToVertex(fromObject map[string]any, parentObject map[string]any, rootOb
 	}
 
 	if InternalGetValueByPath(fromObject, []string{"toolCall"}) != nil {
-		return nil, fmt.Errorf("toolCall parameter is not supported in Vertex AI")
+		return nil, fmt.Errorf("toolCall parameter is not supported in Gemini Enterprise Agent Platform (previously known as Vertex AI)")
 	}
 
 	if InternalGetValueByPath(fromObject, []string{"toolResponse"}) != nil {
-		return nil, fmt.Errorf("toolResponse parameter is not supported in Vertex AI")
+		return nil, fmt.Errorf("toolResponse parameter is not supported in Gemini Enterprise Agent Platform (previously known as Vertex AI)")
 	}
 
 	if InternalGetValueByPath(fromObject, []string{"partMetadata"}) != nil {
-		return nil, fmt.Errorf("partMetadata parameter is not supported in Vertex AI")
+		return nil, fmt.Errorf("partMetadata parameter is not supported in Gemini Enterprise Agent Platform (previously known as Vertex AI)")
 	}
 
 	return toObject, nil
@@ -3567,7 +3589,7 @@ func recontextImageResponseFromVertex(fromObject map[string]any, parentObject ma
 
 	fromGeneratedImages := InternalGetValueByPath(fromObject, []string{"predictions"})
 	if fromGeneratedImages != nil {
-		fromGeneratedImages, err = applyConverterToSliceWithRoot(fromGeneratedImages.([]any), generatedImageFromVertex, rootObject)
+		fromGeneratedImages, err = InternalApplyConverterToSliceWithRoot(fromGeneratedImages.([]any), generatedImageFromVertex, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -3598,7 +3620,7 @@ func recontextImageSourceToVertex(fromObject map[string]any, parentObject map[st
 
 	fromProductImages := InternalGetValueByPath(fromObject, []string{"productImages"})
 	if fromProductImages != nil {
-		fromProductImages, err = applyConverterToSliceWithRoot(fromProductImages.([]any), productImageToVertex, rootObject)
+		fromProductImages, err = InternalApplyConverterToSliceWithRoot(fromProductImages.([]any), productImageToVertex, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -3660,22 +3682,6 @@ func referenceImageAPIToVertex(fromObject map[string]any, parentObject map[strin
 	fromSubjectImageConfig := InternalGetValueByPath(fromObject, []string{"subjectImageConfig"})
 	if fromSubjectImageConfig != nil {
 		InternalSetValueByPath(toObject, []string{"subjectImageConfig"}, fromSubjectImageConfig)
-	}
-
-	return toObject, nil
-}
-
-func replicatedVoiceConfigToVertex(fromObject map[string]any, parentObject map[string]any, rootObject map[string]any) (toObject map[string]any, err error) {
-	toObject = make(map[string]any)
-
-	fromMimeType := InternalGetValueByPath(fromObject, []string{"mimeType"})
-	if fromMimeType != nil {
-		InternalSetValueByPath(toObject, []string{"mimeType"}, fromMimeType)
-	}
-
-	fromVoiceSampleAudio := InternalGetValueByPath(fromObject, []string{"voiceSampleAudio"})
-	if fromVoiceSampleAudio != nil {
-		InternalSetValueByPath(toObject, []string{"voiceSampleAudio"}, fromVoiceSampleAudio)
 	}
 
 	return toObject, nil
@@ -3832,7 +3838,7 @@ func segmentImageResponseFromVertex(fromObject map[string]any, parentObject map[
 
 	fromGeneratedMasks := InternalGetValueByPath(fromObject, []string{"predictions"})
 	if fromGeneratedMasks != nil {
-		fromGeneratedMasks, err = applyConverterToSliceWithRoot(fromGeneratedMasks.([]any), generatedImageMaskFromVertex, rootObject)
+		fromGeneratedMasks, err = InternalApplyConverterToSliceWithRoot(fromGeneratedMasks.([]any), generatedImageMaskFromVertex, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -3869,58 +3875,6 @@ func segmentImageSourceToVertex(fromObject map[string]any, parentObject map[stri
 		}
 
 		InternalSetValueByPath(parentObject, []string{"instances[0]", "scribble"}, fromScribbleImage)
-	}
-
-	return toObject, nil
-}
-
-func speakerVoiceConfigToVertex(fromObject map[string]any, parentObject map[string]any, rootObject map[string]any) (toObject map[string]any, err error) {
-	toObject = make(map[string]any)
-
-	fromSpeaker := InternalGetValueByPath(fromObject, []string{"speaker"})
-	if fromSpeaker != nil {
-		InternalSetValueByPath(toObject, []string{"speaker"}, fromSpeaker)
-	}
-
-	fromVoiceConfig := InternalGetValueByPath(fromObject, []string{"voiceConfig"})
-	if fromVoiceConfig != nil {
-		fromVoiceConfig, err = voiceConfigToVertex(fromVoiceConfig.(map[string]any), toObject, rootObject)
-		if err != nil {
-			return nil, err
-		}
-
-		InternalSetValueByPath(toObject, []string{"voiceConfig"}, fromVoiceConfig)
-	}
-
-	return toObject, nil
-}
-
-func speechConfigToVertex(fromObject map[string]any, parentObject map[string]any, rootObject map[string]any) (toObject map[string]any, err error) {
-	toObject = make(map[string]any)
-
-	fromVoiceConfig := InternalGetValueByPath(fromObject, []string{"voiceConfig"})
-	if fromVoiceConfig != nil {
-		fromVoiceConfig, err = voiceConfigToVertex(fromVoiceConfig.(map[string]any), toObject, rootObject)
-		if err != nil {
-			return nil, err
-		}
-
-		InternalSetValueByPath(toObject, []string{"voiceConfig"}, fromVoiceConfig)
-	}
-
-	fromLanguageCode := InternalGetValueByPath(fromObject, []string{"languageCode"})
-	if fromLanguageCode != nil {
-		InternalSetValueByPath(toObject, []string{"languageCode"}, fromLanguageCode)
-	}
-
-	fromMultiSpeakerVoiceConfig := InternalGetValueByPath(fromObject, []string{"multiSpeakerVoiceConfig"})
-	if fromMultiSpeakerVoiceConfig != nil {
-		fromMultiSpeakerVoiceConfig, err = multiSpeakerVoiceConfigToVertex(fromMultiSpeakerVoiceConfig.(map[string]any), toObject, rootObject)
-		if err != nil {
-			return nil, err
-		}
-
-		InternalSetValueByPath(toObject, []string{"multiSpeakerVoiceConfig"}, fromMultiSpeakerVoiceConfig)
 	}
 
 	return toObject, nil
@@ -3966,7 +3920,7 @@ func toolConfigToVertex(fromObject map[string]any, parentObject map[string]any, 
 	}
 
 	if InternalGetValueByPath(fromObject, []string{"includeServerSideToolInvocations"}) != nil {
-		return nil, fmt.Errorf("includeServerSideToolInvocations parameter is not supported in Vertex AI")
+		return nil, fmt.Errorf("includeServerSideToolInvocations parameter is not supported in Gemini Enterprise Agent Platform (previously known as Vertex AI)")
 	}
 
 	return toObject, nil
@@ -4058,7 +4012,7 @@ func toolToVertex(fromObject map[string]any, parentObject map[string]any, rootOb
 	}
 
 	if InternalGetValueByPath(fromObject, []string{"fileSearch"}) != nil {
-		return nil, fmt.Errorf("fileSearch parameter is not supported in Vertex AI")
+		return nil, fmt.Errorf("fileSearch parameter is not supported in Gemini Enterprise Agent Platform (previously known as Vertex AI)")
 	}
 
 	fromGoogleSearch := InternalGetValueByPath(fromObject, []string{"googleSearch"})
@@ -4083,7 +4037,7 @@ func toolToVertex(fromObject map[string]any, parentObject map[string]any, rootOb
 
 	fromFunctionDeclarations := InternalGetValueByPath(fromObject, []string{"functionDeclarations"})
 	if fromFunctionDeclarations != nil {
-		fromFunctionDeclarations, err = applyConverterToSliceWithRoot(fromFunctionDeclarations.([]any), functionDeclarationToVertex, rootObject)
+		fromFunctionDeclarations, err = InternalApplyConverterToSliceWithRoot(fromFunctionDeclarations.([]any), functionDeclarationToVertex, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -4107,7 +4061,7 @@ func toolToVertex(fromObject map[string]any, parentObject map[string]any, rootOb
 	}
 
 	if InternalGetValueByPath(fromObject, []string{"mcpServers"}) != nil {
-		return nil, fmt.Errorf("mcpServers parameter is not supported in Vertex AI")
+		return nil, fmt.Errorf("mcpServers parameter is not supported in Gemini Enterprise Agent Platform (previously known as Vertex AI)")
 	}
 
 	return toObject, nil
@@ -4334,7 +4288,7 @@ func upscaleImageResponseFromVertex(fromObject map[string]any, parentObject map[
 
 	fromGeneratedImages := InternalGetValueByPath(fromObject, []string{"predictions"})
 	if fromGeneratedImages != nil {
-		fromGeneratedImages, err = applyConverterToSliceWithRoot(fromGeneratedImages.([]any), generatedImageFromVertex, rootObject)
+		fromGeneratedImages, err = InternalApplyConverterToSliceWithRoot(fromGeneratedImages.([]any), generatedImageFromVertex, rootObject)
 		if err != nil {
 			return nil, err
 		}
@@ -4507,27 +4461,6 @@ func videoToVertex(fromObject map[string]any, parentObject map[string]any, rootO
 	fromMimeType := InternalGetValueByPath(fromObject, []string{"mimeType"})
 	if fromMimeType != nil {
 		InternalSetValueByPath(toObject, []string{"mimeType"}, fromMimeType)
-	}
-
-	return toObject, nil
-}
-
-func voiceConfigToVertex(fromObject map[string]any, parentObject map[string]any, rootObject map[string]any) (toObject map[string]any, err error) {
-	toObject = make(map[string]any)
-
-	fromReplicatedVoiceConfig := InternalGetValueByPath(fromObject, []string{"replicatedVoiceConfig"})
-	if fromReplicatedVoiceConfig != nil {
-		fromReplicatedVoiceConfig, err = replicatedVoiceConfigToVertex(fromReplicatedVoiceConfig.(map[string]any), toObject, rootObject)
-		if err != nil {
-			return nil, err
-		}
-
-		InternalSetValueByPath(toObject, []string{"replicatedVoiceConfig"}, fromReplicatedVoiceConfig)
-	}
-
-	fromPrebuiltVoiceConfig := InternalGetValueByPath(fromObject, []string{"prebuiltVoiceConfig"})
-	if fromPrebuiltVoiceConfig != nil {
-		InternalSetValueByPath(toObject, []string{"prebuiltVoiceConfig"}, fromPrebuiltVoiceConfig)
 	}
 
 	return toObject, nil
@@ -4851,7 +4784,7 @@ func (m Models) editImage(ctx context.Context, model string, prompt string, refe
 		fromConverter = editImageResponseFromVertex
 	} else {
 
-		return nil, fmt.Errorf("method EditImage is only supported in the Vertex AI client. You can choose to use Vertex AI by setting ClientConfig.Backend to BackendVertexAI.")
+		return nil, fmt.Errorf("method EditImage is only supported in the Gemini Enterprise Agent Platform (previously known as Vertex AI) client. You can choose to use Gemini Enterprise Agent Platform by setting ClientConfig.Backend to BackendEnterprise.")
 
 	}
 
@@ -4925,7 +4858,7 @@ func (m Models) upscaleImage(ctx context.Context, model string, image *Image, up
 		fromConverter = upscaleImageResponseFromVertex
 	} else {
 
-		return nil, fmt.Errorf("method UpscaleImage is only supported in the Vertex AI client. You can choose to use Vertex AI by setting ClientConfig.Backend to BackendVertexAI.")
+		return nil, fmt.Errorf("method UpscaleImage is only supported in the Gemini Enterprise Agent Platform (previously known as Vertex AI) client. You can choose to use Gemini Enterprise Agent Platform by setting ClientConfig.Backend to BackendEnterprise.")
 
 	}
 
@@ -5001,7 +4934,7 @@ func (m Models) RecontextImage(ctx context.Context, model string, source *Recont
 		fromConverter = recontextImageResponseFromVertex
 	} else {
 
-		return nil, fmt.Errorf("method RecontextImage is only supported in the Vertex AI client. You can choose to use Vertex AI by setting ClientConfig.Backend to BackendVertexAI.")
+		return nil, fmt.Errorf("method RecontextImage is only supported in the Gemini Enterprise Agent Platform (previously known as Vertex AI) client. You can choose to use Gemini Enterprise Agent Platform by setting ClientConfig.Backend to BackendEnterprise.")
 
 	}
 
@@ -5085,7 +5018,7 @@ func (m Models) SegmentImage(ctx context.Context, model string, source *SegmentI
 		fromConverter = segmentImageResponseFromVertex
 	} else {
 
-		return nil, fmt.Errorf("method SegmentImage is only supported in the Vertex AI client. You can choose to use Vertex AI by setting ClientConfig.Backend to BackendVertexAI.")
+		return nil, fmt.Errorf("method SegmentImage is only supported in the Gemini Enterprise Agent Platform (previously known as Vertex AI) client. You can choose to use Gemini Enterprise Agent Platform by setting ClientConfig.Backend to BackendEnterprise.")
 
 	}
 
@@ -5566,7 +5499,7 @@ func (m Models) ComputeTokens(ctx context.Context, model string, contents []*Con
 		fromConverter = computeTokensResponseFromVertex
 	} else {
 
-		return nil, fmt.Errorf("method ComputeTokens is only supported in the Vertex AI client. You can choose to use Vertex AI by setting ClientConfig.Backend to BackendVertexAI.")
+		return nil, fmt.Errorf("method ComputeTokens is only supported in the Gemini Enterprise Agent Platform (previously known as Vertex AI) client. You can choose to use Gemini Enterprise Agent Platform by setting ClientConfig.Backend to BackendEnterprise.")
 
 	}
 

@@ -40,6 +40,9 @@ type Config struct {
 	// If there's no overlap in supported Transport Factory will return an error on Client
 	// creation attempt.
 	PreferredTransports []a2a.TransportProtocol
+	// DisableTenantPropagation disables tenant propagation.
+	// If true, the client will not attach tenant from context to the request.
+	DisableTenantPropagation bool
 }
 
 // Client represents a transport-agnostic implementation of A2A client.
@@ -169,17 +172,17 @@ func (c *Client) SubscribeToTask(ctx context.Context, req *a2a.SubscribeToTaskRe
 }
 
 // GetTaskPushConfig implements the `GetTaskPushNotificationConfig` protocol method.
-func (c *Client) GetTaskPushConfig(ctx context.Context, req *a2a.GetTaskPushConfigRequest) (*a2a.TaskPushConfig, error) {
+func (c *Client) GetTaskPushConfig(ctx context.Context, req *a2a.GetTaskPushConfigRequest) (*a2a.PushConfig, error) {
 	return doCall(ctx, c, "GetTaskPushConfig", req, c.transport.GetTaskPushConfig)
 }
 
 // ListTaskPushConfigs implements the `ListTaskPushNotificationConfig` protocol method.
-func (c *Client) ListTaskPushConfigs(ctx context.Context, req *a2a.ListTaskPushConfigRequest) ([]*a2a.TaskPushConfig, error) {
+func (c *Client) ListTaskPushConfigs(ctx context.Context, req *a2a.ListTaskPushConfigRequest) ([]*a2a.PushConfig, error) {
 	return doCall(ctx, c, "ListTaskPushConfigs", req, c.transport.ListTaskPushConfigs)
 }
 
 // CreateTaskPushConfig implements the `CreateTaskPushNotificationConfig` protocol method.
-func (c *Client) CreateTaskPushConfig(ctx context.Context, req *a2a.CreateTaskPushConfigRequest) (*a2a.TaskPushConfig, error) {
+func (c *Client) CreateTaskPushConfig(ctx context.Context, req *a2a.PushConfig) (*a2a.PushConfig, error) {
 	return doCall(ctx, c, "CreateTaskPushConfig", req, c.transport.CreateTaskPushConfig)
 }
 

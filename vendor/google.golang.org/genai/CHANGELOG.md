@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.55.0](https://github.com/googleapis/go-genai/compare/v1.54.0...v1.55.0) (2026-04-29)
+
+
+### Features
+
+* Add `output_info` to `BatchJob` ([9ec7d3b](https://github.com/googleapis/go-genai/commit/9ec7d3bff89e75126652363def92a820179209e4))
+* Add ImageResizeMode for GenerateVideos ([8fc27f4](https://github.com/googleapis/go-genai/commit/8fc27f4f670f864785424fcd8d0e7931c2989ecb))
+* Add InternalApplyConverterToSliceWithRoot to the common utilities. ([7aaf1eb](https://github.com/googleapis/go-genai/commit/7aaf1eb1eab03698454be3f9398945d2365debeb))
+* Add Vertex Dataset input and output options for batch jobs ([73ee07c](https://github.com/googleapis/go-genai/commit/73ee07cbdae9873271c90e66bb491178587f8495))
+* introduce BackendEnterprise and GOOGLE_GENAI_USE_ENTERPRISE env var ([1181fe0](https://github.com/googleapis/go-genai/commit/1181fe03dfc10ebab1b7d760fce7b18ac22f86d1))
+
+## [1.54.0](https://github.com/googleapis/go-genai/compare/v1.53.0...v1.54.0) (2026-04-13)
+
+
+### Features
+
+* Add "eu" as a supported service location for Vertex AI platform. ([9245aba](https://github.com/googleapis/go-genai/commit/9245aba251afea99b1560fae07b93498ed5b5d8e))
+* Add Live Avatar new fields ([2ae252c](https://github.com/googleapis/go-genai/commit/2ae252caaf0d5273d5656d32858e54c354326248))
+* Add webhook_config to batches.create() and models.generate_videos() ([4790027](https://github.com/googleapis/go-genai/commit/4790027b553d401d5cc99f21776dcfa49cbda16d))
+
 ## [1.53.0](https://github.com/googleapis/go-genai/compare/v1.52.1...v1.53.0) (2026-04-08)
 
 
