@@ -1,6 +1,9 @@
 package adkgo
 
 import (
+	"aicompass/foundation/auth"
+	"aicompass/foundation/logger"
+	"aicompass/modules/chat/thread"
 	"context"
 	"errors"
 	"fmt"
@@ -9,9 +12,6 @@ import (
 	"time"
 
 	agentio "aicompass/foundation/agent/io"
-	"aicompass/foundation/auth"
-	"aicompass/foundation/logger"
-	"aicompass/modules/chat/thread"
 
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"

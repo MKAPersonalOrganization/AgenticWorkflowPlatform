@@ -2,8 +2,8 @@ package agenthandler
 
 import (
 	"aicompass/foundation/agent"
-	"aicompass/foundation/logger"
 	"aicompass/foundation/auth"
+	"aicompass/foundation/logger"
 	"context"
 	"encoding/json"
 	"net/http"

@@ -15,6 +15,8 @@ import (
 )
 
 func TestService_Upload(t *testing.T) {
+	t.Parallel()
+
 	tenantID := uuid.New()
 	workspaceID := uuid.New()
 	userID := "test-user"
@@ -96,6 +98,8 @@ func TestService_Upload(t *testing.T) {
 }
 
 func TestService_List_Headers(t *testing.T) {
+	t.Parallel()
+
 	tenantID := uuid.New()
 	workspaceID := uuid.New()
 	userID := "test-user"
@@ -144,6 +148,8 @@ func TestService_List_Headers(t *testing.T) {
 }
 
 func TestService_UploadAndListFlow(t *testing.T) {
+	t.Parallel()
+
 	tenantID := uuid.New()
 	workspaceID := uuid.New()
 	tCtx := &tenant.TenantContext{
@@ -186,6 +192,8 @@ func TestService_UploadAndListFlow(t *testing.T) {
 }
 
 func TestService_ListPDFs(t *testing.T) {
+	t.Parallel()
+
 	tenantID := uuid.New()
 	workspaceID := uuid.New()
 	tCtx := &tenant.TenantContext{
@@ -224,6 +232,8 @@ func TestService_ListPDFs(t *testing.T) {
 }
 
 func TestService_DeletePDF(t *testing.T) {
+	t.Parallel()
+
 	pdfID := uuid.New().String()
 	tenantID := uuid.New()
 	workspaceID := uuid.New()
@@ -253,6 +263,8 @@ func TestService_DeletePDF(t *testing.T) {
 }
 
 func TestService_DeletePDF_NotFound(t *testing.T) {
+	t.Parallel()
+
 	pdfID := "non-existent"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
@@ -268,6 +280,8 @@ func TestService_DeletePDF_NotFound(t *testing.T) {
 }
 
 func TestService_GetPDFProgress(t *testing.T) {
+	t.Parallel()
+
 	trackID := uuid.New().String()
 	tenantID := uuid.New()
 	workspaceID := uuid.New()
@@ -302,6 +316,8 @@ func TestService_GetPDFProgress(t *testing.T) {
 }
 
 func TestService_GetPDFProgress_NotFound(t *testing.T) {
+	t.Parallel()
+
 	trackID := "non-existent"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
@@ -316,6 +332,8 @@ func TestService_GetPDFProgress_NotFound(t *testing.T) {
 }
 
 func TestService_GetPDFStatus(t *testing.T) {
+	t.Parallel()
+
 	pdfID := uuid.New().String()
 	tenantID := uuid.New()
 	workspaceID := uuid.New()
@@ -359,6 +377,8 @@ func TestService_GetPDFStatus(t *testing.T) {
 }
 
 func TestService_GetPDFStatus_NotFound(t *testing.T) {
+	t.Parallel()
+
 	pdfID := "non-existent"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
@@ -373,6 +393,8 @@ func TestService_GetPDFStatus_NotFound(t *testing.T) {
 }
 
 func TestService_GetPDFContent(t *testing.T) {
+	t.Parallel()
+
 	pdfID := uuid.New().String()
 	tenantID := uuid.New()
 	workspaceID := uuid.New()

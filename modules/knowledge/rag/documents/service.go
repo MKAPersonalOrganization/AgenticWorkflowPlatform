@@ -56,7 +56,7 @@ func (s *Service) List(ctx context.Context, tCtx *tenant.TenantContext, page, pa
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func (s *Service) Get(ctx context.Context, tCtx *tenant.TenantContext, documentI
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -131,7 +131,7 @@ func (s *Service) Upload(ctx context.Context, tCtx *tenant.TenantContext, fileNa
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -166,7 +166,7 @@ func (s *Service) ListPDFs(ctx context.Context, tCtx *tenant.TenantContext, page
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -212,7 +212,7 @@ func (s *Service) UploadPDF(ctx context.Context, tCtx *tenant.TenantContext, fil
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -241,7 +241,7 @@ func (s *Service) DeletePDF(ctx context.Context, tCtx *tenant.TenantContext, pdf
 	if err != nil {
 		return fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		if err.Error() == "PDF not found" {
@@ -268,7 +268,7 @@ func (s *Service) GetPDFProgress(ctx context.Context, tCtx *tenant.TenantContext
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -297,7 +297,7 @@ func (s *Service) GetPDFStatus(ctx context.Context, tCtx *tenant.TenantContext, 
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -326,7 +326,7 @@ func (s *Service) GetPDFContent(ctx context.Context, tCtx *tenant.TenantContext,
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -357,7 +357,7 @@ func (s *Service) DownloadPDF(ctx context.Context, tCtx *tenant.TenantContext, p
 	}
 
 	if err := s.handleError(resp); err != nil {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return nil, "", 0, err
 	}
 
@@ -379,7 +379,7 @@ func (s *Service) GetPipelineTasks(ctx context.Context, tCtx *tenant.TenantConte
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -415,7 +415,7 @@ func (s *Service) Reprocess(ctx context.Context, tCtx *tenant.TenantContext, doc
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -447,7 +447,7 @@ func (s *Service) ReprocessFailed(ctx context.Context, tCtx *tenant.TenantContex
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -478,7 +478,7 @@ func (s *Service) ScanDocuments(ctx context.Context, tCtx *tenant.TenantContext,
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -507,7 +507,7 @@ func (s *Service) DeleteAll(ctx context.Context, tCtx *tenant.TenantContext) (*D
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -536,7 +536,7 @@ func (s *Service) RetryTask(ctx context.Context, tCtx *tenant.TenantContext, tas
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -565,7 +565,7 @@ func (s *Service) RetryPdfProcessing(ctx context.Context, tCtx *tenant.TenantCon
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -594,7 +594,7 @@ func (s *Service) CancelTask(ctx context.Context, tCtx *tenant.TenantContext, ta
 	if err != nil {
 		return fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return s.handleError(resp)
 }
@@ -614,7 +614,7 @@ func (s *Service) Delete(ctx context.Context, tCtx *tenant.TenantContext, docume
 	if err != nil {
 		return fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return s.handleError(resp)
 }

@@ -142,7 +142,7 @@ func (m *openAIResponsesModel) generate(ctx context.Context, params responses.Re
 // arguments and code blocks so the final LLMResponse has the right parts.
 func (m *openAIResponsesModel) generateStream(ctx context.Context, params responses.ResponseNewParams, yield func(*adkmodel.LLMResponse, error) bool) {
 	stream := m.client.Responses.NewStreaming(ctx, params)
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 
 	for stream.Next() {
 		evt := stream.Current()
@@ -434,9 +434,9 @@ func responsesOutputToLLMResponse(out []responses.ResponseOutputItemUnion, usage
 			Parts: parts,
 		},
 		UsageMetadata: &genai.GenerateContentResponseUsageMetadata{
-			PromptTokenCount:     int32(usage.InputTokens),
-			CandidatesTokenCount: int32(usage.OutputTokens),
-			TotalTokenCount:      int32(usage.TotalTokens),
+			PromptTokenCount:     clampInt32(usage.InputTokens),
+			CandidatesTokenCount: clampInt32(usage.OutputTokens),
+			TotalTokenCount:      clampInt32(usage.TotalTokens),
 		},
 	}
 }

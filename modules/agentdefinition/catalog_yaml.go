@@ -9,22 +9,22 @@ import (
 
 // yamlCatalogSpec mirrors the YAML schema for a single catalog entry file.
 type yamlCatalogSpec struct {
-	Name              string             `yaml:"name"`
-	Slug              string             `yaml:"slug"` // deterministic ID seed; defaults to Name
-	Description       string             `yaml:"description"`
-	SystemPrompt      string             `yaml:"system_prompt"`                // non-empty for single-agent entries
-	GlobalInstruction string             `yaml:"global_instruction,omitempty"` // root-only directive shared by every agent in the tree
-	Category          string             `yaml:"category"`
-	Tags              []string           `yaml:"tags"`
-	AuthorName        string             `yaml:"author_name"`
-	Icon              string             `yaml:"icon"` // named icon (e.g. "bot") or raw SVG
-	Featured          bool               `yaml:"featured"`
+	Name                string                   `yaml:"name"`
+	Slug                string                   `yaml:"slug"` // deterministic ID seed; defaults to Name
+	Description         string                   `yaml:"description"`
+	SystemPrompt        string                   `yaml:"system_prompt"`                // non-empty for single-agent entries
+	GlobalInstruction   string                   `yaml:"global_instruction,omitempty"` // root-only directive shared by every agent in the tree
+	Category            string                   `yaml:"category"`
+	Tags                []string                 `yaml:"tags"`
+	AuthorName          string                   `yaml:"author_name"`
+	Icon                string                   `yaml:"icon"` // named icon (e.g. "bot") or raw SVG
+	Featured            bool                     `yaml:"featured"`
 	MemoryPolicy        *yamlMemoryPolicy        `yaml:"memory_policy,omitempty"`         // per-agent cross-session memory policy
 	ArtifactPolicy      *yamlArtifactPolicy      `yaml:"artifact_policy,omitempty"`       // per-agent artifact policy (tool + auto-save)
 	CodeExecutionPolicy *yamlCodeExecutionPolicy `yaml:"code_execution_policy,omitempty"` // provider-agnostic code execution toggle
 	Workflow            *yamlWorkflowNode        `yaml:"workflow"`                        // nil for single-agent entries
-	LLMAgents         []yamlSubAgent      `yaml:"llm_agents"`                // nil for single-agent entries
-	AgentTools        []yamlAgentToolRef  `yaml:"agent_tools,omitempty"`     // expose sub-agents as callable tools
+	LLMAgents           []yamlSubAgent           `yaml:"llm_agents"`                      // nil for single-agent entries
+	AgentTools          []yamlAgentToolRef       `yaml:"agent_tools,omitempty"`           // expose sub-agents as callable tools
 }
 
 // yamlMemoryPolicy is the YAML shape for AgentMemoryPolicy. Fields map

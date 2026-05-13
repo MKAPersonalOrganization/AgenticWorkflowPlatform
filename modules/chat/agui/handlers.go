@@ -1,8 +1,8 @@
 package agui
 
 import (
-	"aicompass/modules/chat/projection/agui"
 	"aicompass/foundation/auth"
+	"aicompass/modules/chat/projection/agui"
 	"bytes"
 	"encoding/json"
 	"net/http"
@@ -120,7 +120,7 @@ func (h *AguiProjectionHandler) writeThreadResponse(w http.ResponseWriter, state
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(buf.Bytes())
+	_, _ = w.Write(buf.Bytes())
 }
 
 // ListThreads returns paginated thread summaries, sorted by most recent.

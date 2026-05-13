@@ -83,7 +83,7 @@ func (s *Service) ListRelationships(ctx context.Context, tc tenant.TenantContext
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -116,7 +116,7 @@ func (s *Service) CreateRelationship(ctx context.Context, tc tenant.TenantContex
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -143,7 +143,7 @@ func (s *Service) GetRelationship(ctx context.Context, tc tenant.TenantContext, 
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -176,7 +176,7 @@ func (s *Service) UpdateRelationship(ctx context.Context, tc tenant.TenantContex
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -203,7 +203,7 @@ func (s *Service) DeleteRelationship(ctx context.Context, tc tenant.TenantContex
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err

@@ -423,7 +423,7 @@ func (t *QueryKnowledgeBaseTool) retrieveContext(ctx context.Context, query, wor
 	if err != nil {
 		return nil, fmt.Errorf("retrieval API request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -465,7 +465,7 @@ func (t *QueryKnowledgeBaseTool) callLLMFull(ctx context.Context, systemPrompt, 
 	if err != nil {
 		return nil, fmt.Errorf("OpenAI API request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -524,7 +524,7 @@ func (t *QueryKnowledgeBaseTool) callLLMStreaming(ctx context.Context, systemPro
 	if err != nil {
 		return "", llmUsage{}, fmt.Errorf("OpenAI streaming API request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -917,7 +917,7 @@ func (t *QueryKnowledgeBaseTool) searchGraphNodes(ctx context.Context, httpClien
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("search nodes returned %d", resp.StatusCode)
@@ -944,7 +944,7 @@ func (t *QueryKnowledgeBaseTool) fetchSubgraph(ctx context.Context, httpClient *
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("graph API returned %d", resp.StatusCode)

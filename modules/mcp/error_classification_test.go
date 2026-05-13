@@ -12,6 +12,8 @@ import (
 // using http.StatusText(code), so the error message contains "Unauthorized"
 // without the numeric 401.
 func TestIsAuthError(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		err  error
@@ -56,7 +58,9 @@ func TestIsAuthError(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := isAuthError(tt.err); got != tt.want {
 				t.Errorf("isAuthError() = %v, want %v", got, tt.want)
 			}
@@ -68,6 +72,8 @@ func TestIsAuthError(t *testing.T) {
 // as permanent client errors using http.StatusText output.
 // TestIsTransientError verifies that 5xx and network errors are classified as transient.
 func TestIsTransientError(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		err  error
@@ -128,7 +134,9 @@ func TestIsTransientError(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := isTransientError(tt.err); got != tt.want {
 				t.Errorf("isTransientError() = %v, want %v", got, tt.want)
 			}
@@ -140,13 +148,17 @@ func TestIsTransientError(t *testing.T) {
 // constants we use for classification match what the go-sdk produces. If the Go
 // standard library ever changes http.StatusText output, this test will catch it.
 func TestStatusTextMatchesGoSDK(t *testing.T) {
+	t.Parallel()
+
 	t.Run("auth", func(t *testing.T) {
+		t.Parallel()
 		if authStatusText != "Unauthorized" {
 			t.Fatalf("authStatusText = %q, want %q", authStatusText, "Unauthorized")
 		}
 	})
 
 	t.Run("transient_errors_are_status_text", func(t *testing.T) {
+		t.Parallel()
 		expectedTexts := map[string]bool{
 			"Bad Gateway":         true,
 			"Service Unavailable": true,

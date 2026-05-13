@@ -184,7 +184,7 @@ func (t *readFileTool) Execute(ctx context.Context, args agent.Arguments) (agent
 	if err != nil {
 		return agent.ErrorResult(fmt.Errorf("reading file: %w", err)), nil
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	limited := io.LimitReader(rc, maxReadBytes+1)
 	buf := new(strings.Builder)

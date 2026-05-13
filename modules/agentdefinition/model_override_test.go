@@ -10,7 +10,10 @@ import (
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestAgentModelOverride_Validate(t *testing.T) {
+	t.Parallel()
+
 	t.Run("nil override is valid", func(t *testing.T) {
+		t.Parallel()
 		var nilOverride *AgentModelOverride
 		if err := nilOverride.Validate(); err != nil {
 			t.Errorf("nil override should be valid, got: %v", err)
@@ -18,6 +21,7 @@ func TestAgentModelOverride_Validate(t *testing.T) {
 	})
 
 	t.Run("both fields set is valid", func(t *testing.T) {
+		t.Parallel()
 		fullyPopulatedOverride := &AgentModelOverride{Provider: "gemini", ModelName: "gemini-2.0-flash"}
 		if err := fullyPopulatedOverride.Validate(); err != nil {
 			t.Errorf("fully populated override should be valid, got: %v", err)
@@ -25,6 +29,7 @@ func TestAgentModelOverride_Validate(t *testing.T) {
 	})
 
 	t.Run("missing provider is rejected", func(t *testing.T) {
+		t.Parallel()
 		overrideWithNoProvider := &AgentModelOverride{ModelName: "gpt-4o"}
 		if err := overrideWithNoProvider.Validate(); err == nil {
 			t.Error("expected error for missing provider")
@@ -32,6 +37,7 @@ func TestAgentModelOverride_Validate(t *testing.T) {
 	})
 
 	t.Run("missing modelName is rejected", func(t *testing.T) {
+		t.Parallel()
 		overrideWithNoModelName := &AgentModelOverride{Provider: "openai"}
 		if err := overrideWithNoModelName.Validate(); err == nil {
 			t.Error("expected error for missing modelName")
@@ -39,6 +45,7 @@ func TestAgentModelOverride_Validate(t *testing.T) {
 	})
 
 	t.Run("both empty is rejected", func(t *testing.T) {
+		t.Parallel()
 		emptyOverride := &AgentModelOverride{}
 		if err := emptyOverride.Validate(); err == nil {
 			t.Error("expected error for both empty fields")
@@ -51,7 +58,10 @@ func TestAgentModelOverride_Validate(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestAgentDefinition_ModelOverrideRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	t.Run("nil override marshals to empty string", func(t *testing.T) {
+		t.Parallel()
 		agentWithNoOverride := &AgentDefinition{}
 		if err := agentWithNoOverride.MarshalModelOverride(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -62,6 +72,7 @@ func TestAgentDefinition_ModelOverrideRoundTrip(t *testing.T) {
 	})
 
 	t.Run("empty JSON unmarshals to nil", func(t *testing.T) {
+		t.Parallel()
 		agentWithEmptyJSON := &AgentDefinition{ModelOverrideJSON: ""}
 		if err := agentWithEmptyJSON.UnmarshalModelOverride(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -72,6 +83,7 @@ func TestAgentDefinition_ModelOverrideRoundTrip(t *testing.T) {
 	})
 
 	t.Run("null JSON unmarshals to nil", func(t *testing.T) {
+		t.Parallel()
 		agentWithNullJSON := &AgentDefinition{ModelOverrideJSON: "null"}
 		if err := agentWithNullJSON.UnmarshalModelOverride(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -82,6 +94,7 @@ func TestAgentDefinition_ModelOverrideRoundTrip(t *testing.T) {
 	})
 
 	t.Run("full override round-trips correctly", func(t *testing.T) {
+		t.Parallel()
 		originalOverride := &AgentModelOverride{Provider: "anthropic", ModelName: "claude-3-opus-20240229"}
 		agentBeforeMarshal := &AgentDefinition{ModelOverride: originalOverride}
 
@@ -113,6 +126,8 @@ func TestAgentDefinition_ModelOverrideRoundTrip(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestAgentModelOverride_JSONFieldNames(t *testing.T) {
+	t.Parallel()
+
 	geminiOverride := &AgentModelOverride{Provider: "gemini", ModelName: "gemini-2.0-flash"}
 
 	serialized, err := json.Marshal(geminiOverride)

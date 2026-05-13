@@ -240,7 +240,6 @@ func (p *PostgresProjection) GetToolTimeSeries(ctx context.Context, agentFilter,
 	if toolFilter != "" {
 		query += fmt.Sprintf(" AND tool_name = $%d", argIdx)
 		args = append(args, toolFilter)
-		argIdx++
 	}
 
 	query += " GROUP BY bucket ORDER BY bucket ASC"

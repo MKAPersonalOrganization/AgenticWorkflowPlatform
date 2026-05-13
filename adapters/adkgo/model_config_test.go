@@ -20,7 +20,10 @@ func f32(v float32) *float32 { return &v }
 func i32(v int32) *int32     { return &v }
 
 func TestBuildGenerateContentConfig_AgentModelConfig(t *testing.T) {
+	t.Parallel()
+
 	t.Run("nil agent config falls back to user global temperature", func(t *testing.T) {
+		t.Parallel()
 		userGlobal := &fagent.ModelConfig{Temperature: f64(0.5)}
 		gc := buildGenerateContentConfig(userGlobal, nil, nil)
 		if gc.Temperature == nil {
@@ -32,6 +35,7 @@ func TestBuildGenerateContentConfig_AgentModelConfig(t *testing.T) {
 	})
 
 	t.Run("agent temperature overrides user global temperature", func(t *testing.T) {
+		t.Parallel()
 		userGlobal := &fagent.ModelConfig{Temperature: f64(0.5)}
 		agentCfg := &fagent.AgentModelConfig{Temperature: f64(1.2)}
 
@@ -45,6 +49,7 @@ func TestBuildGenerateContentConfig_AgentModelConfig(t *testing.T) {
 	})
 
 	t.Run("run config temperature overrides agent config temperature", func(t *testing.T) {
+		t.Parallel()
 		userGlobal := &fagent.ModelConfig{Temperature: f64(0.5)}
 		agentCfg := &fagent.AgentModelConfig{Temperature: f64(1.2)}
 		runCfg := &fagent.RunConfig{Temperature: 1.8}
@@ -59,6 +64,7 @@ func TestBuildGenerateContentConfig_AgentModelConfig(t *testing.T) {
 	})
 
 	t.Run("agent config topP is applied", func(t *testing.T) {
+		t.Parallel()
 		agentCfg := &fagent.AgentModelConfig{TopP: f64(0.9)}
 		gc := buildGenerateContentConfig(&fagent.ModelConfig{}, agentCfg, nil)
 		if gc.TopP == nil {
@@ -70,6 +76,7 @@ func TestBuildGenerateContentConfig_AgentModelConfig(t *testing.T) {
 	})
 
 	t.Run("agent config topK is applied", func(t *testing.T) {
+		t.Parallel()
 		agentCfg := &fagent.AgentModelConfig{TopK: f32(40)}
 		gc := buildGenerateContentConfig(&fagent.ModelConfig{}, agentCfg, nil)
 		if gc.TopK == nil {
@@ -81,6 +88,7 @@ func TestBuildGenerateContentConfig_AgentModelConfig(t *testing.T) {
 	})
 
 	t.Run("agent config maxOutputTokens overrides user global maxTokens", func(t *testing.T) {
+		t.Parallel()
 		userGlobal := &fagent.ModelConfig{MaxTokens: func() *int { v := 2048; return &v }()}
 		agentCfg := &fagent.AgentModelConfig{MaxOutputTokens: i32(512)}
 
@@ -91,6 +99,7 @@ func TestBuildGenerateContentConfig_AgentModelConfig(t *testing.T) {
 	})
 
 	t.Run("run config maxTokens overrides agent config maxOutputTokens", func(t *testing.T) {
+		t.Parallel()
 		agentCfg := &fagent.AgentModelConfig{MaxOutputTokens: i32(512)}
 		runCfg := &fagent.RunConfig{MaxTokens: 1024}
 
@@ -101,6 +110,7 @@ func TestBuildGenerateContentConfig_AgentModelConfig(t *testing.T) {
 	})
 
 	t.Run("agent config stop sequences are applied", func(t *testing.T) {
+		t.Parallel()
 		agentCfg := &fagent.AgentModelConfig{StopSequences: []string{"END", "DONE"}}
 		gc := buildGenerateContentConfig(&fagent.ModelConfig{}, agentCfg, nil)
 		if len(gc.StopSequences) != 2 {
@@ -112,6 +122,7 @@ func TestBuildGenerateContentConfig_AgentModelConfig(t *testing.T) {
 	})
 
 	t.Run("run config stop sequences override agent config stop sequences", func(t *testing.T) {
+		t.Parallel()
 		agentCfg := &fagent.AgentModelConfig{StopSequences: []string{"AGENT_STOP"}}
 		runCfg := &fagent.RunConfig{StopSequences: []string{"REQUEST_STOP"}}
 
@@ -122,6 +133,7 @@ func TestBuildGenerateContentConfig_AgentModelConfig(t *testing.T) {
 	})
 
 	t.Run("user global fields not touched by agent config are preserved", func(t *testing.T) {
+		t.Parallel()
 		// User global has maxTokens. Agent config only sets temperature.
 		// MaxOutputTokens must come from user global.
 		userGlobal := &fagent.ModelConfig{MaxTokens: func() *int { v := 8192; return &v }()}
@@ -137,6 +149,7 @@ func TestBuildGenerateContentConfig_AgentModelConfig(t *testing.T) {
 	})
 
 	t.Run("all layers applied together respect full precedence chain", func(t *testing.T) {
+		t.Parallel()
 		userGlobal := &fagent.ModelConfig{Temperature: f64(0.3), MaxTokens: func() *int { v := 1000; return &v }()}
 		agentCfg := &fagent.AgentModelConfig{
 			Temperature:     f64(0.7), // overrides user global
@@ -164,6 +177,7 @@ func TestBuildGenerateContentConfig_AgentModelConfig(t *testing.T) {
 	})
 
 	t.Run("empty agent config does not overwrite user global settings", func(t *testing.T) {
+		t.Parallel()
 		userGlobal := &fagent.ModelConfig{Temperature: f64(0.6), MaxTokens: func() *int { v := 4096; return &v }()}
 		agentCfg := &fagent.AgentModelConfig{} // all nil — no overrides
 

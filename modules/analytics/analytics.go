@@ -1,14 +1,13 @@
 package analytics
 
 import (
+	"aicompass/foundation/auth"
+	"aicompass/foundation/logger"
+	"aicompass/modules/analytics/statistics"
 	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"net/http"
-
-	"aicompass/foundation/auth"
-	"aicompass/foundation/logger"
-	"aicompass/modules/analytics/statistics"
 
 	component "aicompass/frontend/ui/analytics"
 )

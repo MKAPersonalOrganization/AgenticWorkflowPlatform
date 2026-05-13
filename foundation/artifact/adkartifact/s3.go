@@ -186,7 +186,7 @@ func (s *s3Service) Load(ctx context.Context, req *artifact.LoadRequest) (*artif
 	if err != nil {
 		return nil, fmt.Errorf("adkartifact: get object failed: %w", err)
 	}
-	defer obj.Close()
+	defer func() { _ = obj.Close() }()
 
 	stat, err := obj.Stat()
 	if err != nil {

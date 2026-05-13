@@ -157,4 +157,3 @@ type ToolResult struct {
 	// IsError indicates whether the execution failed.
 	IsError bool `json:"is_error,omitempty"`
 }
-

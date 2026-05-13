@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
@@ -68,7 +69,16 @@ func LoadCatalogs(localesDir string) error {
 			continue // skip invalid language tags
 		}
 
-		path := filepath.Join(localesDir, entry.Name())
+		// Reject names that try to escape localesDir.
+		if strings.ContainsRune(entry.Name(), filepath.Separator) || strings.Contains(entry.Name(), "..") {
+			continue
+		}
+		path := filepath.Clean(filepath.Join(localesDir, entry.Name()))
+		// After cleaning, ensure the resolved path is still inside localesDir.
+		rel, err := filepath.Rel(localesDir, path)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			continue
+		}
 		file, err := os.Open(path)
 		if err != nil {
 			return fmt.Errorf("failed to open locale file %s: %w", path, err)
@@ -78,10 +88,10 @@ func LoadCatalogs(localesDir string) error {
 
 		var messages map[string]string
 		if err := json.NewDecoder(file).Decode(&messages); err != nil {
-			file.Close()
+			_ = file.Close()
 			return fmt.Errorf("failed to decode locale file %s: %w", path, err)
 		}
-		file.Close()
+		_ = file.Close()
 
 		// Store in cache for frontend
 		messagesCache[tag.String()] = messages

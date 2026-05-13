@@ -51,7 +51,7 @@ func (s *Service) List(ctx context.Context, tCtx *tenant.TenantContext) ([]Folde
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -86,7 +86,7 @@ func (s *Service) Create(ctx context.Context, tCtx *tenant.TenantContext, req *C
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -121,7 +121,7 @@ func (s *Service) Update(ctx context.Context, tCtx *tenant.TenantContext, folder
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -150,7 +150,7 @@ func (s *Service) Delete(ctx context.Context, tCtx *tenant.TenantContext, folder
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return s.handleError(resp)
 }

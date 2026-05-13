@@ -40,7 +40,7 @@ func (s *Service) List(ctx context.Context, offset, limit int) (*TenantListRespo
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return nil, fmt.Errorf("unauthorized")
@@ -78,7 +78,7 @@ func (s *Service) Create(ctx context.Context, req *CreateTenantRequest) (*Tenant
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
@@ -105,7 +105,7 @@ func (s *Service) Get(ctx context.Context, tenantID uuid.UUID) (*TenantResponse,
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, fmt.Errorf("tenant not found")
@@ -143,7 +143,7 @@ func (s *Service) Update(ctx context.Context, tenantID uuid.UUID, req *UpdateTen
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, fmt.Errorf("tenant not found")
@@ -174,7 +174,7 @@ func (s *Service) Delete(ctx context.Context, tenantID uuid.UUID) error {
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return fmt.Errorf("tenant not found")

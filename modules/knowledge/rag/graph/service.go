@@ -83,7 +83,7 @@ func (s *Service) GetGraph(ctx context.Context, tc tenant.TenantContext, params 
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -110,7 +110,7 @@ func (s *Service) GetNode(ctx context.Context, tc tenant.TenantContext, nodeID s
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -143,7 +143,7 @@ func (s *Service) SearchLabels(ctx context.Context, tc tenant.TenantContext, q s
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -176,7 +176,7 @@ func (s *Service) SearchNodes(ctx context.Context, tc tenant.TenantContext, q st
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -208,7 +208,7 @@ func (s *Service) GetPopularLabels(ctx context.Context, tc tenant.TenantContext,
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -240,7 +240,7 @@ func (s *Service) GetDegreesBatch(ctx context.Context, tc tenant.TenantContext, 
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err

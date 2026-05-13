@@ -12,6 +12,8 @@ import (
 )
 
 func TestPostgresRepository(t *testing.T) {
+	t.Parallel()
+
 	host := os.Getenv("APP_DB_HOST")
 	if host == "" {
 		host = "localhost:5435"
@@ -52,6 +54,7 @@ func TestPostgresRepository(t *testing.T) {
 	db.Exec("INSERT INTO tools (id, name, tool_set_id) VALUES ('t-perm-1', 'Perm Tool 1', 'ts-perm-1') ON CONFLICT (id) DO NOTHING")
 
 	t.Run("Tool Set Permissions", func(t *testing.T) {
+		t.Parallel()
 		userID := UserID("test-user")
 		agentID := AgentID("agent-1")
 		toolSetID := ToolSetID("ts-perm-1")
@@ -85,6 +88,7 @@ func TestPostgresRepository(t *testing.T) {
 	})
 
 	t.Run("Tool Permissions", func(t *testing.T) {
+		t.Parallel()
 		userID := UserID("test-user")
 		agentID := AgentID("agent-1")
 		toolSetID := ToolSetID("ts-perm-1")

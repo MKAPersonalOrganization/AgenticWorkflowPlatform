@@ -25,7 +25,7 @@ func newHandler(svc *service) *handler {
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	_ = json.NewEncoder(w).Encode(v)
 }
 
 func writeError(w http.ResponseWriter, status int, msg string) {
@@ -238,7 +238,9 @@ func (h *handler) uploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse multipart form (32MB limit).
+	// Parse multipart form (32MB limit). MaxBytesReader bounds the body so
+	// the in-memory cap is only about memory-vs-spill behaviour.
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<20)
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		writeError(w, http.StatusBadRequest, "failed to parse multipart form")
 		return
@@ -255,7 +257,7 @@ func (h *handler) uploadFile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "file is required")
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	contentType := header.Header.Get("Content-Type")
 	if contentType == "" {
@@ -297,7 +299,7 @@ func (h *handler) readFile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, status, err.Error())
 		return
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	if stat.ContentType != "" {
 		w.Header().Set("Content-Type", stat.ContentType)
@@ -307,7 +309,7 @@ func (h *handler) readFile(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", stat.Size))
 	}
 
-	io.Copy(w, rc)
+	_, _ = io.Copy(w, rc)
 }
 
 func (h *handler) removeEntry(w http.ResponseWriter, r *http.Request) {

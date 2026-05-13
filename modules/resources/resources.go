@@ -1,8 +1,8 @@
 package resources
 
 import (
-	"aicompass/foundation/auth"
 	"aicompass/foundation/artifact"
+	"aicompass/foundation/auth"
 	"context"
 	"io"
 

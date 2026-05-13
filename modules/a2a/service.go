@@ -458,7 +458,7 @@ func (s *Service) SendMessage(ctx context.Context, connectorID, userID, message 
 	if err != nil {
 		return "", fmt.Errorf("creating A2A client: %w", err)
 	}
-	defer client.Destroy()
+	defer func() { _ = client.Destroy() }()
 
 	// Build request
 	userMsg := a2atypes.NewMessage(a2atypes.MessageRoleUser, a2atypes.NewTextPart(message))
@@ -507,7 +507,7 @@ func (s *Service) SendStreamingMessage(ctx context.Context, connectorID, userID,
 			yield(StreamChunk{}, fmt.Errorf("creating A2A client: %w", err))
 			return
 		}
-		defer client.Destroy()
+		defer func() { _ = client.Destroy() }()
 
 		userMsg := a2atypes.NewMessage(a2atypes.MessageRoleUser, a2atypes.NewTextPart(message))
 		req := &a2atypes.SendMessageRequest{

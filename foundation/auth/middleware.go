@@ -47,6 +47,13 @@ func NewMiddleware(users UserResolver, sessions SessionReader, appURL string, ct
 	return m
 }
 
+// Shutdown stops the cache eviction goroutine.
+func (m *Middleware) Shutdown() {
+	if m.stopEviction != nil {
+		m.stopEviction()
+	}
+}
+
 // evictExpired removes expired entries from the user cache every 60 seconds.
 func (m *Middleware) evictExpired(ctx context.Context) {
 	ticker := time.NewTicker(60 * time.Second)

@@ -39,6 +39,8 @@ func (m *MockEventStore) DeleteStream(ctx context.Context, streamID string) erro
 }
 
 func TestThreadAggregate_RecordToolEvent(t *testing.T) {
+	t.Parallel()
+
 	// Setup
 	threadID := "thread-123"
 	userID := "user-456"
@@ -66,6 +68,8 @@ func TestThreadAggregate_RecordToolEvent(t *testing.T) {
 }
 
 func TestManager_RecordToolEvent(t *testing.T) {
+	t.Parallel()
+
 	// Setup in-memory event store
 	eventStore := NewMockEventStore()
 	logger := logger.New(io.Discard, logger.LevelDebug, "test", nil)

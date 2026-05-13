@@ -12,6 +12,8 @@ import (
 // =============================================================================
 
 func TestWithHandler_and_FromContext(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	// No handler set → nil
@@ -29,6 +31,8 @@ func TestWithHandler_and_FromContext(t *testing.T) {
 }
 
 func TestConfirm_no_handler_auto_approves(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	approved, err := io.Confirm(ctx, "do something?", nil)
 	if err != nil {
@@ -40,6 +44,8 @@ func TestConfirm_no_handler_auto_approves(t *testing.T) {
 }
 
 func TestRead_no_handler_returns_error(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	_, err := io.Read(ctx, "enter value:", nil)
 	if err == nil {
@@ -52,6 +58,8 @@ func TestRead_no_handler_returns_error(t *testing.T) {
 // =============================================================================
 
 func TestNoopHandler_Confirm_auto_approves(t *testing.T) {
+	t.Parallel()
+
 	h := io.NewNoopHandler()
 	ctx := context.Background()
 
@@ -65,6 +73,8 @@ func TestNoopHandler_Confirm_auto_approves(t *testing.T) {
 }
 
 func TestNoopHandler_Read_returns_error(t *testing.T) {
+	t.Parallel()
+
 	h := io.NewNoopHandler()
 	ctx := context.Background()
 
@@ -84,6 +94,8 @@ func TestNoopHandler_Read_returns_error(t *testing.T) {
 // =============================================================================
 
 func TestDenyHandler_Confirm_denies(t *testing.T) {
+	t.Parallel()
+
 	h := io.NewDenyHandler()
 	ctx := context.Background()
 
@@ -101,6 +113,8 @@ func TestDenyHandler_Confirm_denies(t *testing.T) {
 // =============================================================================
 
 func TestPauseHandler_Confirm_returns_ErrAuthRequired(t *testing.T) {
+	t.Parallel()
+
 	h := io.NewPauseHandler()
 	ctx := context.Background()
 
@@ -129,6 +143,8 @@ func TestPauseHandler_Confirm_returns_ErrAuthRequired(t *testing.T) {
 }
 
 func TestPauseHandler_Confirm_without_tool_name(t *testing.T) {
+	t.Parallel()
+
 	h := io.NewPauseHandler()
 	ctx := context.Background()
 
@@ -143,6 +159,8 @@ func TestPauseHandler_Confirm_without_tool_name(t *testing.T) {
 }
 
 func TestPauseHandler_Read_returns_ErrInputRequired(t *testing.T) {
+	t.Parallel()
+
 	h := io.NewPauseHandler()
 	ctx := context.Background()
 
@@ -167,6 +185,8 @@ func TestPauseHandler_Read_returns_ErrInputRequired(t *testing.T) {
 // =============================================================================
 
 func TestConfirm_with_NoopHandler(t *testing.T) {
+	t.Parallel()
+
 	ctx := io.WithHandler(context.Background(), io.NewNoopHandler())
 	approved, err := io.Confirm(ctx, "do something?", nil)
 	if err != nil {
@@ -178,6 +198,8 @@ func TestConfirm_with_NoopHandler(t *testing.T) {
 }
 
 func TestConfirm_with_DenyHandler(t *testing.T) {
+	t.Parallel()
+
 	ctx := io.WithHandler(context.Background(), io.NewDenyHandler())
 	approved, err := io.Confirm(ctx, "do something?", nil)
 	if err != nil {
@@ -189,6 +211,8 @@ func TestConfirm_with_DenyHandler(t *testing.T) {
 }
 
 func TestConfirm_with_PauseHandler(t *testing.T) {
+	t.Parallel()
+
 	ctx := io.WithHandler(context.Background(), io.NewPauseHandler())
 	_, err := io.Confirm(ctx, "do something?", nil)
 
@@ -203,6 +227,8 @@ func TestConfirm_with_PauseHandler(t *testing.T) {
 // =============================================================================
 
 func TestErrInputRequired_Error(t *testing.T) {
+	t.Parallel()
+
 	err := &io.ErrInputRequired{Question: "What color?"}
 	expected := "io: input required: What color?"
 	if err.Error() != expected {
@@ -211,6 +237,8 @@ func TestErrInputRequired_Error(t *testing.T) {
 }
 
 func TestErrAuthRequired_Error(t *testing.T) {
+	t.Parallel()
+
 	err := &io.ErrAuthRequired{
 		Resource: "tool:web_search",
 		Reason:   "Allow web search?",
@@ -226,6 +254,8 @@ func TestErrAuthRequired_Error(t *testing.T) {
 // =============================================================================
 
 func TestConfirm_with_cancelled_context(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 

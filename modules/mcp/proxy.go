@@ -67,7 +67,7 @@ func (s *Service) MCPProxy(ctx context.Context, connectorID, userID string, w ht
 		cb.RecordFailure()
 		return fmt.Errorf("proxying to MCP server: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 500 {
 		cb.RecordFailure()
@@ -124,10 +124,14 @@ func (s *Service) acquireProxySlot(ctx context.Context, connectorID, userID stri
 // don't leak.
 func (s *Service) buildUpstreamRequest(ctx context.Context, w http.ResponseWriter, r *http.Request, upstreamURL string) (*http.Request, error) {
 	body := http.MaxBytesReader(w, r.Body, maxProxyRequestBytes)
+	safeUpstream, err := safeOutboundURL(upstreamURL)
+	if err != nil {
+		return nil, fmt.Errorf("validating upstream URL: %w", err)
+	}
 	// Preserve any sub-path after the proxy mount point:
 	//   /v1/mcp/connectors/{id}/mcp/some/path → serverURL/some/path
 	// The handler strips the prefix before calling this method.
-	req, err := http.NewRequestWithContext(ctx, r.Method, upstreamURL, body)
+	req, err := http.NewRequestWithContext(ctx, r.Method, safeUpstream.String(), body)
 	if err != nil {
 		return nil, fmt.Errorf("creating upstream request: %w", err)
 	}
@@ -157,7 +161,7 @@ func copyResponseHeaders(w http.ResponseWriter, resp *http.Response) {
 // bodies are capped at maxProxyResponseBytes to prevent OOM.
 func streamResponseBody(w http.ResponseWriter, resp *http.Response) {
 	if !isStreamingResponse(resp) {
-		io.Copy(w, io.LimitReader(resp.Body, maxProxyResponseBytes))
+		_, _ = io.Copy(w, io.LimitReader(resp.Body, maxProxyResponseBytes))
 		return
 	}
 	flusher, _ := w.(http.Flusher)

@@ -149,7 +149,7 @@ func (llm *OpenAILLM) Generate(systemPrompt, userQuery string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("LLM API request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -250,7 +250,7 @@ func (r *EdgeQuakeRetriever) RetrieveContext(query string, opts QueryOptions) (*
 	if err != nil {
 		return nil, fmt.Errorf("retrieval API request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)

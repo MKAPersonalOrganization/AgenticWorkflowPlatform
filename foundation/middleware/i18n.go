@@ -31,7 +31,9 @@ func I18n(next http.Handler) http.Handler {
 					Value:    t.String(),
 					Path:     "/",
 					Expires:  time.Now().Add(365 * 24 * time.Hour),
-					HttpOnly: false, // Allow JS access if needed
+					HttpOnly: true,
+					Secure:   true,
+					SameSite: http.SameSiteLaxMode,
 				})
 			}
 		}
@@ -64,4 +66,3 @@ func I18n(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
-

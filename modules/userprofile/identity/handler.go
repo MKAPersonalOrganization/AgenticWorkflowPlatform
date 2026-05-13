@@ -1,10 +1,10 @@
 package identity
 
 import (
-	"aicompass/frontend/ui/profile"
+	"aicompass/foundation/auth"
 	"aicompass/foundation/i18n"
 	"aicompass/foundation/logger"
-	"aicompass/foundation/auth"
+	"aicompass/frontend/ui/profile"
 	"encoding/json"
 	"net/http"
 	"strings"

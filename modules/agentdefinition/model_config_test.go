@@ -10,11 +10,14 @@ import (
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestAgentModelConfig_Validate(t *testing.T) {
+	t.Parallel()
+
 	f64 := func(v float64) *float64 { return &v }
 	f32 := func(v float32) *float32 { return &v }
 	i32 := func(v int32) *int32 { return &v }
 
 	t.Run("nil config is valid", func(t *testing.T) {
+		t.Parallel()
 		var cfg *AgentModelConfig
 		if err := cfg.Validate(); err != nil {
 			t.Errorf("nil config should be valid, got: %v", err)
@@ -22,6 +25,7 @@ func TestAgentModelConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("zero-value config is valid", func(t *testing.T) {
+		t.Parallel()
 		cfg := &AgentModelConfig{}
 		if err := cfg.Validate(); err != nil {
 			t.Errorf("zero config should be valid, got: %v", err)
@@ -29,6 +33,7 @@ func TestAgentModelConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("valid temperature boundaries", func(t *testing.T) {
+		t.Parallel()
 		for _, temp := range []float64{0.0, 0.7, 1.0, 2.0} {
 			cfg := &AgentModelConfig{Temperature: f64(temp)}
 			if err := cfg.Validate(); err != nil {
@@ -38,6 +43,7 @@ func TestAgentModelConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("temperature below 0 is rejected", func(t *testing.T) {
+		t.Parallel()
 		cfg := &AgentModelConfig{Temperature: f64(-0.1)}
 		if err := cfg.Validate(); err == nil {
 			t.Error("expected error for temperature -0.1")
@@ -45,6 +51,7 @@ func TestAgentModelConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("temperature above 2 is rejected", func(t *testing.T) {
+		t.Parallel()
 		cfg := &AgentModelConfig{Temperature: f64(2.1)}
 		if err := cfg.Validate(); err == nil {
 			t.Error("expected error for temperature 2.1")
@@ -52,6 +59,7 @@ func TestAgentModelConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("valid topP boundaries", func(t *testing.T) {
+		t.Parallel()
 		for _, p := range []float64{0.0, 0.5, 1.0} {
 			cfg := &AgentModelConfig{TopP: f64(p)}
 			if err := cfg.Validate(); err != nil {
@@ -61,6 +69,7 @@ func TestAgentModelConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("topP above 1 is rejected", func(t *testing.T) {
+		t.Parallel()
 		cfg := &AgentModelConfig{TopP: f64(1.1)}
 		if err := cfg.Validate(); err == nil {
 			t.Error("expected error for topP 1.1")
@@ -68,6 +77,7 @@ func TestAgentModelConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("topP below 0 is rejected", func(t *testing.T) {
+		t.Parallel()
 		cfg := &AgentModelConfig{TopP: f64(-0.1)}
 		if err := cfg.Validate(); err == nil {
 			t.Error("expected error for topP -0.1")
@@ -75,6 +85,7 @@ func TestAgentModelConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("topK zero is rejected", func(t *testing.T) {
+		t.Parallel()
 		cfg := &AgentModelConfig{TopK: f32(0)}
 		if err := cfg.Validate(); err == nil {
 			t.Error("expected error for topK 0")
@@ -82,6 +93,7 @@ func TestAgentModelConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("topK 1 is valid", func(t *testing.T) {
+		t.Parallel()
 		cfg := &AgentModelConfig{TopK: f32(1)}
 		if err := cfg.Validate(); err != nil {
 			t.Errorf("topK 1 should be valid, got: %v", err)
@@ -89,6 +101,7 @@ func TestAgentModelConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("maxOutputTokens zero is rejected", func(t *testing.T) {
+		t.Parallel()
 		cfg := &AgentModelConfig{MaxOutputTokens: i32(0)}
 		if err := cfg.Validate(); err == nil {
 			t.Error("expected error for maxOutputTokens 0")
@@ -96,6 +109,7 @@ func TestAgentModelConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("maxOutputTokens 1 is valid", func(t *testing.T) {
+		t.Parallel()
 		cfg := &AgentModelConfig{MaxOutputTokens: i32(1)}
 		if err := cfg.Validate(); err != nil {
 			t.Errorf("maxOutputTokens 1 should be valid, got: %v", err)
@@ -103,6 +117,7 @@ func TestAgentModelConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("maxOutputTokens 65536 is valid", func(t *testing.T) {
+		t.Parallel()
 		cfg := &AgentModelConfig{MaxOutputTokens: i32(65536)}
 		if err := cfg.Validate(); err != nil {
 			t.Errorf("maxOutputTokens 65536 should be valid, got: %v", err)
@@ -110,6 +125,7 @@ func TestAgentModelConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("maxOutputTokens above 65536 is rejected", func(t *testing.T) {
+		t.Parallel()
 		cfg := &AgentModelConfig{MaxOutputTokens: i32(65537)}
 		if err := cfg.Validate(); err == nil {
 			t.Error("expected error for maxOutputTokens 65537")
@@ -117,6 +133,7 @@ func TestAgentModelConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("all fields valid together", func(t *testing.T) {
+		t.Parallel()
 		cfg := &AgentModelConfig{
 			Temperature:     f64(0.7),
 			TopP:            f64(0.9),
@@ -135,11 +152,14 @@ func TestAgentModelConfig_Validate(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestAgentDefinition_ModelConfigRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	f64 := func(v float64) *float64 { return &v }
 	f32 := func(v float32) *float32 { return &v }
 	i32 := func(v int32) *int32 { return &v }
 
 	t.Run("nil config marshals to empty string", func(t *testing.T) {
+		t.Parallel()
 		a := &AgentDefinition{}
 		if err := a.MarshalModelConfig(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -150,6 +170,7 @@ func TestAgentDefinition_ModelConfigRoundTrip(t *testing.T) {
 	})
 
 	t.Run("empty JSON unmarshals to nil", func(t *testing.T) {
+		t.Parallel()
 		a := &AgentDefinition{ModelConfigJSON: ""}
 		if err := a.UnmarshalModelConfig(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -160,6 +181,7 @@ func TestAgentDefinition_ModelConfigRoundTrip(t *testing.T) {
 	})
 
 	t.Run("null JSON unmarshals to nil", func(t *testing.T) {
+		t.Parallel()
 		a := &AgentDefinition{ModelConfigJSON: "null"}
 		if err := a.UnmarshalModelConfig(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -170,6 +192,7 @@ func TestAgentDefinition_ModelConfigRoundTrip(t *testing.T) {
 	})
 
 	t.Run("full config round-trips correctly", func(t *testing.T) {
+		t.Parallel()
 		original := &AgentModelConfig{
 			Temperature:     f64(0.7),
 			TopP:            f64(0.9),
@@ -213,6 +236,7 @@ func TestAgentDefinition_ModelConfigRoundTrip(t *testing.T) {
 	})
 
 	t.Run("partial config marshals only set fields", func(t *testing.T) {
+		t.Parallel()
 		a := &AgentDefinition{ModelConfig: &AgentModelConfig{Temperature: f64(1.2)}}
 		if err := a.MarshalModelConfig(); err != nil {
 			t.Fatalf("marshal error: %v", err)
@@ -239,6 +263,8 @@ func TestAgentDefinition_ModelConfigRoundTrip(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestAgentModelConfig_JSONFieldNames(t *testing.T) {
+	t.Parallel()
+
 	f64 := func(v float64) *float64 { return &v }
 	f32 := func(v float32) *float32 { return &v }
 	i32 := func(v int32) *int32 { return &v }

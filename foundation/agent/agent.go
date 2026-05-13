@@ -210,4 +210,3 @@ type RunConfig struct {
 	// StopSequences are strings that stop generation when encountered.
 	StopSequences []string
 }
-

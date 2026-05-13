@@ -94,7 +94,7 @@ func (h *Handler) DownloadArtifact(w http.ResponseWriter, r *http.Request) {
 	}
 	// Thread ownership check: stops user A from reading user B's
 	// artifacts by guessing thread IDs.
-	if !h.ownsThread(r, user.ID, threadID, /*allowMissing=*/ false) {
+	if !h.ownsThread(r, user.ID, threadID /*allowMissing=*/, false) {
 		jsonError(w, "Artifact not found", http.StatusNotFound)
 		return
 	}
@@ -104,7 +104,7 @@ func (h *Handler) DownloadArtifact(w http.ResponseWriter, r *http.Request) {
 		h.writeLoadError(w, r, err, user.ID, threadID, fileName)
 		return
 	}
-	defer content.Close()
+	defer func() { _ = content.Close() }()
 
 	writeArtifactHeaders(w, fileName, meta.ContentType)
 	h.streamArtifactBody(w, r, content, fileName)
@@ -200,7 +200,7 @@ func sanitizeFileName(name string) string {
 func jsonError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
 // allowedUploadTypes is the server-side allowlist of MIME types accepted for
@@ -247,13 +247,15 @@ func (h *Handler) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 	}
 	// Thread ownership: fresh threads (not yet in the projection) are
 	// allowed — the thread row gets created on first message send.
-	if !h.ownsThread(r, user.ID, threadID, /*allowMissing=*/ true) {
+	if !h.ownsThread(r, user.ID, threadID /*allowMissing=*/, true) {
 		jsonError(w, "Thread not found", http.StatusNotFound)
 		return
 	}
 
-	// maxMemory = 2 MB so RAM stays bounded under concurrent load;
-	// excess spills to OS temp files cleaned up when the request ends.
+	// Cap the request body before parsing so a hostile uploader can't
+	// exhaust memory or disk. 64 MB total request, with 2 MB of that kept
+	// in memory; the rest spills to OS temp files cleaned up at request end.
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<20)
 	if err := r.ParseMultipartForm(2 << 20); err != nil {
 		jsonError(w, "Failed to parse multipart form", http.StatusBadRequest)
 		return
@@ -263,7 +265,7 @@ func (h *Handler) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "Missing 'file' field", http.StatusBadRequest)
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	contentType, err := resolveUploadContentType(file, header)
 	if err != nil {
@@ -306,14 +308,14 @@ func resolveUploadContentType(file io.ReadSeeker, header *multipart.FileHeader) 
 	detected := http.DetectContentType(sniffBuf[:n])
 	// Seek back so the S3 upload reads from byte zero.
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return "", fmt.Errorf("Internal error")
+		return "", errors.New("internal error")
 	}
 	contentType := header.Header.Get("Content-Type")
 	if contentType == "" || !allowedUploadTypes[contentType] {
 		contentType = detected
 	}
 	if !allowedUploadTypes[contentType] {
-		return "", fmt.Errorf("Unsupported file type: %s", contentType)
+		return "", fmt.Errorf("unsupported file type: %s", contentType)
 	}
 	return contentType, nil
 }

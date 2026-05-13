@@ -1,9 +1,9 @@
 package aisettings
 
 import (
+	"aicompass/foundation/auth"
 	"aicompass/foundation/i18n"
 	"aicompass/foundation/logger"
-	"aicompass/foundation/auth"
 	"encoding/json"
 	"net/http"
 
@@ -82,7 +82,7 @@ func (h *handler) listProviders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	_ = json.NewEncoder(w).Encode(result)
 }
 
 // getSettings handles GET /api/ai-settings
@@ -109,7 +109,7 @@ func (h *handler) getSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	_ = json.NewEncoder(w).Encode(result)
 }
 
 // saveSettings handles PUT /api/ai-settings
@@ -156,7 +156,7 @@ func (h *handler) saveSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(toSettingsResponse(*settings))
+	_ = json.NewEncoder(w).Encode(toSettingsResponse(*settings))
 }
 
 // deleteSettings handles DELETE /api/ai-settings/{id}
@@ -240,7 +240,7 @@ func (h *handler) listProviderModels(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(models)
+	_ = json.NewEncoder(w).Encode(models)
 }
 
 // getTTSVoices handles GET /api/ai-settings/tts-voices?model=...
@@ -251,7 +251,7 @@ func (h *handler) getTTSVoices(w http.ResponseWriter, r *http.Request) {
 		voices = []string{}
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"model":  model,
 		"voices": voices,
 	})
@@ -291,7 +291,7 @@ func (h *handler) getCapabilityConfigs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	_ = json.NewEncoder(w).Encode(result)
 }
 
 // saveCapabilityConfig handles PUT /api/ai-settings/capabilities/{capability}
@@ -334,7 +334,7 @@ func (h *handler) saveCapabilityConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(capabilityConfigResponse{
+	_ = json.NewEncoder(w).Encode(capabilityConfigResponse{
 		ID:         config.ID,
 		Capability: string(config.Capability),
 		Provider:   string(config.Provider),

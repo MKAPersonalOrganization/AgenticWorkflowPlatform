@@ -69,6 +69,8 @@ func (f *stubFactory) anyFactory(apiKey, model string) any {
 // =========================================================================
 
 func TestWebSearchTool_Name(t *testing.T) {
+	t.Parallel()
+
 	tool := NewWebSearchTool(&stubClient{configured: true})
 	if got := tool.Name(); got != "web_search" {
 		t.Errorf("Name() = %q, want %q", got, "web_search")
@@ -76,6 +78,8 @@ func TestWebSearchTool_Name(t *testing.T) {
 }
 
 func TestWebSearchTool_Schema(t *testing.T) {
+	t.Parallel()
+
 	tool := NewWebSearchTool(&stubClient{configured: true})
 	schema := tool.Schema()
 	if schema == nil {
@@ -97,6 +101,8 @@ func TestWebSearchTool_Schema(t *testing.T) {
 // =========================================================================
 
 func TestWebSearchTool_Execute_EmptyQuery(t *testing.T) {
+	t.Parallel()
+
 	tool := NewWebSearchTool(&stubClient{configured: true})
 	args := WebSearchArgs{Query: ""}
 	raw, _ := json.Marshal(args)
@@ -110,6 +116,8 @@ func TestWebSearchTool_Execute_EmptyQuery(t *testing.T) {
 }
 
 func TestWebSearchTool_Execute_WhitespaceQuery(t *testing.T) {
+	t.Parallel()
+
 	tool := NewWebSearchTool(&stubClient{configured: true})
 	args := WebSearchArgs{Query: "   \t  "}
 	raw, _ := json.Marshal(args)
@@ -123,6 +131,8 @@ func TestWebSearchTool_Execute_WhitespaceQuery(t *testing.T) {
 }
 
 func TestWebSearchTool_Execute_QueryTooLong(t *testing.T) {
+	t.Parallel()
+
 	tool := NewWebSearchTool(&stubClient{configured: true})
 	longQuery := make([]byte, maxQueryLength+1)
 	for i := range longQuery {
@@ -140,6 +150,8 @@ func TestWebSearchTool_Execute_QueryTooLong(t *testing.T) {
 }
 
 func TestWebSearchTool_Execute_InvalidJSON(t *testing.T) {
+	t.Parallel()
+
 	tool := NewWebSearchTool(&stubClient{configured: true})
 	result, err := tool.Execute(context.Background(), agent.Arguments{Raw: json.RawMessage(`{invalid}`)})
 	if err != nil {
@@ -151,6 +163,8 @@ func TestWebSearchTool_Execute_InvalidJSON(t *testing.T) {
 }
 
 func TestWebSearchTool_Execute_MissingAPIKey(t *testing.T) {
+	t.Parallel()
+
 	tool := NewWebSearchTool(&stubClient{configured: false})
 	args := WebSearchArgs{Query: "what is Go programming language"}
 	raw, _ := json.Marshal(args)
@@ -168,6 +182,8 @@ func TestWebSearchTool_Execute_MissingAPIKey(t *testing.T) {
 // =========================================================================
 
 func TestRateLimiter_AllowsUnderLimit(t *testing.T) {
+	t.Parallel()
+
 	rl := newRateLimiter()
 	for i := range rateLimitMax {
 		if !rl.allow("user-1") {
@@ -177,6 +193,8 @@ func TestRateLimiter_AllowsUnderLimit(t *testing.T) {
 }
 
 func TestRateLimiter_BlocksOverLimit(t *testing.T) {
+	t.Parallel()
+
 	rl := newRateLimiter()
 	for range rateLimitMax {
 		rl.allow("user-2")
@@ -187,6 +205,8 @@ func TestRateLimiter_BlocksOverLimit(t *testing.T) {
 }
 
 func TestRateLimiter_SeparateUsers(t *testing.T) {
+	t.Parallel()
+
 	rl := newRateLimiter()
 	for range rateLimitMax {
 		rl.allow("user-3")
@@ -201,6 +221,8 @@ func TestRateLimiter_SeparateUsers(t *testing.T) {
 // =========================================================================
 
 func TestInsertCitationMarkers_NoCitations(t *testing.T) {
+	t.Parallel()
+
 	text := "Hello world"
 	got := InsertCitationMarkers(text, nil)
 	if got != text {
@@ -209,6 +231,8 @@ func TestInsertCitationMarkers_NoCitations(t *testing.T) {
 }
 
 func TestInsertCitationMarkers_SingleCitation(t *testing.T) {
+	t.Parallel()
+
 	text := "Go is a programming language."
 	citations := []Citation{
 		{Text: "Go is a programming language.", SourceIndices: []int{1}, StartIndex: 0, EndIndex: 29},
@@ -221,6 +245,8 @@ func TestInsertCitationMarkers_SingleCitation(t *testing.T) {
 }
 
 func TestInsertCitationMarkers_MultipleSources(t *testing.T) {
+	t.Parallel()
+
 	text := "Go is fast."
 	citations := []Citation{
 		{Text: "Go is fast.", SourceIndices: []int{1, 3}, StartIndex: 0, EndIndex: 11},
@@ -237,6 +263,8 @@ func TestInsertCitationMarkers_MultipleSources(t *testing.T) {
 // =========================================================================
 
 func TestProvider_Interface(t *testing.T) {
+	t.Parallel()
+
 	p := &Provider{}
 	if got := p.ID(); got != "websearch" {
 		t.Errorf("ID() = %q, want %q", got, "websearch")
@@ -279,6 +307,8 @@ func TestProvider_Interface(t *testing.T) {
 }
 
 func TestProvider_CreateExecutable(t *testing.T) {
+	t.Parallel()
+
 	sf := &stubFactory{client: &stubClient{configured: true}}
 	p := &Provider{}
 	ctx := context.Background()

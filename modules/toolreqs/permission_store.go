@@ -325,4 +325,3 @@ func (s *PermissionStore) ToolSetsWithConfirmation(ctx context.Context, userID U
 
 	return confirmToolSets, nil
 }
-

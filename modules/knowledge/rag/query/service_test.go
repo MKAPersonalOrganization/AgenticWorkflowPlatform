@@ -12,6 +12,8 @@ import (
 )
 
 func TestService_Execute(t *testing.T) {
+	t.Parallel()
+
 	tenantID := uuid.New()
 	workspaceID := uuid.New()
 	tCtx := &tenant.TenantContext{
@@ -71,6 +73,8 @@ func TestService_Execute(t *testing.T) {
 }
 
 func TestService_Stream(t *testing.T) {
+	t.Parallel()
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")

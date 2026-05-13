@@ -55,7 +55,7 @@ func (r *postgresUserPreferenceRepository) GetAll(ctx context.Context, userID st
 	if err != nil {
 		return nil, fmt.Errorf("failed to list user preferences: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var prefs []UserPreference
 	for rows.Next() {

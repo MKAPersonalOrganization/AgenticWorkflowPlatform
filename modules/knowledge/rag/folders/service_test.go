@@ -11,6 +11,8 @@ import (
 )
 
 func TestService_List(t *testing.T) {
+	t.Parallel()
+
 	tenantID := uuid.New()
 	mockResponse := []FolderResponse{
 		{ID: uuid.New(), TenantID: tenantID, Name: "Folder 1", Position: 0, CreatedAt: "2024-01-01T00:00:00Z", UpdatedAt: "2024-01-01T00:00:00Z"},
@@ -38,6 +40,8 @@ func TestService_List(t *testing.T) {
 }
 
 func TestService_Create(t *testing.T) {
+	t.Parallel()
+
 	folderID := uuid.New()
 	tenantID := uuid.New()
 	mockRequest := CreateFolderRequest{Name: "New Folder"}
@@ -65,6 +69,8 @@ func TestService_Create(t *testing.T) {
 }
 
 func TestService_Update(t *testing.T) {
+	t.Parallel()
+
 	folderID := uuid.New()
 	tenantID := uuid.New()
 	updatedName := "Updated Folder"
@@ -92,6 +98,8 @@ func TestService_Update(t *testing.T) {
 }
 
 func TestService_Delete(t *testing.T) {
+	t.Parallel()
+
 	folderID := uuid.New()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodDelete {

@@ -77,7 +77,10 @@ func (m *mockModelConfigResolver) GetModelConfigForUser(_ context.Context, _ str
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestIsWorkflowAgent(t *testing.T) {
+	t.Parallel()
+
 	t.Run("simple agent returns false", func(t *testing.T) {
+		t.Parallel()
 		a := &mockAgent{id: "a1", name: "simple"}
 		wa, ok := isWorkflowAgent(a)
 		if ok {
@@ -89,6 +92,7 @@ func TestIsWorkflowAgent(t *testing.T) {
 	})
 
 	t.Run("workflow agent returns true", func(t *testing.T) {
+		t.Parallel()
 		a := &mockWorkflowAgent{
 			mockAgent: mockAgent{id: "a2", name: "workflow"},
 			graph: fagent.WorkflowNodeInfo{
@@ -118,7 +122,10 @@ func TestIsWorkflowAgent(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestExtractAgentConfig(t *testing.T) {
+	t.Parallel()
+
 	t.Run("non-configurable returns nil", func(t *testing.T) {
+		t.Parallel()
 		a := &mockAgent{id: "a1", name: "basic"}
 		cfg := extractAgentConfig(a)
 		if cfg != nil {
@@ -127,6 +134,7 @@ func TestExtractAgentConfig(t *testing.T) {
 	})
 
 	t.Run("configurable returns config", func(t *testing.T) {
+		t.Parallel()
 		a := &mockConfigurableAgent{
 			mockAgent: mockAgent{id: "a2", name: "configured"},
 			config: fagent.Config{
@@ -159,6 +167,8 @@ func TestExtractAgentConfig(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestUniqueName(t *testing.T) {
+	t.Parallel()
+
 	wbc := &workflowBuildContext{}
 
 	tests := []struct {
@@ -185,7 +195,10 @@ func TestUniqueName(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestBuildGenerateContentConfig(t *testing.T) {
+	t.Parallel()
+
 	t.Run("nil fields", func(t *testing.T) {
+		t.Parallel()
 		cfg := &fagent.ModelConfig{}
 		gc := buildGenerateContentConfig(cfg, nil, nil)
 		if gc == nil {
@@ -197,6 +210,7 @@ func TestBuildGenerateContentConfig(t *testing.T) {
 	})
 
 	t.Run("with temperature and maxTokens", func(t *testing.T) {
+		t.Parallel()
 		temp := 0.7
 		maxTok := 4096
 		cfg := &fagent.ModelConfig{Temperature: &temp, MaxTokens: &maxTok}
@@ -221,6 +235,8 @@ func TestBuildGenerateContentConfig(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestWorkflowNodeInfoCompleteness(t *testing.T) {
+	t.Parallel()
+
 	boolTrue := true
 	boolFalse := false
 
@@ -284,6 +300,8 @@ func TestWorkflowNodeInfoCompleteness(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestNodeTypeMapping(t *testing.T) {
+	t.Parallel()
+
 	validTypes := map[string]bool{
 		"agent": true, "sequential": true, "parallel": true, "loop": true,
 	}
@@ -306,7 +324,10 @@ func TestNodeTypeMapping(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestRunnerAdapterConstructor(t *testing.T) {
+	t.Parallel()
+
 	t.Run("nil config resolver returns error", func(t *testing.T) {
+		t.Parallel()
 		_, err := NewRunnerAdapter(RunnerAdapterConfig{
 			MemoryService: &mockMemoryService{},
 		})
@@ -316,6 +337,7 @@ func TestRunnerAdapterConstructor(t *testing.T) {
 	})
 
 	t.Run("nil memory service returns error", func(t *testing.T) {
+		t.Parallel()
 		_, err := NewRunnerAdapter(RunnerAdapterConfig{
 			ConfigResolver: &mockModelConfigResolver{},
 		})
@@ -325,6 +347,7 @@ func TestRunnerAdapterConstructor(t *testing.T) {
 	})
 
 	t.Run("with config resolver succeeds", func(t *testing.T) {
+		t.Parallel()
 		adapter, err := NewRunnerAdapter(RunnerAdapterConfig{
 			ConfigResolver: &mockModelConfigResolver{},
 			MemoryService:  &mockMemoryService{},
@@ -338,6 +361,7 @@ func TestRunnerAdapterConstructor(t *testing.T) {
 	})
 
 	t.Run("all dependencies wired", func(t *testing.T) {
+		t.Parallel()
 		provider := &mockAgentProvider{agents: map[string]fagent.Agent{}}
 		adapter, err := NewRunnerAdapter(RunnerAdapterConfig{
 			ConfigResolver: &mockModelConfigResolver{},
@@ -358,7 +382,10 @@ func TestRunnerAdapterConstructor(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestPipelineGraphPatterns(t *testing.T) {
+	t.Parallel()
+
 	t.Run("sequential with two agents", func(t *testing.T) {
+		t.Parallel()
 		graph := fagent.WorkflowNodeInfo{
 			ID: "node-1", Type: "sequential",
 			Children: []fagent.WorkflowNodeInfo{
@@ -370,6 +397,7 @@ func TestPipelineGraphPatterns(t *testing.T) {
 	})
 
 	t.Run("parallel with three agents", func(t *testing.T) {
+		t.Parallel()
 		graph := fagent.WorkflowNodeInfo{
 			ID: "node-1", Type: "parallel",
 			Children: []fagent.WorkflowNodeInfo{
@@ -382,6 +410,7 @@ func TestPipelineGraphPatterns(t *testing.T) {
 	})
 
 	t.Run("loop with review-edit cycle", func(t *testing.T) {
+		t.Parallel()
 		graph := fagent.WorkflowNodeInfo{
 			ID: "node-1", Type: "loop", MaxIterations: 3,
 			Children: []fagent.WorkflowNodeInfo{
@@ -396,6 +425,7 @@ func TestPipelineGraphPatterns(t *testing.T) {
 	})
 
 	t.Run("nested sequential-parallel-loop", func(t *testing.T) {
+		t.Parallel()
 		graph := fagent.WorkflowNodeInfo{
 			ID: "node-1", Type: "sequential",
 			Children: []fagent.WorkflowNodeInfo{
@@ -423,6 +453,7 @@ func TestPipelineGraphPatterns(t *testing.T) {
 	})
 
 	t.Run("agent with transfer policy overrides", func(t *testing.T) {
+		t.Parallel()
 		boolTrue := true
 		boolFalse := false
 		graph := fagent.WorkflowNodeInfo{
@@ -494,6 +525,8 @@ func countNodesRecursive(node *fagent.WorkflowNodeInfo) int {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestFrontendJSONFieldMapping(t *testing.T) {
+	t.Parallel()
+
 	type frontendNode struct {
 		ID                       string         `json:"id"`
 		Type                     string         `json:"type"`
@@ -539,6 +572,8 @@ func TestFrontendJSONFieldMapping(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestLoopLastChildFlag(t *testing.T) {
+	t.Parallel()
+
 	children := []fagent.WorkflowNodeInfo{
 		{ID: "node-1", Type: "agent", AgentID: "reviewer"},
 		{ID: "node-2", Type: "agent", AgentID: "editor"},
@@ -565,6 +600,8 @@ func TestLoopLastChildFlag(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestMaxNodeLimit(t *testing.T) {
+	t.Parallel()
+
 	const maxNodes = 50
 
 	children := make([]fagent.WorkflowNodeInfo, 49)
@@ -592,7 +629,10 @@ func TestMaxNodeLimit(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestConditionalRouting(t *testing.T) {
+	t.Parallel()
+
 	t.Run("conditional node structure is valid", func(t *testing.T) {
+		t.Parallel()
 		// This maps to how the UI constructs conditional nodes:
 		// Children[0] = evaluator agent (output_key read from AgentDefinition at runtime)
 		// Children[1:] = branches with condition values
@@ -649,6 +689,7 @@ func TestConditionalRouting(t *testing.T) {
 	})
 
 	t.Run("conditional with composite branch agents", func(t *testing.T) {
+		t.Parallel()
 		// Branches can be composite nodes (sequential, parallel)
 		graph := fagent.WorkflowNodeInfo{
 			ID: "cond-2", Type: "conditional",

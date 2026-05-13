@@ -149,7 +149,7 @@ func (r *postgresMCPConnectorRepository) ListByUser(ctx context.Context, userID 
 	if err != nil {
 		return nil, fmt.Errorf("querying mcp connectors: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []MCPConnector
 	for rows.Next() {
@@ -274,7 +274,7 @@ func (r *postgresMCPConnectorRepository) UpsertTools(ctx context.Context, connec
 	if err != nil {
 		return fmt.Errorf("beginning transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Delete existing tools
 	if _, err := tx.ExecContext(ctx, `DELETE FROM mcp_discovered_tools WHERE connector_id = $1`, connectorID); err != nil {
@@ -314,8 +314,17 @@ func (r *postgresMCPConnectorRepository) UpsertTools(ctx context.Context, connec
 		)
 	}
 
-	query := `INSERT INTO mcp_discovered_tools (id, connector_id, name, description, input_schema, annotations, created_at, updated_at) VALUES ` +
-		strings.Join(valuesClauses, ", ")
+	const insertPrefix = `INSERT INTO mcp_discovered_tools (id, connector_id, name, description, input_schema, annotations, created_at, updated_at) VALUES `
+	var b strings.Builder
+	b.Grow(len(insertPrefix) + len(valuesClauses)*32)
+	b.WriteString(insertPrefix)
+	for i, clause := range valuesClauses {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(clause)
+	}
+	query := b.String()
 
 	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
 		return fmt.Errorf("batch inserting discovered tools: %w", err)
@@ -336,7 +345,7 @@ func (r *postgresMCPConnectorRepository) ListTools(ctx context.Context, connecto
 	if err != nil {
 		return nil, fmt.Errorf("querying discovered tools: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []MCPDiscoveredTool
 	for rows.Next() {
@@ -376,7 +385,7 @@ func (r *postgresMCPConnectorRepository) ListToolsByConnectors(ctx context.Conte
 	if err != nil {
 		return nil, fmt.Errorf("querying tools by connectors: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	result := make(map[string][]MCPDiscoveredTool, len(connectorIDs))
 	for rows.Next() {
@@ -406,7 +415,7 @@ func (r *postgresMCPConnectorRepository) CountToolsByConnectors(ctx context.Cont
 	if err != nil {
 		return nil, fmt.Errorf("counting tools by connectors: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	result := make(map[string]int, len(connectorIDs))
 	for rows.Next() {

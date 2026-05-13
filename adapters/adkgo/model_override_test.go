@@ -53,10 +53,13 @@ func userGlobalGeminiConfig() *fagent.ModelConfig {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestApplyModelOverride(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	const runningUserID = "user-1"
 
 	t.Run("agent configured for OpenAI uses OpenAI provider and model instead of user global Gemini", func(t *testing.T) {
+		t.Parallel()
 		runner := &RunnerAdapter{apiKeyResolver: resolverWithAllProviders()}
 		openAIOverride := &fagent.AgentModelOverride{Provider: "openai", ModelName: "gpt-4o"}
 
@@ -76,6 +79,7 @@ func TestApplyModelOverride(t *testing.T) {
 	})
 
 	t.Run("switching provider preserves user global temperature maxTokens and maxIterations", func(t *testing.T) {
+		t.Parallel()
 		runner := &RunnerAdapter{apiKeyResolver: resolverWithAllProviders()}
 		anthropicOverride := &fagent.AgentModelOverride{Provider: "anthropic", ModelName: "claude-3-opus-20240229"}
 
@@ -95,6 +99,7 @@ func TestApplyModelOverride(t *testing.T) {
 	})
 
 	t.Run("overriding model within the same provider resolves the correct API key", func(t *testing.T) {
+		t.Parallel()
 		runner := &RunnerAdapter{apiKeyResolver: resolverWithAllProviders()}
 		newerGeminiModelOverride := &fagent.AgentModelOverride{Provider: "gemini", ModelName: "gemini-1.5-pro"}
 
@@ -111,6 +116,7 @@ func TestApplyModelOverride(t *testing.T) {
 	})
 
 	t.Run("provider the user has not added an API key for returns a descriptive error", func(t *testing.T) {
+		t.Parallel()
 		runner := &RunnerAdapter{apiKeyResolver: resolverWithAllProviders()}
 		overrideForProviderWithNoKey := &fagent.AgentModelOverride{Provider: "unknown-provider", ModelName: "some-model"}
 
@@ -121,6 +127,7 @@ func TestApplyModelOverride(t *testing.T) {
 	})
 
 	t.Run("runner without an API key resolver cannot apply model overrides", func(t *testing.T) {
+		t.Parallel()
 		runnerWithNoKeyResolver := &RunnerAdapter{apiKeyResolver: nil}
 		openAIOverride := &fagent.AgentModelOverride{Provider: "openai", ModelName: "gpt-4o"}
 
@@ -131,6 +138,7 @@ func TestApplyModelOverride(t *testing.T) {
 	})
 
 	t.Run("user global config with no generation params does not inject nil pointers into resolved config", func(t *testing.T) {
+		t.Parallel()
 		runner := &RunnerAdapter{apiKeyResolver: resolverWithAllProviders()}
 		globalConfigWithNoGenerationParams := &fagent.ModelConfig{
 			Provider: "gemini",
@@ -163,6 +171,8 @@ func TestApplyModelOverride(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestPerAgentModelOverride_DoesNotSuppressPerAgentGenerationConfig(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	runner := &RunnerAdapter{
 		apiKeyResolver: &stubAPIKeyResolver{configuredKeys: map[string]string{"openai": "openai-api-key"}},

@@ -1,9 +1,9 @@
 package a2a
 
 import (
+	"aicompass/foundation/auth"
 	"aicompass/foundation/i18n"
 	"aicompass/foundation/logger"
-	"aicompass/foundation/auth"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -83,8 +83,8 @@ func toConnectorResponse(c A2AConnector, skillCount int) connectorResponse {
 
 func toSkillResponse(s A2ADiscoveredSkill) skillResponse {
 	var tags, examples []string
-	json.Unmarshal([]byte(s.Tags), &tags)         //nolint:errcheck
-	json.Unmarshal([]byte(s.Examples), &examples) //nolint:errcheck
+	_ = json.Unmarshal([]byte(s.Tags), &tags)
+	_ = json.Unmarshal([]byte(s.Examples), &examples)
 
 	return skillResponse{
 		ID:          s.ID,
@@ -127,7 +127,7 @@ func (h *handler) listConnectors(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"connectors": result})
+	_ = json.NewEncoder(w).Encode(map[string]any{"connectors": result})
 }
 
 // createConnector handles POST /v1/a2a/connectors
@@ -160,7 +160,7 @@ func (h *handler) createConnector(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(toConnectorResponse(*connector, 0))
+	_ = json.NewEncoder(w).Encode(toConnectorResponse(*connector, 0))
 }
 
 // getConnector handles GET /v1/a2a/connectors/{id}
@@ -181,7 +181,7 @@ func (h *handler) getConnector(w http.ResponseWriter, r *http.Request) {
 
 	skills, _ := h.service.GetConnectorSkills(r.Context(), id, user.ID)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(toConnectorResponse(*connector, len(skills)))
+	_ = json.NewEncoder(w).Encode(toConnectorResponse(*connector, len(skills)))
 }
 
 // deleteConnector handles DELETE /v1/a2a/connectors/{id}
@@ -219,7 +219,7 @@ func (h *handler) connect(w http.ResponseWriter, r *http.Request) {
 			skills, _ := h.service.GetConnectorSkills(r.Context(), id, user.ID)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnprocessableEntity)
-			json.NewEncoder(w).Encode(toConnectorResponse(*updated, len(skills)))
+			_ = json.NewEncoder(w).Encode(toConnectorResponse(*updated, len(skills)))
 			return
 		}
 		msg, code := mapServiceError(err)
@@ -229,7 +229,7 @@ func (h *handler) connect(w http.ResponseWriter, r *http.Request) {
 
 	skills, _ := h.service.GetConnectorSkills(r.Context(), id, user.ID)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(toConnectorResponse(*updated, len(skills)))
+	_ = json.NewEncoder(w).Encode(toConnectorResponse(*updated, len(skills)))
 }
 
 // disconnect handles POST /v1/a2a/connectors/{id}/disconnect
@@ -250,7 +250,7 @@ func (h *handler) disconnect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(toConnectorResponse(*updated, 0))
+	_ = json.NewEncoder(w).Encode(toConnectorResponse(*updated, 0))
 }
 
 // listSkills handles GET /v1/a2a/connectors/{id}/skills
@@ -275,7 +275,7 @@ func (h *handler) listSkills(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"skills": result})
+	_ = json.NewEncoder(w).Encode(map[string]any{"skills": result})
 }
 
 // refreshSkills handles POST /v1/a2a/connectors/{id}/refresh
@@ -297,7 +297,7 @@ func (h *handler) refreshSkills(w http.ResponseWriter, r *http.Request) {
 
 	skills, _ := h.service.GetConnectorSkills(r.Context(), id, user.ID)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(toConnectorResponse(*updated, len(skills)))
+	_ = json.NewEncoder(w).Encode(toConnectorResponse(*updated, len(skills)))
 }
 
 // --------------------------------------------------------------------------
@@ -328,5 +328,5 @@ func mapServiceError(err error) (string, int) {
 func writeJSONError(w http.ResponseWriter, message string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": message})
 }

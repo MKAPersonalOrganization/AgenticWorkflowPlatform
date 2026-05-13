@@ -1,11 +1,12 @@
 package mcp
 
 import (
+	"aicompass/foundation/auth"
 	"aicompass/foundation/i18n"
 	"aicompass/foundation/logger"
-	"aicompass/foundation/auth"
 	"encoding/json"
 	"errors"
+	"html/template"
 	"io"
 	"net/http"
 	"net/url"
@@ -419,14 +420,21 @@ func (h *handler) handleOAuthProviderError(w http.ResponseWriter, r *http.Reques
 	writeOAuthFailureHTML(w, desc)
 }
 
+// oauthFailureTmpl renders the OAuth callback failure popup. `Reason` flows
+// through html/template's contextual auto-escaping for both the JS and the
+// HTML-text positions, so untrusted upstream error strings can't break out.
+var oauthFailureTmpl = template.Must(template.New("oauth-failure").Parse(
+	`<!DOCTYPE html><html><body><script>` +
+		`window.opener && window.opener.postMessage({type:'mcp-oauth-callback',success:false,error:{{.Reason}}},window.location.origin);` +
+		`window.close();` +
+		`</script><p>Authentication failed: {{.Reason}}. You can close this window.</p></body></html>`,
+))
+
 // writeOAuthFailureHTML posts a `{success:false, error:…}` message back
 // to the opener window and closes the popup.
 func writeOAuthFailureHTML(w http.ResponseWriter, reason string) {
 	w.Header().Set("Content-Type", "text/html")
-	_, _ = w.Write([]byte(`<!DOCTYPE html><html><body><script>
-window.opener && window.opener.postMessage({type:'mcp-oauth-callback',success:false,error:` + jsonEscape(reason) + `},window.location.origin);
-window.close();
-</script><p>Authentication failed: ` + reason + `. You can close this window.</p></body></html>`))
+	_ = oauthFailureTmpl.Execute(w, struct{ Reason string }{Reason: reason})
 }
 
 // writeOAuthSuccessHTML posts a `{success:true, connector_id, status}`
@@ -455,7 +463,7 @@ func ptr[T any](v T) *T {
 
 // setOAuthStateCookie sets a CSRF state cookie when an OAuth authURL is returned.
 // Extracted to avoid duplicating the cookie logic in multiple paths.
-func setOAuthStateCookie(w http.ResponseWriter, r *http.Request, authURL string) {
+func setOAuthStateCookie(w http.ResponseWriter, _ *http.Request, authURL string) {
 	if authURL == "" {
 		return
 	}
@@ -473,14 +481,9 @@ func setOAuthStateCookie(w http.ResponseWriter, r *http.Request, authURL string)
 		Path:     "/v1/mcp/oauth/callback",
 		MaxAge:   600, // 10 minutes
 		HttpOnly: true,
-		Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
-}
-
-func jsonEscape(s string) string {
-	b, _ := json.Marshal(s)
-	return string(b)
 }
 
 // headersSent checks if the response writer has already sent headers.
@@ -495,7 +498,7 @@ func headersSent(w http.ResponseWriter) bool {
 func writeJSONError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
 // mapServiceError translates typed service errors to (message, httpStatus) pairs.

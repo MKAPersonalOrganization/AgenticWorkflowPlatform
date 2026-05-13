@@ -10,6 +10,8 @@ import (
 )
 
 func TestToolRegistry(t *testing.T) {
+	t.Parallel()
+
 	// Create logger for tests
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
 

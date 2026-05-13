@@ -64,10 +64,13 @@ func (m *ConcurrentMockEventStore) DeleteStream(ctx context.Context, streamID st
 }
 
 func TestManager_RetryUpdate(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	log := logger.New(io.Discard, logger.LevelInfo, "test", nil)
 
 	t.Run("Success after retries", func(t *testing.T) {
+		t.Parallel()
 		// No conflicts for setup
 		store := NewConcurrentMockEventStore(0)
 		repo := threadpkg.NewThreadRepository(store)
@@ -96,6 +99,7 @@ func TestManager_RetryUpdate(t *testing.T) {
 	})
 
 	t.Run("Failure after max retries", func(t *testing.T) {
+		t.Parallel()
 		// No conflicts for setup
 		store := NewConcurrentMockEventStore(0)
 		repo := threadpkg.NewThreadRepository(store)
@@ -124,6 +128,8 @@ func TestManager_RetryUpdate(t *testing.T) {
 }
 
 func TestManager_AutoTitling(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	log := logger.New(io.Discard, logger.LevelInfo, "test", nil)
 	store := NewConcurrentMockEventStore(0)
@@ -131,6 +137,7 @@ func TestManager_AutoTitling(t *testing.T) {
 	mgr := New(log, repo)
 
 	t.Run("Auto-titles on first user message", func(t *testing.T) {
+		t.Parallel()
 		threadID := "auto-title-thread"
 
 		// 1. Create thread with default title
@@ -169,6 +176,7 @@ func TestManager_AutoTitling(t *testing.T) {
 	})
 
 	t.Run("Does not overwrite non-default title", func(t *testing.T) {
+		t.Parallel()
 		threadID := "no-overwrite-thread"
 
 		// 1. Create thread with custom title

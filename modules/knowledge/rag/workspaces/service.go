@@ -60,7 +60,7 @@ func (s *Service) List(ctx context.Context, tCtx *tenant.TenantContext, page, pa
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
@@ -109,7 +109,7 @@ func (s *Service) Create(ctx context.Context, tCtx *tenant.TenantContext, req *C
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
@@ -149,7 +149,7 @@ func (s *Service) Get(ctx context.Context, tCtx *tenant.TenantContext, workspace
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, fmt.Errorf("workspace not found")
@@ -193,7 +193,7 @@ func (s *Service) Delete(ctx context.Context, tCtx *tenant.TenantContext, worksp
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil // Idempotent
@@ -232,7 +232,7 @@ func (s *Service) GetStats(ctx context.Context, tCtx *tenant.TenantContext, work
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, fmt.Errorf("workspace not found")
@@ -283,7 +283,7 @@ func (s *Service) Update(ctx context.Context, tCtx *tenant.TenantContext, worksp
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, fmt.Errorf("workspace not found")
@@ -322,7 +322,7 @@ func (s *Service) RebuildGraph(ctx context.Context, tCtx *tenant.TenantContext, 
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
@@ -357,7 +357,7 @@ func (s *Service) RebuildEmbeddings(ctx context.Context, tCtx *tenant.TenantCont
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)

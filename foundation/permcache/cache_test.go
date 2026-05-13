@@ -20,6 +20,8 @@ func testRedis(t *testing.T) (*miniredis.Miniredis, goredis.Cmdable) {
 // ---------------------------------------------------------------------------
 
 func TestGetMiss(t *testing.T) {
+	t.Parallel()
+
 	_, rdb := testRedis(t)
 	c := New[string](rdb, "test")
 	v, ok := c.Get("user1", "agent1", "res1")
@@ -29,6 +31,8 @@ func TestGetMiss(t *testing.T) {
 }
 
 func TestSetAndGet(t *testing.T) {
+	t.Parallel()
+
 	_, rdb := testRedis(t)
 	c := New[string](rdb, "test")
 	val := "hello"
@@ -44,6 +48,8 @@ func TestSetAndGet(t *testing.T) {
 }
 
 func TestOverwrite(t *testing.T) {
+	t.Parallel()
+
 	_, rdb := testRedis(t)
 	c := New[int](rdb, "test")
 	v1 := 1
@@ -58,6 +64,8 @@ func TestOverwrite(t *testing.T) {
 }
 
 func TestMultipleKeysPerUser(t *testing.T) {
+	t.Parallel()
+
 	_, rdb := testRedis(t)
 	c := New[int](rdb, "test")
 	v10 := 10
@@ -77,6 +85,8 @@ func TestMultipleKeysPerUser(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDelete(t *testing.T) {
+	t.Parallel()
+
 	_, rdb := testRedis(t)
 	c := New[int](rdb, "test")
 	v := 42
@@ -95,6 +105,8 @@ func TestDelete(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestTTLExpiry(t *testing.T) {
+	t.Parallel()
+
 	s, rdb := testRedis(t)
 	c := NewWithTTL[int](rdb, "test", 5*time.Second)
 	v := 99
@@ -116,6 +128,8 @@ func TestTTLExpiry(t *testing.T) {
 }
 
 func TestNonPositiveTTLUsesDefault(t *testing.T) {
+	t.Parallel()
+
 	_, rdb := testRedis(t)
 	c := NewWithTTL[int](rdb, "test", 0)
 	if c.ttl != DefaultTTL {
@@ -133,6 +147,8 @@ func TestNonPositiveTTLUsesDefault(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestPrefixIsolation(t *testing.T) {
+	t.Parallel()
+
 	_, rdb := testRedis(t)
 	c1 := New[int](rdb, "cache1")
 	c2 := New[int](rdb, "cache2")
@@ -163,6 +179,8 @@ type samplePerm struct {
 }
 
 func TestStructRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	_, rdb := testRedis(t)
 	c := New[samplePerm](rdb, "perm")
 

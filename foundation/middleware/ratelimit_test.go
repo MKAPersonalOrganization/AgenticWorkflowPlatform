@@ -18,6 +18,8 @@ func newTestRedis(t *testing.T) *goredis.Client {
 }
 
 func TestRateLimiterAllowsWithinLimit(t *testing.T) {
+	t.Parallel()
+
 	rdb := newTestRedis(t)
 	// 10 req/s with burst of 5
 	handler := RateLimiter(rdb, 10, 5)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -37,6 +39,8 @@ func TestRateLimiterAllowsWithinLimit(t *testing.T) {
 }
 
 func TestRateLimiterBlocks(t *testing.T) {
+	t.Parallel()
+
 	rdb := newTestRedis(t)
 	// 1 req/s with burst of 1 — second request should be blocked.
 	handler := RateLimiter(rdb, 1, 1)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -62,6 +66,8 @@ func TestRateLimiterBlocks(t *testing.T) {
 }
 
 func TestRateLimiterDifferentIPsGetOwnBuckets(t *testing.T) {
+	t.Parallel()
+
 	rdb := newTestRedis(t)
 	handler := RateLimiter(rdb, 1, 1)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -87,6 +93,8 @@ func TestRateLimiterDifferentIPsGetOwnBuckets(t *testing.T) {
 }
 
 func TestRateLimiterUsesXForwardedFor(t *testing.T) {
+	t.Parallel()
+
 	rdb := newTestRedis(t)
 	handler := RateLimiter(rdb, 1, 1)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

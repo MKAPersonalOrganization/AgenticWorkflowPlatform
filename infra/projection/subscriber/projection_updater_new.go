@@ -159,7 +159,7 @@ func (u *ProjectionUpdater) runAsLeader(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("acquiring db connection for leader lock: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	acquired, err := tryAcquireAdvisoryLock(ctx, conn, advisoryLockID)
 	if err != nil {

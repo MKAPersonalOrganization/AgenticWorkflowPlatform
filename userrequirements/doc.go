@@ -8,14 +8,14 @@
 // complete agent configuration and asserts only what a user can observe —
 // the response body, the event trace, and whatever JSON the model returns.
 //
-// Promises covered
+// # Promises covered
 //
 // Each *_test.go file starts with a comment block listing the doc paragraph
 // it exercises and the specific claims it pins down. When a claim here
 // regresses, the failing test name points directly at the sentence in the
 // docs that is no longer true.
 //
-// Running
+// # Running
 //
 // The suite is gated behind the "integration" build tag so `go test ./...`
 // stays fast. To run it:

@@ -18,6 +18,8 @@ func (s *stubWorkspacePermissions) GetEnabledWorkspaces(context.Context, string,
 }
 
 func TestKnowledgeBasePromptInjectorBuildPromptAddition(t *testing.T) {
+	t.Parallel()
+
 	ctx := auth.SetUserInContext(context.Background(), &auth.User{ID: "u1"})
 	injector := NewKnowledgeBasePromptInjector(&stubWorkspacePermissions{ids: []string{"ws-1", "ws-2"}})
 
@@ -28,6 +30,8 @@ func TestKnowledgeBasePromptInjectorBuildPromptAddition(t *testing.T) {
 }
 
 func TestKnowledgeBasePromptInjectorBuildPromptAdditionEmptyCases(t *testing.T) {
+	t.Parallel()
+
 	injector := NewKnowledgeBasePromptInjector(&stubWorkspacePermissions{err: errors.New("boom")})
 	if got := injector.BuildPromptAddition(context.Background(), "agent-1", ""); got != "" {
 		t.Fatalf("expected empty prompt without user, got %q", got)

@@ -2,10 +2,10 @@ package messagehandler
 
 import (
 	"aicompass/foundation/agent"
+	"aicompass/foundation/auth"
 	"aicompass/foundation/logger"
 	"aicompass/modules/chat/agentorchestrator"
 	"aicompass/modules/chat/handlers/common"
-	"aicompass/foundation/auth"
 	"encoding/json"
 	"fmt"
 	"net/http"

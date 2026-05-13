@@ -44,7 +44,7 @@ func (s *Service) GetEntityLineage(ctx context.Context, tCtx *tenant.TenantConte
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -73,7 +73,7 @@ func (s *Service) GetDocumentLineage(ctx context.Context, tCtx *tenant.TenantCon
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err

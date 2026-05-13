@@ -2,9 +2,9 @@ package toolreqs_test
 
 import (
 	"aicompass/foundation/logger"
+	"aicompass/foundation/toolregistry"
 	"aicompass/modules/toolreqs"
 	"aicompass/modules/toolreqs/mocks"
-	"aicompass/foundation/toolregistry"
 	"context"
 	"os"
 	"testing"
@@ -30,6 +30,8 @@ func testPairToolset(t *testing.T) (*toolreqs.Service, *toolreqs.PermissionStore
 }
 
 func TestToolSetRequirementConfigs(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
 

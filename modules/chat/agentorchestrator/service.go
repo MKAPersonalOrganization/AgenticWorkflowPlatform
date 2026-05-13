@@ -2,11 +2,11 @@ package agentorchestrator
 
 import (
 	"aicompass/foundation/agent"
+	"aicompass/foundation/artifact"
 	"aicompass/foundation/logger"
 	"aicompass/modules/chat/chatcontracts"
 	"aicompass/modules/chat/thread"
 	"aicompass/modules/chat/threadmgmt"
-	"aicompass/foundation/artifact"
 	"context"
 	"encoding/base64"
 	"fmt"
@@ -553,7 +553,7 @@ func (s *Service) loadArtifactAsDataURL(ctx context.Context, userID, threadID, f
 	if err != nil {
 		return "", fmt.Errorf("load artifact: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	data, err := io.ReadAll(io.LimitReader(reader, maxArtifactLoadSize+1))
 	if err != nil {

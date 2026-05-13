@@ -81,6 +81,8 @@ func (m *mockArtifactService) HealthCheck(ctx context.Context) error {
 }
 
 func TestUploadResource(t *testing.T) {
+	t.Parallel()
+
 	repo := &mockRepository{resources: make(map[uuid.UUID]Resource)}
 	artSvc := &mockArtifactService{files: make(map[string][]byte)}
 	svc := newService(repo, artSvc)
@@ -109,6 +111,8 @@ func TestUploadResource(t *testing.T) {
 }
 
 func TestListResources(t *testing.T) {
+	t.Parallel()
+
 	repo := &mockRepository{resources: make(map[uuid.UUID]Resource)}
 	artSvc := &mockArtifactService{files: make(map[string][]byte)}
 	svc := newService(repo, artSvc)

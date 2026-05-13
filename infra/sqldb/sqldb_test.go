@@ -56,14 +56,10 @@ func TestOpenConnMaxLifetimeDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open() returned error: %v", err)
 	}
-	defer db.Close()
-
-	// sql.DB doesn't expose ConnMaxLifetime via Stats(), but we can verify
-	// that the config fields exist and that Open doesn't panic with zero values.
-	// The real validation is that Open() applied defaults without error.
 	if db == nil {
 		t.Fatal("Open() returned nil db")
 	}
+	defer db.Close()
 }
 
 func TestOpenCustomConnLifetime(t *testing.T) {
@@ -86,11 +82,10 @@ func TestOpenCustomConnLifetime(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open() returned error: %v", err)
 	}
-	defer db.Close()
-
 	if db == nil {
 		t.Fatal("Open() returned nil db")
 	}
+	defer db.Close()
 }
 
 func TestOpenMaxOpenConnsNotZero(t *testing.T) {

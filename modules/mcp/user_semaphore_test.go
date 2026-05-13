@@ -7,6 +7,8 @@ import (
 )
 
 func TestUserSemaphore_BasicAcquireRelease(t *testing.T) {
+	t.Parallel()
+
 	us := newUserSemaphore(3)
 
 	ctx := context.Background()
@@ -50,6 +52,8 @@ func TestUserSemaphore_BasicAcquireRelease(t *testing.T) {
 }
 
 func TestUserSemaphore_IsolatesBetweenUsers(t *testing.T) {
+	t.Parallel()
+
 	us := newUserSemaphore(2)
 
 	ctx := context.Background()
@@ -87,6 +91,8 @@ func TestUserSemaphore_IsolatesBetweenUsers(t *testing.T) {
 }
 
 func TestUserSemaphore_ConcurrentSafety(t *testing.T) {
+	t.Parallel()
+
 	us := newUserSemaphore(5)
 	ctx := context.Background()
 	userID := "user-concurrent"

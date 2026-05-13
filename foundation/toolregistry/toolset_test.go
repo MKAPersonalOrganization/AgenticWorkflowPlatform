@@ -10,6 +10,8 @@ import (
 )
 
 func TestToolSetFunctionality(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	log := logger.NewText(os.Stdout, logger.LevelInfo, "TEST", nil)
 

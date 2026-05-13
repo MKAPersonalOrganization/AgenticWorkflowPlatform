@@ -30,10 +30,10 @@ func fetchGeminiModels(ctx context.Context, apiKey string) ([]ProviderModel, err
 	if err != nil {
 		return nil, fmt.Errorf("calling Gemini models API: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Gemini models API returned status %d — check your API key", resp.StatusCode)
+		return nil, fmt.Errorf("gemini models API returned status %d — check your API key", resp.StatusCode)
 	}
 
 	var body struct {
@@ -74,7 +74,7 @@ func fetchOpenAIModels(ctx context.Context, apiKey string) ([]ProviderModel, err
 	if err != nil {
 		return nil, fmt.Errorf("calling OpenAI models API: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("OpenAI models API returned status %d — check your API key", resp.StatusCode)
@@ -119,10 +119,10 @@ func fetchAnthropicModels(ctx context.Context, apiKey string) ([]ProviderModel, 
 	if err != nil {
 		return nil, fmt.Errorf("calling Anthropic models API: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Anthropic models API returned status %d — check your API key", resp.StatusCode)
+		return nil, fmt.Errorf("anthropic models API returned status %d — check your API key", resp.StatusCode)
 	}
 
 	var body struct {

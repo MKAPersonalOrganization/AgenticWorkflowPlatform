@@ -1,8 +1,8 @@
 package preferences
 
 import (
-	"aicompass/foundation/logger"
 	"aicompass/foundation/auth"
+	"aicompass/foundation/logger"
 	"encoding/json"
 	"net/http"
 )
@@ -42,11 +42,11 @@ func (h *handler) getPreference(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if pref == nil {
 		// Return empty value rather than 404 for simpler client handling
-		json.NewEncoder(w).Encode(map[string]string{"key": key, "value": ""})
+		_ = json.NewEncoder(w).Encode(map[string]string{"key": key, "value": ""})
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{"key": pref.Key, "value": pref.Value})
+	_ = json.NewEncoder(w).Encode(map[string]string{"key": pref.Key, "value": pref.Value})
 }
 
 // setPreference handles PUT /api/preferences/{key}
@@ -108,5 +108,5 @@ func (h *handler) getAllPreferences(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	_ = json.NewEncoder(w).Encode(result)
 }

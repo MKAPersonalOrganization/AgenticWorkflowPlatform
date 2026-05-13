@@ -84,4 +84,3 @@ func (e *Error) HTTPStatus() int {
 func (e *Error) Equal(e2 *Error) bool {
 	return e.Code == e2.Code && e.Message == e2.Message
 }
-

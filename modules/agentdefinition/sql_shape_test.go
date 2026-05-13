@@ -7,6 +7,8 @@ import (
 )
 
 func TestGeneratedInsertAndUpdateParams(t *testing.T) {
+	t.Parallel()
+
 	got := insertAgentQuery
 	// 13 leading + 11 JSON + 4 trailing = 28 placeholders.
 	want := 13 + len(agentJSONColumns) + 4

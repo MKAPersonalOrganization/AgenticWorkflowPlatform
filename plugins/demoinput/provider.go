@@ -15,8 +15,10 @@ const ToolSetID = "demoinput-set"
 // Provider implements toolregistry.PluginProvider for the demo input plugin.
 type Provider struct{}
 
-func (p *Provider) ID() string   { return "demoinput" }
-func (p *Provider) Icon() string { return toolregistry.BuildIconSVG(`<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>`) }
+func (p *Provider) ID() string { return "demoinput" }
+func (p *Provider) Icon() string {
+	return toolregistry.BuildIconSVG(`<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>`)
+}
 
 func (p *Provider) DefaultSets() []toolregistry.ToolSet {
 	now := time.Now()
@@ -58,4 +60,4 @@ func (p *Provider) CreateExecutable(_ context.Context, toolID string, _ toolregi
 }
 
 func (p *Provider) GetUITemplate() templ.Component { return nil }
-func (p *Provider) UIHandledTools() []string        { return nil }
+func (p *Provider) UIHandledTools() []string       { return nil }

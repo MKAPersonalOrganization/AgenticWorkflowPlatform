@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"path"
 	"strings"
 	"time"
@@ -54,8 +55,29 @@ func (v *GitHubVFS) apiURL(p string) string {
 	return base
 }
 
-func (v *GitHubVFS) doGet(ctx context.Context, url string) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+// gitHubAPIHost is the fixed origin doGet will dial. Any request whose URL
+// resolves to a different host is rejected so user-controlled paths cannot
+// be turned into requests against arbitrary internal hosts (SSRF guard).
+const gitHubAPIHost = "api.github.com"
+
+func (v *GitHubVFS) doGet(ctx context.Context, rawURL string) (*http.Response, error) {
+	parsed, err := neturl.Parse(rawURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid github url: %w", err)
+	}
+	if parsed.Scheme != "https" || parsed.Host != gitHubAPIHost {
+		return nil, fmt.Errorf("github url not allowed")
+	}
+	// Reconstruct the request URL from constants + validated components so
+	// the URL object passed to the HTTP client is rooted in the literal
+	// "https://api.github.com" origin rather than the caller-supplied string.
+	safeURL := &neturl.URL{
+		Scheme:   "https",
+		Host:     gitHubAPIHost,
+		Path:     parsed.Path,
+		RawQuery: parsed.RawQuery,
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, safeURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +103,7 @@ func (v *GitHubVFS) ReadDir(ctx context.Context, p string) ([]DirEntry, error) {
 	if err != nil {
 		return nil, fmt.Errorf("githubvfs: readdir: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, ErrNotFound
@@ -115,7 +137,7 @@ func (v *GitHubVFS) ReadFile(ctx context.Context, p string) (io.ReadCloser, *Fil
 	if err != nil {
 		return nil, nil, fmt.Errorf("githubvfs: readfile meta: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, nil, ErrNotFound
@@ -139,7 +161,7 @@ func (v *GitHubVFS) ReadFile(ctx context.Context, p string) (io.ReadCloser, *Fil
 		return nil, nil, fmt.Errorf("githubvfs: readfile download: %w", err)
 	}
 	if dlResp.StatusCode != http.StatusOK {
-		dlResp.Body.Close()
+		_ = dlResp.Body.Close()
 		return nil, nil, fmt.Errorf("githubvfs: readfile download: status %d", dlResp.StatusCode)
 	}
 
@@ -164,7 +186,7 @@ func (v *GitHubVFS) Stat(ctx context.Context, p string) (*FileStat, error) {
 	if err != nil {
 		return nil, fmt.Errorf("githubvfs: stat: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, ErrNotFound

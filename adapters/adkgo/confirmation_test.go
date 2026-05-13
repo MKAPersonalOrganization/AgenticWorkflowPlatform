@@ -112,6 +112,8 @@ func buildFunctionResponseEvent() *session.Event {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestTranslateEvent_ConfirmationFunctionCall_EmitsToolNeedsConfirmation(t *testing.T) {
+	t.Parallel()
+
 	evt := buildConfirmationFunctionCallEvent()
 	ctx := testEventContext()
 
@@ -171,6 +173,8 @@ func TestTranslateEvent_ConfirmationFunctionCall_EmitsToolNeedsConfirmation(t *t
 }
 
 func TestTranslateEvent_RegularToolCall_StillEmitsToolStart(t *testing.T) {
+	t.Parallel()
+
 	evt := session.NewEvent("inv-1")
 	evt.ID = "evt-regular"
 	evt.Author = testAgent
@@ -218,6 +222,8 @@ func TestTranslateEvent_RegularToolCall_StillEmitsToolStart(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestExtractConfirmationInfo(t *testing.T) {
+	t.Parallel()
+
 	args := map[string]any{
 		"originalFunctionCall": map[string]any{
 			"id":   "call-abc",
@@ -248,6 +254,8 @@ func TestExtractConfirmationInfo(t *testing.T) {
 }
 
 func TestExtractConfirmationInfo_CustomInput(t *testing.T) {
+	t.Parallel()
+
 	args := map[string]any{
 		"originalFunctionCall": map[string]any{
 			"id":   "call-xyz",
@@ -283,6 +291,8 @@ func TestExtractConfirmationInfo_CustomInput(t *testing.T) {
 }
 
 func TestExtractConfirmationInfo_InvalidJSON(t *testing.T) {
+	t.Parallel()
+
 	info := extractConfirmationInfo("not json")
 	if info.originalID != "" || info.originalName != "" || info.hint != "" {
 		t.Errorf("expected empty strings for invalid JSON, got id=%q name=%q hint=%q", info.originalID, info.originalName, info.hint)
@@ -294,6 +304,8 @@ func TestExtractConfirmationInfo_InvalidJSON(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestBuildConfirmationResponse(t *testing.T) {
+	t.Parallel()
+
 	content := buildConfirmationResponse("call-confirm-xyz", "call-original-abc")
 
 	if content.Role != "user" {
@@ -329,6 +341,8 @@ func TestBuildConfirmationResponse(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestGetConfirmationWrapperID(t *testing.T) {
+	t.Parallel()
+
 	argsJSON, _ := json.Marshal(map[string]any{
 		"originalFunctionCall": map[string]any{"id": originalToolCallID, "name": "delete_file"},
 		"toolConfirmation":     map[string]any{"hint": "confirm?"},
@@ -354,6 +368,8 @@ func TestGetConfirmationWrapperID(t *testing.T) {
 }
 
 func TestMessageToSessionEvent_ConfirmationToolResult(t *testing.T) {
+	t.Parallel()
+
 	mappings := confirmationMappings{
 		wrapperIDs:     map[string]bool{confirmationCallID: true},
 		originalToWrap: map[string]string{originalToolCallID: confirmationCallID},
@@ -404,6 +420,8 @@ func TestMessageToSessionEvent_ConfirmationToolResult(t *testing.T) {
 }
 
 func TestMessageToSessionEvent_RegularToolResult_Unchanged(t *testing.T) {
+	t.Parallel()
+
 	mappings := confirmationMappings{
 		wrapperIDs:     map[string]bool{confirmationCallID: true},
 		originalToWrap: map[string]string{},
@@ -443,6 +461,8 @@ func TestMessageToSessionEvent_RegularToolResult_Unchanged(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestConfirmationWorkflow_E2E(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	evtCtx := testEventContext()
 

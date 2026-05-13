@@ -32,8 +32,11 @@ func (h *handler) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse multipart form
-	if err := r.ParseMultipartForm(32 << 20); err != nil { // 32MB max
+	// Parse multipart form. Cap the on-wire body via MaxBytesReader so
+	// ParseMultipartForm's maxMemory is only about memory-vs-spill, not
+	// the total upload size.
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<20)
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		http.Error(w, "failed to parse multipart form", http.StatusBadRequest)
 		return
 	}
@@ -43,7 +46,7 @@ func (h *handler) upload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "file is required", http.StatusBadRequest)
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	res, err := h.svc.uploadResource(r.Context(), user.ID, header.Filename, header.Header.Get("Content-Type"), file)
 	if err != nil {
@@ -52,7 +55,7 @@ func (h *handler) upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(res)
+	_ = json.NewEncoder(w).Encode(res)
 }
 
 // list handles listing resources.
@@ -76,7 +79,7 @@ func (h *handler) list(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(res)
+	_ = json.NewEncoder(w).Encode(res)
 }
 
 // getContent handles resource content retrieval.
@@ -100,7 +103,7 @@ func (h *handler) getContent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Resource not found", http.StatusNotFound)
 		return
 	}
-	defer content.Close()
+	defer func() { _ = content.Close() }()
 
 	// Security check: private resources only for owner
 	if res.Source == SourcePrivate && (res.UserID == nil || *res.UserID != user.ID) {

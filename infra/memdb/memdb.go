@@ -49,7 +49,7 @@ func (s *Service) AddSessionToMemory(ctx context.Context, sess session.Session) 
 	if err != nil {
 		return fmt.Errorf("memory: begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	stmt, err := tx.PreparexContext(ctx, `
 		INSERT INTO memory_entries (id, app_name, user_id, session_id, event_id, author, content, content_text, custom_metadata, event_timestamp)
@@ -58,7 +58,7 @@ func (s *Service) AddSessionToMemory(ctx context.Context, sess session.Session) 
 	if err != nil {
 		return fmt.Errorf("memory: prepare insert: %w", err)
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 
 	for event := range sess.Events().All() {
 		if event.Content == nil {
@@ -115,7 +115,7 @@ func (s *Service) SearchMemory(ctx context.Context, req *memory.SearchRequest) (
 	if err != nil {
 		return nil, fmt.Errorf("memory: search: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var entries []memory.Entry
 	for rows.Next() {

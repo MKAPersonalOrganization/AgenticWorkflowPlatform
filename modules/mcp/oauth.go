@@ -8,8 +8,10 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -94,22 +96,84 @@ type OAuthTokenResponse struct {
 	Scope        string `json:"scope,omitempty"`
 }
 
+// safeOutboundURL parses a caller-supplied URL, rejects schemes other than
+// https (or http for explicit localhost dev), refuses hosts that resolve to
+// loopback/private/link-local ranges, and returns a *url.URL freshly
+// constructed from validated components. Returning a fresh struct rather
+// than the parsed object keeps the request URL rooted in vetted values and
+// breaks gosec G704's taint chain.
+func safeOutboundURL(raw string) (*url.URL, error) {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return nil, fmt.Errorf("parsing url: %w", err)
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	host := parsed.Hostname()
+	port := parsed.Port()
+	if host == "" {
+		return nil, errors.New("url missing host")
+	}
+	switch scheme {
+	case "https":
+	case "http":
+		// Only allow plaintext for explicit localhost MCP servers used in dev.
+		if host != "localhost" && host != "127.0.0.1" && host != "::1" {
+			return nil, fmt.Errorf("scheme http only permitted for localhost, got host %q", host)
+		}
+	default:
+		return nil, fmt.Errorf("scheme %q not allowed", scheme)
+	}
+	if err := rejectInternalHost(host); err != nil {
+		return nil, err
+	}
+	out := &url.URL{
+		Scheme:   scheme,
+		Host:     host,
+		Path:     parsed.Path,
+		RawQuery: parsed.RawQuery,
+	}
+	if port != "" {
+		out.Host = net.JoinHostPort(host, port)
+	}
+	return out, nil
+}
+
+// rejectInternalHost blocks hostnames whose IPs would point at cloud
+// metadata services or private/loopback ranges, which are the typical SSRF
+// targets in multi-tenant deployments. Hostnames that don't resolve are
+// rejected too rather than left as a covert channel.
+func rejectInternalHost(host string) error {
+	if host == "localhost" {
+		return nil // accepted above as an explicit dev-mode exception
+	}
+	ips, err := net.LookupIP(host)
+	if err != nil || len(ips) == 0 {
+		return fmt.Errorf("resolving host %q: %w", host, err)
+	}
+	for _, ip := range ips {
+		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+			return fmt.Errorf("host %q resolves to disallowed address %s", host, ip)
+		}
+	}
+	return nil
+}
+
 // DiscoverProtectedResourceMetadata fetches RFC 9728 metadata from the MCP server.
 // Results are cached for 10 minutes (agentstack pattern) to avoid redundant
 // round-trips when multiple connectors point to the same server.
 func (o *OAuthService) DiscoverProtectedResourceMetadata(ctx context.Context, serverURL string) (*ProtectedResourceMetadata, error) {
-	parsed, err := url.Parse(serverURL)
+	safe, err := safeOutboundURL(serverURL)
 	if err != nil {
-		return nil, fmt.Errorf("parsing server URL: %w", err)
+		return nil, fmt.Errorf("validating server URL: %w", err)
 	}
 
-	cacheKey := parsed.Scheme + "://" + parsed.Host
+	cacheKey := safe.Scheme + "://" + safe.Host
 	if cached, ok := o.resourceMetaCache.Get(cacheKey); ok {
 		return cached, nil
 	}
 
-	metaURL := fmt.Sprintf("%s://%s/.well-known/oauth-protected-resource", parsed.Scheme, parsed.Host)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, metaURL, nil)
+	metaURL := &url.URL{Scheme: safe.Scheme, Host: safe.Host, Path: "/.well-known/oauth-protected-resource"}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, metaURL.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating metadata request: %w", err)
 	}
@@ -118,7 +182,7 @@ func (o *OAuthService) DiscoverProtectedResourceMetadata(ctx context.Context, se
 	if err != nil {
 		return nil, fmt.Errorf("fetching protected resource metadata: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("protected resource metadata returned status %d", resp.StatusCode)
@@ -135,18 +199,18 @@ func (o *OAuthService) DiscoverProtectedResourceMetadata(ctx context.Context, se
 // DiscoverAuthServerMetadata fetches OAuth Authorization Server metadata (RFC 8414).
 // Results are cached for 10 minutes (agentstack pattern).
 func (o *OAuthService) DiscoverAuthServerMetadata(ctx context.Context, authServerURL string) (*OAuthMetadata, error) {
-	parsed, err := url.Parse(authServerURL)
+	safe, err := safeOutboundURL(authServerURL)
 	if err != nil {
-		return nil, fmt.Errorf("parsing auth server URL: %w", err)
+		return nil, fmt.Errorf("validating auth server URL: %w", err)
 	}
 
-	cacheKey := parsed.Scheme + "://" + parsed.Host
+	cacheKey := safe.Scheme + "://" + safe.Host
 	if cached, ok := o.authMetaCache.Get(cacheKey); ok {
 		return cached, nil
 	}
 
-	metaURL := fmt.Sprintf("%s://%s/.well-known/oauth-authorization-server", parsed.Scheme, parsed.Host)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, metaURL, nil)
+	metaURL := &url.URL{Scheme: safe.Scheme, Host: safe.Host, Path: "/.well-known/oauth-authorization-server"}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, metaURL.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating auth metadata request: %w", err)
 	}
@@ -155,7 +219,7 @@ func (o *OAuthService) DiscoverAuthServerMetadata(ctx context.Context, authServe
 	if err != nil {
 		return nil, fmt.Errorf("fetching auth server metadata: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("auth server metadata returned status %d", resp.StatusCode)
@@ -190,7 +254,11 @@ func (o *OAuthService) RegisterClient(ctx context.Context, registrationEndpoint,
 		return "", "", fmt.Errorf("marshalling registration body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, registrationEndpoint, strings.NewReader(string(jsonBody)))
+	safeRegURL, err := safeOutboundURL(registrationEndpoint)
+	if err != nil {
+		return "", "", fmt.Errorf("validating registration endpoint: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, safeRegURL.String(), strings.NewReader(string(jsonBody)))
 	if err != nil {
 		return "", "", fmt.Errorf("creating registration request: %w", err)
 	}
@@ -200,7 +268,7 @@ func (o *OAuthService) RegisterClient(ctx context.Context, registrationEndpoint,
 	if err != nil {
 		return "", "", fmt.Errorf("performing client registration: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, maxTokenResponseBytes))
@@ -260,7 +328,7 @@ func (o *OAuthService) ExchangeCode(ctx context.Context, meta *OAuthMetadata, cl
 	if err != nil {
 		return nil, fmt.Errorf("exchanging code for token: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxTokenResponseBytes))
@@ -295,7 +363,7 @@ func (o *OAuthService) RefreshToken(ctx context.Context, meta *OAuthMetadata, cl
 	if err != nil {
 		return nil, fmt.Errorf("refreshing token: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxTokenResponseBytes))
@@ -332,7 +400,7 @@ func (o *OAuthService) RevokeToken(ctx context.Context, meta *OAuthMetadata, acc
 	if err != nil {
 		return fmt.Errorf("revoking token: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// RFC 7009: the server returns 200 even if the token was already invalid.
 	if resp.StatusCode != http.StatusOK {
@@ -436,7 +504,7 @@ func (t *AutoRefreshTransport) RoundTrip(req *http.Request) (*http.Response, err
 	if req.Body != nil {
 		var err error
 		bodyBytes, err = io.ReadAll(req.Body)
-		req.Body.Close()
+		_ = req.Body.Close()
 		if err != nil {
 			return nil, fmt.Errorf("reading request body for retry: %w", err)
 		}
@@ -464,7 +532,7 @@ func (t *AutoRefreshTransport) RoundTrip(req *http.Request) (*http.Response, err
 
 	// If 401 and we have a refresh token, try once.
 	if resp.StatusCode == http.StatusUnauthorized && t.token.RefreshToken != "" {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if refreshErr := t.refreshToken(req.Context()); refreshErr != nil {
 			// Refresh failed — return the original 401 with auth header.
 			retry := req.Clone(req.Context())

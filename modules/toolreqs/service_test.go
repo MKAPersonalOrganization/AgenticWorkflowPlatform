@@ -35,6 +35,8 @@ func newTestPair(t *testing.T) (*toolreqs.Service, *toolreqs.PermissionStore) {
 // =============================================================================
 
 func TestService_GetEnabledToolSets_Empty(t *testing.T) {
+	t.Parallel()
+
 	svc, _ := newTestPair(t)
 	sets, err := svc.GetEnabledToolSets(context.Background(), "user1", "agent1")
 	if err != nil {
@@ -46,6 +48,8 @@ func TestService_GetEnabledToolSets_Empty(t *testing.T) {
 }
 
 func TestService_GetEnabledToolSets_WithData(t *testing.T) {
+	t.Parallel()
+
 	svc, store := newTestPair(t)
 	ctx := context.Background()
 
@@ -71,6 +75,8 @@ func TestService_GetEnabledToolSets_WithData(t *testing.T) {
 }
 
 func TestService_HasPermission_Allowed(t *testing.T) {
+	t.Parallel()
+
 	svc, store := newTestPair(t)
 	ctx := context.Background()
 
@@ -88,6 +94,8 @@ func TestService_HasPermission_Allowed(t *testing.T) {
 }
 
 func TestService_HasPermission_Blocked(t *testing.T) {
+	t.Parallel()
+
 	svc, store := newTestPair(t)
 	ctx := context.Background()
 
@@ -105,6 +113,8 @@ func TestService_HasPermission_Blocked(t *testing.T) {
 }
 
 func TestService_HasToolSetPermission(t *testing.T) {
+	t.Parallel()
+
 	svc, store := newTestPair(t)
 	ctx := context.Background()
 
@@ -131,6 +141,8 @@ func TestService_HasToolSetPermission(t *testing.T) {
 }
 
 func TestService_CheckConfirmation_Default(t *testing.T) {
+	t.Parallel()
+
 	svc, _ := newTestPair(t)
 	needs, _ := svc.CheckConfirmation(context.Background(), "user1", "agent1", "", "calculator", nil)
 	if needs {

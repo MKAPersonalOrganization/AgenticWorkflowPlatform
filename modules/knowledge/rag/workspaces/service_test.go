@@ -14,6 +14,8 @@ import (
 )
 
 func TestService_List(t *testing.T) {
+	t.Parallel()
+
 	tenantID := uuid.New()
 	tCtx := &tenant.TenantContext{
 		TenantID: &tenantID,
@@ -51,6 +53,8 @@ func TestService_List(t *testing.T) {
 }
 
 func TestService_Create(t *testing.T) {
+	t.Parallel()
+
 	tenantID := uuid.New()
 	tCtx := &tenant.TenantContext{
 		TenantID: &tenantID,
@@ -92,6 +96,8 @@ func TestService_Create(t *testing.T) {
 }
 
 func TestService_Get(t *testing.T) {
+	t.Parallel()
+
 	workspaceID := uuid.New()
 	mockResponse := WorkspaceResponse{
 		ID:   workspaceID,
@@ -118,6 +124,8 @@ func TestService_Get(t *testing.T) {
 }
 
 func TestService_Delete(t *testing.T) {
+	t.Parallel()
+
 	workspaceID := uuid.New()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -135,6 +143,8 @@ func TestService_Delete(t *testing.T) {
 }
 
 func TestService_GetStats(t *testing.T) {
+	t.Parallel()
+
 	workspaceID := uuid.New()
 	mockResponse := WorkspaceStatsResponse{
 		WorkspaceID:       workspaceID,
@@ -166,6 +176,8 @@ func TestService_GetStats(t *testing.T) {
 }
 
 func TestService_Update(t *testing.T) {
+	t.Parallel()
+
 	workspaceID := uuid.New()
 	newName := "Updated Name"
 	req := &UpdateWorkspaceRequest{

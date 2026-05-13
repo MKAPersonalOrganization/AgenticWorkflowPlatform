@@ -1,8 +1,8 @@
 package agui
 
 import (
-	"aicompass/modules/chat/projection/agui"
 	"aicompass/foundation/auth"
+	"aicompass/modules/chat/projection/agui"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -90,6 +90,8 @@ func contextWithUser(userID string) context.Context {
 }
 
 func TestListThreads_FirstPage(t *testing.T) {
+	t.Parallel()
+
 	// Create mock with 25 threads (more than one page)
 	threads := make([]agui.ThreadSummary, 25)
 	baseTime := time.Date(2026, 1, 19, 12, 0, 0, 0, time.UTC)
@@ -142,6 +144,8 @@ func TestListThreads_FirstPage(t *testing.T) {
 }
 
 func TestListThreads_WithCursor(t *testing.T) {
+	t.Parallel()
+
 	// Create mock with threads
 	threads := make([]agui.ThreadSummary, 30)
 	baseTime := time.Date(2026, 1, 19, 12, 0, 0, 0, time.UTC)
@@ -190,6 +194,8 @@ func TestListThreads_WithCursor(t *testing.T) {
 }
 
 func TestListThreads_EmptyResults(t *testing.T) {
+	t.Parallel()
+
 	mock := &mockProjection{threads: []agui.ThreadSummary{}}
 	handler := NewAguiProjectionHandler(mock, &mockProjectionService{})
 
@@ -218,6 +224,8 @@ func TestListThreads_EmptyResults(t *testing.T) {
 }
 
 func TestListThreads_InvalidCursor(t *testing.T) {
+	t.Parallel()
+
 	mock := &mockProjection{
 		threads:     []agui.ThreadSummary{},
 		returnError: fmt.Errorf("invalid cursor format"),
@@ -236,6 +244,8 @@ func TestListThreads_InvalidCursor(t *testing.T) {
 }
 
 func TestListThreads_InvalidLimit(t *testing.T) {
+	t.Parallel()
+
 	mock := &mockProjection{threads: []agui.ThreadSummary{}}
 	handler := NewAguiProjectionHandler(mock, &mockProjectionService{})
 
@@ -251,6 +261,8 @@ func TestListThreads_InvalidLimit(t *testing.T) {
 }
 
 func TestListThreads_NoAuth(t *testing.T) {
+	t.Parallel()
+
 	mock := &mockProjection{threads: []agui.ThreadSummary{}}
 	handler := NewAguiProjectionHandler(mock, &mockProjectionService{})
 
@@ -266,6 +278,8 @@ func TestListThreads_NoAuth(t *testing.T) {
 }
 
 func TestListThreads_LastPage(t *testing.T) {
+	t.Parallel()
+
 	// Create exactly one page of threads
 	threads := make([]agui.ThreadSummary, 15)
 	baseTime := time.Date(2026, 1, 19, 12, 0, 0, 0, time.UTC)

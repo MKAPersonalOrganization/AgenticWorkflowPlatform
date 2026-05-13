@@ -2,10 +2,10 @@ package permissions
 
 import (
 	"aicompass/foundation/agent"
+	"aicompass/foundation/auth"
 	"aicompass/foundation/logger"
 	"aicompass/modules/knowledge/tenant"
 	"aicompass/modules/permissions/workspace"
-	"aicompass/foundation/auth"
 	"encoding/json"
 	"net/http"
 

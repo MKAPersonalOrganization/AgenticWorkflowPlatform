@@ -1,11 +1,11 @@
 package threadhandler
 
 import (
+	"aicompass/foundation/auth"
 	"aicompass/foundation/logger"
 	"aicompass/modules/chat/projection/agui"
 	"aicompass/modules/chat/thread"
 	"aicompass/modules/chat/threadmgmt"
-	"aicompass/foundation/auth"
 	"encoding/json"
 	"errors"
 	"net/http"

@@ -27,6 +27,8 @@ func testPairIndiv(t *testing.T) (*toolreqs.Service, *toolreqs.PermissionStore) 
 }
 
 func TestIndividualToolRequirementConfig(t *testing.T) {
+	t.Parallel()
+
 	service, store := testPairIndiv(t)
 	ctx := context.Background()
 
@@ -74,6 +76,8 @@ func TestIndividualToolRequirementConfig(t *testing.T) {
 }
 
 func TestToolSetRequirementInheritance(t *testing.T) {
+	t.Parallel()
+
 	service, store := testPairIndiv(t)
 	ctx := context.Background()
 
@@ -114,6 +118,8 @@ func TestToolSetRequirementInheritance(t *testing.T) {
 }
 
 func TestToolRequirementOverridesToolSet(t *testing.T) {
+	t.Parallel()
+
 	service, store := testPairIndiv(t)
 	ctx := context.Background()
 
@@ -152,6 +158,8 @@ func TestToolRequirementOverridesToolSet(t *testing.T) {
 }
 
 func TestRequireConfirmationConfig(t *testing.T) {
+	t.Parallel()
+
 	service, store := testPairIndiv(t)
 	ctx := context.Background()
 
@@ -196,6 +204,8 @@ func TestRequireConfirmationConfig(t *testing.T) {
 }
 
 func TestListToolRequirementConfigs(t *testing.T) {
+	t.Parallel()
+
 	_, store := testPairIndiv(t)
 	ctx := context.Background()
 
@@ -242,6 +252,8 @@ func TestListToolRequirementConfigs(t *testing.T) {
 }
 
 func TestGetAllowedToolSets(t *testing.T) {
+	t.Parallel()
+
 	service, store := testPairIndiv(t)
 	ctx := context.Background()
 

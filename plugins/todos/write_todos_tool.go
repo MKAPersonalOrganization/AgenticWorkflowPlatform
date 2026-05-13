@@ -94,7 +94,7 @@ func (t *WriteTodosTool) Execute(_ context.Context, args agent.Arguments) (agent
 
 	var sb strings.Builder
 	for i, todo := range todos {
-		sb.WriteString(fmt.Sprintf("%d. [%s] %s\n", i+1, todo.Status, todo.Description))
+		fmt.Fprintf(&sb, "%d. [%s] %s\n", i+1, todo.Status, todo.Description)
 	}
 
 	counts := countByStatus(todos)

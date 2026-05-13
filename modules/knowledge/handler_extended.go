@@ -677,8 +677,8 @@ func (h *handler) ListTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	page := uint32(intFromQuery(r, "page", 1))
-	pageSize := uint32(intFromQuery(r, "page_size", 50))
+	page := uint32FromQuery(r, "page", 1)
+	pageSize := uint32FromQuery(r, "page_size", 50)
 	status := r.URL.Query().Get("status")
 	taskType := r.URL.Query().Get("task_type")
 	sort := r.URL.Query().Get("sort")
@@ -1061,4 +1061,19 @@ func intFromQuery(r *http.Request, param string, defaultVal int) int {
 		return defaultVal
 	}
 	return n
+}
+
+// uint32FromQuery reads a non-negative uint32 query param with a default.
+// Negative or out-of-range values fall back to the default rather than
+// silently wrapping during the int→uint32 conversion.
+func uint32FromQuery(r *http.Request, param string, defaultVal uint32) uint32 {
+	v := r.URL.Query().Get(param)
+	if v == "" {
+		return defaultVal
+	}
+	n, err := strconv.ParseUint(v, 10, 32)
+	if err != nil {
+		return defaultVal
+	}
+	return uint32(n)
 }

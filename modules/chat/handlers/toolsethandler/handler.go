@@ -1,11 +1,11 @@
 package toolsethandler
 
 import (
+	"aicompass/foundation/auth"
 	"aicompass/foundation/logger"
 	"aicompass/foundation/toolregistry"
 	"aicompass/modules/chat/chatcontracts"
 	"aicompass/modules/chat/handlers/common"
-	"aicompass/foundation/auth"
 	"encoding/json"
 	"net/http"
 )

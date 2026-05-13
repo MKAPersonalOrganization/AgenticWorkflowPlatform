@@ -1,10 +1,10 @@
 package pluginsettings
 
 import (
+	"aicompass/foundation/auth"
 	"aicompass/foundation/i18n"
 	"aicompass/foundation/logger"
 	"aicompass/foundation/toolregistry"
-	"aicompass/foundation/auth"
 	"encoding/json"
 	"net/http"
 
@@ -51,7 +51,7 @@ func (h *handler) listSchemas(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(out)
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 // getAll handles GET /api/plugin-settings
@@ -80,7 +80,7 @@ func (h *handler) getAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(out)
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 // getOne handles GET /api/plugin-settings/{pluginID}
@@ -106,7 +106,7 @@ func (h *handler) getOne(w http.ResponseWriter, r *http.Request) {
 
 	if s == nil {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(pluginSettingsResponse{
+		_ = json.NewEncoder(w).Encode(pluginSettingsResponse{
 			PluginID: pluginID,
 			Settings: map[string]string{},
 		})
@@ -115,7 +115,7 @@ func (h *handler) getOne(w http.ResponseWriter, r *http.Request) {
 
 	sensitiveKeys := SensitiveKeysForPlugin(pluginID)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(pluginSettingsResponse{
+	_ = json.NewEncoder(w).Encode(pluginSettingsResponse{
 		PluginID: s.PluginID,
 		Settings: s.MaskedSettings(sensitiveKeys),
 	})

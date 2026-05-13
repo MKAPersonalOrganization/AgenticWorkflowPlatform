@@ -64,4 +64,3 @@ func GetUserFromContext(ctx context.Context) *User {
 func SetUserInContext(ctx context.Context, user *User) context.Context {
 	return context.WithValue(ctx, UserContextKey, user)
 }
-

@@ -40,7 +40,7 @@ func (s *Service) GetMetricsHistory(ctx context.Context, tCtx *tenant.TenantCont
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := handleExtendedError(resp); err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func (s *Service) TriggerMetricsSnapshot(ctx context.Context, tCtx *tenant.Tenan
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := handleExtendedError(resp); err != nil {
 		return nil, err
@@ -97,7 +97,7 @@ func (s *Service) GetBySlug(ctx context.Context, tCtx *tenant.TenantContext, slu
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := handleExtendedError(resp); err != nil {
 		return nil, err
@@ -131,7 +131,7 @@ func (s *Service) ReprocessAllDocuments(ctx context.Context, tCtx *tenant.Tenant
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)

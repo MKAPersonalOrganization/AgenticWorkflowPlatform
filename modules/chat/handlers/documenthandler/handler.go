@@ -1,10 +1,10 @@
 package documenthandler
 
 import (
+	"aicompass/foundation/auth"
 	"aicompass/foundation/logger"
 	"aicompass/modules/chat/chatcontracts"
 	"aicompass/modules/knowledge/tenant"
-	"aicompass/foundation/auth"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -116,8 +116,10 @@ func (h *Handler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		Role:     string(tenant.RoleAdmin),
 	}
 
-	// 3. Parse Multipart Form
-	if err := r.ParseMultipartForm(32 << 20); err != nil { // 32MB max
+	// 3. Parse Multipart Form. MaxBytesReader caps the on-wire body before
+	// ParseMultipartForm decides how much to keep in memory vs spill.
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<20)
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		http.Error(w, "Failed to parse multipart form", http.StatusBadRequest)
 		return
 	}
@@ -127,7 +129,7 @@ func (h *Handler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "file is required", http.StatusBadRequest)
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// 4. Delegate to Document Provider (Passive Enforcement)
 	resp, err := h.documentProvider.UploadDocument(r.Context(), tCtx, header.Filename, header.Header.Get("Content-Type"), file)

@@ -383,7 +383,7 @@ func (t *VisualizeTool) Execute(_ context.Context, args agent.Arguments) (agent.
 	renderTask = func(task *Task, depth int, visited map[string]bool) {
 		if visited[task.ID] {
 			sb.WriteString(strings.Repeat("  ", depth))
-			sb.WriteString(fmt.Sprintf("[CYCLE DETECTED: %s]\n", task.ID))
+			fmt.Fprintf(&sb, "[CYCLE DETECTED: %s]\n", task.ID)
 			return
 		}
 		visited[task.ID] = true
@@ -391,10 +391,10 @@ func (t *VisualizeTool) Execute(_ context.Context, args agent.Arguments) (agent.
 		indent := strings.Repeat("  ", depth)
 		emoji := statusEmojis[task.Status]
 		label := typeLabels[task.Type]
-		sb.WriteString(fmt.Sprintf("%s%s %s %s %s\n", indent, emoji, task.ID, label, task.Title))
+		fmt.Fprintf(&sb, "%s%s %s %s %s\n", indent, emoji, task.ID, label, task.Title)
 
 		if len(task.Dependencies) > 0 {
-			sb.WriteString(fmt.Sprintf("%s  └─ Depends on: %s\n", indent, strings.Join(task.Dependencies, ", ")))
+			fmt.Fprintf(&sb, "%s  └─ Depends on: %s\n", indent, strings.Join(task.Dependencies, ", "))
 		}
 
 		children := childrenMap[task.ID]

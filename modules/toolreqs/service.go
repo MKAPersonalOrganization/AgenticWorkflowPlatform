@@ -1,11 +1,10 @@
 package toolreqs
 
 import (
-	"context"
-
 	"aicompass/foundation/agent"
 	"aicompass/foundation/logger"
 	"aicompass/foundation/toolregistry"
+	"context"
 )
 
 // Service is the runtime decision-making surface for tool requirements:

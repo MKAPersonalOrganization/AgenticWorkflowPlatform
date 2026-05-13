@@ -9,6 +9,8 @@ import (
 )
 
 func TestThreadAggregate_ActiveToolStates(t *testing.T) {
+	t.Parallel()
+
 	th := thread.NewThreadAggregate("thread-1")
 
 	// 1. Tool enters AwaitingInput
@@ -55,6 +57,8 @@ func TestThreadAggregate_ActiveToolStates(t *testing.T) {
 }
 
 func TestThreadAggregate_ActiveToolStates_Auth(t *testing.T) {
+	t.Parallel()
+
 	th := thread.NewThreadAggregate("thread-1")
 
 	// 1. Awaiting Auth

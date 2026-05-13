@@ -39,7 +39,7 @@ func (s *Service) Execute(ctx context.Context, tCtx *tenant.TenantContext, req *
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
@@ -79,7 +79,7 @@ func (s *Service) runStream(
 		errChan <- fmt.Errorf("failed to execute request: %w", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		errChan <- fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 		return

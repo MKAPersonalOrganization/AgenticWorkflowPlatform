@@ -8,6 +8,8 @@ import (
 )
 
 func TestCachedReadHandler_Read_returns_cached_value(t *testing.T) {
+	t.Parallel()
+
 	h := io.NewCachedReadHandler("John Doe")
 	ctx := context.Background()
 
@@ -21,6 +23,8 @@ func TestCachedReadHandler_Read_returns_cached_value(t *testing.T) {
 }
 
 func TestCachedReadHandler_Read_second_call_returns_ErrInputRequired(t *testing.T) {
+	t.Parallel()
+
 	h := io.NewCachedReadHandler("first answer")
 	ctx := context.Background()
 
@@ -42,6 +46,8 @@ func TestCachedReadHandler_Read_second_call_returns_ErrInputRequired(t *testing.
 }
 
 func TestCachedReadHandler_Confirm_delegates_to_PauseHandler(t *testing.T) {
+	t.Parallel()
+
 	h := io.NewCachedReadHandler("some input")
 	ctx := context.Background()
 
@@ -56,6 +62,8 @@ func TestCachedReadHandler_Confirm_delegates_to_PauseHandler(t *testing.T) {
 }
 
 func TestCachedReadHandler_via_context(t *testing.T) {
+	t.Parallel()
+
 	ctx := io.WithHandler(context.Background(), io.NewCachedReadHandler("cached text"))
 
 	result, err := io.Read(ctx, "prompt", nil)

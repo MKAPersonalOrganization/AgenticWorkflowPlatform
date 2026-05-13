@@ -21,22 +21,15 @@ package chat
 
 import (
 	"aicompass/foundation/agent"
+	"aicompass/foundation/artifact"
 	"aicompass/foundation/auth"
 	"aicompass/foundation/event"
 	es "aicompass/foundation/eventsourcing"
 	"aicompass/foundation/logger"
 	"aicompass/foundation/middleware"
+	"aicompass/foundation/toolregistry"
 	"aicompass/modules/chat/agentorchestrator"
 	"aicompass/modules/chat/chatcontracts"
-	"aicompass/modules/chat/projection/agui"
-	"aicompass/modules/chat/projection/llmcontext"
-	"aicompass/modules/chat/projection"
-	"aicompass/modules/chat/thread"
-	"aicompass/modules/chat/threadmgmt"
-	"aicompass/foundation/artifact"
-	"aicompass/foundation/toolregistry"
-
-	aguihandlers "aicompass/modules/chat/agui"
 	"aicompass/modules/chat/handlers/agenthandler"
 	"aicompass/modules/chat/handlers/artifacthandler"
 	"aicompass/modules/chat/handlers/common"
@@ -46,6 +39,13 @@ import (
 	"aicompass/modules/chat/handlers/requirementhandler"
 	"aicompass/modules/chat/handlers/threadhandler"
 	"aicompass/modules/chat/handlers/toolsethandler"
+	"aicompass/modules/chat/projection"
+	"aicompass/modules/chat/projection/agui"
+	"aicompass/modules/chat/projection/llmcontext"
+	"aicompass/modules/chat/thread"
+	"aicompass/modules/chat/threadmgmt"
+
+	aguihandlers "aicompass/modules/chat/agui"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"
@@ -83,12 +83,12 @@ type Dependencies struct {
 //	module.RegisterProjection(persistenceRouter)
 //	module.RegisterRoutes(r, authMiddleware)
 type Module struct {
-	log            *logger.Logger
-	orchestrator   *agentorchestrator.Service
-	threadMgmt     *threadmgmt.Manager
-	aguiProjection *agui.PostgresAguiProjection
-	llmProjection  *llmcontext.PostgresLLMContextProjection
-	threadQuery    chatcontracts.ThreadQueryService
+	log                *logger.Logger
+	orchestrator       *agentorchestrator.Service
+	threadMgmt         *threadmgmt.Manager
+	aguiProjection     *agui.PostgresAguiProjection
+	llmProjection      *llmcontext.PostgresLLMContextProjection
+	threadQuery        chatcontracts.ThreadQueryService
 	aguiHandler        *aguihandlers.AguiProjectionHandler
 	messageHandler     *messagehandler.Handler
 	threadHandler      *threadhandler.Handler

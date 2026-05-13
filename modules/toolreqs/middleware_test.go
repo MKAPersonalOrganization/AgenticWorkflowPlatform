@@ -7,6 +7,8 @@ import (
 )
 
 func TestCheckConfirmation_NilStore_NoConfirmation(t *testing.T) {
+	t.Parallel()
+
 	needs, hint := toolreqs.CheckConfirmation(context.Background(), nil, nil, "user1", "agent1", "", "calculator", nil)
 	if needs {
 		t.Error("expected no confirmation when store is nil")
@@ -17,6 +19,8 @@ func TestCheckConfirmation_NilStore_NoConfirmation(t *testing.T) {
 }
 
 func TestCheckConfirmation_EmptyUser_NoConfirmation(t *testing.T) {
+	t.Parallel()
+
 	_, store := newTestPair(t)
 	needs, _ := toolreqs.CheckConfirmation(context.Background(), store, nil, "", "agent1", "set1", "tool_x", nil)
 	if needs {
@@ -25,6 +29,8 @@ func TestCheckConfirmation_EmptyUser_NoConfirmation(t *testing.T) {
 }
 
 func TestCheckConfirmation_ToolLevelConfig_RequiresConfirmation(t *testing.T) {
+	t.Parallel()
+
 	_, store := newTestPair(t)
 	ctx := context.Background()
 
@@ -46,6 +52,8 @@ func TestCheckConfirmation_ToolLevelConfig_RequiresConfirmation(t *testing.T) {
 }
 
 func TestCheckConfirmation_ToolSetLevelConfig_RequiresConfirmation(t *testing.T) {
+	t.Parallel()
+
 	_, store := newTestPair(t)
 	ctx := context.Background()
 
@@ -67,6 +75,8 @@ func TestCheckConfirmation_ToolSetLevelConfig_RequiresConfirmation(t *testing.T)
 }
 
 func TestCheckConfirmation_AllowedToolSet_NoConfirmation(t *testing.T) {
+	t.Parallel()
+
 	_, store := newTestPair(t)
 	ctx := context.Background()
 

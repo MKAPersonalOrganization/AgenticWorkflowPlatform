@@ -44,7 +44,7 @@ func (s *Service) GetTrackStatus(ctx context.Context, tCtx *tenant.TenantContext
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func (s *Service) RecoverStuck(ctx context.Context, tCtx *tenant.TenantContext) 
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -98,7 +98,7 @@ func (s *Service) GetDeletionImpact(ctx context.Context, tCtx *tenant.TenantCont
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -125,7 +125,7 @@ func (s *Service) RetryFailedChunks(ctx context.Context, tCtx *tenant.TenantCont
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -152,7 +152,7 @@ func (s *Service) ListFailedChunks(ctx context.Context, tCtx *tenant.TenantConte
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -180,7 +180,7 @@ func (s *Service) GetFullLineage(ctx context.Context, tCtx *tenant.TenantContext
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -207,7 +207,7 @@ func (s *Service) GetMetadata(ctx context.Context, tCtx *tenant.TenantContext, d
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -237,7 +237,7 @@ func (s *Service) ExportLineage(ctx context.Context, tCtx *tenant.TenantContext,
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -264,7 +264,7 @@ func (s *Service) CancelPdfProcessing(ctx context.Context, tCtx *tenant.TenantCo
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -286,8 +286,8 @@ func (s *Service) UploadBatch(ctx context.Context, tCtx *tenant.TenantContext, f
 	writer := multipart.NewWriter(pw)
 
 	go func() {
-		defer pw.Close()
-		defer writer.Close()
+		defer func() { _ = pw.Close() }()
+		defer func() { _ = writer.Close() }()
 		for i, f := range files {
 			name := "files"
 			if i < len(fileNames) {
@@ -297,7 +297,7 @@ func (s *Service) UploadBatch(ctx context.Context, tCtx *tenant.TenantContext, f
 			if err != nil {
 				return
 			}
-			io.Copy(part, f)
+			_, _ = io.Copy(part, f)
 		}
 	}()
 	body = pr
@@ -313,7 +313,7 @@ func (s *Service) UploadBatch(ctx context.Context, tCtx *tenant.TenantContext, f
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err

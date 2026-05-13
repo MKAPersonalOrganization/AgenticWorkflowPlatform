@@ -11,6 +11,8 @@ import (
 )
 
 func TestService_List(t *testing.T) {
+	t.Parallel()
+
 	tenantID := uuid.New()
 	mockResponse := TenantListResponse{
 		Items: []TenantResponse{
@@ -52,6 +54,8 @@ func TestService_List(t *testing.T) {
 }
 
 func TestService_List_Unauthorized(t *testing.T) {
+	t.Parallel()
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 	}))
@@ -68,6 +72,8 @@ func TestService_List_Unauthorized(t *testing.T) {
 }
 
 func TestService_Create(t *testing.T) {
+	t.Parallel()
+
 	tenantID := uuid.New()
 	slug := "new-org"
 	mockRequest := CreateTenantRequest{
@@ -121,6 +127,8 @@ func TestService_Create(t *testing.T) {
 }
 
 func TestService_Get(t *testing.T) {
+	t.Parallel()
+
 	tenantID := uuid.New()
 	mockResponse := TenantResponse{
 		ID:   tenantID,
@@ -151,6 +159,8 @@ func TestService_Get(t *testing.T) {
 }
 
 func TestService_Get_NotFound(t *testing.T) {
+	t.Parallel()
+
 	tenantID := uuid.New()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
@@ -168,6 +178,8 @@ func TestService_Get_NotFound(t *testing.T) {
 }
 
 func TestService_Update(t *testing.T) {
+	t.Parallel()
+
 	tenantID := uuid.New()
 	newName := "Updated Org"
 	mockRequest := UpdateTenantRequest{
@@ -209,6 +221,8 @@ func TestService_Update(t *testing.T) {
 }
 
 func TestService_Delete(t *testing.T) {
+	t.Parallel()
+
 	tenantID := uuid.New()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodDelete {

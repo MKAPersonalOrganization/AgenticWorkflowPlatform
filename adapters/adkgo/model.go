@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"iter"
+	"math"
 	"strings"
 
 	"github.com/openai/openai-go/v3"
@@ -226,13 +227,28 @@ func (m *openAIModel) generateStream(ctx context.Context, params openai.ChatComp
 	}, nil)
 }
 
+// clampInt32 narrows a wider integer into int32, saturating at the
+// int32 bounds instead of silently wrapping. Used for fields like
+// token counts and MaxOutputTokens that are nominally well below 2^31
+// but technically come from caller-supplied or external sources.
+func clampInt32[T int | int64](v T) int32 {
+	switch {
+	case v > math.MaxInt32:
+		return math.MaxInt32
+	case v < math.MinInt32:
+		return math.MinInt32
+	default:
+		return int32(v)
+	}
+}
+
 // openAIUsageToGenAI maps the OpenAI usage struct onto the genai
 // equivalent that ADK downstream consumers expect.
 func openAIUsageToGenAI(u openai.CompletionUsage) *genai.GenerateContentResponseUsageMetadata {
 	return &genai.GenerateContentResponseUsageMetadata{
-		PromptTokenCount:     int32(u.PromptTokens),
-		CandidatesTokenCount: int32(u.CompletionTokens),
-		TotalTokenCount:      int32(u.TotalTokens),
+		PromptTokenCount:     clampInt32(u.PromptTokens),
+		CandidatesTokenCount: clampInt32(u.CompletionTokens),
+		TotalTokenCount:      clampInt32(u.TotalTokens),
 	}
 }
 
@@ -435,9 +451,9 @@ func openAIChoiceToLLMResponse(choice openai.ChatCompletionChoice, usage openai.
 			Parts: parts,
 		},
 		UsageMetadata: &genai.GenerateContentResponseUsageMetadata{
-			PromptTokenCount:     int32(usage.PromptTokens),
-			CandidatesTokenCount: int32(usage.CompletionTokens),
-			TotalTokenCount:      int32(usage.TotalTokens),
+			PromptTokenCount:     clampInt32(usage.PromptTokens),
+			CandidatesTokenCount: clampInt32(usage.CompletionTokens),
+			TotalTokenCount:      clampInt32(usage.TotalTokens),
 		},
 	}
 }
@@ -662,7 +678,7 @@ func buildGenerateContentConfig(
 		gc.Temperature = &t
 	}
 	if cfg.MaxTokens != nil {
-		gc.MaxOutputTokens = int32(*cfg.MaxTokens)
+		gc.MaxOutputTokens = clampInt32(*cfg.MaxTokens)
 	}
 
 	// Layer 2: per-agent saved preferences (override user global).
@@ -694,7 +710,7 @@ func buildGenerateContentConfig(
 			gc.Temperature = &t
 		}
 		if runCfg.MaxTokens > 0 {
-			gc.MaxOutputTokens = int32(runCfg.MaxTokens)
+			gc.MaxOutputTokens = clampInt32(runCfg.MaxTokens)
 		}
 		if len(runCfg.StopSequences) > 0 {
 			gc.StopSequences = runCfg.StopSequences

@@ -11,6 +11,8 @@ import (
 )
 
 func TestTryAcquireAdvisoryLock_AcquiresOnce(t *testing.T) {
+	t.Parallel()
+
 	// Integration test — requires a real PostgreSQL. Set TEST_DATABASE_URL
 	// (e.g. "postgres://appuser:dev-password@localhost:5435/projections?sslmode=disable")
 	// to run. Skipped otherwise.
@@ -74,6 +76,8 @@ func TestTryAcquireAdvisoryLock_AcquiresOnce(t *testing.T) {
 }
 
 func TestAdvisoryLockID_IsConstant(t *testing.T) {
+	t.Parallel()
+
 	// Guard against accidental changes to the lock ID which would break
 	// rolling upgrades (old pod holds lock with old ID, new pod uses new ID
 	// → both think they are leader).

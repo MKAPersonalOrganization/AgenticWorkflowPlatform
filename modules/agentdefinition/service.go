@@ -1,6 +1,7 @@
 package agentdefinition
 
 import (
+	"aicompass/foundation/logger"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -9,8 +10,6 @@ import (
 	"slices"
 	"sort"
 	"strings"
-
-	"aicompass/foundation/logger"
 )
 
 // Composition tree limits prevent unbounded nesting.

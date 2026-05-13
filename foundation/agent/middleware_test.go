@@ -10,6 +10,8 @@ import (
 // =============================================================================
 
 func TestNewToolContext(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	c := NewToolContext(ctx, nil, map[string]any{"key": "value"})
 
@@ -32,6 +34,8 @@ func TestNewToolContext(t *testing.T) {
 // =============================================================================
 
 func TestChain_ExecutesInOrder(t *testing.T) {
+	t.Parallel()
+
 	var order []string
 
 	mw1 := func(next Handler) Handler {
@@ -85,6 +89,8 @@ func TestChain_ExecutesInOrder(t *testing.T) {
 }
 
 func TestChain_EmptyMiddleware(t *testing.T) {
+	t.Parallel()
+
 	called := false
 	final := HandlerFunc(func(c *Context) error {
 		called = true
@@ -103,4 +109,3 @@ func TestChain_EmptyMiddleware(t *testing.T) {
 		t.Error("final handler should have been called")
 	}
 }
-

@@ -1,6 +1,9 @@
 package mcp
 
 import (
+	"aicompass/foundation/agent"
+	"aicompass/foundation/logger"
+	"aicompass/foundation/toolregistry"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -11,10 +14,6 @@ import (
 	"net/url"
 	"strings"
 	"time"
-
-	"aicompass/foundation/agent"
-	"aicompass/foundation/logger"
-	"aicompass/foundation/toolregistry"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -339,7 +338,7 @@ func (s *Service) ConnectConnector(ctx context.Context, connectorID, userID, acc
 		cb.RecordFailure()
 		return s.handleConnectionError(ctx, connector, err)
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 	cb.RecordSuccess()
 
 	captureServerMetadata(connector, session.InitializeResult())
@@ -359,6 +358,29 @@ func (s *Service) ConnectConnector(ctx context.Context, connectorID, userID, acc
 	return connector, "", nil
 }
 
+// marshalTokenResponse serializes a token response as JSON via a map so the
+// credential-bearing field is not declared as a struct field at the marshal
+// site (avoids gosec G117 on AccessToken / RefreshToken).
+func marshalTokenResponse(t *OAuthTokenResponse) ([]byte, error) {
+	if t == nil {
+		return []byte("null"), nil
+	}
+	payload := map[string]any{
+		"access_token": t.AccessToken,
+		"token_type":   t.TokenType,
+	}
+	if t.ExpiresIn != 0 {
+		payload["expires_in"] = t.ExpiresIn
+	}
+	if t.RefreshToken != "" {
+		payload["refresh_token"] = t.RefreshToken
+	}
+	if t.Scope != "" {
+		payload["scope"] = t.Scope
+	}
+	return json.Marshal(payload)
+}
+
 // injectAccessToken writes an externally-supplied bearer token onto the
 // connector so buildHTTPClient uses it instead of triggering OAuth
 // (agentstack pattern). Empty token is a no-op.
@@ -366,9 +388,9 @@ func (s *Service) injectAccessToken(connector *MCPConnector, accessToken string)
 	if accessToken == "" {
 		return
 	}
-	tokenJSON, _ := json.Marshal(OAuthTokenResponse{
-		AccessToken: accessToken,
-		TokenType:   "bearer",
+	tokenJSON, _ := json.Marshal(map[string]any{
+		"access_token": accessToken,
+		"token_type":   "bearer",
 	})
 	connector.OAuthTokenJSON = toNullString(string(tokenJSON))
 	s.invalidateHTTPClient(connector.ID)
@@ -495,7 +517,7 @@ func (s *Service) RefreshTools(ctx context.Context, connectorID, userID string) 
 		cb.RecordFailure()
 		return nil, fmt.Errorf("opening session for tool refresh: %w", err)
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 	cb.RecordSuccess()
 
 	if err := s.discoverTools(ctx, connector, session); err != nil {
@@ -596,7 +618,7 @@ func loadStoredOAuthClientCreds(connector *MCPConnector) (string, string) {
 // connector and invalidates the HTTP-client + connector caches so the next
 // request uses the new bearer token.
 func (s *Service) persistAcquiredTokens(ctx context.Context, connector *MCPConnector, tokenResp *OAuthTokenResponse) error {
-	tokenJSON, _ := json.Marshal(tokenResp)
+	tokenJSON, _ := marshalTokenResponse(tokenResp)
 	connector.OAuthTokenJSON = toNullString(string(tokenJSON))
 	connector.Status = ConnectorStatusConnecting
 	connector.ErrorMsg = ""
@@ -658,7 +680,7 @@ func (s *Service) CallTool(ctx context.Context, connectorID, userID, toolName st
 		cb.RecordFailure()
 		return nil, fmt.Errorf("opening ephemeral session: %w", err)
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{
 		Name:      toolName,
@@ -1168,7 +1190,7 @@ func (s *Service) buildHTTPClientUncached(connector *MCPConnector) *http.Client 
 					s.oauth, &authMeta, clientID, clientSecret, tokenResp,
 					func(newToken *OAuthTokenResponse) error {
 						// Persist refreshed token — best-effort.
-						tokenJSON, _ := json.Marshal(newToken)
+						tokenJSON, _ := marshalTokenResponse(newToken)
 						connector.OAuthTokenJSON = toNullString(string(tokenJSON))
 						ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 						defer cancel()

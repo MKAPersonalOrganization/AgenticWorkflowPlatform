@@ -29,7 +29,7 @@ func (s *Service) GetPricing(ctx context.Context, tCtx *tenant.TenantContext) (*
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err

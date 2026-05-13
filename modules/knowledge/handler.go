@@ -1,14 +1,14 @@
 package knowledge
 
 import (
-	"aicompass/frontend/ui/knowledge"
+	"aicompass/foundation/auth"
 	"aicompass/foundation/logger"
+	"aicompass/frontend/ui/knowledge"
 	"aicompass/modules/knowledge/edgequake"
 	"aicompass/modules/knowledge/rag/documents"
 	"aicompass/modules/knowledge/rag/graph"
 	"aicompass/modules/knowledge/rag/workspaces"
 	"aicompass/modules/knowledge/tenant"
-	"aicompass/foundation/auth"
 	"context"
 	"encoding/json"
 	"errors"
@@ -213,6 +213,7 @@ func (h *handler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<20)
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Failed to parse form"})
 		return
@@ -223,7 +224,7 @@ func (h *handler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "No file provided"})
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	contentType := header.Header.Get("Content-Type")
 	if contentType == "" {
@@ -264,6 +265,7 @@ func (h *handler) UploadPDF(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 128<<20)
 	if err := r.ParseMultipartForm(64 << 20); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Failed to parse form"})
 		return
@@ -274,7 +276,7 @@ func (h *handler) UploadPDF(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "No file provided"})
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	result, err := h.edgequakeService.UploadPDF(r.Context(), tCtx, header.Filename, file)
 	if err != nil {
@@ -430,7 +432,7 @@ func (h *handler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to download PDF", http.StatusInternalServerError)
 		return
 	}
-	defer body.Close()
+	defer func() { _ = body.Close() }()
 
 	if contentType != "" {
 		w.Header().Set("Content-Type", contentType)

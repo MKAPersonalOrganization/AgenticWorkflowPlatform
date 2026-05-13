@@ -1,20 +1,19 @@
 package agentdefinition
 
 import (
+	"aicompass/foundation/auth"
+	"aicompass/foundation/logger"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
-
-	"aicompass/foundation/auth"
-	"aicompass/foundation/logger"
 )
 
 // Sentinel errors surfaced to the YAML-import caller. Kept as vars so the
 // helper can return them without an fmt.Errorf allocation — the handler
 // only looks at .Error() to write the 400 body.
 var (
-	errProvideEitherURLOrYAML = errors.New("Provide either url or yaml, not both")
+	errProvideEitherURLOrYAML = errors.New("provide either url or yaml, not both")
 	errYAMLBodyEmpty          = errors.New("YAML body is empty")
 )
 
@@ -676,5 +675,5 @@ func (h *storeHandler) forkSharedAgent(w http.ResponseWriter, r *http.Request) {
 func writeJSONError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }

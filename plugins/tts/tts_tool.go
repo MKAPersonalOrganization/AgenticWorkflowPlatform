@@ -204,7 +204,7 @@ func (t *SpeakTool) callOpenAITTS(ctx context.Context, model, voice, text, instr
 	if err != nil {
 		return nil, fmt.Errorf("executing TTS request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		errBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
@@ -253,7 +253,7 @@ func (t *SpeakTool) callWhisperAlignment(ctx context.Context, audioData []byte) 
 	if err != nil {
 		return nil, fmt.Errorf("executing whisper request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		errBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))

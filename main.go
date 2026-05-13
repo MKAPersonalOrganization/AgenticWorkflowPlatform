@@ -4,13 +4,6 @@ import (
 	"aicompass/adapters/adkgo"
 	"aicompass/adapters/filesystembridge"
 	"aicompass/adapters/gemini"
-	"aicompass/frontend/ui"
-	"aicompass/frontend/ui/agenteditor"
-	authcomp "aicompass/frontend/ui/auth"
-	"aicompass/frontend/ui/blog"
-	"aicompass/frontend/ui/docs"
-	"aicompass/frontend/ui/landing"
-	"aicompass/frontend/ui/pricing"
 	"aicompass/foundation/artifact"
 	"aicompass/foundation/artifact/adkartifact"
 	"aicompass/foundation/auth"
@@ -20,11 +13,19 @@ import (
 	"aicompass/foundation/logger"
 	"aicompass/foundation/middleware"
 	"aicompass/foundation/toolregistry"
+	"aicompass/frontend/ui"
+	"aicompass/frontend/ui/agenteditor"
+	authcomp "aicompass/frontend/ui/auth"
+	"aicompass/frontend/ui/blog"
+	"aicompass/frontend/ui/docs"
+	"aicompass/frontend/ui/landing"
+	"aicompass/frontend/ui/pricing"
 	"aicompass/infra/googleauth"
 	"aicompass/infra/memdb"
 	"aicompass/infra/projection/subscriber"
 	"aicompass/infra/sqldb"
 	"aicompass/infra/sqldb/migrate"
+	"aicompass/modules/chat/handlers/common"
 	"aicompass/modules/chat/thread"
 	"aicompass/modules/knowledge/edgequake"
 	"aicompass/modules/knowledge/rag/users"
@@ -71,7 +72,7 @@ import (
 	analyticsmod "aicompass/modules/analytics"
 	billingmod "aicompass/modules/billing"
 	chatmod "aicompass/modules/chat"
-	"aicompass/modules/chat/handlers/common"
+
 	filesystemmod "aicompass/modules/filesystem"
 	knowledgemod "aicompass/modules/knowledge"
 	mcpmod "aicompass/modules/mcp"
@@ -916,6 +917,10 @@ func HandleViewChatInputScreen(log *logger.Logger, edgequakeService *edgequake.S
 		// Sync user to RAG at most once per process lifetime (idempotent create).
 		if user != nil {
 			if _, alreadySynced := syncedUsers.LoadOrStore(user.ID, struct{}{}); !alreadySynced {
+				// Detach from the request context: the response will return
+				// before the sync completes, but request-scoped values (trace
+				// IDs, etc.) stay available to downstream calls.
+				parentCtx := context.WithoutCancel(r.Context())
 				go func(u *auth.User) {
 					// Generate a random password since RAG requires one, but we don't use it for auth
 					randomPass := uuid.New().String()
@@ -928,8 +933,8 @@ func HandleViewChatInputScreen(log *logger.Logger, edgequakeService *edgequake.S
 						Role:     &u.Role,
 					}
 
-					// Use a bounded context so this goroutine cannot block forever
-					syncCtx, syncCancel := context.WithTimeout(context.Background(), 10*time.Second)
+					// Bound the goroutine so it cannot block forever.
+					syncCtx, syncCancel := context.WithTimeout(parentCtx, 10*time.Second)
 					defer syncCancel()
 
 					_, err := edgequakeService.Users.Create(syncCtx, req)

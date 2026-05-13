@@ -8,6 +8,8 @@ import (
 )
 
 func TestWriteTodosTool_Name(t *testing.T) {
+	t.Parallel()
+
 	tool := &WriteTodosTool{}
 	if got := tool.Name(); got != "write_todos" {
 		t.Errorf("Name() = %q, want %q", got, "write_todos")
@@ -15,6 +17,8 @@ func TestWriteTodosTool_Name(t *testing.T) {
 }
 
 func TestWriteTodosTool_Schema(t *testing.T) {
+	t.Parallel()
+
 	tool := &WriteTodosTool{}
 	schema := tool.Schema()
 	if schema == nil {
@@ -29,6 +33,8 @@ func TestWriteTodosTool_Schema(t *testing.T) {
 }
 
 func TestWriteTodosTool_Execute_Success(t *testing.T) {
+	t.Parallel()
+
 	tool := &WriteTodosTool{}
 	args := WriteTodosArgs{
 		Todos: []TodoItem{
@@ -66,6 +72,8 @@ func TestWriteTodosTool_Execute_Success(t *testing.T) {
 }
 
 func TestWriteTodosTool_Execute_EmptyList(t *testing.T) {
+	t.Parallel()
+
 	tool := &WriteTodosTool{}
 	args := WriteTodosArgs{Todos: []TodoItem{}}
 	raw, _ := json.Marshal(args)
@@ -79,6 +87,8 @@ func TestWriteTodosTool_Execute_EmptyList(t *testing.T) {
 }
 
 func TestWriteTodosTool_Execute_MultipleInProgress(t *testing.T) {
+	t.Parallel()
+
 	tool := &WriteTodosTool{}
 	args := WriteTodosArgs{
 		Todos: []TodoItem{
@@ -98,6 +108,8 @@ func TestWriteTodosTool_Execute_MultipleInProgress(t *testing.T) {
 }
 
 func TestWriteTodosTool_Execute_TooManyTodos(t *testing.T) {
+	t.Parallel()
+
 	tool := &WriteTodosTool{}
 	todos := make([]TodoItem, 30)
 	for i := range todos {
@@ -115,6 +127,8 @@ func TestWriteTodosTool_Execute_TooManyTodos(t *testing.T) {
 }
 
 func TestWriteTodosTool_Execute_EmptyDescription(t *testing.T) {
+	t.Parallel()
+
 	tool := &WriteTodosTool{}
 	args := WriteTodosArgs{
 		Todos: []TodoItem{
@@ -132,6 +146,8 @@ func TestWriteTodosTool_Execute_EmptyDescription(t *testing.T) {
 }
 
 func TestWriteTodosTool_Execute_InvalidStatus(t *testing.T) {
+	t.Parallel()
+
 	tool := &WriteTodosTool{}
 	args := WriteTodosArgs{
 		Todos: []TodoItem{
@@ -149,6 +165,8 @@ func TestWriteTodosTool_Execute_InvalidStatus(t *testing.T) {
 }
 
 func TestProvider_Interface(t *testing.T) {
+	t.Parallel()
+
 	p := &Provider{}
 	if got := p.ID(); got != "todos" {
 		t.Errorf("ID() = %q, want %q", got, "todos")
@@ -177,6 +195,8 @@ func TestProvider_Interface(t *testing.T) {
 }
 
 func TestProvider_CreateExecutable(t *testing.T) {
+	t.Parallel()
+
 	p := &Provider{}
 	ctx := context.Background()
 

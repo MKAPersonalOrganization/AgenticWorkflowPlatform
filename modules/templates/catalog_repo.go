@@ -53,7 +53,7 @@ LIMIT $2 OFFSET $3
 		if err != nil {
 			return nil, 0, fmt.Errorf("listing catalog entries: %w", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		entries, err = scanCatalogRows(rows)
 		if err != nil {
 			return nil, 0, err
@@ -77,7 +77,7 @@ LIMIT $1 OFFSET $2
 		if err != nil {
 			return nil, 0, fmt.Errorf("listing catalog entries: %w", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		entries, err = scanCatalogRows(rows)
 		if err != nil {
 			return nil, 0, err
@@ -117,7 +117,7 @@ LIMIT $2 OFFSET $3
 	if err != nil {
 		return nil, 0, fmt.Errorf("searching catalog: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	entries, err := scanCatalogRows(rows)
 	if err != nil {
@@ -161,7 +161,7 @@ func (r *postgresAgentCatalogRepository) Categories(ctx context.Context) ([]stri
 	if err != nil {
 		return nil, fmt.Errorf("listing categories: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var categories []string
 	for rows.Next() {

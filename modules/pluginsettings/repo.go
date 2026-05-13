@@ -74,7 +74,7 @@ ORDER BY plugin_id ASC`
 	if err != nil {
 		return nil, fmt.Errorf("querying user_plugin_settings: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []UserPluginSettings
 	for rows.Next() {

@@ -5,9 +5,25 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"html/template"
 	"net/http"
 	"net/url"
 )
+
+// githubConnectedPopupTmpl renders the OAuth popup-close page. The login name
+// flows through contextual auto-escaping for both the JS-string position and
+// the HTML position so any unexpected characters in the GitHub username can't
+// break out of their context.
+var githubConnectedPopupTmpl = template.Must(template.New("github-connected").Parse(
+	`<!DOCTYPE html><html><body><script>` +
+		`if (window.opener) {` +
+		`  window.opener.postMessage({type: 'github-connected', username: {{.Login}}}, '*');` +
+		`  window.close();` +
+		`} else {` +
+		`  window.location.href = {{.AppURL}};` +
+		`}` +
+		`</script></body></html>`,
+))
 
 // githubHandler handles GitHub OAuth connection endpoints.
 type githubHandler struct {
@@ -79,10 +95,13 @@ func (h *githubHandler) callback(w http.ResponseWriter, r *http.Request) {
 
 	// Clear state cookie
 	http.SetCookie(w, &http.Cookie{
-		Name:   "gh_oauth_state",
-		Value:  "",
-		Path:   "/",
-		MaxAge: -1,
+		Name:     "gh_oauth_state",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	// Check for errors from GitHub
@@ -130,16 +149,10 @@ func (h *githubHandler) callback(w http.ResponseWriter, r *http.Request) {
 	// Redirect back to the app — the frontend will detect the connection
 	// and close the popup / refresh the dialog.
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprint(w, `<!DOCTYPE html><html><body>
-<script>
-if (window.opener) {
-	window.opener.postMessage({type: 'github-connected', username: '`+ghUser.Login+`'}, '*');
-	window.close();
-} else {
-	window.location.href = '`+h.appURL+`';
-}
-</script>
-</body></html>`)
+	_ = githubConnectedPopupTmpl.Execute(w, struct {
+		Login  string
+		AppURL string
+	}{Login: ghUser.Login, AppURL: h.appURL})
 }
 
 // status returns the current GitHub connection status for the user.

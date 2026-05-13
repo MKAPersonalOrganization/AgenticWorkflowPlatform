@@ -27,5 +27,5 @@ func (h *bannerHandler) getBanner(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(b)
+	_ = json.NewEncoder(w).Encode(b)
 }

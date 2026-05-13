@@ -11,6 +11,8 @@ import (
 )
 
 func TestService_Get(t *testing.T) {
+	t.Parallel()
+
 	trackID := "test-track-123"
 	mockResponse := TaskResponse{
 		TrackID:     trackID,
@@ -51,6 +53,8 @@ func TestService_Get(t *testing.T) {
 }
 
 func TestService_List(t *testing.T) {
+	t.Parallel()
+
 	mockResponse := TaskListResponse{
 		Tasks: []TaskResponse{
 			{
@@ -118,6 +122,8 @@ func TestService_List(t *testing.T) {
 }
 
 func TestService_Cancel(t *testing.T) {
+	t.Parallel()
+
 	trackID := "test-track-123"
 	mockResponse := TaskResponse{
 		TrackID:     trackID,
@@ -152,6 +158,8 @@ func TestService_Cancel(t *testing.T) {
 }
 
 func TestService_Retry(t *testing.T) {
+	t.Parallel()
+
 	trackID := "test-track-123"
 	mockResponse := TaskResponse{
 		TrackID:     trackID,

@@ -27,6 +27,8 @@ func parseResult(t *testing.T, r agent.Result) map[string]any {
 // --- Provider tests ---
 
 func TestProviderID(t *testing.T) {
+	t.Parallel()
+
 	p := &Provider{}
 	if got := p.ID(); got != "planmode" {
 		t.Fatalf("expected 'planmode', got %q", got)
@@ -34,6 +36,8 @@ func TestProviderID(t *testing.T) {
 }
 
 func TestProviderDefaultSets(t *testing.T) {
+	t.Parallel()
+
 	sets := (&Provider{}).DefaultSets()
 	if len(sets) != 1 {
 		t.Fatalf("expected 1 set, got %d", len(sets))
@@ -47,6 +51,8 @@ func TestProviderDefaultSets(t *testing.T) {
 }
 
 func TestProviderDefaultTools(t *testing.T) {
+	t.Parallel()
+
 	tools := (&Provider{}).DefaultTools()
 	if len(tools) != 2 {
 		t.Fatalf("expected 2 tools, got %d", len(tools))
@@ -61,6 +67,8 @@ func TestProviderDefaultTools(t *testing.T) {
 }
 
 func TestProviderCreateExecutable(t *testing.T) {
+	t.Parallel()
+
 	p := &Provider{}
 	ctx := context.Background()
 	var deps toolregistry.FactoryDeps
@@ -91,6 +99,8 @@ func TestProviderCreateExecutable(t *testing.T) {
 }
 
 func TestProviderUIHandledTools(t *testing.T) {
+	t.Parallel()
+
 	handled := (&Provider{}).UIHandledTools()
 	want := map[string]bool{"enter_plan_mode": true, "exit_plan_mode": true}
 	if len(handled) != len(want) {
@@ -106,12 +116,16 @@ func TestProviderUIHandledTools(t *testing.T) {
 // --- EnterPlanModeTool tests ---
 
 func TestEnterPlanModeName(t *testing.T) {
+	t.Parallel()
+
 	if name := (&EnterPlanModeTool{}).Name(); name != "enter_plan_mode" {
 		t.Fatalf("expected 'enter_plan_mode', got %q", name)
 	}
 }
 
 func TestEnterPlanModeWithReason(t *testing.T) {
+	t.Parallel()
+
 	tool := &EnterPlanModeTool{}
 	result, err := tool.Execute(context.Background(), agent.Arguments{
 		Raw: json.RawMessage(`{"reason":"Research essay topics"}`),
@@ -135,6 +149,8 @@ func TestEnterPlanModeWithReason(t *testing.T) {
 }
 
 func TestEnterPlanModeDefaultReason(t *testing.T) {
+	t.Parallel()
+
 	tool := &EnterPlanModeTool{}
 	result, err := tool.Execute(context.Background(), agent.Arguments{
 		Raw: json.RawMessage(`{}`),
@@ -152,6 +168,8 @@ func TestEnterPlanModeDefaultReason(t *testing.T) {
 }
 
 func TestEnterPlanModeIncludesAllowedTools(t *testing.T) {
+	t.Parallel()
+
 	tool := &EnterPlanModeTool{}
 	result, _ := tool.Execute(context.Background(), agent.Arguments{
 		Raw: json.RawMessage(`{}`),
@@ -166,12 +184,16 @@ func TestEnterPlanModeIncludesAllowedTools(t *testing.T) {
 // --- ExitPlanModeTool tests ---
 
 func TestExitPlanModeName(t *testing.T) {
+	t.Parallel()
+
 	if name := (&ExitPlanModeTool{}).Name(); name != "exit_plan_mode" {
 		t.Fatalf("expected 'exit_plan_mode', got %q", name)
 	}
 }
 
 func TestExitPlanModeValidPlan(t *testing.T) {
+	t.Parallel()
+
 	plan := "## Research Plan\n\n### Objective\nHelp the student understand WWII causes.\n\n### Steps\n1. Search knowledge base for WWII materials\n2. Identify three main causes\n3. Create a structured essay outline\n4. Present sources and citations\n\n### Expected Outcome\nA well-researched outline."
 	tool := &ExitPlanModeTool{}
 	result, err := tool.Execute(context.Background(), agent.Arguments{
@@ -200,6 +222,8 @@ func TestExitPlanModeValidPlan(t *testing.T) {
 }
 
 func TestExitPlanModeEmptyPlan(t *testing.T) {
+	t.Parallel()
+
 	tool := &ExitPlanModeTool{}
 	result, err := tool.Execute(context.Background(), agent.Arguments{
 		Raw: json.RawMessage(`{"plan":""}`),
@@ -213,6 +237,8 @@ func TestExitPlanModeEmptyPlan(t *testing.T) {
 }
 
 func TestExitPlanModeTooBrief(t *testing.T) {
+	t.Parallel()
+
 	tool := &ExitPlanModeTool{}
 	result, err := tool.Execute(context.Background(), agent.Arguments{
 		Raw: json.RawMessage(`{"plan":"Do it."}`),
@@ -226,6 +252,8 @@ func TestExitPlanModeTooBrief(t *testing.T) {
 }
 
 func TestExitPlanModeDefaultTitle(t *testing.T) {
+	t.Parallel()
+
 	plan := "## Objective\nAnalyze the dataset and produce visualizations.\n\n### Steps\n1. Load and clean the data\n2. Generate summary statistics\n3. Create charts\n4. Write notes"
 	tool := &ExitPlanModeTool{}
 	result, _ := tool.Execute(context.Background(), agent.Arguments{
@@ -240,6 +268,8 @@ func TestExitPlanModeDefaultTitle(t *testing.T) {
 // --- Validation helper tests ---
 
 func TestValidatePlan(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		plan    string
@@ -251,7 +281,9 @@ func TestValidatePlan(t *testing.T) {
 		{"valid", "This is a reasonably detailed plan that explains the approach we will take to solve this problem step by step.", false},
 	}
 	for _, tc := range cases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			err := validatePlan(tc.plan)
 			if tc.wantErr && err == nil {
 				t.Fatal("expected error")
@@ -264,6 +296,8 @@ func TestValidatePlan(t *testing.T) {
 }
 
 func TestCountPlanSteps(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name  string
 		plan  string
@@ -278,7 +312,9 @@ func TestCountPlanSteps(t *testing.T) {
 		{"mixed", "1. A\n- B\n* C\n• D", 4},
 	}
 	for _, tc := range cases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got := countPlanSteps(tc.plan)
 			if got != tc.count {
 				t.Fatalf("expected %d, got %d", tc.count, got)
@@ -290,6 +326,8 @@ func TestCountPlanSteps(t *testing.T) {
 // --- Interface compliance ---
 
 func TestInterfaceCompliance(t *testing.T) {
+	t.Parallel()
+
 	var _ agent.ExecutableTool = (*EnterPlanModeTool)(nil)
 	var _ agent.ExecutableTool = (*ExitPlanModeTool)(nil)
 	var _ toolregistry.PluginProvider = (*Provider)(nil)

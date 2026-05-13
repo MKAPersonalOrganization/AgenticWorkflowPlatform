@@ -50,7 +50,7 @@ func (s *Service) Status(ctx context.Context, tCtx *tenant.TenantContext) (*Enha
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func (s *Service) Cancel(ctx context.Context, tCtx *tenant.TenantContext) (*Canc
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -108,7 +108,7 @@ func (s *Service) Metrics(ctx context.Context, tCtx *tenant.TenantContext) (*Que
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -154,7 +154,7 @@ func (s *Service) History(ctx context.Context, tCtx *tenant.TenantContext, param
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -189,7 +189,7 @@ func (s *Service) EstimateCost(ctx context.Context, tCtx *tenant.TenantContext, 
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err

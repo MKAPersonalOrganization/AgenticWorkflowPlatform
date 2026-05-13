@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"math"
 	"strings"
 
 	es "aicompass/foundation/eventsourcing"
@@ -32,8 +33,11 @@ func NewPostgresEventStore(db *sqlx.DB, registry *es.DeserializerRegistry) *Post
 // advisoryLockKey generates a deterministic advisory lock key from a stream ID.
 func advisoryLockKey(streamID string) int64 {
 	h := fnv.New64a()
-	h.Write([]byte("eventstore:" + streamID))
-	return int64(h.Sum64()) // Safe: advisory locks accept any int64
+	_, _ = h.Write([]byte("eventstore:" + streamID))
+	// Mask the top bit to fit the unsigned hash into a positive int64;
+	// 63 bits of entropy is still effectively collision-free for advisory
+	// lock keys and matches Postgres' int64 lock-key type without overflow.
+	return int64(h.Sum64() & math.MaxInt64)
 }
 
 // AppendWithVersion adds events to a stream with optimistic concurrency control.
@@ -185,7 +189,7 @@ func (s *PostgresEventStore) ReadStream(ctx context.Context, streamID string, fr
 	if err != nil {
 		return nil, fmt.Errorf("query events: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var events []es.Event
 	for rows.Next() {
@@ -251,7 +255,7 @@ func (s *PostgresEventStore) ReadAllFromPosition(ctx context.Context, afterPosit
 	if err != nil {
 		return nil, fmt.Errorf("query all events: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var result []EventWithPosition
 	for rows.Next() {

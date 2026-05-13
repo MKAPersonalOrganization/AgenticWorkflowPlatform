@@ -27,6 +27,8 @@ func testPair(t *testing.T) (*toolreqs.Service, *toolreqs.PermissionStore) {
 }
 
 func TestToolSetRequirementConfigService(t *testing.T) {
+	t.Parallel()
+
 	service, store := testPair(t)
 	ctx := context.Background()
 
@@ -67,6 +69,8 @@ func TestToolSetRequirementConfigService(t *testing.T) {
 }
 
 func TestToolSetBlockingViaRequirementConfig(t *testing.T) {
+	t.Parallel()
+
 	service, store := testPair(t)
 	ctx := context.Background()
 
@@ -108,6 +112,8 @@ func TestToolSetBlockingViaRequirementConfig(t *testing.T) {
 }
 
 func TestDefaultToolSets(t *testing.T) {
+	t.Parallel()
+
 	service, _ := testPair(t)
 	ctx := context.Background()
 

@@ -40,7 +40,7 @@ func (s *Service) GetStatus(ctx context.Context) (*ProviderStatusResponse, error
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func (s *Service) GetProviders(ctx context.Context) (*AvailableProvidersResponse
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err

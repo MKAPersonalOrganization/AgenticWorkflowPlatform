@@ -50,7 +50,7 @@ func (s *Service) Get(ctx context.Context, tCtx *tenant.TenantContext, trackID s
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -112,7 +112,7 @@ func (s *Service) List(ctx context.Context, tCtx *tenant.TenantContext, params *
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -141,7 +141,7 @@ func (s *Service) Cancel(ctx context.Context, tCtx *tenant.TenantContext, trackI
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -170,7 +170,7 @@ func (s *Service) Retry(ctx context.Context, tCtx *tenant.TenantContext, trackID
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err

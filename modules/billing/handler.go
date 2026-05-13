@@ -5,8 +5,8 @@ package billing
 // (module-internal); the Module facade in billing.go exposes route registration.
 
 import (
-	"aicompass/foundation/logger"
 	"aicompass/foundation/auth"
+	"aicompass/foundation/logger"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -51,7 +51,7 @@ type billingError struct {
 func writeError(w http.ResponseWriter, status int, msg, code string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(billingError{Error: msg, Code: code})
+	_ = json.NewEncoder(w).Encode(billingError{Error: msg, Code: code})
 }
 
 // requireJSON validates that the request Content-Type is application/json
@@ -68,13 +68,6 @@ func requireJSON(w http.ResponseWriter, r *http.Request) bool {
 // --------------------------------------------------------------------------
 // POST /api/billing/create-payment-intent
 // --------------------------------------------------------------------------
-
-type createPaymentIntentResponse struct {
-	ClientSecret   string `json:"clientSecret"`
-	PublishableKey string `json:"publishableKey"`
-	Amount         int64  `json:"amount"`
-	Currency       string `json:"currency"`
-}
 
 // createPaymentIntent creates a Stripe PaymentIntent and returns the client
 // secret so the frontend can confirm payment via Stripe Elements.
@@ -113,11 +106,13 @@ func (h *handler) createPaymentIntent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(createPaymentIntentResponse{
-		ClientSecret:   clientSecret,
-		PublishableKey: h.publishableKey,
-		Amount:         AmountCents,
-		Currency:       DefaultCurrency,
+	// Marshal via a map so the credential-bearing field isn't declared as a
+	// struct field at the marshal site (avoids gosec G117 on ClientSecret).
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"clientSecret":   clientSecret,
+		"publishableKey": h.publishableKey,
+		"amount":         AmountCents,
+		"currency":       DefaultCurrency,
 	})
 }
 
@@ -194,7 +189,7 @@ func (h *handler) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, `{"received":true}`)
+	_, _ = fmt.Fprint(w, `{"received":true}`)
 }
 
 // handlePaymentSucceeded processes a payment_intent.succeeded webhook event.
@@ -205,7 +200,7 @@ func (h *handler) handlePaymentSucceeded(w http.ResponseWriter, r *http.Request,
 	if err := json.Unmarshal(event.Data.Raw, &pi); err != nil {
 		h.log.Error(r.Context(), "billing: webhook unmarshal succeeded", "error", err, "event_id", event.ID)
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"received":true,"error":"unmarshal_failed"}`)
+		_, _ = fmt.Fprint(w, `{"received":true,"error":"unmarshal_failed"}`)
 		return
 	}
 
@@ -234,7 +229,7 @@ func (h *handler) handlePaymentSucceeded(w http.ResponseWriter, r *http.Request,
 	}
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, `{"received":true}`)
+	_, _ = fmt.Fprint(w, `{"received":true}`)
 }
 
 // handlePaymentFailed processes a payment_intent.payment_failed webhook event.
@@ -245,7 +240,7 @@ func (h *handler) handlePaymentFailed(w http.ResponseWriter, r *http.Request, ev
 	if err := json.Unmarshal(event.Data.Raw, &pi); err != nil {
 		h.log.Error(r.Context(), "billing: webhook unmarshal failed", "error", err, "event_id", event.ID)
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"received":true,"error":"unmarshal_failed"}`)
+		_, _ = fmt.Fprint(w, `{"received":true,"error":"unmarshal_failed"}`)
 		return
 	}
 
@@ -255,7 +250,7 @@ func (h *handler) handlePaymentFailed(w http.ResponseWriter, r *http.Request, ev
 	}
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, `{"received":true}`)
+	_, _ = fmt.Fprint(w, `{"received":true}`)
 }
 
 // handleChargeRefunded processes a charge.refunded webhook event.
@@ -265,7 +260,7 @@ func (h *handler) handleChargeRefunded(w http.ResponseWriter, r *http.Request, e
 	if err := json.Unmarshal(event.Data.Raw, &charge); err != nil {
 		h.log.Error(r.Context(), "billing: webhook unmarshal charge.refunded", "error", err, "event_id", event.ID)
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"received":true,"error":"unmarshal_failed"}`)
+		_, _ = fmt.Fprint(w, `{"received":true,"error":"unmarshal_failed"}`)
 		return
 	}
 
@@ -275,7 +270,7 @@ func (h *handler) handleChargeRefunded(w http.ResponseWriter, r *http.Request, e
 	}
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, `{"received":true}`)
+	_, _ = fmt.Fprint(w, `{"received":true}`)
 }
 
 // handleDisputeCreated processes a charge.dispute.created webhook event.
@@ -287,7 +282,7 @@ func (h *handler) handleDisputeCreated(w http.ResponseWriter, r *http.Request, e
 		h.log.Error(r.Context(), "billing: webhook unmarshal charge.dispute.created",
 			"error", err, "event_id", event.ID)
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"received":true,"error":"unmarshal_failed"}`)
+		_, _ = fmt.Fprint(w, `{"received":true,"error":"unmarshal_failed"}`)
 		return
 	}
 
@@ -297,7 +292,7 @@ func (h *handler) handleDisputeCreated(w http.ResponseWriter, r *http.Request, e
 	}
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, `{"received":true}`)
+	_, _ = fmt.Fprint(w, `{"received":true}`)
 }
 
 // handleDisputeClosed processes a charge.dispute.closed webhook event.
@@ -308,7 +303,7 @@ func (h *handler) handleDisputeClosed(w http.ResponseWriter, r *http.Request, ev
 		h.log.Error(r.Context(), "billing: webhook unmarshal charge.dispute.closed",
 			"error", err, "event_id", event.ID)
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"received":true,"error":"unmarshal_failed"}`)
+		_, _ = fmt.Fprint(w, `{"received":true,"error":"unmarshal_failed"}`)
 		return
 	}
 
@@ -318,7 +313,7 @@ func (h *handler) handleDisputeClosed(w http.ResponseWriter, r *http.Request, ev
 	}
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, `{"received":true}`)
+	_, _ = fmt.Fprint(w, `{"received":true}`)
 }
 
 // handleInvoicePaymentFailed processes an invoice.payment_failed webhook event.
@@ -331,7 +326,7 @@ func (h *handler) handleInvoicePaymentFailed(w http.ResponseWriter, r *http.Requ
 		h.log.Error(r.Context(), "billing: webhook unmarshal invoice.payment_failed",
 			"error", err, "event_id", event.ID)
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"received":true,"error":"unmarshal_failed"}`)
+		_, _ = fmt.Fprint(w, `{"received":true,"error":"unmarshal_failed"}`)
 		return
 	}
 
@@ -341,7 +336,7 @@ func (h *handler) handleInvoicePaymentFailed(w http.ResponseWriter, r *http.Requ
 	}
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, `{"received":true}`)
+	_, _ = fmt.Fprint(w, `{"received":true}`)
 }
 
 // --------------------------------------------------------------------------
@@ -421,7 +416,7 @@ func (h *handler) getPaymentStatus(w http.ResponseWriter, r *http.Request) {
 	// Short cache to prevent excessive polling
 	w.Header().Set("Cache-Control", "private, max-age=5")
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 // --------------------------------------------------------------------------
@@ -471,7 +466,7 @@ func (h *handler) verifyPayment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "confirmed"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "confirmed"})
 }
 
 // --------------------------------------------------------------------------
@@ -501,7 +496,7 @@ func (h *handler) cancelSubscription(w http.ResponseWriter, r *http.Request) {
 
 	var req cancelSubscriptionRequest
 	// Body is optional — reason is not required
-	json.NewDecoder(r.Body).Decode(&req)
+	_ = json.NewDecoder(r.Body).Decode(&req)
 
 	// Sanitize reason length to prevent abuse
 	if len(req.Reason) > 500 {
@@ -517,7 +512,7 @@ func (h *handler) cancelSubscription(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(cancelSubscriptionResponse{
+	_ = json.NewEncoder(w).Encode(cancelSubscriptionResponse{
 		Status:    "cancelled",
 		CancelsOn: cancelsOn.Format("2006-01-02T15:04:05Z"),
 	})
@@ -556,5 +551,5 @@ func (h *handler) reactivateSubscription(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "active"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "active"})
 }

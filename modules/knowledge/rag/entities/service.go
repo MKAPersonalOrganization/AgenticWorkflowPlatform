@@ -86,7 +86,7 @@ func (s *Service) ListEntities(ctx context.Context, tc tenant.TenantContext, par
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -119,7 +119,7 @@ func (s *Service) CreateEntity(ctx context.Context, tc tenant.TenantContext, req
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -149,7 +149,7 @@ func (s *Service) EntityExists(ctx context.Context, tc tenant.TenantContext, ent
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -182,7 +182,7 @@ func (s *Service) MergeEntities(ctx context.Context, tc tenant.TenantContext, re
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -209,7 +209,7 @@ func (s *Service) GetEntity(ctx context.Context, tc tenant.TenantContext, name s
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -242,7 +242,7 @@ func (s *Service) UpdateEntity(ctx context.Context, tc tenant.TenantContext, nam
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -275,7 +275,7 @@ func (s *Service) DeleteEntity(ctx context.Context, tc tenant.TenantContext, nam
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err
@@ -307,7 +307,7 @@ func (s *Service) GetEntityNeighborhood(ctx context.Context, tc tenant.TenantCon
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if err := s.handleError(resp); err != nil {
 		return nil, err

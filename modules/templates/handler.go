@@ -1,9 +1,9 @@
 package templates
 
 import (
+	"aicompass/foundation/auth"
 	"aicompass/foundation/logger"
 	"aicompass/modules/agentdefinition"
-	"aicompass/foundation/auth"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -106,7 +106,7 @@ func (h *catalogHandler) list(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 // search handles GET /v1/agent-catalog/search?q=...
@@ -145,7 +145,7 @@ func (h *catalogHandler) search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 // addToMyAgentsRequest represents the optional request body for adding a catalog entry.
@@ -220,7 +220,7 @@ func (h *catalogHandler) addToMyAgents(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]string{
+		_ = json.NewEncoder(w).Encode(map[string]string{
 			"id":     agentID,
 			"name":   agentName,
 			"status": "added",
@@ -248,7 +248,7 @@ func (h *catalogHandler) addToMyAgents(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
+	_ = json.NewEncoder(w).Encode(map[string]string{
 		"id":     agent.ID,
 		"name":   agent.Name,
 		"status": "added",

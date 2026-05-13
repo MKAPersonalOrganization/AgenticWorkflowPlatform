@@ -8,6 +8,8 @@ import (
 )
 
 func TestSpeakTool_Name(t *testing.T) {
+	t.Parallel()
+
 	tool := NewSpeakTool(nil, "", "", "")
 	if got := tool.Name(); got != "speak" {
 		t.Errorf("Name() = %q, want %q", got, "speak")
@@ -15,6 +17,8 @@ func TestSpeakTool_Name(t *testing.T) {
 }
 
 func TestSpeakTool_Schema(t *testing.T) {
+	t.Parallel()
+
 	tool := NewSpeakTool(nil, "", "", "")
 	schema := tool.Schema()
 	if schema == nil {
@@ -35,6 +39,8 @@ func TestSpeakTool_Schema(t *testing.T) {
 }
 
 func TestSpeakTool_Execute_EmptyText(t *testing.T) {
+	t.Parallel()
+
 	tool := NewSpeakTool(nil, "test-key", "", "")
 	args := agent.Arguments{
 		Raw: json.RawMessage(`{"text": ""}`),
@@ -49,6 +55,8 @@ func TestSpeakTool_Execute_EmptyText(t *testing.T) {
 }
 
 func TestSpeakTool_Execute_TextTooLong(t *testing.T) {
+	t.Parallel()
+
 	tool := NewSpeakTool(nil, "test-key", "", "")
 	longText := make([]byte, 4097)
 	for i := range longText {
@@ -68,6 +76,8 @@ func TestSpeakTool_Execute_TextTooLong(t *testing.T) {
 }
 
 func TestSpeakTool_Execute_MissingAPIKey(t *testing.T) {
+	t.Parallel()
+
 	tool := NewSpeakTool(nil, "", "", "")
 	args := agent.Arguments{
 		Raw: json.RawMessage(`{"text": "Hello world"}`),
@@ -82,6 +92,8 @@ func TestSpeakTool_Execute_MissingAPIKey(t *testing.T) {
 }
 
 func TestSanitizeFilename(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input string
 		want  string
@@ -100,6 +112,8 @@ func TestSanitizeFilename(t *testing.T) {
 }
 
 func TestWordTimestamp_JSONRoundtrip(t *testing.T) {
+	t.Parallel()
+
 	original := []WordTimestamp{
 		{Word: "Hello", Start: 0.0, End: 0.48},
 		{Word: "world", Start: 0.52, End: 1.1},
@@ -127,6 +141,8 @@ func TestWordTimestamp_JSONRoundtrip(t *testing.T) {
 }
 
 func TestWhisperResponse_Decode(t *testing.T) {
+	t.Parallel()
+
 	raw := `{
 		"text": "Hello world",
 		"words": [

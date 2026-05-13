@@ -754,7 +754,7 @@ func (n *CompositionNode) Walk(fn func(*CompositionNode)) {
 // AgentID, UserID, and CatalogID are named string types so the compiler
 // catches argument-order mistakes that plain (id, userID string) pairs
 // otherwise permit. Each call site converts explicitly, e.g.
-// ``repo.Delete(ctx, AgentID(id), UserID(userID))`` — the conversion
+// “repo.Delete(ctx, AgentID(id), UserID(userID))“ — the conversion
 // cost is paid once at the boundary and buys swap-proof signatures
 // throughout. This is the "Connascence of Position → Connascence of
 // Name" reduction from Khononov, Balancing Coupling in Software

@@ -111,12 +111,12 @@ type AgentCodeExecutionPolicy struct {
 //     the runner's artifact service is
 //     made visible to this agent.
 //   - Enabled=true, AutoSaveUserBlobs=false
-//                                       → load_artifacts is injected so the
+//     → load_artifacts is injected so the
 //     agent can list and read files, but
 //     uploaded inline blobs stay in the
 //     user message unchanged.
 //   - Enabled=true, AutoSaveUserBlobs=true
-//                                       → as above, plus the runner
+//     → as above, plus the runner
 //     auto-persists inline blobs from
 //     the user message into the artifact
 //     service and replaces them with a
@@ -351,4 +351,3 @@ type AgentModelOverride struct {
 	// (e.g. "gemini-2.0-flash", "gpt-4o", "claude-opus-4-5-20251001").
 	ModelName string
 }
-

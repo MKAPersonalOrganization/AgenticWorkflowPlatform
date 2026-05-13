@@ -12,6 +12,8 @@ import (
 )
 
 func TestPostgresWorkspacePermissionsRepository(t *testing.T) {
+	t.Parallel()
+
 	host := os.Getenv("APP_DB_HOST")
 	if host == "" {
 		host = "localhost:5435"

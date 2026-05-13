@@ -1,9 +1,9 @@
 package requirementhandler
 
 import (
+	"aicompass/foundation/auth"
 	"aicompass/foundation/logger"
 	"aicompass/modules/chat/chatcontracts"
-	"aicompass/foundation/auth"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -89,7 +89,7 @@ func (h *Handler) GetToolRequirementConfig(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 // SetToolRequirementConfig updates the requirement configuration for a single tool.
@@ -145,7 +145,7 @@ func (h *Handler) SetToolRequirementConfig(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"status":      "success",
 		"tool_set_id": toolSetID,
 		"tool_id":     toolID,
@@ -196,7 +196,7 @@ func (h *Handler) GetToolSetRequirementConfig(w http.ResponseWriter, r *http.Req
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 // SetToolSetRequirementConfig updates the requirement configuration for a tool set.
@@ -249,7 +249,7 @@ func (h *Handler) SetToolSetRequirementConfig(w http.ResponseWriter, r *http.Req
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"status":      "success",
 		"tool_set_id": toolSetID,
 		"config":      req,
@@ -302,5 +302,5 @@ func (h *Handler) ListToolRequirementConfigs(w http.ResponseWriter, r *http.Requ
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"configs": configs})
+	_ = json.NewEncoder(w).Encode(map[string]any{"configs": configs})
 }

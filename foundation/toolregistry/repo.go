@@ -32,14 +32,14 @@ func (r *PostgresToolRegistryRepository) GetTool(ctx context.Context, id string)
 	const q = `SELECT * FROM tools WHERE id = $1`
 
 	var dest struct {
-		ID          string             `db:"id"`
-		Name        string             `db:"name"`
-		Description sql.NullString     `db:"description"`
-		Category    sql.NullString     `db:"category"`
-		ToolSetID   sql.NullString     `db:"tool_set_id"`
-		Metadata    sql.NullString     `db:"metadata"`
-		CreatedAt   sql.NullTime       `db:"created_at"`
-		UpdatedAt   sql.NullTime       `db:"updated_at"`
+		ID          string         `db:"id"`
+		Name        string         `db:"name"`
+		Description sql.NullString `db:"description"`
+		Category    sql.NullString `db:"category"`
+		ToolSetID   sql.NullString `db:"tool_set_id"`
+		Metadata    sql.NullString `db:"metadata"`
+		CreatedAt   sql.NullTime   `db:"created_at"`
+		UpdatedAt   sql.NullTime   `db:"updated_at"`
 	}
 
 	if err := r.db.GetContext(ctx, &dest, q, id); err != nil {
@@ -357,9 +357,6 @@ func (r *PostgresToolRegistryRepository) SaveToolSet(ctx context.Context, toolSe
 	}
 
 	if _, err := r.db.NamedExecContext(ctx, q, params); err != nil {
-		if strings.Contains(err.Error(), "pq: invalid input syntax for type json") {
-			// Try to handle potentially nil metadata
-		}
 		return fmt.Errorf("saving tool set: %w", err)
 	}
 

@@ -1,11 +1,10 @@
 package agentdefinition
 
 import (
+	"aicompass/foundation/logger"
 	"context"
 	"io"
 	"testing"
-
-	"aicompass/foundation/logger"
 )
 
 // available_state_keys_test.go verifies the behaviour that powers the
@@ -57,6 +56,8 @@ func findKey(suggestions []StateKeySuggestion, key string) *StateKeySuggestion {
 }
 
 func TestGetAvailableStateKeysReturnsTheAgentsOwnOutputKeyAsSelfTier(t *testing.T) {
+	t.Parallel()
+
 	svc := newStateKeysService(&AgentDefinition{
 		ID:        "a1",
 		UserID:    "u1",
@@ -85,6 +86,8 @@ func TestGetAvailableStateKeysReturnsTheAgentsOwnOutputKeyAsSelfTier(t *testing.
 }
 
 func TestGetAvailableStateKeysIncludesOutputKeysOfDirectSubAgents(t *testing.T) {
+	t.Parallel()
+
 	svc := newStateKeysService(
 		&AgentDefinition{
 			ID:     "parent",
@@ -120,6 +123,8 @@ func TestGetAvailableStateKeysIncludesOutputKeysOfDirectSubAgents(t *testing.T) 
 }
 
 func TestGetAvailableStateKeysIncludesOutputKeysOfAgentTools(t *testing.T) {
+	t.Parallel()
+
 	svc := newStateKeysService(
 		&AgentDefinition{
 			ID:     "parent",
@@ -155,6 +160,8 @@ func TestGetAvailableStateKeysIncludesOutputKeysOfAgentTools(t *testing.T) {
 }
 
 func TestGetAvailableStateKeysIncludesOutputKeysOfChildrenInTheAgentsOwnGraph(t *testing.T) {
+	t.Parallel()
+
 	svc := newStateKeysService(
 		&AgentDefinition{
 			ID:     "workflow",
@@ -198,6 +205,8 @@ func TestGetAvailableStateKeysIncludesOutputKeysOfChildrenInTheAgentsOwnGraph(t 
 // optimisation closes — a leaf agent's Graph is nil, so the only way to
 // know its peers is to scan all workflows that contain it.
 func TestGetAvailableStateKeysDetectsWorkflowPeersOfALeafAgent(t *testing.T) {
+	t.Parallel()
+
 	svc := newStateKeysService(
 		&AgentDefinition{
 			ID:     "pipeline",
@@ -243,6 +252,8 @@ func TestGetAvailableStateKeysDetectsWorkflowPeersOfALeafAgent(t *testing.T) {
 }
 
 func TestGetAvailableStateKeysFallsBackToLibraryForUnrelatedAgents(t *testing.T) {
+	t.Parallel()
+
 	svc := newStateKeysService(
 		&AgentDefinition{
 			ID:     "focused",
@@ -279,6 +290,8 @@ func TestGetAvailableStateKeysFallsBackToLibraryForUnrelatedAgents(t *testing.T)
 // picker should never show duplicates, and the chosen source label has
 // to match the tier actually displayed.
 func TestGetAvailableStateKeysDeduplicatesAcrossTiersKeepingHighestPriority(t *testing.T) {
+	t.Parallel()
+
 	// Agent A has its own OutputKey "shared_key" AND the same key is
 	// declared on another agent in the library. Self (100) must beat
 	// library (20).
@@ -325,6 +338,8 @@ func TestGetAvailableStateKeysDeduplicatesAcrossTiersKeepingHighestPriority(t *t
 // headers in the right sequence. Verify ordering is
 // (priority DESC, then key ASC) regardless of insertion order.
 func TestGetAvailableStateKeysSortsByPriorityDescendingThenByKey(t *testing.T) {
+	t.Parallel()
+
 	svc := newStateKeysService(
 		&AgentDefinition{
 			ID:     "editing",
@@ -378,6 +393,8 @@ func TestGetAvailableStateKeysSortsByPriorityDescendingThenByKey(t *testing.T) {
 }
 
 func TestGetAvailableStateKeysReturnsEmptyWhenNoOutputKeysAreDeclared(t *testing.T) {
+	t.Parallel()
+
 	svc := newStateKeysService(
 		&AgentDefinition{ID: "a", UserID: "u1", Name: "A"},
 		&AgentDefinition{ID: "b", UserID: "u1", Name: "B"},
@@ -397,6 +414,8 @@ func TestGetAvailableStateKeysReturnsEmptyWhenNoOutputKeysAreDeclared(t *testing
 // OutputKey on its definition. Both are valid at runtime, so the picker
 // surfaces both names — each carrying the direct-child priority.
 func TestGetAvailableStateKeysIncludesBothTheSubAgentRefOverrideAndTheChildsOwnOutputKey(t *testing.T) {
+	t.Parallel()
+
 	svc := newStateKeysService(
 		&AgentDefinition{
 			ID:     "parent",

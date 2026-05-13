@@ -33,7 +33,9 @@ func TestSecurityHeaders(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.header, func(t *testing.T) {
+			t.Parallel()
 			got := rec.Header().Get(tt.header)
 			if got != tt.want {
 				t.Errorf("%s = %q, want %q", tt.header, got, tt.want)

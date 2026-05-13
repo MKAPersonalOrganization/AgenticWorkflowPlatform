@@ -37,7 +37,7 @@ ORDER BY is_default DESC, created_at ASC
 	if err != nil {
 		return nil, fmt.Errorf("querying ai settings: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []AISettings
 	for rows.Next() {
@@ -154,7 +154,7 @@ func (r *postgresAISettingsRepository) SetDefault(ctx context.Context, id string
 	if err != nil {
 		return fmt.Errorf("beginning transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Unset all defaults for user
 	if _, err := tx.ExecContext(ctx, `UPDATE user_ai_settings SET is_default = false, updated_at = $1 WHERE user_id = $2`, time.Now(), userID); err != nil {
@@ -203,7 +203,7 @@ ORDER BY capability ASC
 	if err != nil {
 		return nil, fmt.Errorf("querying ai capability configs: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []AICapabilityConfig
 	for rows.Next() {

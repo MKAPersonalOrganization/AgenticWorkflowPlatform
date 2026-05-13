@@ -61,7 +61,7 @@ func (c *SearchClient) Search(ctx context.Context, query string) (*websearch.Web
 		},
 	}, config)
 	if err != nil {
-		return nil, fmt.Errorf("Gemini API call failed: %w", err)
+		return nil, fmt.Errorf("gemini API call failed: %w", err)
 	}
 
 	return parseGroundedResponse(query, resp)

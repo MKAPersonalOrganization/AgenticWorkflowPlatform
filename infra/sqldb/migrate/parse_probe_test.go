@@ -13,6 +13,8 @@ import (
 // "-- des" would cause ParseMigrations to return an empty slice — this
 // test catches that at unit-test time rather than at cluster startup.
 func TestMigrateSQLParses(t *testing.T) {
+	t.Parallel()
+
 	parsed := darwin.ParseMigrations(migrateDoc)
 	versionLines := strings.Count(migrateDoc, "\n-- Version:")
 	if strings.HasPrefix(migrateDoc, "-- Version:") {

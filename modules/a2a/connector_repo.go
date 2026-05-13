@@ -151,7 +151,7 @@ func (r *postgresA2AConnectorRepository) ListByUser(ctx context.Context, userID 
 	if err != nil {
 		return nil, fmt.Errorf("listing a2a connectors: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var c A2AConnector
@@ -262,8 +262,17 @@ func (r *postgresA2AConnectorRepository) UpsertSkills(ctx context.Context, conne
 		)
 	}
 
-	query := `INSERT INTO a2a_discovered_skills (id, connector_id, skill_id, name, description, tags, examples, input_modes, output_modes, created_at) VALUES ` +
-		strings.Join(valueStrings, ", ")
+	const insertPrefix = `INSERT INTO a2a_discovered_skills (id, connector_id, skill_id, name, description, tags, examples, input_modes, output_modes, created_at) VALUES `
+	var b strings.Builder
+	b.Grow(len(insertPrefix) + len(valueStrings)*40)
+	b.WriteString(insertPrefix)
+	for i, clause := range valueStrings {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(clause)
+	}
+	query := b.String()
 
 	if _, err := tx.ExecContext(ctx, query, valueArgs...); err != nil {
 		return fmt.Errorf("inserting skills: %w", err)
@@ -285,7 +294,7 @@ func (r *postgresA2AConnectorRepository) ListSkills(ctx context.Context, connect
 	if err != nil {
 		return nil, fmt.Errorf("listing a2a skills: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var s A2ADiscoveredSkill
@@ -313,7 +322,7 @@ func (r *postgresA2AConnectorRepository) ListSkillsByConnectors(ctx context.Cont
 	if err != nil {
 		return nil, fmt.Errorf("batch listing a2a skills: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	result := make(map[string][]A2ADiscoveredSkill)
 	for rows.Next() {
@@ -351,7 +360,7 @@ func (r *postgresA2AConnectorRepository) CountSkillsByConnectors(ctx context.Con
 	if err != nil {
 		return nil, fmt.Errorf("counting a2a skills: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	result := make(map[string]int)
 	for rows.Next() {
