@@ -3,6 +3,10 @@ package nav
 import (
 	"aicompass/frontend/components/button"
 	"aicompass/frontend/components/icon"
+	"aicompass/frontend/components/label"
+	"aicompass/frontend/components/selectbox"
+	"aicompass/frontend/components/skeleton"
+	"aicompass/frontend/components/textarea"
 	"aicompass/frontend/ui/i18n"
 )
 
@@ -111,10 +115,10 @@ templ profileDialog() {
 					<!-- Loading State -->
 					<template x-if="loading">
 						<div class="space-y-4">
-							<div class="h-10 bg-muted animate-pulse rounded-md"></div>
-							<div class="h-20 bg-muted animate-pulse rounded-md"></div>
-							<div class="h-20 bg-muted animate-pulse rounded-md"></div>
-							<div class="h-24 bg-muted animate-pulse rounded-md"></div>
+							@skeleton.Skeleton(skeleton.Props{Class: "h-10 rounded-md"})
+							@skeleton.Skeleton(skeleton.Props{Class: "h-20 rounded-md"})
+							@skeleton.Skeleton(skeleton.Props{Class: "h-20 rounded-md"})
+							@skeleton.Skeleton(skeleton.Props{Class: "h-24 rounded-md"})
 						</div>
 					</template>
 					<!-- Form -->
@@ -122,51 +126,82 @@ templ profileDialog() {
 						<div class="space-y-5">
 							<!-- Learning Style -->
 							<div class="space-y-2">
-								<label class="text-sm font-medium text-foreground">{ i18n.T(ctx, "Work Style") }</label>
-								<select
-									x-model="profile.learning_style"
-									class="w-full h-10 px-3 rounded-md border border-input bg-background text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-ring"
-								>
-									<option value="">{ i18n.T(ctx, "Select a style...") }</option>
-									<option value="Visual">{ i18n.T(ctx, "Visual") }</option>
-									<option value="Auditory">{ i18n.T(ctx, "Auditory") }</option>
-									<option value="Read/Write">{ i18n.T(ctx, "Read/Write") }</option>
-									<option value="Kinesthetic">{ i18n.T(ctx, "Kinesthetic") }</option>
-									<option value="Multimodal">{ i18n.T(ctx, "Multimodal") }</option>
-								</select>
+								@label.Label() {
+									{ i18n.T(ctx, "Work Style") }
+								}
+								@selectbox.SelectBox() {
+									@selectbox.Trigger(selectbox.TriggerProps{
+										Attributes: templ.Attributes{
+											"x-model": "profile.learning_style",
+										},
+									}) {
+										@selectbox.Value(selectbox.ValueProps{
+											Placeholder: i18n.T(ctx, "Select a style..."),
+										})
+									}
+									@selectbox.Content(selectbox.ContentProps{NoSearch: true}) {
+										@selectbox.Item(selectbox.ItemProps{Value: "Visual"}) {
+											{ i18n.T(ctx, "Visual") }
+										}
+										@selectbox.Item(selectbox.ItemProps{Value: "Auditory"}) {
+											{ i18n.T(ctx, "Auditory") }
+										}
+										@selectbox.Item(selectbox.ItemProps{Value: "Read/Write"}) {
+											{ i18n.T(ctx, "Read/Write") }
+										}
+										@selectbox.Item(selectbox.ItemProps{Value: "Kinesthetic"}) {
+											{ i18n.T(ctx, "Kinesthetic") }
+										}
+										@selectbox.Item(selectbox.ItemProps{Value: "Multimodal"}) {
+											{ i18n.T(ctx, "Multimodal") }
+										}
+									}
+								}
 								<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "How you prefer to take in and process information.") }</p>
 							</div>
 							<!-- Struggles -->
 							<div class="space-y-2">
-								<label class="text-sm font-medium text-foreground">{ i18n.T(ctx, "Current Struggles") }</label>
-								<textarea
-									x-model="profile.struggles"
-									placeholder={ i18n.T(ctx, "e.g. Algebra, focus, time management...") }
-									rows="3"
-									class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-								></textarea>
+								@label.Label() {
+									{ i18n.T(ctx, "Current Struggles") }
+								}
+								@textarea.Textarea(textarea.Props{
+									Placeholder: i18n.T(ctx, "e.g. Algebra, focus, time management..."),
+									Rows:        3,
+									Class:       "resize-none",
+									Attributes: templ.Attributes{
+										"x-model": "profile.struggles",
+									},
+								})
 								<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Topics or skills you find challenging (comma separated).") }</p>
 							</div>
 							<!-- Strengths -->
 							<div class="space-y-2">
-								<label class="text-sm font-medium text-foreground">{ i18n.T(ctx, "Strengths") }</label>
-								<textarea
-									x-model="profile.strengths"
-									placeholder={ i18n.T(ctx, "e.g. Critical thinking, geometry, writing...") }
-									rows="3"
-									class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-								></textarea>
+								@label.Label() {
+									{ i18n.T(ctx, "Strengths") }
+								}
+								@textarea.Textarea(textarea.Props{
+									Placeholder: i18n.T(ctx, "e.g. Critical thinking, geometry, writing..."),
+									Rows:        3,
+									Class:       "resize-none",
+									Attributes: templ.Attributes{
+										"x-model": "profile.strengths",
+									},
+								})
 								<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Areas where you excel or feel confident (comma separated).") }</p>
 							</div>
 							<!-- Goals -->
 							<div class="space-y-2">
-								<label class="text-sm font-medium text-foreground">{ i18n.T(ctx, "Professional/Personal Goals") }</label>
-								<textarea
-									x-model="profile.goals"
-									placeholder={ i18n.T(ctx, "e.g. Master system design, improve coding skills...") }
-									rows="3"
-									class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-								></textarea>
+								@label.Label() {
+									{ i18n.T(ctx, "Professional/Personal Goals") }
+								}
+								@textarea.Textarea(textarea.Props{
+									Placeholder: i18n.T(ctx, "e.g. Master system design, improve coding skills..."),
+									Rows:        3,
+									Class:       "resize-none",
+									Attributes: templ.Attributes{
+										"x-model": "profile.goals",
+									},
+								})
 								<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "What you hope to achieve with your AI assistant.") }</p>
 							</div>
 						</div>

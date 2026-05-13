@@ -2,14 +2,17 @@ package nav
 
 import (
 	"fmt"
+	"aicompass/frontend/components/alert"
 	"aicompass/frontend/components/button"
+	"aicompass/frontend/components/collapsible"
 	"aicompass/frontend/components/dialog"
-	"aicompass/frontend/ui/i18n"
 	"aicompass/frontend/components/icon"
-	"aicompass/frontend/ui/nativeselect"
+	"aicompass/frontend/components/input"
 	"aicompass/frontend/components/selectbox"
 	switchcomp "aicompass/frontend/components/switch"
 	"aicompass/frontend/components/tabs"
+	"aicompass/frontend/ui/i18n"
+	"aicompass/frontend/ui/nativeselect"
 )
 
 // Settings renders the settings dialog
@@ -281,12 +284,13 @@ templ Settings() {
 										<!-- API Key -->
 										<div class="flex flex-col gap-2">
 											<label class="text-foreground text-sm">{ i18n.T(ctx, "API Key") }</label>
-											<input
-												type="password"
-												x-model="form.api_key"
-												placeholder={ i18n.T(ctx, "sk-...or paste your API key") }
-												class="w-full h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs"
-											/>
+											@input.Input(input.Props{
+												Type:        input.TypePassword,
+												Placeholder: i18n.T(ctx, "sk-...or paste your API key"),
+												Attributes: templ.Attributes{
+													"x-model": "form.api_key",
+												},
+											})
 											<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Your API key is encrypted and stored securely. You are responsible for usage costs.") }</p>
 										</div>
 										<!-- Save / Cancel -->
@@ -379,54 +383,74 @@ templ Settings() {
 											</select>
 										</div>
 										<!-- Advanced: Temperature & Max Tokens -->
-										<details class="group" x-show="chatForm.model">
-											<summary class="cursor-pointer text-sm text-muted-foreground hover:text-foreground transition-colors list-none flex items-center gap-1">
-												@icon.ChevronRight(icon.Props{Class: "size-4 transition-transform group-open:rotate-90"})
+										@collapsible.Collapsible(collapsible.Props{
+											Attributes: templ.Attributes{
+												"x-show": "chatForm.model",
+											},
+										}) {
+											@collapsible.Trigger(collapsible.TriggerProps{
+												Class: "cursor-pointer text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 group",
+											}) {
+												@icon.ChevronRight(icon.Props{Class: "size-4 transition-transform group-data-[tui-collapsible-state=open]:rotate-90"})
 												{ i18n.T(ctx, "Advanced Settings") }
-											</summary>
-											<div class="pt-3 space-y-4">
-												<div class="flex items-center justify-between gap-4">
-													<div>
-														<label class="text-foreground text-sm">{ i18n.T(ctx, "Temperature") }</label>
-														<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Controls randomness. Lower = more deterministic.") }</p>
+											}
+											@collapsible.Content() {
+												<div class="pt-3 space-y-4">
+													<div class="flex items-center justify-between gap-4">
+														<div>
+															<label class="text-foreground text-sm">{ i18n.T(ctx, "Temperature") }</label>
+															<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Controls randomness. Lower = more deterministic.") }</p>
+														</div>
+														<div class="w-24 shrink-0">
+															@input.Input(input.Props{
+																Type:  input.TypeNumber,
+																Class: "text-center",
+																Attributes: templ.Attributes{
+																	"x-model.number": "chatForm.temperature",
+																	"min":            "0",
+																	"max":            "2",
+																	"step":           "0.1",
+																},
+															})
+														</div>
 													</div>
-													<input
-														type="number"
-														x-model.number="chatForm.temperature"
-														min="0"
-														max="2"
-														step="0.1"
-														class="w-24 h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs text-center"
-													/>
-												</div>
-												<div class="flex items-center justify-between gap-4">
-													<div>
-														<label class="text-foreground text-sm">{ i18n.T(ctx, "Max Tokens") }</label>
-														<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Maximum tokens in the response. 0 = provider default.") }</p>
+													<div class="flex items-center justify-between gap-4">
+														<div>
+															<label class="text-foreground text-sm">{ i18n.T(ctx, "Max Tokens") }</label>
+															<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Maximum tokens in the response. 0 = provider default.") }</p>
+														</div>
+														<div class="w-24 shrink-0">
+															@input.Input(input.Props{
+																Type:  input.TypeNumber,
+																Class: "text-center",
+																Attributes: templ.Attributes{
+																	"x-model.number": "chatForm.max_tokens",
+																	"min":            "0",
+																	"max":            "128000",
+																},
+															})
+														</div>
 													</div>
-													<input
-														type="number"
-														x-model.number="chatForm.max_tokens"
-														min="0"
-														max="128000"
-														class="w-24 h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs text-center"
-													/>
-												</div>
-												<div class="flex items-center justify-between gap-4">
-													<div>
-														<label class="text-foreground text-sm">{ i18n.T(ctx, "Max Iterations") }</label>
-														<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Maximum tool-calling loops per request. 0 = engine default.") }</p>
+													<div class="flex items-center justify-between gap-4">
+														<div>
+															<label class="text-foreground text-sm">{ i18n.T(ctx, "Max Iterations") }</label>
+															<p class="text-[11px] text-muted-foreground">{ i18n.T(ctx, "Maximum tool-calling loops per request. 0 = engine default.") }</p>
+														</div>
+														<div class="w-24 shrink-0">
+															@input.Input(input.Props{
+																Type:  input.TypeNumber,
+																Class: "text-center",
+																Attributes: templ.Attributes{
+																	"x-model.number": "chatForm.max_iterations",
+																	"min":            "0",
+																	"max":            "50",
+																},
+															})
+														</div>
 													</div>
-													<input
-														type="number"
-														x-model.number="chatForm.max_iterations"
-														min="0"
-														max="50"
-														class="w-24 h-9 px-3 py-1 text-sm rounded-md border border-input bg-background shadow-xs text-center"
-													/>
 												</div>
-											</div>
-										</details>
+											}
+										}
 										<!-- Save Button -->
 										<div class="flex items-center justify-end gap-2 pt-2" x-show="chatForm.provider && chatForm.model">
 											<span x-show="chatSaved" x-transition class="text-xs text-success">&check; { i18n.T(ctx, "Saved") }</span>
@@ -731,9 +755,15 @@ templ Settings() {
 									</template>
 									<!-- Error state -->
 									<template x-if="!acctLoading && acctError">
-										<div class="p-3 rounded-xl border border-destructive/20 bg-destructive/5 text-destructive text-sm">
-											{ i18n.T(ctx, "Failed to load account info.") }
-										</div>
+										@alert.Alert(alert.Props{
+											Variant: alert.VariantDestructive,
+											Class:   "rounded-xl",
+										}) {
+											@icon.CircleAlert(icon.Props{Class: "size-4"})
+											@alert.Description(alert.DescriptionProps{}) {
+												{ i18n.T(ctx, "Failed to load account info.") }
+											}
+										}
 									</template>
 									<!-- Loaded state -->
 									<template x-if="!acctLoading && acct">
@@ -871,20 +901,40 @@ templ Settings() {
 																		</div>
 																	</div>
 																	<!-- Optional cancel reason -->
-																	<div>
+																	<div class="space-y-1">
 																		<label class="text-[10px] text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "Reason (optional)") }</label>
-																		<select
-																			x-model="cancelReason"
-																			class="mt-1 w-full h-8 px-2 text-xs rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-																		>
-																			<option value="">{ i18n.T(ctx, "Select a reason…") }</option>
-																			<option value="too_expensive">{ i18n.T(ctx, "Too expensive") }</option>
-																			<option value="not_using">{ i18n.T(ctx, "Not using it enough") }</option>
-																			<option value="missing_features">{ i18n.T(ctx, "Missing features I need") }</option>
-																			<option value="switching">{ i18n.T(ctx, "Switching to another service") }</option>
-																			<option value="temporary">{ i18n.T(ctx, "Temporary — I'll be back") }</option>
-																			<option value="other">{ i18n.T(ctx, "Other") }</option>
-																		</select>
+																		@selectbox.SelectBox() {
+																			@selectbox.Trigger(selectbox.TriggerProps{
+																				Class: "h-8 text-xs",
+																				Attributes: templ.Attributes{
+																					"x-model": "cancelReason",
+																				},
+																			}) {
+																				@selectbox.Value(selectbox.ValueProps{
+																					Placeholder: i18n.T(ctx, "Select a reason…"),
+																				})
+																			}
+																			@selectbox.Content(selectbox.ContentProps{NoSearch: true}) {
+																				@selectbox.Item(selectbox.ItemProps{Value: "too_expensive"}) {
+																					{ i18n.T(ctx, "Too expensive") }
+																				}
+																				@selectbox.Item(selectbox.ItemProps{Value: "not_using"}) {
+																					{ i18n.T(ctx, "Not using it enough") }
+																				}
+																				@selectbox.Item(selectbox.ItemProps{Value: "missing_features"}) {
+																					{ i18n.T(ctx, "Missing features I need") }
+																				}
+																				@selectbox.Item(selectbox.ItemProps{Value: "switching"}) {
+																					{ i18n.T(ctx, "Switching to another service") }
+																				}
+																				@selectbox.Item(selectbox.ItemProps{Value: "temporary"}) {
+																					{ i18n.T(ctx, "Temporary — I'll be back") }
+																				}
+																				@selectbox.Item(selectbox.ItemProps{Value: "other"}) {
+																					{ i18n.T(ctx, "Other") }
+																				}
+																			}
+																		}
 																	</div>
 																	<template x-if="cancelError">
 																		<p class="text-xs text-destructive" x-text="cancelError"></p>

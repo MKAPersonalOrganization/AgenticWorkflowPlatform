@@ -2,11 +2,12 @@ package agenteditor
 
 import (
 	"aicompass/frontend/components/button"
-	"aicompass/frontend/ui/i18n"
 	"aicompass/frontend/components/icon"
 	"aicompass/frontend/components/input"
 	"aicompass/frontend/components/label"
+	switchcomp "aicompass/frontend/components/switch"
 	"aicompass/frontend/components/textarea"
+	"aicompass/frontend/ui/i18n"
 )
 
 // agentDesignerBody renders the x-data-scoped inner body of the designer —
@@ -146,25 +147,18 @@ templ agentNodeForm() {
 
 // toggleSwitch renders a labeled toggle switch for boolean form fields.
 templ toggleSwitch(model string, labelText string, helpText string) {
-	<label class="flex items-center justify-between gap-2 py-1.5 cursor-pointer">
+	<div class="flex items-center justify-between gap-2 py-1.5">
 		<div class="flex-1 min-w-0">
 			<span class="text-xs font-medium text-foreground">{ labelText }</span>
 			<p class="text-[10px] text-muted-foreground mt-0.5">{ helpText }</p>
 		</div>
-		<button
-			type="button"
-			x-on:click={ model + " = !" + model }
-			class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
-			x-bind:class={ model + " ? 'bg-primary' : 'bg-input'" }
-			role="switch"
-			x-bind:aria-checked={ model }
-		>
-			<span
-				class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out"
-				x-bind:class={ model + " ? 'translate-x-4' : 'translate-x-0'" }
-			></span>
-		</button>
-	</label>
+		@switchcomp.Switch(switchcomp.Props{
+			Attributes: templ.Attributes{
+				"x-model":      model,
+				"aria-label":   labelText,
+			},
+		})
+	</div>
 }
 
 // schemaBuilder renders the row-based JSON Schema editor used by both the

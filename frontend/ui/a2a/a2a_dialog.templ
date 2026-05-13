@@ -1,10 +1,15 @@
 package a2acomp
 
 import (
+	"aicompass/frontend/components/alert"
 	"aicompass/frontend/components/button"
+	"aicompass/frontend/components/collapsible"
 	"aicompass/frontend/components/dialog"
-	"aicompass/frontend/ui/i18n"
 	"aicompass/frontend/components/icon"
+	"aicompass/frontend/components/input"
+	"aicompass/frontend/components/label"
+	"aicompass/frontend/components/selectbox"
+	"aicompass/frontend/ui/i18n"
 )
 
 // A2AAddDialog renders the "Add A2A Agent" modal dialog.
@@ -28,105 +33,137 @@ templ A2AAddDialog() {
 			}
 			<div class="space-y-4 px-6 py-4">
 				<!-- Agent URL -->
-				<div>
-					<label for="a2a-url" class="text-sm font-medium text-foreground mb-1.5 block">
+				<div class="space-y-1.5">
+					@label.Label(label.Props{For: "a2a-url"}) {
 						{ i18n.T(ctx, "Agent URL") }
 						<span class="text-destructive">*</span>
-					</label>
-					<input
-						id="a2a-url"
-						type="url"
-						x-model="newUrl"
-						placeholder="https://agent.example.com"
-						class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-						@keydown.enter="addConnector()"
-					/>
-					<p class="text-xs text-muted-foreground mt-1">
+					}
+					@input.Input(input.Props{
+						ID:          "a2a-url",
+						Type:        input.TypeURL,
+						Placeholder: "https://agent.example.com",
+						Attributes: templ.Attributes{
+							"x-model":         "newUrl",
+							"@keydown.enter": "addConnector()",
+						},
+					})
+					<p class="text-xs text-muted-foreground">
 						{ i18n.T(ctx, "The base URL of the A2A-compatible agent. The agent card will be discovered at /.well-known/agent-card.json") }
 					</p>
 				</div>
 				<!-- Display Name -->
-				<div>
-					<label for="a2a-title" class="text-sm font-medium text-foreground mb-1.5 block">
+				<div class="space-y-1.5">
+					@label.Label(label.Props{For: "a2a-title"}) {
 						{ i18n.T(ctx, "Display Name") }
-					</label>
-					<input
-						id="a2a-title"
-						type="text"
-						x-model="newTitle"
-						placeholder="e.g., Research Assistant Agent"
-						class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-					/>
+					}
+					@input.Input(input.Props{
+						ID:          "a2a-title",
+						Type:        input.TypeText,
+						Placeholder: "e.g., Research Assistant Agent",
+						Attributes: templ.Attributes{
+							"x-model": "newTitle",
+						},
+					})
 				</div>
 				<!-- Advanced Options (collapsible) -->
-				<details class="group">
-					<summary class="text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors flex items-center gap-1">
-						@icon.ChevronRight(icon.Props{Class: "size-3 transition-transform group-open:rotate-90"})
+				@collapsible.Collapsible() {
+					@collapsible.Trigger(collapsible.TriggerProps{
+						Class: "text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors flex items-center gap-1 group",
+					}) {
+						@icon.ChevronRight(icon.Props{Class: "size-3 transition-transform group-data-[tui-collapsible-state=open]:rotate-90"})
 						{ i18n.T(ctx, "Authentication") }
-					</summary>
-					<div class="mt-3 space-y-3 ps-4 border-s-2 border-border">
-						<div>
-							<label for="a2a-auth-type" class="text-xs font-medium text-foreground mb-1 block">
-								{ i18n.T(ctx, "Auth Type") }
-							</label>
-							<select
-								id="a2a-auth-type"
-								x-model="newAuthType"
-								class="w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-							>
-								<option value="none">{ i18n.T(ctx, "None") }</option>
-								<option value="bearer">{ i18n.T(ctx, "Bearer Token") }</option>
-								<option value="api_key">{ i18n.T(ctx, "API Key") }</option>
-								<option value="custom_header">{ i18n.T(ctx, "Custom Header") }</option>
-							</select>
-						</div>
-						<template x-if="newAuthType !== 'none'">
-							<div class="space-y-3">
-								<template x-if="newAuthType === 'custom_header' || newAuthType === 'api_key'">
-									<div>
-										<label for="a2a-auth-header" class="text-xs font-medium text-foreground mb-1 block">
-											{ i18n.T(ctx, "Header Name") }
-										</label>
-										<input
-											id="a2a-auth-header"
-											type="text"
-											x-model="newAuthHeader"
-											placeholder="X-API-Key"
-											class="w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-										/>
-									</div>
-								</template>
-								<div>
-									<label for="a2a-auth-token" class="text-xs font-medium text-foreground mb-1 block">
-										<template x-if="newAuthType === 'bearer'">
-											<span>{ i18n.T(ctx, "Bearer Token") }</span>
-										</template>
-										<template x-if="newAuthType !== 'bearer'">
-											<span>{ i18n.T(ctx, "Token / Secret") }</span>
-										</template>
-									</label>
-									<input
-										id="a2a-auth-token"
-										type="password"
-										x-model="newAuthToken"
-										placeholder=""
-										class="w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-									/>
-								</div>
+					}
+					@collapsible.Content() {
+						<div class="mt-3 space-y-3 ps-4 border-s-2 border-border">
+							<div class="space-y-1">
+								@label.Label(label.Props{For: "a2a-auth-type", Class: "text-xs"}) {
+									{ i18n.T(ctx, "Auth Type") }
+								}
+								@selectbox.SelectBox(selectbox.Props{}) {
+									@selectbox.Trigger(selectbox.TriggerProps{
+										ID: "a2a-auth-type",
+										Attributes: templ.Attributes{
+											"x-model": "newAuthType",
+										},
+									}) {
+										@selectbox.Value(selectbox.ValueProps{
+											Placeholder: i18n.T(ctx, "Select auth type..."),
+										})
+									}
+									@selectbox.Content(selectbox.ContentProps{NoSearch: true}) {
+										@selectbox.Item(selectbox.ItemProps{Value: "none"}) {
+											{ i18n.T(ctx, "None") }
+										}
+										@selectbox.Item(selectbox.ItemProps{Value: "bearer"}) {
+											{ i18n.T(ctx, "Bearer Token") }
+										}
+										@selectbox.Item(selectbox.ItemProps{Value: "api_key"}) {
+											{ i18n.T(ctx, "API Key") }
+										}
+										@selectbox.Item(selectbox.ItemProps{Value: "custom_header"}) {
+											{ i18n.T(ctx, "Custom Header") }
+										}
+									}
+								}
 							</div>
-						</template>
-						<p class="text-xs text-muted-foreground">
-							{ i18n.T(ctx, "Authentication credentials for accessing the remote agent. Used for both agent card discovery and task execution.") }
-						</p>
-					</div>
-				</details>
+							<template x-if="newAuthType !== 'none'">
+								<div class="space-y-3">
+									<template x-if="newAuthType === 'custom_header' || newAuthType === 'api_key'">
+										<div class="space-y-1">
+											@label.Label(label.Props{For: "a2a-auth-header", Class: "text-xs"}) {
+												{ i18n.T(ctx, "Header Name") }
+											}
+											@input.Input(input.Props{
+												ID:          "a2a-auth-header",
+												Type:        input.TypeText,
+												Placeholder: "X-API-Key",
+												Class:       "text-xs",
+												Attributes: templ.Attributes{
+													"x-model": "newAuthHeader",
+												},
+											})
+										</div>
+									</template>
+									<div class="space-y-1">
+										@label.Label(label.Props{For: "a2a-auth-token", Class: "text-xs"}) {
+											<template x-if="newAuthType === 'bearer'">
+												<span>{ i18n.T(ctx, "Bearer Token") }</span>
+											</template>
+											<template x-if="newAuthType !== 'bearer'">
+												<span>{ i18n.T(ctx, "Token / Secret") }</span>
+											</template>
+										}
+										@input.Input(input.Props{
+											ID:    "a2a-auth-token",
+											Type:  input.TypePassword,
+											Class: "text-xs",
+											Attributes: templ.Attributes{
+												"x-model": "newAuthToken",
+											},
+										})
+									</div>
+								</div>
+							</template>
+							<p class="text-xs text-muted-foreground">
+								{ i18n.T(ctx, "Authentication credentials for accessing the remote agent. Used for both agent card discovery and task execution.") }
+							</p>
+						</div>
+					}
+				}
 				<!-- Error display -->
-				<div x-show="error" x-cloak class="rounded-md bg-destructive/10 border border-destructive/20 p-3">
-					<p class="text-xs text-destructive flex items-center gap-1.5">
-						@icon.CircleAlert(icon.Props{Class: "size-3.5 shrink-0"})
+				@alert.Alert(alert.Props{
+					Variant: alert.VariantDestructive,
+					Class:   "py-3",
+					Attributes: templ.Attributes{
+						"x-show":   "error",
+						"x-cloak": "",
+					},
+				}) {
+					@icon.CircleAlert(icon.Props{Class: "size-3.5"})
+					@alert.Description(alert.DescriptionProps{Class: "text-xs"}) {
 						<span x-text="error"></span>
-					</p>
-				</div>
+					}
+				}
 			</div>
 			@dialog.Footer(dialog.FooterProps{}) {
 				@dialog.Close(dialog.CloseProps{For: "a2a-add-dialog"}) {
