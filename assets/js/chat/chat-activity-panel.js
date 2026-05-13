@@ -42,6 +42,30 @@ export function createActivityPanelMethods() {
         activityPanelOpen: localStorage.getItem('activityPanelOpen') === 'true',
         activityPanelMinimized: localStorage.getItem('activityPanelMinimized') === 'true',
 
+        // ── Per-leaf state-value expansion ────────────────────────────
+        // Tracks which output_keys the user has clicked to expand their
+        // full value preview. Keyed by output_key string for stability
+        // across rerenders.
+        expandedStateKeys: {},
+
+        toggleExpandStateKey(key) {
+            if (!key) return;
+            this.expandedStateKeys = {
+                ...this.expandedStateKeys,
+                [key]: !this.expandedStateKeys[key],
+            };
+        },
+
+        async copyStateValue(value) {
+            const text = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+            try {
+                await navigator.clipboard.writeText(text);
+                this.showToast?.(window.i18n.t('Copied'), 'success', 1200);
+            } catch (err) {
+                console.error('Failed to copy state value:', err);
+            }
+        },
+
         // ── Position (top-left in viewport coords) ────────────────────
         activityPanelX: parseInt(localStorage.getItem('activityPanelX')) || defaultX(),
         activityPanelY: parseInt(localStorage.getItem('activityPanelY')) || defaultY(),

@@ -44,6 +44,7 @@ templ formInstructionsSection() {
 				@icon.Info(icon.Props{Class: "size-3 inline me-0.5"})
 				{ i18n.T(ctx, "Describe the agent's role, expertise, and behavior. Type { to reference an upstream agent's output by key. Append ? to make a reference optional.") }
 			</p>
+			@lineageIssuesWarning()
 			@unknownPromptKeysWarning()
 		</div>
 	</div>
@@ -96,6 +97,48 @@ templ promptAutocompletePopover() {
 			<span><kbd class="font-mono">↑↓</kbd> { i18n.T(ctx, "navigate") }</span>
 			<span><kbd class="font-mono">↵</kbd> { i18n.T(ctx, "insert") }</span>
 			<span><kbd class="font-mono">esc</kbd> { i18n.T(ctx, "close") }</span>
+		</div>
+	</div>
+}
+
+// lineageIssuesWarning surfaces analyzer findings tied to the leaf the
+// user is currently editing. Issues come from the static state-flow
+// analyzer (POST /v1/agent-definitions/analyze-state-lineage); the
+// frontend filters by `editingAgent.id` so only this leaf's findings
+// show up here. Missing references and conditional-evaluator gaps
+// render as red errors — both flip the workflow's "Valid" badge.
+// branch-only-key warnings render amber; the run may still succeed if
+// the user always takes the branch that produces the key.
+//
+// This is more precise than unknownPromptKeysWarning: the analyzer
+// knows the workflow position, so it catches keys that exist somewhere
+// in the user's library but aren't reachable from this node.
+templ lineageIssuesWarning() {
+	<div
+		x-show="currentLeafLineageIssues.length > 0"
+		x-cloak
+		class="rounded-md border border-rose-500/30 bg-rose-500/5 px-3 py-2"
+	>
+		<div class="flex items-start gap-2 text-[11px] text-rose-700 dark:text-rose-400">
+			@icon.TriangleAlert(icon.Props{Class: "size-3.5 shrink-0 mt-0.5"})
+			<div class="flex-1 min-w-0">
+				<div class="font-medium">{ i18n.T(ctx, "State-flow problems in this workflow") }</div>
+				<div class="text-muted-foreground leading-relaxed">
+					{ i18n.T(ctx, "These references exist in your agents but aren't reachable from this node's position in the workflow.") }
+				</div>
+				<ul class="mt-1.5 space-y-1">
+					<template x-for="issue in currentLeafLineageIssues" :key="issue.kind + ':' + (issue.key || '') + ':' + (issue.node_id || '')">
+						<li class="flex items-start gap-1.5">
+							<code
+								class="px-1.5 py-0.5 rounded text-[10px] font-mono shrink-0"
+								:class="issue.kind === 'branch_only_key' ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300' : 'bg-rose-500/10 text-rose-700 dark:text-rose-300'"
+								x-text="issue.key ? '{' + issue.key + '}' : '·'"
+							></code>
+							<span class="text-foreground/80" x-text="issue.message"></span>
+						</li>
+					</template>
+				</ul>
+			</div>
 		</div>
 	</div>
 }

@@ -119,6 +119,14 @@ export function createInitialState() {
         selectedAgent: localStorage.getItem('selectedAgent') || '',
         currentAgentData: null,
 
+        // Static state-lineage analysis for the current agent's
+        // workflow graph. Populated by fetchAgentLineage after
+        // selectAgent succeeds. Shape mirrors the Go StateLineage
+        // struct: { issues: [{kind, node_id, agent_id, key, message}],
+        // producible_before: {...}, produces: {...}, references: {...} }.
+        // Drives the inline red-dot warnings on leaves with missing refs.
+        currentAgentLineage: { issues: [], producible_before: {}, produces: {}, references: {} },
+
         // UI state
         sessions: [],
         sessionsNextCursor: null,

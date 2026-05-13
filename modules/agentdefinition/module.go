@@ -53,6 +53,7 @@ func (m *Module) RegisterRoutes(r chi.Router, authMW *auth.Middleware) {
 	r.Delete("/v1/agent-definitions", authMW.RequireAuthFunc(m.storeHandler.deleteAll))
 	r.Get("/v1/agent-definitions/{id}/consumers", authMW.RequireAuthFunc(m.storeHandler.consumers))
 	r.Get("/v1/agent-definitions/{id}/available-state-keys", authMW.RequireAuthFunc(m.storeHandler.availableStateKeys))
+	r.Post("/v1/agent-definitions/analyze-state-lineage", authMW.RequireAuthFunc(m.storeHandler.analyzeStateLineage))
 
 	// Agent sharing
 	r.Post("/v1/agent-definitions/{id}/share", authMW.RequireAuthFunc(m.storeHandler.shareAgent))

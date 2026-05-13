@@ -126,6 +126,17 @@ export const agentDesigner = () => ({
     // are intentionally hidden from the picker to keep the UI
     // approachable for non-programmers.
     availableStateKeys: [],           // [{key, scope, source}] from backend
+
+    // ── Workflow state-flow lineage ────────────────────────────────────
+    // Set by refreshLineage() (POST /v1/agent-definitions/analyze-state-
+    // lineage). The shape mirrors the Go StateLineage struct:
+    //   { producible_before: { nodeId: [keys] }, produces: {...},
+    //     references: { nodeId: [{key, optional, source}] },
+    //     issues:    [{ kind, node_id, agent_id, key, message }] }
+    // Empty by default; validatePipeline() reads issues[] and surfaces
+    // them alongside the structural errors.
+    lineageAnalysis: { producible_before: {}, produces: {}, references: {}, issues: [] },
+    __lineageRefreshTimer: null,
     promptAutocomplete: {
         open: false,
         query: '',
@@ -226,6 +237,13 @@ export const agentDesigner = () => ({
     // ══════════════════════════════════════════
 
     init() {
+        // Re-analyze whenever the user types into a leaf's instruction
+        // surfaces or changes its output_key — those mutations move the
+        // lineage and we want the Valid badge to react inside a few
+        // hundred ms (the analyzer itself is already debounced).
+        this.$watch('form.systemPrompt', () => this.refreshLineage());
+        this.$watch('form.globalInstruction', () => this.refreshLineage());
+        this.$watch('form.outputKey', () => this.refreshLineage());
     },
 
     async open() {
@@ -439,6 +457,64 @@ export const agentDesigner = () => ({
     },
 
     /**
+     * Re-run the state-lineage analyzer against the in-flight workflow
+     * graph. Debounced because Alpine getters fire often — we batch
+     * graph mutations and the editing-leaf's prompt edits into one
+     * round-trip every 400ms. The analysis result populates
+     * `lineageAnalysis`; validatePipeline() reads its issues[] to
+     * surface missing-ref / unused-output warnings beside the
+     * structural errors.
+     *
+     * No-op when no workflow graph is in scope (single-LLM-agent edit).
+     * The endpoint is best-effort — failures keep the previous analysis
+     * so a transient network blip doesn't blank the Validation panel.
+     */
+    refreshLineage() {
+        if (this.__lineageRefreshTimer) {
+            clearTimeout(this.__lineageRefreshTimer);
+        }
+        this.__lineageRefreshTimer = setTimeout(() => this._fetchLineage(), 400);
+    },
+
+    async _fetchLineage() {
+        const graph = this.pipelineGraph;
+        if (!graph) {
+            this.lineageAnalysis = { producible_before: {}, produces: {}, references: {}, issues: [] };
+            return;
+        }
+        // When the user is mid-edit on a leaf inside this workflow, send
+        // the unsaved values so the analysis matches what they see in
+        // the prompt editor — otherwise we'd validate stale text.
+        const overrides = [];
+        if (this.editingAgent && this.editingAgent.id) {
+            overrides.push({
+                agentId: this.editingAgent.id,
+                name: this.form.name,
+                systemPrompt: this.form.systemPrompt,
+                globalInstruction: this.form.globalInstruction,
+                outputKey: this.form.outputKey,
+            });
+        }
+        try {
+            const response = await fetch('/v1/agent-definitions/analyze-state-lineage', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ graph, leafOverrides: overrides }),
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            this.lineageAnalysis = {
+                producible_before: data.producible_before || {},
+                produces: data.produces || {},
+                references: data.references || {},
+                issues: Array.isArray(data.issues) ? data.issues : [],
+            };
+        } catch (err) {
+            console.error('Failed to analyze state lineage:', err);
+        }
+    },
+
+    /**
      * Handle keystrokes inside the system-prompt textarea. Typing '{'
      * opens the picker; typing '}' or whitespace closes it. While open
      * the input narrows the list by prefix. Matches ADK's lexer, which
@@ -628,6 +704,25 @@ export const agentDesigner = () => ({
      * .READ/adk-go/internal/llminternal/instruction_processor.go, but
      * applies our tighter identifier rule before flagging unknowns.
      */
+    /**
+     * Return state-lineage issues from the latest analyzer pass that
+     * are tied to the leaf the user is currently editing. The analyzer
+     * keys issues by composition NODE id; this getter filters by the
+     * underlying AGENT id (editingAgent.id) so the leaf form sees only
+     * its own findings even when the same agent appears at multiple
+     * nodes in the workflow.
+     *
+     * Empty list when no workflow is open or the analyzer hasn't run
+     * yet — the parent <div x-show> hides the warning block in those
+     * cases.
+     */
+    get currentLeafLineageIssues() {
+        const issues = (this.lineageAnalysis && this.lineageAnalysis.issues) || [];
+        const agentId = this.editingAgent && this.editingAgent.id;
+        if (!agentId) return [];
+        return issues.filter(i => i.agent_id === agentId);
+    },
+
     get unknownPromptKeys() {
         const text = this.form.systemPrompt || '';
         if (!text.includes('{')) return [];
@@ -2088,6 +2183,20 @@ export const agentDesigner = () => ({
             errors.push('Workflow tree exceeds maximum of 50 nodes');
         }
 
+        // State-flow issues come from the static lineage analyzer
+        // (POST /analyze-state-lineage). Missing-ref + conditional-no-
+        // evaluator-output are hard errors and flip the Valid badge;
+        // unused-output stays out of the badge so a soft warning doesn't
+        // block save (we surface it elsewhere as a hint).
+        const lineageIssues = this.lineageAnalysis && Array.isArray(this.lineageAnalysis.issues)
+            ? this.lineageAnalysis.issues
+            : [];
+        for (const issue of lineageIssues) {
+            if (issue.kind === 'missing_ref' || issue.kind === 'conditional_no_evaluator_output' || issue.kind === 'branch_only_key') {
+                errors.push(issue.message);
+            }
+        }
+
         return errors;
     },
 
@@ -2139,6 +2248,9 @@ export const agentDesigner = () => ({
 
         store.load(this.pipelineGraph, allAgents, this.connectors, this.pipelineSystemPrompt);
         this.view = 'flow';
+        // First analysis pass — the Validation badge needs an answer
+        // even before the user mutates anything.
+        this.refreshLineage();
 
         // Initialize the editable workflow tree component
         this.$nextTick(() => {
@@ -2179,6 +2291,10 @@ export const agentDesigner = () => ({
         const g = store.export();
         if (g) this.pipelineGraph = g;
         this.pipelineSystemPrompt = store.systemPrompt || this.pipelineSystemPrompt;
+        // Canvas mutations land here on the way back to component
+        // state — keep the lineage analysis in sync with what the
+        // "Valid" badge will now read.
+        this.refreshLineage();
     },
 
 

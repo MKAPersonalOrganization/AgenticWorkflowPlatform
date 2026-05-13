@@ -488,6 +488,42 @@ func (a *stateKeyAccumulator) sorted() []StateKeySuggestion {
 	return out
 }
 
+// AnalyzeWorkflowLineage runs the static state-flow analyzer against the
+// provided composition graph. Leaf agents referenced by the graph are
+// loaded from the user's library so the analyzer can read their
+// SystemPrompt / OutputKey / GlobalInstruction.
+//
+// `leafOverrides` lets the caller substitute in-flight (unsaved) leaf
+// edits — when the designer is in mid-edit, the prompt the user is
+// actually typing should drive the analysis, not the stale repo copy.
+// Pass nil when no overrides are needed.
+func (s *Service) AnalyzeWorkflowLineage(ctx context.Context, userID string, root *CompositionNode, leafOverrides map[string]*AgentDefinition) (StateLineage, error) {
+	if root == nil {
+		return StateLineage{
+			ProducibleBefore: map[string][]string{},
+			Produces:         map[string][]string{},
+			References:       map[string][]Reference{},
+		}, nil
+	}
+	all, err := s.repo.ListByUser(ctx, UserID(userID))
+	if err != nil {
+		return StateLineage{}, err
+	}
+	byID := make(map[string]*AgentDefinition, len(all))
+	for i := range all {
+		byID[all[i].ID] = &all[i]
+	}
+	// Apply caller-supplied overrides last — the in-flight edit wins
+	// over the repo snapshot.
+	for id, override := range leafOverrides {
+		if override == nil {
+			continue
+		}
+		byID[id] = override
+	}
+	return AnalyzeLineage(root, byID), nil
+}
+
 // GetConsumers returns all agents that reference the given agent ID in their graph.
 // This identifies workflows that use this agent as a sub-agent.
 func (s *Service) GetConsumers(ctx context.Context, userID, agentID string) ([]AgentDefinition, error) {

@@ -81,9 +81,13 @@ templ ActivityPanel() {
 		</div>
 		</template>
 		<!-- ── Expanded panel ─────────────────────────────────────────── -->
+		<!-- Solid bg-background (no transparency) — the panel often sits
+		     over chat text and the previous glass-heavy bleed-through
+		     made the workflow rows hard to read. The drag header still
+		     has its own subtle bg-background/40 for visual separation. -->
 		<template x-if="!activityPanelMinimized">
 		<div
-			class="glass-heavy rounded-2xl shadow-modern-xl border border-border/40 flex flex-col overflow-hidden relative"
+			class="bg-background rounded-2xl shadow-modern-xl border border-border/60 flex flex-col overflow-hidden relative"
 			:style="`width:${activityPanelW}px; height:${activityPanelH}px;`"
 		>
 			<!-- Drag-handle header -->
@@ -136,7 +140,9 @@ templ ActivityPanel() {
 					</button>
 				</div>
 			</div>
-			<!-- Body: scrollable workflow graph -->
+			<!-- Body: workflow tree with inline state values. Structure
+			     and state share one surface so the user sees "who wrote
+			     what" in the order it actually happened. -->
 			<div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
 				@ActivityBody()
 			</div>
@@ -380,17 +386,71 @@ templ ActivityBody() {
 									<template x-if="row.isLeaf && agentStatusFor(row.agentName) === 'error'">
 										<span class="ms-auto text-[10px] text-destructive font-medium shrink-0">{ i18n.T(ctx, "failed") }</span>
 									</template>
+									<!-- Design-time lineage warning. Lights up when
+									     the static analyzer reported a missing
+									     reference or a no-evaluator-output issue
+									     against this leaf. Hover for the full
+									     message list. The dot rides the same
+									     status pill row so it never overlaps the
+									     value row below. -->
+									<template x-if="row.isLeaf && row.agentId && (lineageIssuesByAgent[row.agentId] || []).length > 0">
+										<span
+											class="inline-flex items-center gap-1 text-[10px] text-rose-500 font-medium shrink-0 cursor-help"
+											:title="(lineageIssuesByAgent[row.agentId] || []).map(i => i.message).join('\n')"
+										>
+											<span class="relative flex size-2">
+												<span class="absolute inset-0 rounded-full bg-rose-500/40 animate-ping"></span>
+												<span class="relative size-2 rounded-full bg-rose-500"></span>
+											</span>
+											<span x-text="`${(lineageIssuesByAgent[row.agentId] || []).length} ${(lineageIssuesByAgent[row.agentId] || []).length === 1 ? window.i18n.t('issue') : window.i18n.t('issues')}`"></span>
+										</span>
+									</template>
 								</div>
-								<!-- Output value preview under leaves -->
-								<template x-if="row.isLeaf && agentOutputPreview(row)">
-									<div
-										class="mt-1 text-[11px] leading-snug flex items-start gap-1.5"
-										x-transition.opacity
-									>
-										<span class="text-muted-foreground/40 shrink-0">↳</span>
-										<span class="font-mono text-[10px] text-muted-foreground/80 shrink-0" x-text="agentOutputPreview(row).key"></span>
-										<span class="text-muted-foreground/40 shrink-0">·</span>
-										<span class="truncate italic text-muted-foreground/80" x-text="agentOutputPreview(row).value"></span>
+								<!-- Inline state value under each leaf. The
+								     workflow tree is the source of truth for
+								     "who wrote what"; this row is the actual
+								     value. The state map is keyed by
+								     output_key but row.outputKey isn't always
+								     available (sub-agents are filtered from
+								     /v1/agent-definitions), so we look up by
+								     agentName via outputEntryForRow. -->
+								<template x-if="row.isLeaf && outputEntryForRow(row)">
+									<div class="mt-1 ms-1 text-[11px] leading-snug" x-transition.opacity>
+										<button
+											type="button"
+											class="group/preview w-full flex items-start gap-1.5 text-start hover:bg-muted/20 rounded px-1 py-0.5 -mx-1 transition-colors"
+											@click="toggleExpandStateKey(outputEntryForRow(row).key)"
+											:title="expandedStateKeys[outputEntryForRow(row).key] ? window.i18n.t('Collapse') : window.i18n.t('Expand')"
+										>
+											<svg
+												class="size-3 mt-0.5 text-muted-foreground/50 shrink-0 transition-transform"
+												:class="expandedStateKeys[outputEntryForRow(row).key] ? 'rotate-90' : ''"
+												viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+											>
+												<polyline points="9 18 15 12 9 6"/>
+											</svg>
+											<code class="font-mono text-[10px] text-primary/70 shrink-0 group-hover/preview:text-primary transition-colors" x-text="'{' + outputEntryForRow(row).key + '}'"></code>
+											<span class="text-muted-foreground/40 shrink-0">·</span>
+											<span
+												class="italic text-muted-foreground/80 min-w-0"
+												:class="expandedStateKeys[outputEntryForRow(row).key] ? 'whitespace-pre-wrap wrap-break-word' : 'truncate'"
+												x-text="expandedStateKeys[outputEntryForRow(row).key] ? (typeof outputEntryForRow(row).entry.value === 'string' ? outputEntryForRow(row).entry.value : JSON.stringify(outputEntryForRow(row).entry.value, null, 2)) : agentOutputPreview(row)?.value"
+											></span>
+										</button>
+										<!-- Copy button shown only when expanded — keeps
+										     the collapsed row uncluttered. -->
+										<template x-if="expandedStateKeys[outputEntryForRow(row).key]">
+											<div class="mt-1 flex items-center gap-2">
+												<button
+													type="button"
+													class="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1 transition-colors"
+													@click.stop="copyStateValue(outputEntryForRow(row).entry.value)"
+												>
+													<svg class="size-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+													{ i18n.T(ctx, "Copy value") }
+												</button>
+											</div>
+										</template>
 									</div>
 								</template>
 							</div>

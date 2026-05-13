@@ -130,18 +130,38 @@ export function createWorkflowStatusMethods() {
         },
 
         /**
+         * Find the state entry a given leaf row wrote. We can't rely
+         * on row.outputKey alone — the chat's /v1/agent-definitions
+         * list excludes sub-agents (excludeSubAgents on the backend),
+         * so leaf rows don't always know their own output_key. The
+         * STATE_CHANGE_REPORTED handler does, though, and stamps each
+         * workflowOutputs entry with the producing agentName — so we
+         * reverse-lookup by name and return the matching key.
+         * Returns { key, entry: {agentName, value} } or null.
+         */
+        outputEntryForRow(row) {
+            if (!row || !row.agentName) return null;
+            const all = this.workflowOutputs || {};
+            for (const key of Object.keys(all)) {
+                const e = all[key];
+                if (e && e.agentName === row.agentName) {
+                    return { key, entry: e };
+                }
+            }
+            return null;
+        },
+
+        /**
          * One-line preview of the value an agent wrote to session
-         * state, shown inline under completed leaves in the Activity
-         * tree. Returns null when there's nothing to show.
+         * state. Returns null when there's nothing to show.
          */
         agentOutputPreview(row) {
-            if (!row || !row.outputKey) return null;
-            const out = this.workflowOutputs?.[row.outputKey];
-            if (!out || out.value == null) return null;
-            let s = typeof out.value === 'string' ? out.value : JSON.stringify(out.value);
+            const found = this.outputEntryForRow(row);
+            if (!found || found.entry.value == null) return null;
+            let s = typeof found.entry.value === 'string' ? found.entry.value : JSON.stringify(found.entry.value);
             s = s.replace(/\s+/g, ' ').trim();
             if (s.length > 80) s = s.slice(0, 77) + '…';
-            return { key: row.outputKey, value: s };
+            return { key: found.key, value: s };
         },
     };
 }

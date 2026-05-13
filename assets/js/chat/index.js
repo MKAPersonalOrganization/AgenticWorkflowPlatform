@@ -177,6 +177,58 @@ document.addEventListener('alpine:init', () => {
                     console.error('Failed to resolve current agent details:', err);
                     this.currentAgentData = { id: agentId, name: 'Agent', description: '', icon: '' };
                 }
+
+                // Best-effort design-time analysis. Failures are silent;
+                // the Activity panel just won't show red dots until the
+                // user re-selects the agent.
+                this.__fetchAgentLineage();
+            },
+
+            // __fetchAgentLineage runs the static state-flow analyzer
+            // for the currently selected agent's workflow graph. The
+            // result drives the inline red-dot warnings on Activity-
+            // panel leaves whose instructions reference unreachable
+            // keys. No-op for non-workflow agents.
+            async __fetchAgentLineage() {
+                const graph = this.currentAgentData?.graph;
+                if (!graph) {
+                    this.currentAgentLineage = { issues: [], producible_before: {}, produces: {}, references: {} };
+                    return;
+                }
+                try {
+                    const response = await fetch('/v1/agent-definitions/analyze-state-lineage', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ graph }),
+                    });
+                    if (!response.ok) return;
+                    const data = await response.json();
+                    this.currentAgentLineage = {
+                        issues: Array.isArray(data.issues) ? data.issues : [],
+                        producible_before: data.producible_before || {},
+                        produces: data.produces || {},
+                        references: data.references || {},
+                    };
+                } catch (err) {
+                    console.error('Failed to analyze state lineage:', err);
+                }
+            },
+
+            // lineageIssuesByAgent buckets the latest analysis result
+            // by agent ID so the Activity-panel leaf-render can look up
+            // its leaf in O(1). Issues with no agent_id (e.g. a
+            // conditional with a missing evaluator output_key on a
+            // node-only basis) bucket under '_node:<node_id>' so a
+            // separate lookup can surface them.
+            get lineageIssuesByAgent() {
+                const out = {};
+                const issues = this.currentAgentLineage?.issues || [];
+                for (const issue of issues) {
+                    const k = issue.agent_id || ('_node:' + (issue.node_id || ''));
+                    if (!out[k]) out[k] = [];
+                    out[k].push(issue);
+                }
+                return out;
             },
 
             // Persist agent preference to server and localStorage cache
@@ -479,6 +531,11 @@ document.addEventListener('alpine:init', () => {
                         kind: node.type, // 'sequential' | 'parallel' | 'loop' | 'conditional' | 'agent' | 'remote'
                         label: agentName || node.label || node.id || node.type,
                         agentName,
+                        // agentId lets the Activity panel join the row
+                        // against currentAgentLineage.issues — keyed by
+                        // agent_id, not node_id — so red-dot warnings
+                        // light up on the leaves that own the problem.
+                        agentId: node.agent_id || null,
                         outputKey,
                         description,
                         condition: node.condition || null,

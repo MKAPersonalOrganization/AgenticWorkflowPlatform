@@ -533,6 +533,65 @@ type availableStateKeysResponse struct {
 	Keys []StateKeySuggestion `json:"keys"`
 }
 
+// analyzeLineageRequest carries the in-flight workflow graph plus any
+// unsaved leaf edits the designer wants reflected in the analysis. When
+// the user is mid-edit on a leaf agent inside an open workflow, the
+// client supplies that leaf via `leafOverrides` keyed by AgentID so the
+// analyzer sees the typed-but-not-yet-saved instruction text.
+type analyzeLineageRequest struct {
+	Graph         *CompositionNode      `json:"graph"`
+	LeafOverrides []analyzeLeafOverride `json:"leafOverrides,omitempty"`
+}
+
+// analyzeLeafOverride is a single in-flight leaf edit. Only the fields
+// the analyzer actually reads are accepted — other AgentDefinition
+// fields are ignored.
+type analyzeLeafOverride struct {
+	AgentID           string `json:"agentId"`
+	Name              string `json:"name,omitempty"`
+	SystemPrompt      string `json:"systemPrompt,omitempty"`
+	GlobalInstruction string `json:"globalInstruction,omitempty"`
+	OutputKey         string `json:"outputKey,omitempty"`
+}
+
+// analyzeStateLineage handles POST /v1/agent-definitions/analyze-state-lineage.
+// The request body carries the in-flight composition graph (the user
+// may not have hit Save yet). The handler loads referenced leaf agents
+// from the repo, layers any caller-supplied overrides on top, and
+// returns the static-analysis result so the designer can surface
+// missing-ref / unused-output warnings before the workflow runs.
+func (h *storeHandler) analyzeStateLineage(w http.ResponseWriter, r *http.Request) {
+	user := requireUser(w, r)
+	if user == nil {
+		return
+	}
+	var req analyzeLineageRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	overrides := make(map[string]*AgentDefinition, len(req.LeafOverrides))
+	for _, o := range req.LeafOverrides {
+		if o.AgentID == "" {
+			continue
+		}
+		overrides[o.AgentID] = &AgentDefinition{
+			ID:                o.AgentID,
+			Name:              o.Name,
+			SystemPrompt:      o.SystemPrompt,
+			GlobalInstruction: o.GlobalInstruction,
+			OutputKey:         o.OutputKey,
+		}
+	}
+	analysis, err := h.svc.AnalyzeWorkflowLineage(r.Context(), user.ID, req.Graph, overrides)
+	if err != nil {
+		h.log.Error(r.Context(), "failed to analyze state lineage", "error", err)
+		writeJSONError(w, "Failed to analyze state lineage", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, 0, analysis)
+}
+
 // availableStateKeys handles GET /v1/agent-definitions/{id}/available-state-keys
 func (h *storeHandler) availableStateKeys(w http.ResponseWriter, r *http.Request) {
 	user := requireUser(w, r)
