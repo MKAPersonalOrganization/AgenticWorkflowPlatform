@@ -39,7 +39,7 @@ templ DocumentTableRow() {
 		<td class="p-3 align-middle font-medium">
 			<div class="flex flex-col gap-0.5">
 				<div class="flex items-center gap-2">
-					<span x-html="fileTypeIconSvg(doc.file_name)" class="flex-shrink-0"></span>
+					<span x-html="fileTypeIconSvg(doc.file_name)" class="shrink-0"></span>
 					<span class="truncate max-w-xs" x-html="highlightSearch(doc.title || doc.file_name || ('Document ' + doc.id.slice(0, 8)), docSearch)"></span>
 					<!-- NEW indicator -->
 					<span
@@ -55,7 +55,7 @@ templ DocumentTableRow() {
 							@click.stop="showError = !showError"
 							class="text-xs text-destructive truncate max-w-xs cursor-pointer hover:underline flex items-center gap-1"
 						>
-							<svg xmlns="http://www.w3.org/2000/svg" class="size-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="8" y2="12"></line><line x1="12" x2="12.01" y1="16" y2="16"></line></svg>
+							<svg xmlns="http://www.w3.org/2000/svg" class="size-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="8" y2="12"></line><line x1="12" x2="12.01" y1="16" y2="16"></line></svg>
 							<span x-text="doc.error_message" class="truncate"></span>
 						</button>
 						<div
@@ -65,7 +65,7 @@ templ DocumentTableRow() {
 							x-transition
 							class="absolute start-0 top-full z-50 mt-1 w-72 rounded-lg border bg-popover p-3 shadow-md"
 						>
-							<p class="text-xs text-popover-foreground mb-2 break-words" x-text="doc.error_message"></p>
+							<p class="text-xs text-popover-foreground mb-2 wrap-break-word" x-text="doc.error_message"></p>
 							<button
 								@click.stop="reprocessDocument(doc.id); showError = false"
 								class="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium hover:bg-accent transition-colors"

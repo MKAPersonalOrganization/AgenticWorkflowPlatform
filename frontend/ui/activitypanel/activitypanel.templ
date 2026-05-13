@@ -192,13 +192,13 @@ templ ActivityBody() {
 		<template x-if="hasWorkflowGraph">
 			<div class="flex flex-col h-full">
 				<!-- ───── Hero summary card (sticky) ───────────────────── -->
-				<div class="px-4 pt-4 pb-3 sticky top-0 z-10 bg-gradient-to-b from-background/95 via-background/85 to-background/0 backdrop-blur-sm">
+				<div class="px-4 pt-4 pb-3 sticky top-0 z-10 bg-linear-to-b from-background/95 via-background/85 to-background/0 backdrop-blur-sm">
 					<div
 						class="rounded-2xl border p-4 transition-all duration-300"
 						:class="{
-							'border-success/30 bg-success/[0.06] shadow-modern-sm': workflowRunSummary.status === 'running',
+							'border-success/30 bg-success/6 shadow-modern-sm': workflowRunSummary.status === 'running',
 							'border-border/40 bg-card/30': workflowRunSummary.status === 'success' || workflowRunSummary.status === 'idle',
-							'border-destructive/30 bg-destructive/[0.04]': workflowRunSummary.status === 'error',
+							'border-destructive/30 bg-destructive/4': workflowRunSummary.status === 'error',
 						}"
 					>
 						<div class="flex items-center gap-3">
@@ -268,7 +268,7 @@ templ ActivityBody() {
 					<template x-for="row in workflowGraphRows" :key="row.id">
 						<div
 							class="relative flex items-stretch transition-colors duration-200"
-							:class="row.isLeaf && agentStatusFor(row.agentName) === 'active' ? 'bg-success/[0.05] rounded-lg' : ''"
+							:class="row.isLeaf && agentStatusFor(row.agentName) === 'active' ? 'bg-success/5 rounded-lg' : ''"
 						>
 							<!-- ─── Tree rail columns ─── -->
 							<template x-for="col in Array.from({length: row.depth}, (_, k) => k)" :key="row.id + '-rail-' + col">

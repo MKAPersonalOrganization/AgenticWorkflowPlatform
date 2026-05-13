@@ -79,7 +79,7 @@ templ Container() {
 				<div class="w-full h-1.5 bg-muted/10 rounded-full overflow-hidden">
 					<div
 						class="h-full rounded-full transition-all duration-700 ease-out"
-						:class="progress === 100 ? 'bg-gradient-to-r from-emerald-500/60 to-emerald-400/60' : 'bg-gradient-to-r from-primary/40 to-primary/60'"
+						:class="progress === 100 ? 'bg-linear-to-r from-emerald-500/60 to-emerald-400/60' : 'bg-linear-to-r from-primary/40 to-primary/60'"
 						:style="'width: ' + progress + '%'"
 					></div>
 				</div>
@@ -91,13 +91,13 @@ templ Container() {
 						class="group/item flex items-start gap-3 px-3 py-2.5 rounded-xl transition-all duration-300"
 						:class="{
 							'bg-emerald-500/[0.04] border border-emerald-500/10': todo.status === 'completed',
-							'bg-primary/[0.06] border border-primary/15 shadow-[0_0_15px_-3px_rgba(var(--primary-rgb,99,102,241),0.08)]': todo.status === 'in_progress',
-							'bg-muted/[0.02] border border-transparent hover:border-border/10 hover:bg-muted/[0.04]': todo.status === 'pending',
-							'bg-muted/[0.01] border border-transparent opacity-50': todo.status === 'cancelled'
+							'bg-primary/6 border border-primary/15 shadow-[0_0_15px_-3px_rgba(var(--primary-rgb,99,102,241),0.08)]': todo.status === 'in_progress',
+							'bg-muted/2 border border-transparent hover:border-border/10 hover:bg-muted/4': todo.status === 'pending',
+							'bg-muted/1 border border-transparent opacity-50': todo.status === 'cancelled'
 						}"
 					>
 						<!-- Status indicator -->
-						<div class="flex-shrink-0 mt-0.5">
+						<div class="shrink-0 mt-0.5">
 							<!-- Completed: check circle -->
 							<template x-if="todo.status === 'completed'">
 								<div class="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 border border-emerald-500/20">
@@ -147,7 +147,7 @@ templ Container() {
 						</div>
 						<!-- Step number -->
 						<span
-							class="flex-shrink-0 text-[10px] font-mono tabular-nums mt-0.5"
+							class="shrink-0 text-[10px] font-mono tabular-nums mt-0.5"
 							:class="{
 								'text-emerald-500/30': todo.status === 'completed',
 								'text-primary/40': todo.status === 'in_progress',

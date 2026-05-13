@@ -70,7 +70,7 @@ templ agentDesignerBody(initExpr string) {
 templ agentNodeForm() {
 	<!-- Identity Section -->
 	<div class="rounded-xl border border-border bg-card overflow-hidden">
-		<div class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary/5 to-transparent border-b border-border/50">
+		<div class="flex items-center gap-2 px-4 py-2.5 bg-linear-to-r from-primary/5 to-transparent border-b border-border/50">
 			<div class="size-6 rounded-md bg-primary/10 flex items-center justify-center">
 				@icon.Bot(icon.Props{Class: "size-3.5 text-primary"})
 			</div>
@@ -247,7 +247,7 @@ templ schemaBuilder(fieldKey, emptyMessage string) {
 		<div class="space-y-1.5">
 			@textarea.Textarea(textarea.Props{
 				Placeholder: i18n.T(ctx, `{"type": "object", "properties": {"topic": {"type": "string"}}, "required": ["topic"]}`),
-				Class:       "min-h-[80px] resize-y font-mono text-[11px]",
+				Class:       "min-h-20 resize-y font-mono text-[11px]",
 				Rows:        3,
 				Attributes: templ.Attributes{
 					"x-model": "form." + fieldKey,

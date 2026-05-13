@@ -62,7 +62,7 @@ templ CreateTaskContainer() {
 				<span class="text-[9px] font-bold uppercase tracking-widest text-emerald-500/50 bg-emerald-500/[0.08] px-2 py-0.5 rounded-full">open</span>
 			</div>
 			<template x-if="task.description">
-				<p class="text-[12px] text-muted-foreground/40 leading-relaxed px-1" x-text="task.description"></p>
+				<p class="text-xs text-muted-foreground/40 leading-relaxed px-1" x-text="task.description"></p>
 			</template>
 			<template x-if="task.dependencies && task.dependencies.length > 0">
 				<div class="flex items-center gap-1 px-1">
@@ -118,7 +118,7 @@ templ UpdateTaskContainer() {
 				:class="{
 					'text-emerald-500/60 bg-emerald-500/[0.08]': task.status === 'closed',
 					'text-amber-500/60 bg-amber-500/[0.08]': task.status === 'in_progress',
-					'text-destructive/60 bg-destructive/[0.08]': task.status === 'blocked',
+					'text-destructive/60 bg-destructive/8': task.status === 'blocked',
 					'text-muted-foreground/50 bg-muted/10': task.status === 'open'
 				}"
 				x-text="task.status"
@@ -172,7 +172,7 @@ templ GetTaskContainer() {
 				<span class="text-lg" x-text="statusEmoji(task.status)"></span>
 			</div>
 			<template x-if="task.description">
-				<p class="text-[12px] text-muted-foreground/40 leading-relaxed px-1" x-text="task.description"></p>
+				<p class="text-xs text-muted-foreground/40 leading-relaxed px-1" x-text="task.description"></p>
 			</template>
 			<template x-if="task.parent_id">
 				<div class="flex items-center gap-1 px-1">
@@ -234,7 +234,7 @@ templ ListTasksContainer() {
 	}) {
 		<div class="flex flex-col gap-0.5" x-show="total > 0">
 			<template x-for="(task, idx) in tasks" :key="task.id || idx">
-				<div class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-muted/[0.04] transition-colors">
+				<div class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-muted/4 transition-colors">
 					<span class="text-sm" x-text="statusEmoji(task.status)"></span>
 					<span class="text-[10px] font-mono font-bold text-sky-500/50 bg-sky-500/[0.06] px-1.5 py-0.5 rounded min-w-[3.5rem] text-center" x-text="task.id"></span>
 					<span
@@ -246,7 +246,7 @@ templ ListTasksContainer() {
 						}"
 						x-text="typeLabel(task.type)"
 					></span>
-					<span class="text-[12px] text-foreground/60 flex-1 truncate" x-text="task.title"></span>
+					<span class="text-xs text-foreground/60 flex-1 truncate" x-text="task.title"></span>
 					<template x-if="task.dependencies && task.dependencies.length > 0">
 						<span class="text-[9px] text-amber-500/40" x-text="'⛓ ' + task.dependencies.length"></span>
 					</template>
@@ -348,7 +348,7 @@ templ VisualizeContainer() {
 				</div>
 				<div class="w-full h-1.5 bg-muted/10 rounded-full overflow-hidden">
 					<div
-						class="h-full rounded-full transition-all duration-700 ease-out bg-gradient-to-r from-emerald-500/60 to-emerald-400/60"
+						class="h-full rounded-full transition-all duration-700 ease-out bg-linear-to-r from-emerald-500/60 to-emerald-400/60"
 						:style="'width: ' + closedPct + '%'"
 					></div>
 				</div>
@@ -368,7 +368,7 @@ templ VisualizeContainer() {
 					</div>
 				</template>
 				<template x-if="counts.blocked > 0">
-					<div class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/[0.06] border border-destructive/10">
+					<div class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/6 border border-destructive/10">
 						<span class="text-xs">🚫</span>
 						<span class="text-[9px] font-semibold text-destructive/50 tabular-nums" x-text="counts.blocked + ' blocked'"></span>
 					</div>
@@ -381,7 +381,7 @@ templ VisualizeContainer() {
 				</template>
 			</div>
 			<!-- ASCII graph -->
-			<div class="px-3 py-3 rounded-xl bg-muted/[0.03] border border-border/10 font-mono text-[11px] leading-relaxed text-foreground/50 whitespace-pre-wrap overflow-x-auto" x-text="graph"></div>
+			<div class="px-3 py-3 rounded-xl bg-muted/3 border border-border/10 font-mono text-[11px] leading-relaxed text-foreground/50 whitespace-pre-wrap overflow-x-auto" x-text="graph"></div>
 		</div>
 		<div x-show="total === 0" class="flex flex-col items-center justify-center py-4 gap-2">
 			<span class="text-2xl">📋</span>

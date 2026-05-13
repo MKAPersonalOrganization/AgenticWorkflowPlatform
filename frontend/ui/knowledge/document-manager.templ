@@ -23,7 +23,7 @@ templ DocumentManager() {
 				x-cloak
 				class="rounded-lg border border-destructive/50 bg-destructive/10 p-4 flex items-start gap-3"
 			>
-				@icon.CircleAlert(icon.Props{Class: "size-5 text-destructive flex-shrink-0 mt-0.5"})
+				@icon.CircleAlert(icon.Props{Class: "size-5 text-destructive shrink-0 mt-0.5"})
 				<div class="flex-1 min-w-0">
 					<h4 class="text-sm font-medium text-destructive">{ i18n.T(ctx, "Error loading documents") }</h4>
 					<p class="text-xs text-destructive/80 mt-1" x-text="docsError"></p>

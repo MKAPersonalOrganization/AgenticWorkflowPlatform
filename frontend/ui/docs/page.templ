@@ -20,7 +20,7 @@ templ DocsPage(props DocsPageProps) {
 			<!-- Subtle background grid -->
 			<div class="fixed inset-0 pointer-events-none z-[-1]">
 				<div class="absolute inset-0 bg-grid-pattern [mask-image:radial-gradient(ellipse_at_top,black,transparent_80%)] opacity-20"></div>
-				<div class="absolute inset-0 bg-gradient-to-b from-background/50 to-background"></div>
+				<div class="absolute inset-0 bg-linear-to-b from-background/50 to-background"></div>
 			</div>
 			<!-- Navbar (reuse landing nav) -->
 			@landing.Nav(props.User)

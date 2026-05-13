@@ -47,7 +47,7 @@ templ Container() {
 	}) {
 		<div class="flex flex-col gap-4 py-2">
 			<!-- Filename Display -->
-			<div class="w-full bg-muted/[0.03] border border-border/10 rounded-xl p-4 shadow-[inset_0_1px_4px_rgba(0,0,0,0.01)] transition-colors hover:bg-muted/[0.05] flex items-center gap-3">
+			<div class="w-full bg-muted/3 border border-border/10 rounded-xl p-4 shadow-[inset_0_1px_4px_rgba(0,0,0,0.01)] transition-colors hover:bg-muted/5 flex items-center gap-3">
 				<div class="p-2 rounded-md bg-background/50 border border-border/5">
 					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground/60"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
 				</div>
@@ -58,7 +58,7 @@ templ Container() {
 					</template>
 				</div>
                 <!-- Action Button (View) -->
-                 <button 
+                 <button type="button" 
                     class="ms-auto px-3 py-1.5 text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 rounded-md transition-colors"
                     @click="$dispatch('open-artifact', { filename: message.parsedArgs?.filename })"
                     x-show="message.name !== 'delete_markdown'"

@@ -25,7 +25,7 @@ templ NodeDetails() {
 		x-transition:leave="transition ease-in duration-150"
 		x-transition:leave-start="opacity-100"
 		x-transition:leave-end="opacity-0 w-0"
-		class="border-s bg-background overflow-y-auto flex-shrink-0 relative flex flex-col"
+		class="border-s bg-background overflow-y-auto shrink-0 relative flex flex-col"
 		:style="`width: ${_nodeDetailsPanelWidth || 320}px`"
 	>
 		<!-- Resize handle -->
@@ -84,7 +84,7 @@ templ NodeDetails() {
 						Description
 					</h5>
 				</div>
-				<p class="text-xs leading-relaxed text-foreground/90 break-words" x-text="selectedNode?.description"></p>
+				<p class="text-xs leading-relaxed text-foreground/90 wrap-break-word" x-text="selectedNode?.description"></p>
 			</div>
 			<!-- Properties -->
 			<div x-show="getNodeProperties() && Object.keys(getNodeProperties()).length > 0">
@@ -198,7 +198,7 @@ templ NodeDetails() {
 </span>
 									</template>
 								</div>
-								<div class="inline-flex items-center rounded-md border border-transparent bg-secondary px-1.5 py-0.5 text-[9px] font-semibold transition-colors shrink-0 max-w-[80px] truncate" x-text="edge.edge_type"></div>
+								<div class="inline-flex items-center rounded-md border border-transparent bg-secondary px-1.5 py-0.5 text-[9px] font-semibold transition-colors shrink-0 max-w-20 truncate" x-text="edge.edge_type"></div>
 								<div class="flex items-center gap-1.5 flex-1 min-w-0">
 									<div
 										class="w-2 h-2 rounded-full shrink-0"

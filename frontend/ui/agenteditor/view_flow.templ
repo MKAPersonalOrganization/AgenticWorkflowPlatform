@@ -292,10 +292,10 @@ templ flowView() {
 																	<div class="space-y-1">
 																		<template x-for="subAgent in selectedAgent.subAgents" :key="subAgent.agent_id">
 																			<div class="flex items-center gap-1.5 px-2 py-1 rounded bg-background border border-violet-500/20 text-[9px]">
-																				<span class="text-[8px] flex-shrink-0">🤖</span>
+																				<span class="text-[8px] shrink-0">🤖</span>
 																				<span class="flex-1 min-w-0 truncate text-foreground font-medium" x-text="getSubAgentName(subAgent.agent_id)"></span>
 																				<template x-if="subAgent.output_key">
-																					<span class="text-[8px] font-mono text-violet-600 dark:text-violet-400 flex-shrink-0" x-text="'→'+subAgent.output_key"></span>
+																					<span class="text-[8px] font-mono text-violet-600 dark:text-violet-400 shrink-0" x-text="'→'+subAgent.output_key"></span>
 																				</template>
 																			</div>
 																		</template>

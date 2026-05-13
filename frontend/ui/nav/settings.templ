@@ -84,7 +84,7 @@ templ Settings() {
 						},
 					}) {
 						<!-- Tab List -->
-						<div class="flex flex-row md:flex-col gap-1 min-w-[160px] overflow-x-auto md:overflow-y-auto scrollbar-none pb-2 md:pb-0 border-b md:border-b-0 md:border-e border-border pe-0 md:pe-4">
+						<div class="flex flex-row md:flex-col gap-1 min-w-40 overflow-x-auto md:overflow-y-auto scrollbar-none pb-2 md:pb-0 border-b md:border-b-0 md:border-e border-border pe-0 md:pe-4">
 							@tabs.List(tabs.ListProps{Class: "flex flex-row md:flex-col gap-1 bg-transparent p-0 w-full h-auto items-stretch"}) {
 								@tabs.Trigger(tabs.TriggerProps{
 									Value:    "general",
@@ -208,7 +208,7 @@ templ Settings() {
 										<div class="flex items-center justify-between">
 											<h3 class="text-foreground font-medium">{ i18n.T(ctx, "AI Provider Configuration") }</h3>
 										</div>
-										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Configure your own AI provider and API keys. You are responsible for any costs incurred.") }</p>
+										<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Configure your own AI provider and API keys. You are responsible for any costs incurred.") }</p>
 									</div>
 									<!-- Status Banner -->
 									<template x-if="statusMessage">
@@ -237,7 +237,7 @@ templ Settings() {
 																	<span class="text-[10px] bg-primary/20 text-primary rounded-full px-2 py-0.5">Default</span>
 																</template>
 															</div>
-															<div class="text-[12px] text-muted-foreground">
+															<div class="text-xs text-muted-foreground">
 																<span x-text="s.api_key_masked"></span>
 															</div>
 														</div>
@@ -323,7 +323,7 @@ templ Settings() {
 												@icon.MessageSquare(icon.Props{Class: "size-4"})
 												{ i18n.T(ctx, "Chat Model") }
 											</h3>
-											<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Choose which model to use for chatting with agents. Your configured providers are listed automatically.") }</p>
+											<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Choose which model to use for chatting with agents. Your configured providers are listed automatically.") }</p>
 										</div>
 										<!-- Chat Status Banner -->
 										<template x-if="chatStatusMessage">
@@ -343,7 +343,7 @@ templ Settings() {
 													<div class="font-medium text-foreground text-sm">
 														<span x-text="currentChatConfig.model"></span>
 													</div>
-													<div class="text-[12px] text-muted-foreground">
+													<div class="text-xs text-muted-foreground">
 														<span x-text="currentChatConfig.provider_name"></span>
 													</div>
 												</div>
@@ -477,7 +477,7 @@ templ Settings() {
 												@icon.Network(icon.Props{Class: "size-4"})
 												{ i18n.T(ctx, "Knowledge Graph Embedding") }
 											</h3>
-											<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Choose the embedding model for knowledge graph vector search. Your configured providers are listed automatically.") }</p>
+											<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Choose the embedding model for knowledge graph vector search. Your configured providers are listed automatically.") }</p>
 										</div>
 										<!-- Provider Status -->
 										<template x-if="kgProviderStatus">
@@ -592,7 +592,7 @@ templ Settings() {
 												}
 											}
 										}
-										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "How you prefer to take in and process information.") }</p>
+										<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "How you prefer to take in and process information.") }</p>
 									</div>
 									<div class="flex flex-col gap-2 pt-2">
 										<label class="text-foreground font-medium">{ i18n.T(ctx, "Struggles") }</label>
@@ -601,7 +601,7 @@ templ Settings() {
 											placeholder={ i18n.T(ctx, "e.g. Algebra, focus, time management...") }
 											class="w-full h-20 bg-card border border-border rounded-xl p-3 outline-none focus:ring-1 focus:ring-primary resize-none"
 										></textarea>
-										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Topics or skills you find challenging (comma separated).") }</p>
+										<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Topics or skills you find challenging (comma separated).") }</p>
 									</div>
 									<div class="flex flex-col gap-2 pt-2">
 										<label class="text-foreground font-medium">{ i18n.T(ctx, "Strengths") }</label>
@@ -610,7 +610,7 @@ templ Settings() {
 											placeholder={ i18n.T(ctx, "e.g. Critical thinking, geometry, writing...") }
 											class="w-full h-20 bg-card border border-border rounded-xl p-3 outline-none focus:ring-1 focus:ring-primary resize-none"
 										></textarea>
-										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Areas where you excel or feel confident (comma separated).") }</p>
+										<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Areas where you excel or feel confident (comma separated).") }</p>
 									</div>
 									<div class="flex flex-col gap-2 pt-2">
 										<label class="text-foreground font-medium">{ i18n.T(ctx, "Professional/Personal Goals") }</label>
@@ -619,7 +619,7 @@ templ Settings() {
 											placeholder={ i18n.T(ctx, "e.g. Master system design, improve coding skills...") }
 											class="w-full h-24 bg-card border border-border rounded-xl p-3 outline-none focus:ring-1 focus:ring-primary resize-none"
 										></textarea>
-										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "What you hope to achieve with your AI assistant.") }</p>
+										<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "What you hope to achieve with your AI assistant.") }</p>
 									</div>
 									<!-- Explict Save Button -->
 									<div class="flex items-center justify-end pt-2">
@@ -646,7 +646,7 @@ templ Settings() {
 									<div class="flex items-center justify-between gap-4">
 										<div class="space-y-0.5">
 											<div class="text-foreground font-medium">{ i18n.T(ctx, "Text-to-Speech") }</div>
-											<p class="text-[12px] text-muted-foreground leading-tight">{ i18n.T(ctx, "Enable reading assistant messages aloud.") }</p>
+											<p class="text-xs text-muted-foreground leading-tight">{ i18n.T(ctx, "Enable reading assistant messages aloud.") }</p>
 										</div>
 										@switchcomp.Switch(switchcomp.Props{
 											Name: "textToSpeech",
@@ -658,7 +658,7 @@ templ Settings() {
 									</div>
 									<div class="flex flex-col gap-2 pt-4 border-t border-border">
 										<div class="text-foreground font-medium">{ i18n.T(ctx, "Voice Engine") }</div>
-										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Choose how AI-generated speech is produced.") }</p>
+										<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Choose how AI-generated speech is produced.") }</p>
 										@selectbox.SelectBox(selectbox.Props{Class: "w-full"}) {
 											@selectbox.Trigger(selectbox.TriggerProps{}) {
 												<span>{ i18n.T(ctx, "Default Browser Voice") }</span>
@@ -675,7 +675,7 @@ templ Settings() {
 									</div>
 									<!-- Hint to configure voice in Plugins tab -->
 									<div class="pt-4 border-t border-border">
-										<p class="text-[12px] text-muted-foreground">
+										<p class="text-xs text-muted-foreground">
 											{ i18n.T(ctx, "To configure the AI voice model and voice, go to") }
 											<button
 												type="button"
@@ -694,14 +694,14 @@ templ Settings() {
 								>
 									<div class="space-y-0.5">
 										<div class="text-destructive font-medium">{ i18n.T(ctx, "Clear all conversations") }</div>
-										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Permanently delete all thread history.") }</p>
+										<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Permanently delete all thread history.") }</p>
 									</div>
 									@icon.Trash2(icon.Props{Class: "size-4 text-destructive"})
 								</div>
 								<div class="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-accent transition-colors group cursor-pointer">
 									<div class="space-y-0.5">
 										<div class="text-foreground font-medium">{ i18n.T(ctx, "Export all data") }</div>
-										<p class="text-[12px] text-muted-foreground">{ i18n.T(ctx, "Download a copy of your chat history.") }</p>
+										<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Download a copy of your chat history.") }</p>
 									</div>
 									@icon.Download(icon.Props{Class: "size-4 text-muted-foreground group-hover:text-foreground"})
 								</div>
@@ -830,7 +830,7 @@ templ Settings() {
 												<template x-if="!billingLoading && billing && billing.status === 'active'">
 													<div class="space-y-4">
 														<!-- Plan card -->
-														<div class="rounded-xl border border-success/20 bg-gradient-to-br from-success/5 to-transparent p-4">
+														<div class="rounded-xl border border-success/20 bg-linear-to-br from-success/5 to-transparent p-4">
 															<div class="flex items-center justify-between mb-3">
 																<div class="flex items-center gap-3">
 																	<div class="flex items-center justify-center size-10 rounded-xl bg-success/10 ring-1 ring-success/20">
@@ -987,7 +987,7 @@ templ Settings() {
 												<!-- ─────── CANCELLED subscription ─────── -->
 												<template x-if="!billingLoading && billing && billing.status === 'cancelled'">
 													<div class="space-y-4">
-														<div class="rounded-xl border border-warning/20 bg-gradient-to-br from-warning/5 to-transparent p-4">
+														<div class="rounded-xl border border-warning/20 bg-linear-to-br from-warning/5 to-transparent p-4">
 															<div class="flex items-center justify-between mb-3">
 																<div class="flex items-center gap-3">
 																	<div class="flex items-center justify-center size-10 rounded-xl bg-warning/10 ring-1 ring-warning/20">

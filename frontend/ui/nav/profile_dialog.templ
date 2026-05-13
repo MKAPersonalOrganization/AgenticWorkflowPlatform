@@ -2,7 +2,7 @@ package nav
 
 import (
 	"aicompass/frontend/components/button"
-	"aicompass/frontend/components/icon"
+	"aicompass/frontend/components/dialog"
 	"aicompass/frontend/components/label"
 	"aicompass/frontend/components/selectbox"
 	"aicompass/frontend/components/skeleton"
@@ -10,109 +10,78 @@ import (
 	"aicompass/frontend/ui/i18n"
 )
 
+// profileDialog renders the "Personalized Profile" modal. Opened by
+// dispatching `open-profile-dialog` on `window` — the handler both
+// triggers load() (fetches /api/profile once per session) and opens
+// the templui dialog via its imperative API.
 templ profileDialog() {
-	<div x-data="{
-		open: false,
-		loading: false,
-		saving: false,
-		loaded: false,
-		profile: {
-			learning_style: '',
-			struggles: '',
-			strengths: '',
-			goals: ''
-		},
-		load() {
-			this.open = true;
-			if (this.loaded) return;
-			this.loading = true;
-			fetch('/api/profile')
-				.then(r => {
-					if (!r.ok) throw new Error('Failed to load');
-					return r.json();
+	<div
+		x-data="{
+			loading: false,
+			saving: false,
+			loaded: false,
+			profile: {
+				learning_style: '',
+				struggles: '',
+				strengths: '',
+				goals: ''
+			},
+			load() {
+				if (window.tui && window.tui.dialog) {
+					window.tui.dialog.open('profile-dialog');
+				}
+				if (this.loaded) return;
+				this.loading = true;
+				fetch('/api/profile')
+					.then(r => {
+						if (!r.ok) throw new Error('Failed to load');
+						return r.json();
+					})
+					.then(d => {
+						this.profile.learning_style = d.learning_style || '';
+						this.profile.struggles = (d.struggles || []).join(', ');
+						this.profile.strengths = (d.strengths || []).join(', ');
+						this.profile.goals = d.goals || '';
+						this.loading = false;
+						this.loaded = true;
+					})
+					.catch(e => {
+						this.loading = false;
+					});
+			},
+			save() {
+				this.saving = true;
+				fetch('/api/profile', {
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(this.profile)
 				})
-				.then(d => {
-					this.profile.learning_style = d.learning_style || '';
-					this.profile.struggles = (d.struggles || []).join(', ');
-					this.profile.strengths = (d.strengths || []).join(', ');
-					this.profile.goals = d.goals || '';
-					this.loading = false;
-					this.loaded = true;
+				.then(r => {
+					if (!r.ok) throw new Error('Failed to save');
+					this.saving = false;
+					if (window.tui && window.tui.dialog) {
+						window.tui.dialog.close('profile-dialog');
+					}
 				})
 				.catch(e => {
-					this.loading = false;
+					this.saving = false;
 				});
-		},
-		save() {
-			this.saving = true;
-			fetch('/api/profile', {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(this.profile)
-			})
-			.then(r => {
-				if (!r.ok) throw new Error('Failed to save');
-				this.saving = false;
-			})
-			.catch(e => {
-				this.saving = false;
-			});
-		},
-		close() {
-			this.open = false;
-		}
-	}"
-	@open-profile-dialog.window="load()"
+			}
+		}"
+		@open-profile-dialog.window="load()"
 	>
-		<!-- Backdrop -->
-		<div
-			class="fixed inset-0 z-[60] bg-black/30 dark:bg-black/60 transition-opacity"
-			x-show="open"
-			x-transition:enter="ease-out duration-300"
-			x-transition:enter-start="opacity-0"
-			x-transition:enter-end="opacity-100"
-			x-transition:leave="ease-in duration-200"
-			x-transition:leave-start="opacity-100"
-			x-transition:leave-end="opacity-0"
-			style="display: none;"
-			aria-hidden="true"
-		></div>
-		<!-- Modal Container -->
-		<div
-			class="fixed inset-0 z-[60] flex items-center justify-center p-4"
-			x-show="open"
-			style="display: none;"
-			@click.self="close()"
-		>
-			<div
-				class="relative w-full max-w-2xl max-h-[85vh] bg-background rounded-lg shadow-lg flex flex-col overflow-hidden border border-border"
-				x-show="open"
-				x-transition:enter="ease-out duration-300"
-				x-transition:enter-start="opacity-0 scale-95"
-				x-transition:enter-end="opacity-100 scale-100"
-				x-transition:leave="ease-in duration-200"
-				x-transition:leave-start="opacity-100 scale-100"
-				x-transition:leave-end="opacity-0 scale-95"
-				@keydown.escape.window="close()"
-			>
-				<!-- Header -->
-				<div class="flex items-center justify-between p-6 pb-4 border-b border-border">
-					<div class="space-y-1">
-						<h2 class="text-lg font-semibold leading-none tracking-tight">{ i18n.T(ctx, "Personalized Profile") }</h2>
-						<p class="text-sm text-muted-foreground">{ i18n.T(ctx, "Personalize your AI companion experience") }</p>
-					</div>
-					<button
-						type="button"
-						class="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-						@click="close()"
-					>
-						@icon.X(icon.Props{Class: "size-4"})
-						<span class="sr-only">Close</span>
-					</button>
-				</div>
-				<!-- Body -->
-				<div class="flex-1 overflow-auto p-6">
-					<!-- Loading State -->
+		@dialog.Dialog(dialog.Props{ID: "profile-dialog"}) {
+			@dialog.Content(dialog.ContentProps{Class: "sm:max-w-2xl"}) {
+				@dialog.Header(dialog.HeaderProps{}) {
+					@dialog.Title(dialog.TitleProps{}) {
+						{ i18n.T(ctx, "Personalized Profile") }
+					}
+					@dialog.Description(dialog.DescriptionProps{}) {
+						{ i18n.T(ctx, "Personalize your AI companion experience") }
+					}
+				}
+				<div class="px-6 pb-2 max-h-[60vh] overflow-y-auto">
+					<!-- Loading state: skeleton placeholders match the form's section shapes -->
 					<template x-if="loading">
 						<div class="space-y-4">
 							@skeleton.Skeleton(skeleton.Props{Class: "h-10 rounded-md"})
@@ -124,7 +93,6 @@ templ profileDialog() {
 					<!-- Form -->
 					<template x-if="!loading">
 						<div class="space-y-5">
-							<!-- Learning Style -->
 							<div class="space-y-2">
 								@label.Label() {
 									{ i18n.T(ctx, "Work Style") }
@@ -159,7 +127,6 @@ templ profileDialog() {
 								}
 								<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "How you prefer to take in and process information.") }</p>
 							</div>
-							<!-- Struggles -->
 							<div class="space-y-2">
 								@label.Label() {
 									{ i18n.T(ctx, "Current Struggles") }
@@ -174,7 +141,6 @@ templ profileDialog() {
 								})
 								<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Topics or skills you find challenging (comma separated).") }</p>
 							</div>
-							<!-- Strengths -->
 							<div class="space-y-2">
 								@label.Label() {
 									{ i18n.T(ctx, "Strengths") }
@@ -189,7 +155,6 @@ templ profileDialog() {
 								})
 								<p class="text-xs text-muted-foreground">{ i18n.T(ctx, "Areas where you excel or feel confident (comma separated).") }</p>
 							</div>
-							<!-- Goals -->
 							<div class="space-y-2">
 								@label.Label() {
 									{ i18n.T(ctx, "Professional/Personal Goals") }
@@ -207,19 +172,15 @@ templ profileDialog() {
 						</div>
 					</template>
 				</div>
-				<!-- Footer -->
-				<div class="p-4 border-t border-border flex justify-end gap-2 bg-background">
-					@button.Button(button.Props{
-						Type:    button.TypeButton,
-						Variant: button.VariantOutline,
-						Attributes: templ.Attributes{
-							"@click": "close()",
-						},
-					}) {
-						{ i18n.T(ctx, "Cancel") }
+				@dialog.Footer(dialog.FooterProps{}) {
+					@dialog.Close(dialog.CloseProps{For: "profile-dialog"}) {
+						@button.Button(button.Props{
+							Variant: button.VariantOutline,
+						}) {
+							{ i18n.T(ctx, "Cancel") }
+						}
 					}
 					@button.Button(button.Props{
-						Type: button.TypeButton,
 						Attributes: templ.Attributes{
 							"@click":    "save()",
 							":disabled": "saving || loading",
@@ -231,8 +192,8 @@ templ profileDialog() {
 							{ i18n.T(ctx, "Saving...") }
 						</span>
 					}
-				</div>
-			</div>
-		</div>
+				}
+			}
+		}
 	</div>
 }

@@ -25,7 +25,7 @@ import (
 // they both shape how this agent participates in multi-agent runs.
 templ formStateContextSection() {
 	<div class="rounded-xl border border-border bg-card overflow-hidden">
-		<div class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500/5 to-transparent border-b border-border/50">
+		<div class="flex items-center gap-2 px-4 py-2.5 bg-linear-to-r from-blue-500/5 to-transparent border-b border-border/50">
 			<div class="size-6 rounded-md bg-blue-500/10 flex items-center justify-center">
 				@icon.Key(icon.Props{Class: "size-3.5 text-blue-600 dark:text-blue-400"})
 			</div>
@@ -94,7 +94,7 @@ templ formInputSchemaSection() {
 			type="button"
 			@click="showCalledAsTool = !showCalledAsTool"
 			class="flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent/30 transition-colors"
-			:class="showCalledAsTool ? 'bg-gradient-to-r from-muted to-transparent border-b border-border/50' : ''"
+			:class="showCalledAsTool ? 'bg-linear-to-r from-muted to-transparent border-b border-border/50' : ''"
 		>
 			<span class="flex items-center gap-2">
 				<div class="size-6 rounded-md bg-muted flex items-center justify-center">
@@ -129,7 +129,7 @@ templ formOutputSchemaSection() {
 			type="button"
 			@click="showOutputSchema = !showOutputSchema"
 			class="flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent/30 transition-colors"
-			:class="showOutputSchema ? 'bg-gradient-to-r from-muted to-transparent border-b border-border/50' : ''"
+			:class="showOutputSchema ? 'bg-linear-to-r from-muted to-transparent border-b border-border/50' : ''"
 		>
 			<span class="flex items-center gap-2">
 				<div class="size-6 rounded-md bg-muted flex items-center justify-center">

@@ -45,10 +45,10 @@ templ DocumentPreviewPanel() {
 		<!-- Header -->
 		<div class="flex items-center justify-between border-b px-4 py-3">
 			<div class="flex items-center gap-2 min-w-0 flex-1">
-				@icon.FileText(icon.Props{Class: "size-4 text-muted-foreground flex-shrink-0"})
+				@icon.FileText(icon.Props{Class: "size-4 text-muted-foreground shrink-0"})
 				<h3 class="text-sm font-semibold truncate" x-text="previewDoc?.title || previewDoc?.file_name || 'Document Preview'"></h3>
 			</div>
-			<div class="flex items-center gap-1 flex-shrink-0">
+			<div class="flex items-center gap-1 shrink-0">
 				<!-- Open detail dialog -->
 				@button.Button(button.Props{
 					Variant: button.VariantGhost,

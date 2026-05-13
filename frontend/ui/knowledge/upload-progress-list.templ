@@ -39,7 +39,7 @@ templ UploadProgressList() {
 			<template x-for="(file, idx) in uploadingFiles" :key="file.name + idx">
 				<div class="flex items-center gap-3 rounded-md border px-3 py-2 bg-card">
 					<!-- File icon -->
-					<div class="flex-shrink-0" x-html="fileTypeIcon(file.name)"></div>
+					<div class="shrink-0" x-html="fileTypeIcon(file.name)"></div>
 					<!-- Name + progress -->
 					<div class="flex-1 min-w-0">
 						<p class="text-sm truncate" x-text="file.name"></p>
@@ -52,7 +52,7 @@ templ UploadProgressList() {
 						</div>
 					</div>
 					<!-- Status -->
-					<div class="flex-shrink-0 text-xs">
+					<div class="shrink-0 text-xs">
 						<template x-if="file.error">
 							<span class="text-destructive flex items-center gap-1">
 								@icon.CircleX(icon.Props{Class: "size-3"})

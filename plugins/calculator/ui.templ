@@ -27,10 +27,10 @@ templ ArithmeticContainer() {
 	}) {
 		<div class="flex flex-col gap-4">
 			<!-- Expression: Academic Typography -->
-			<div class="flex items-center gap-2 text-[12px] text-muted-foreground/50 italic font-serif">
+			<div class="flex items-center gap-2 text-xs text-muted-foreground/50 italic font-serif">
 				<span class="font-semibold text-muted-foreground/40">Operation:</span>
 				<span
-					class="text-primary/70 not-italic font-mono text-[11px] bg-primary/[0.05] px-2 py-0.5 rounded-md border border-primary/10"
+					class="text-primary/70 not-italic font-mono text-[11px] bg-primary/5 px-2 py-0.5 rounded-md border border-primary/10"
 					x-text="
 					message.name === 'add' ? `${message.parsedArgs?.a} + ${message.parsedArgs?.b}` :
 					message.name === 'subtract' ? `${message.parsedArgs?.a} - ${message.parsedArgs?.b}` :
@@ -52,7 +52,7 @@ templ ArithmeticContainer() {
 				</template>
 				<!-- Success State: High Impact Typography -->
 				<template x-if="!message.parsedResult?.error && !(typeof message.result === 'string' && message.result.includes('error'))">
-					<div class="bg-muted/[0.03] border border-border/10 rounded-xl p-8 flex flex-col items-center justify-center shadow-[inset_0_1px_4px_rgba(0,0,0,0.01)] transition-colors hover:bg-muted/[0.05]">
+					<div class="bg-muted/3 border border-border/10 rounded-xl p-8 flex flex-col items-center justify-center shadow-[inset_0_1px_4px_rgba(0,0,0,0.01)] transition-colors hover:bg-muted/5">
 						<div class="text-[10px] uppercase tracking-[0.3em] font-bold text-muted-foreground/30 mb-2">Calculated Value</div>
 						<div class="text-5xl font-mono font-bold text-foreground tracking-tighter break-all" x-text="message.parsedResult?.result || message.result"></div>
 					</div>
@@ -85,15 +85,15 @@ templ EquationSolverContainer() {
 		<div class="flex flex-col gap-4">
 			<!-- Equation & Classification -->
 			<div class="flex flex-col gap-2">
-				<div class="flex items-center gap-2 text-[12px] text-muted-foreground/50 italic font-serif">
+				<div class="flex items-center gap-2 text-xs text-muted-foreground/50 italic font-serif">
 					<span class="font-semibold text-muted-foreground/40">Equation:</span>
 					<span
-						class="text-primary/70 not-italic font-mono text-[11px] bg-primary/[0.05] px-2 py-0.5 rounded-md border border-primary/10 shadow-sm"
+						class="text-primary/70 not-italic font-mono text-[11px] bg-primary/5 px-2 py-0.5 rounded-md border border-primary/10 shadow-sm"
 						x-text="message.parsedArgs?.equation || message.parsedResult?.equation || ''"
 					></span>
 				</div>
 				<div class="flex items-center gap-3">
-					<div class="flex items-center gap-2 text-[12px] text-muted-foreground/50 italic font-serif">
+					<div class="flex items-center gap-2 text-xs text-muted-foreground/50 italic font-serif">
 						<span class="font-semibold text-muted-foreground/40">Variable:</span>
 						<span
 							class="text-foreground/70 not-italic font-mono text-[11px] bg-muted/10 px-2 py-0.5 rounded-md border border-border/10"
@@ -123,7 +123,7 @@ templ EquationSolverContainer() {
 			</template>
 			<!-- Solutions -->
 			<template x-if="message.parsedResult?.solutions && !message.parsedResult?.error">
-				<div class="bg-muted/[0.03] border border-border/10 rounded-xl p-6 flex flex-col items-center justify-center shadow-[inset_0_1px_4px_rgba(0,0,0,0.01)] transition-colors hover:bg-muted/[0.05]">
+				<div class="bg-muted/3 border border-border/10 rounded-xl p-6 flex flex-col items-center justify-center shadow-[inset_0_1px_4px_rgba(0,0,0,0.01)] transition-colors hover:bg-muted/5">
 					<div class="text-[10px] uppercase tracking-[0.3em] font-bold text-muted-foreground/30 mb-3">
 						<span x-text="message.parsedResult.solutions.length === 1 ? 'Solution' : 'Solutions'"></span>
 					</div>

@@ -22,7 +22,7 @@ templ BlogIndexPage(props PageProps) {
 			<!-- Subtle background grid, matching /docs -->
 			<div class="fixed inset-0 pointer-events-none z-[-1]">
 				<div class="absolute inset-0 bg-grid-pattern [mask-image:radial-gradient(ellipse_at_top,black,transparent_80%)] opacity-20"></div>
-				<div class="absolute inset-0 bg-gradient-to-b from-background/50 to-background"></div>
+				<div class="absolute inset-0 bg-linear-to-b from-background/50 to-background"></div>
 			</div>
 			@landing.Nav(props.User)
 			<main class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-12 relative z-10">
@@ -61,7 +61,7 @@ templ BlogPostPage(props PageProps, post Post) {
 		<div class="h-full overflow-y-auto scroll-smooth relative">
 			<div class="fixed inset-0 pointer-events-none z-[-1]">
 				<div class="absolute inset-0 bg-grid-pattern [mask-image:radial-gradient(ellipse_at_top,black,transparent_80%)] opacity-20"></div>
-				<div class="absolute inset-0 bg-gradient-to-b from-background/50 to-background"></div>
+				<div class="absolute inset-0 bg-linear-to-b from-background/50 to-background"></div>
 			</div>
 			@landing.Nav(props.User)
 			<article class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-12 relative z-10">

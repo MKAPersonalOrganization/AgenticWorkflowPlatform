@@ -529,7 +529,7 @@ templ FilesystemDialog() {
 										x-show="sortOpen"
 										x-cloak
 										@click.away="sortOpen = false"
-										class="absolute left-0 top-full mt-1 z-50 min-w-[160px] rounded-md border bg-popover p-1 shadow-md"
+										class="absolute left-0 top-full mt-1 z-50 min-w-40 rounded-md border bg-popover p-1 shadow-md"
 									>
 										<button class="flex items-center gap-2 w-full rounded-sm px-2 py-1.5 text-sm hover:bg-accent" @click="setSortBy('name'); sortOpen = false">
 											@icon.ArrowUpAZ(icon.Props{Class: "size-3.5"})

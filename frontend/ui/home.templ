@@ -155,7 +155,7 @@ templ ChatInputScreen(user *auth.User) {
 											<div class="w-full max-w-3xl xl:max-w-4xl mx-auto px-4">
 												@messagelist.MessageList()
 											</div>
-											<div id="messages-end" x-ref="messagesEnd" class="h-0 w-full flex-shrink-0"></div>
+											<div id="messages-end" x-ref="messagesEnd" class="h-0 w-full shrink-0"></div>
 										</div>
 									</div>
 									<!-- Scroll to Bottom Button -->
@@ -230,7 +230,7 @@ templ ChatInputScreen(user *auth.User) {
 				<template x-for="toast in toasts" :key="toast.id">
 					<div
 						:class="toast.leaving ? 'toast-leave' : 'toast-enter'"
-						class="w-full bg-popover/95 backdrop-blur-lg text-popover-foreground rounded-2xl shadow-modern-lg border border-border/50 pt-5 pb-4 px-4 flex items-center justify-center relative overflow-hidden group max-w-md min-w-[320px] mb-2"
+						class="w-full bg-popover/95 backdrop-blur-lg text-popover-foreground rounded-2xl shadow-modern-lg border border-border/50 pt-5 pb-4 px-4 flex items-center justify-center relative overflow-hidden group max-w-md min-w-80 mb-2"
 						role="alert"
 						:aria-live="toast.type === 'error' ? 'assertive' : 'polite'"
 					>

@@ -58,7 +58,7 @@ templ toolRequirementsDialog() {
 				<label class="text-xs font-medium text-foreground">{ i18n.T(ctx, "Confirmation Prompt") }</label>
 				@textarea.Textarea(textarea.Props{
 					Placeholder: i18n.T(ctx, "e.g., This tool will modify files. Are you sure?"),
-					Class:       "min-h-[56px] resize-y text-xs",
+					Class:       "min-h-14 resize-y text-xs",
 					Rows:        2,
 					Attributes: templ.Attributes{
 						"x-model": "reqConfig.confirmation_hint",

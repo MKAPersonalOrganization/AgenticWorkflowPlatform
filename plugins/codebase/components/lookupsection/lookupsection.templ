@@ -13,13 +13,13 @@ templ Container() {
 	}) {
 		<div class="flex flex-col gap-4">
 			<!-- Query Info: Academic Typography -->
-			<div class="flex items-center gap-2 text-[12px] text-muted-foreground/50 italic font-serif">
+			<div class="flex items-center gap-2 text-xs text-muted-foreground/50 italic font-serif">
 				<span class="font-semibold text-muted-foreground/40">Lookup Query:</span>
-				<span class="text-primary/70 not-italic font-mono text-[11px] bg-primary/[0.05] px-2 py-0.5 rounded-md border border-primary/10 shadow-sm" x-text="message.parsedArgs?.query || 'context lookup'"></span>
+				<span class="text-primary/70 not-italic font-mono text-[11px] bg-primary/5 px-2 py-0.5 rounded-md border border-primary/10 shadow-sm" x-text="message.parsedArgs?.query || 'context lookup'"></span>
 			</div>
 			<!-- Content Area: Specialized Surface -->
 			<div class="relative w-full">
-				<div class="bg-muted/[0.04] border border-border/10 rounded-xl p-5 text-[14px] leading-relaxed text-foreground/90 font-serif shadow-[inset_0_1px_4px_rgba(0,0,0,0.02)] transition-colors hover:bg-muted/[0.06]">
+				<div class="bg-muted/4 border border-border/10 rounded-xl p-5 text-[14px] leading-relaxed text-foreground/90 font-serif shadow-[inset_0_1px_4px_rgba(0,0,0,0.02)] transition-colors hover:bg-muted/6">
 					<span x-text="message.result"></span>
 				</div>
 			</div>

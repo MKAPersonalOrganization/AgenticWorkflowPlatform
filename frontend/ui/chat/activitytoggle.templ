@@ -9,7 +9,9 @@ import (
 // ActivityToggle renders the chat-header trigger for the floating
 // multi-agent Activity panel. It only appears when the current session
 // has at least one multi-agent turn (i.e. there's something worth
-// showing). A pulsing primary dot indicates a live run.
+// showing). A pulsing success dot indicates a live run — matches the
+// "green only while streaming" theme used everywhere in the activity
+// surface.
 //
 // The panel itself is a free-floating, draggable, minimizable window —
 // not part of the right sidebar — so this toggle just opens / minimizes
@@ -30,9 +32,9 @@ templ ActivityToggle() {
 			<span
 				x-show="isStreaming && hasActivity"
 				x-cloak
-				class="absolute top-1.5 right-1.5 size-2 rounded-full bg-primary ring-2 ring-background"
+				class="absolute top-1.5 right-1.5 size-2 rounded-full bg-success ring-2 ring-background"
 			>
-				<span class="absolute inset-0 rounded-full bg-primary animate-ping opacity-75"></span>
+				<span class="absolute inset-0 rounded-full bg-success animate-ping opacity-75"></span>
 			</span>
 		}
 	</div>
