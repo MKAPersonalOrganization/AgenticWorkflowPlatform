@@ -11,8 +11,7 @@ import (
 // panel plumbing doesn't bleed into the other views' simpler structures.
 templ flowView() {
 					<div
-							class="relative flex flex-col flex-1 overflow-hidden"
-							:class="expanded ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[calc(90vh-8rem)]'"
+							class="relative flex flex-col flex-1 min-h-0 overflow-hidden"
 							@keydown.window="if ($event.key === '?' && $event.target.tagName !== 'INPUT' && $event.target.tagName !== 'TEXTAREA' && $event.target.tagName !== 'SELECT' && view === 'flow') { $event.preventDefault(); $store.flow._showHelp = !$store.flow._showHelp; }"
 							@keydown.window.prevent.ctrl.s="if (view === 'flow' && !pipelineSaving && pipelineName.trim()) saveFromFlowView()"
 							@keydown.window.prevent.meta.s="if (view === 'flow' && !pipelineSaving && pipelineName.trim()) saveFromFlowView()"
