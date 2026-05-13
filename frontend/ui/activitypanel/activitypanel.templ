@@ -1,0 +1,403 @@
+package activitypanel
+
+import (
+	"aicompass/frontend/components/icon"
+	"aicompass/frontend/ui/i18n"
+)
+
+// ActivityPanel renders the floating, draggable, minimizable multi-agent
+// workflow surface. Decoupled from the sidebar: position, size, and
+// open/minimized state all live in chat-activity-panel.js and persist to
+// localStorage so the user's chosen layout sticks.
+//
+// Visual: glass-heavy panel with a drag-handle header, expand/minimize
+// and close affordances, and a workflow-graph body (trunk + parallel
+// lanes) for the current run's intermediate work.
+//
+// Single source of truth for the activity view — sidepanel/activity.templ
+// no longer participates.
+templ ActivityPanel() {
+	<!-- Outer positioned wrapper. <template x-if> ensures the wrapper is
+	     removed from the DOM entirely when closed, and the inner pill /
+	     expanded variants are mutually exclusive (single DOM node, no
+	     chance of both showing during a transition or hydration race). -->
+	<template x-if="activityPanelOpen">
+		<div
+			x-cloak
+			x-transition:enter="transition ease-out duration-200"
+			x-transition:enter-start="opacity-0 scale-95"
+			x-transition:enter-end="opacity-100 scale-100"
+			x-transition:leave="transition ease-in duration-150"
+			x-transition:leave-start="opacity-100 scale-100"
+			x-transition:leave-end="opacity-0 scale-95"
+			class="fixed z-40 select-none"
+			:style="`left:${activityPanelX}px; top:${activityPanelY}px;`"
+		>
+		<!-- ── Minimized pill (still draggable, click to expand) ──────── -->
+		<template x-if="activityPanelMinimized">
+		<div
+			class="glass-heavy rounded-full shadow-modern border border-border/40 flex items-center gap-2.5 ps-3 pe-2 py-1.5"
+			:style="activityPanelDragging ? 'cursor: grabbing' : 'cursor: grab'"
+			@pointerdown="startActivityPanelDrag($event)"
+			@pointermove="onActivityPanelMove($event)"
+			@pointerup="stopActivityPanelDrag($event)"
+			@click="if (!activityPanelDragMoved) restoreActivityPanel()"
+		>
+			<!-- Status orb — green only while actively streaming. -->
+			<div class="relative shrink-0">
+				<template x-if="workflowRunSummary.status === 'running'">
+					<div class="size-5 rounded-full bg-success/15 ring-1 ring-success/40 flex items-center justify-center">
+						<svg class="size-2.5 text-success animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+							<path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+						</svg>
+					</div>
+				</template>
+				<template x-if="workflowRunSummary.status !== 'running'">
+					<div class="size-5 rounded-full bg-muted/40 ring-1 ring-border/40 flex items-center justify-center">
+						@icon.Workflow(icon.Props{Class: "size-2.5 text-muted-foreground"})
+					</div>
+				</template>
+			</div>
+			<!-- Compact summary: status label + active-agent count badge
+			     when a parallel run has more than one live agent. -->
+			<span class="text-xs font-medium text-foreground/85">
+				<span x-text="workflowRunSummary.status === 'running' ? window.i18n.t('Running') : workflowRunSummary.status === 'success' ? window.i18n.t('Completed') : workflowRunSummary.status === 'error' ? window.i18n.t('Failed') : window.i18n.t('Activity')"></span>
+				<template x-if="workflowRunSummary.status === 'running' && workflowRunSummary.active > 1">
+					<span class="text-muted-foreground"> · <span x-text="workflowRunSummary.active"></span> { i18n.T(ctx, "agents") }</span>
+				</template>
+				<template x-if="workflowRunSummary.elapsedMs > 0 && workflowRunSummary.active <= 1">
+					<span class="text-muted-foreground tabular-nums"> · <span x-text="workflowRunSummary.elapsedLabel"></span></span>
+				</template>
+			</span>
+			<button
+				type="button"
+				data-no-drag
+				@click.stop="closeActivityPanel()"
+				class="ms-1 size-6 rounded-full hover:bg-accent/60 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+				title={ i18n.T(ctx, "Close") }
+			>
+				@icon.X(icon.Props{Class: "size-3"})
+			</button>
+		</div>
+		</template>
+		<!-- ── Expanded panel ─────────────────────────────────────────── -->
+		<template x-if="!activityPanelMinimized">
+		<div
+			class="glass-heavy rounded-2xl shadow-modern-xl border border-border/40 flex flex-col overflow-hidden relative"
+			:style="`width:${activityPanelW}px; height:${activityPanelH}px;`"
+		>
+			<!-- Drag-handle header -->
+			<div
+				class="flex items-center gap-2 px-3 py-2 border-b border-border/40 bg-background/40 backdrop-blur-sm"
+				:style="activityPanelDragging ? 'cursor: grabbing' : 'cursor: grab'"
+				@pointerdown="startActivityPanelDrag($event)"
+				@pointermove="onActivityPanelMove($event)"
+				@pointerup="stopActivityPanelDrag($event)"
+			>
+				<!-- Status orb -->
+				<div class="relative shrink-0" data-no-drag>
+					<template x-if="isStreaming && hasActivity">
+						<div class="size-6 rounded-md bg-primary/10 flex items-center justify-center ring-1 ring-primary/30">
+							<svg class="size-3 text-primary animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+								<path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+							</svg>
+						</div>
+					</template>
+					<template x-if="!(isStreaming && hasActivity)">
+						<div class="size-6 rounded-md bg-primary/10 flex items-center justify-center ring-1 ring-primary/30 text-primary">
+							@icon.Workflow(icon.Props{Class: "size-3"})
+						</div>
+					</template>
+				</div>
+				<!-- Title -->
+				<div class="flex-1 min-w-0 flex items-center gap-1.5">
+					<span class="text-sm font-semibold text-foreground truncate">{ i18n.T(ctx, "Activity") }</span>
+					<template x-if="activityCards.length > 0">
+						<span class="text-xs text-muted-foreground" x-text="`(${activityCards.length})`"></span>
+					</template>
+				</div>
+				<!-- Header controls -->
+				<div class="flex items-center gap-0.5 shrink-0" data-no-drag>
+					<button
+						type="button"
+						@click="minimizeActivityPanel()"
+						class="size-7 rounded-md hover:bg-accent/60 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+						title={ i18n.T(ctx, "Minimize") }
+					>
+						<svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+					</button>
+					<button
+						type="button"
+						@click="closeActivityPanel()"
+						class="size-7 rounded-md hover:bg-accent/60 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+						title={ i18n.T(ctx, "Close") }
+					>
+						@icon.X(icon.Props{Class: "size-3.5"})
+					</button>
+				</div>
+			</div>
+			<!-- Body: scrollable workflow graph -->
+			<div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
+				@ActivityBody()
+			</div>
+			<!-- Resize handle (bottom-right corner) -->
+			<div
+				class="absolute bottom-1 right-1 size-4 cursor-nwse-resize text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+				@pointerdown="startActivityPanelResize($event)"
+				@pointermove="onActivityPanelResize($event)"
+				@pointerup="stopActivityPanelResize($event)"
+				title={ i18n.T(ctx, "Resize") }
+			>
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-full">
+					<polyline points="22 22 22 16 16 22 22 22"></polyline>
+					<line x1="14" y1="22" x2="22" y2="14"></line>
+					<line x1="9" y1="22" x2="22" y2="9"></line>
+				</svg>
+			</div>
+		</div>
+		</template>
+		</div>
+	</template>
+}
+
+// ActivityBody renders the *static* workflow graph of the currently
+// selected agent and highlights nodes as runtime events fire. We use the
+// agent's known composition tree as the source of truth instead of
+// deriving structure from per-event traffic — the event stream is
+// linearised by the parallel runner (each goroutine fires its own
+// transfers, interleaved) and produces dozens of noisy entries that
+// don't reflect the actual workflow shape.
+//
+// Each row is one node in the tree (composite or leaf). Indent + rail
+// glyphs hint at depth; a status dot on the left shows whether the node
+// is pending / active / done / errored. Composite nodes also show a
+// type chip (Sequential, Parallel, Loop, Conditional).
+//
+// Falls back to an empty state when the current agent isn't composed —
+// single-agent chats don't need a separate activity surface.
+templ ActivityBody() {
+	<div class="flex flex-col h-full">
+		<!-- ───── Empty state: no workflow graph ───────────────────────── -->
+		<template x-if="!hasWorkflowGraph">
+			<div class="flex flex-col items-center justify-center py-16 text-center gap-3 px-4">
+				<div class="size-12 rounded-2xl bg-muted/40 flex items-center justify-center">
+					@icon.Workflow(icon.Props{Class: "size-6 text-muted-foreground/60"})
+				</div>
+				<div class="space-y-1 max-w-[280px]">
+					<p class="text-sm font-medium text-foreground/80">{ i18n.T(ctx, "No workflow yet") }</p>
+					<p class="text-xs text-muted-foreground leading-relaxed">{ i18n.T(ctx, "Pick a composed agent to see its workflow graph here. Nodes light up live as each step runs.") }</p>
+				</div>
+			</div>
+		</template>
+		<template x-if="hasWorkflowGraph">
+			<div class="flex flex-col h-full">
+				<!-- ───── Hero summary card (sticky) ───────────────────── -->
+				<div class="px-4 pt-4 pb-3 sticky top-0 z-10 bg-gradient-to-b from-background/95 via-background/85 to-background/0 backdrop-blur-sm">
+					<div
+						class="rounded-2xl border p-4 transition-all duration-300"
+						:class="{
+							'border-success/30 bg-success/[0.06] shadow-modern-sm': workflowRunSummary.status === 'running',
+							'border-border/40 bg-card/30': workflowRunSummary.status === 'success' || workflowRunSummary.status === 'idle',
+							'border-destructive/30 bg-destructive/[0.04]': workflowRunSummary.status === 'error',
+						}"
+					>
+						<div class="flex items-center gap-3">
+							<!-- Status icon — only green while actively streaming -->
+							<div class="relative shrink-0">
+								<template x-if="workflowRunSummary.status === 'running'">
+									<div class="size-9 rounded-xl bg-success/15 ring-1 ring-success/40 flex items-center justify-center">
+										<svg class="size-4 text-success animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+											<path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+										</svg>
+										<span class="absolute inset-0 rounded-xl bg-success/20 animate-ping opacity-60"></span>
+									</div>
+								</template>
+								<template x-if="workflowRunSummary.status === 'success'">
+									<div class="size-9 rounded-xl bg-muted/40 ring-1 ring-border/40 flex items-center justify-center">
+										<svg class="size-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+											<polyline points="20 6 9 17 4 12"></polyline>
+										</svg>
+									</div>
+								</template>
+								<template x-if="workflowRunSummary.status === 'error'">
+									<div class="size-9 rounded-xl bg-destructive/15 ring-1 ring-destructive/40 flex items-center justify-center">
+										<svg class="size-4 text-destructive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+											<line x1="12" y1="8" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/><circle cx="12" cy="12" r="10"/>
+										</svg>
+									</div>
+								</template>
+								<template x-if="workflowRunSummary.status === 'idle'">
+									<div class="size-9 rounded-xl bg-muted/40 ring-1 ring-border/40 flex items-center justify-center">
+										@icon.Workflow(icon.Props{Class: "size-4 text-muted-foreground"})
+									</div>
+								</template>
+							</div>
+							<!-- Status label — the tree below identifies *which*
+							     agents are active via their lit-up nodes, so the
+							     hero stays minimal: just status + elapsed. -->
+							<div class="flex-1 min-w-0">
+								<div
+									class="text-sm font-semibold tracking-wide"
+									:class="{
+										'text-success': workflowRunSummary.status === 'running',
+										'text-destructive': workflowRunSummary.status === 'error',
+										'text-foreground': workflowRunSummary.status === 'success',
+										'text-muted-foreground': workflowRunSummary.status === 'idle',
+									}"
+									x-text="workflowRunSummary.status === 'running' ? window.i18n.t('Running') : workflowRunSummary.status === 'success' ? window.i18n.t('Completed') : workflowRunSummary.status === 'error' ? window.i18n.t('Failed') : window.i18n.t('Ready')"
+								></div>
+								<template x-if="workflowRunSummary.error > 0">
+									<div class="text-[11px] text-destructive mt-0.5">
+										<span x-text="workflowRunSummary.error"></span>
+										<span> { i18n.T(ctx, "failed") }</span>
+									</div>
+								</template>
+							</div>
+							<!-- Elapsed timer (only once a run has started). -->
+							<template x-if="workflowRunSummary.elapsedMs > 0">
+								<div class="text-end shrink-0 tabular-nums">
+									<div class="text-[10px] text-muted-foreground uppercase tracking-wider">{ i18n.T(ctx, "Elapsed") }</div>
+									<div class="text-sm font-medium text-foreground" x-text="workflowRunSummary.elapsedLabel"></div>
+								</div>
+							</template>
+						</div>
+					</div>
+				</div>
+				<!-- ───── Workflow tree ────────────────────────────────── -->
+				<div class="flex-1 min-h-0 overflow-y-auto px-4 pb-4 pt-2 scrollbar-thin">
+					<template x-for="row in workflowGraphRows" :key="row.id">
+						<div
+							class="relative flex items-stretch transition-colors duration-200"
+							:class="row.isLeaf && agentStatusFor(row.agentName) === 'active' ? 'bg-success/[0.05] rounded-lg' : ''"
+						>
+							<!-- ─── Tree rail columns ─── -->
+							<template x-for="col in Array.from({length: row.depth}, (_, k) => k)" :key="row.id + '-rail-' + col">
+								<div class="w-5 shrink-0 relative">
+									<div
+										class="absolute start-[10px] top-0 bottom-0 w-px transition-colors"
+										:class="row.isLeaf && agentStatusFor(row.agentName) === 'active' ? 'bg-success/40' : 'bg-border/50'"
+										x-show="!row.ancestorIsLastChain[col + 1]"
+									></div>
+								</div>
+							</template>
+							<!-- Row's own glyph column (depth > 0) -->
+							<template x-if="row.depth > 0">
+								<div class="w-5 shrink-0 relative">
+									<div
+										class="absolute start-[10px] top-0 h-1/2 w-px transition-colors"
+										:class="row.isLeaf && agentStatusFor(row.agentName) === 'active' ? 'bg-success/50' : 'bg-border/50'"
+									></div>
+									<div
+										class="absolute start-[10px] bottom-0 h-1/2 w-px transition-colors"
+										:class="row.isLeaf && agentStatusFor(row.agentName) === 'active' ? 'bg-success/40' : 'bg-border/50'"
+										x-show="!row.isLast"
+									></div>
+									<div
+										class="absolute top-1/2 start-[10px] end-0 h-px transition-colors"
+										:class="row.isLeaf && agentStatusFor(row.agentName) === 'active' ? 'bg-success/50' : 'bg-border/50'"
+									></div>
+								</div>
+							</template>
+							<!-- ─── Node body ─── -->
+							<div class="flex-1 min-w-0 py-1.5 ps-1 pe-2">
+								<div class="flex items-center gap-2">
+									<div class="relative shrink-0">
+										<template x-if="row.isLeaf">
+											<div class="relative size-4 flex items-center justify-center">
+												<template x-if="agentStatusFor(row.agentName) === 'active'">
+													<span class="absolute inset-0 size-4 rounded-full bg-success/30 animate-ping"></span>
+												</template>
+												<div
+													class="relative size-2.5 rounded-full ring-2 ring-background transition-colors duration-300"
+													:class="{
+														'bg-success ring-success/40': agentStatusFor(row.agentName) === 'active',
+														'bg-destructive': agentStatusFor(row.agentName) === 'error',
+														'bg-muted-foreground/30': agentStatusFor(row.agentName) === 'done' || agentStatusFor(row.agentName) === 'pending',
+													}"
+												></div>
+											</div>
+										</template>
+										<template x-if="!row.isLeaf">
+											<div
+												class="size-4 flex items-center justify-center rounded-md"
+												:class="{
+													'bg-blue-500/15 text-blue-500 ring-1 ring-blue-500/30': row.kind === 'sequential',
+													'bg-amber-500/15 text-amber-500 ring-1 ring-amber-500/30': row.kind === 'parallel',
+													'bg-violet-500/15 text-violet-500 ring-1 ring-violet-500/30': row.kind === 'loop',
+													'bg-rose-500/15 text-rose-500 ring-1 ring-rose-500/30': row.kind === 'conditional',
+												}"
+											>
+												<template x-if="row.kind === 'sequential'">
+													<svg class="size-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+												</template>
+												<template x-if="row.kind === 'parallel'">
+													<svg class="size-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v12"/><path d="M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+												</template>
+												<template x-if="row.kind === 'loop'">
+													<svg class="size-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+												</template>
+												<template x-if="row.kind === 'conditional'">
+													<svg class="size-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="12" r="3"/><path d="M9 6h6a3 3 0 0 1 3 3v0"/><path d="M9 18h6a3 3 0 0 0 3-3v0"/></svg>
+												</template>
+											</div>
+										</template>
+									</div>
+									<template x-if="row.isLeaf">
+										<span
+											class="text-[13px] truncate transition-colors duration-300"
+											:class="{
+												'text-foreground font-medium': agentStatusFor(row.agentName) === 'active',
+												'text-destructive font-medium': agentStatusFor(row.agentName) === 'error',
+												'text-muted-foreground': agentStatusFor(row.agentName) === 'done' || agentStatusFor(row.agentName) === 'pending',
+											}"
+											x-text="row.label"
+										></span>
+									</template>
+									<template x-if="!row.isLeaf">
+										<span
+											class="text-[11px] font-semibold uppercase tracking-wider truncate"
+											:class="{
+												'text-blue-600 dark:text-blue-400': row.kind === 'sequential',
+												'text-amber-600 dark:text-amber-400': row.kind === 'parallel',
+												'text-violet-600 dark:text-violet-400': row.kind === 'loop',
+												'text-rose-600 dark:text-rose-400': row.kind === 'conditional',
+											}"
+											x-text="row.kind"
+										></span>
+									</template>
+									<template x-if="row.condition">
+										<span class="text-[10px] text-rose-500/90 bg-rose-500/10 rounded px-1.5 py-0.5 font-mono shrink-0" x-text="row.condition"></span>
+									</template>
+									<template x-if="row.kind === 'loop' && row.maxIterations">
+										<span class="text-[10px] text-violet-500/80 tabular-nums shrink-0" x-text="`max ${row.maxIterations}`"></span>
+									</template>
+									<template x-if="row.isLeaf && agentStatusFor(row.agentName) === 'done' && completedNodes[row.agentName]?.durationMs">
+										<span class="ms-auto text-[10px] text-muted-foreground tabular-nums shrink-0" x-text="`${(completedNodes[row.agentName].durationMs / 1000).toFixed(1)}s`"></span>
+									</template>
+									<template x-if="row.isLeaf && agentStatusFor(row.agentName) === 'active'">
+										<span class="ms-auto text-[10px] text-success font-medium tabular-nums shrink-0">{ i18n.T(ctx, "running…") }</span>
+									</template>
+									<template x-if="row.isLeaf && agentStatusFor(row.agentName) === 'error'">
+										<span class="ms-auto text-[10px] text-destructive font-medium shrink-0">{ i18n.T(ctx, "failed") }</span>
+									</template>
+								</div>
+								<!-- Output value preview under leaves -->
+								<template x-if="row.isLeaf && agentOutputPreview(row)">
+									<div
+										class="mt-1 text-[11px] leading-snug flex items-start gap-1.5"
+										x-transition.opacity
+									>
+										<span class="text-muted-foreground/40 shrink-0">↳</span>
+										<span class="font-mono text-[10px] text-muted-foreground/80 shrink-0" x-text="agentOutputPreview(row).key"></span>
+										<span class="text-muted-foreground/40 shrink-0">·</span>
+										<span class="truncate italic text-muted-foreground/80" x-text="agentOutputPreview(row).value"></span>
+									</div>
+								</template>
+							</div>
+						</div>
+					</template>
+				</div>
+			</div>
+		</template>
+	</div>
+}

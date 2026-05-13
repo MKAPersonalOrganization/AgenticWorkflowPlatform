@@ -53,6 +53,10 @@ export function createEmptyThreadState() {
         completedNodes: {},   // { [agentName]: { durationMs, timestamp } }
         failedNodes: {},      // { [agentName]: { timestamp } }
         workflowOutputs: {},  // { [key]: { agentName, value } }
+        // Run lifecycle timestamps — drive the Activity panel's live elapsed
+        // display and the "running / done / failed" hero state.
+        runStartedAt: null,
+        runEndedAt: null,
         // Parallel message coalescing — maps multiple SSE message IDs
         // from the same parallel branch agent into a single UI message.
         // parallelAgentMessages: { [agentName]: messageId } — canonical msg per agent

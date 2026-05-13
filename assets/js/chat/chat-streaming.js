@@ -220,6 +220,18 @@ export function createStreamingMethods() {
                     break;
 
                 case 'RUN_STARTED':
+                    // Reset per-run tracking so the Activity panel starts fresh.
+                    state.runStartedAt = event.timestamp || Date.now();
+                    state.runEndedAt = null;
+                    state.completedNodes = {};
+                    state.failedNodes = {};
+                    state.activeAgentNames = {};
+                    state.activeAgentName = null;
+                    // Cancel any in-flight hysteresis flushes left over
+                    // from the previous run — keeps the state machine
+                    // clean across consecutive turns.
+                    this.clearHysteresisTimers && this.clearHysteresisTimers();
+                    break;
                 case 'STEP_STARTED':
                 case 'STEP_FINISHED':
                 case 'STATE_SNAPSHOT':

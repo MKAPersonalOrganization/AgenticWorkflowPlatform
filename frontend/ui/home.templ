@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"aicompass/frontend/ui/activitypanel"
 	"aicompass/frontend/ui/banner"
 	"aicompass/frontend/ui/chat"
 	"aicompass/frontend/ui/chatinput"
@@ -200,6 +201,9 @@ templ ChatInputScreen(user *auth.User) {
 							</main>
 						<!-- Side Panel (inside layout to push content) -->
 						@sidepanel.SidePanel()
+						<!-- Floating, draggable Activity panel for
+						     multi-agent workflow visibility -->
+						@activitypanel.ActivityPanel()
 					</div>
 				}
 			</div>

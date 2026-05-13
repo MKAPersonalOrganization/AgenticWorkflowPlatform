@@ -61,6 +61,7 @@ llm_agents:
     name: TechnicalDiagnosis
     description: Diagnoses technical issues and identifies the root cause.
     icon: terminal
+    output_key: diagnosis
     system_prompt: |
       You are a senior technical support engineer.
       The user's inquiry type has been classified as: {inquiry_type}

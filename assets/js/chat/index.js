@@ -42,6 +42,8 @@ import { createHealthMethods } from './chat-health.js';
 import { createToastMethods } from './chat-toasts.js';
 import { createScrollMethods } from './chat-scroll.js';
 import { createEventLogMethods } from './chat-event-log.js';
+import { createActivityPanelMethods } from './chat-activity-panel.js';
+import { createWorkflowStatusMethods } from './chat-workflow-status.js';
 import { createInputMethods } from './chat-input.js';
 import { createProfileMethods } from './chat-profile.js';
 import { createEventHandlerMethods } from './chat-event-handlers.js';
@@ -77,6 +79,8 @@ document.addEventListener('alpine:init', () => {
         const toastMethods = createToastMethods();
         const scrollMethods = createScrollMethods();
         const eventLogMethods = createEventLogMethods();
+        const activityPanelMethods = createActivityPanelMethods();
+        const workflowStatusMethods = createWorkflowStatusMethods();
         const inputMethods = createInputMethods();
         const profileMethods = createProfileMethods();
         const eventHandlerMethods = createEventHandlerMethods();
@@ -99,6 +103,8 @@ document.addEventListener('alpine:init', () => {
             ...toastMethods,
             ...scrollMethods,
             ...eventLogMethods,
+            ...activityPanelMethods,
+            ...workflowStatusMethods,
             ...inputMethods,
             ...profileMethods,
             ...eventHandlerMethods,
@@ -192,51 +198,52 @@ document.addEventListener('alpine:init', () => {
 
             /**
              * Grouped message view for rendering.
-             * Consecutive parallel messages (same parentAgent) are collapsed
-             * into a single parallel_group entry with per-branch arrays
-             * so the template can render them as side-by-side columns.
-             * Non-parallel messages pass through unchanged.
+             *
+             * Pass 1 — Collapse consecutive parallel messages (same parentAgent)
+             * into a single parallel_group entry with per-branch arrays so the
+             * template can render them as side-by-side columns.
+             *
+             * Pass 2 — Bucket multi-agent turns into (activity_card, final).
+             * A "turn" is everything between consecutive user messages. Within
+             * each turn, the *last* assistant-style entry is the final answer
+             * and gets the main bubble; everything else (intermediate sequential
+             * steps, parallel_groups, workflow_markers, tool calls) is folded
+             * into one premium activity_card that the user can expand to see
+             * the work. Single-agent turns pass through unchanged.
              */
             get displayMessages() {
                 const msgs = this.__currentState.messages;
                 if (!msgs || msgs.length === 0) return [];
 
-                const result = [];
+                // ── Pass 1: collapse parallel sections ──────────────────────
+                const flat = [];
                 let i = 0;
-
                 while (i < msgs.length) {
                     const msg = msgs[i];
-
-                    // When we hit a parallel workflow_marker, group everything
-                    // that belongs to this parallel section into branches.
                     if (msg.type === 'workflow_marker' && msg.markerType === 'parallel') {
                         const parentAgent = msg.parentAgent;
                         const stepCount = msg.stepCount || 2;
                         const branches = {};
-                        const agentToBranch = {}; // agentName → stepIndex lookup for tool calls
-                        i++; // skip the marker itself
-
+                        const agentToBranch = {};
+                        i++;
                         while (i < msgs.length) {
                             const m = msgs[i];
                             if (m.workflowType === 'parallel' && m.parentAgent === parentAgent) {
-                                // Assistant message (or tagged tool call) — direct branch match
                                 const branch = m.stepIndex || 0;
                                 if (!branches[branch]) branches[branch] = [];
                                 branches[branch].push(m);
                                 if (m.agentName) agentToBranch[m.agentName] = branch;
                                 i++;
                             } else if (m.type === 'tool_call' && m.agentName && m.agentName in agentToBranch) {
-                                // Untagged tool call — match by agent name
                                 const branch = agentToBranch[m.agentName];
                                 if (!branches[branch]) branches[branch] = [];
                                 branches[branch].push(m);
                                 i++;
                             } else {
-                                break; // end of parallel section
+                                break;
                             }
                         }
-
-                        result.push({
+                        flat.push({
                             id: msg.id,
                             type: 'parallel_group',
                             parentAgent,
@@ -245,16 +252,313 @@ document.addEventListener('alpine:init', () => {
                             timestamp: msg.timestamp,
                         });
                     } else {
-                        result.push(msg);
+                        flat.push(msg);
                         i++;
                     }
                 }
-                return result;
+
+                // ── Pass 2: bucket each turn into activity + final ──────────
+                // A turn starts at a user message and runs until the next user
+                // message. Within the turn:
+                //   • If any message carries workflow context, the whole run
+                //     is treated as multi-agent. EVERY workflow message is
+                //     folded into an activity_card (which is hidden from the
+                //     main thread and only surfaced in the side panel).
+                //   • While intermediate agents run, the main thread shows
+                //     a `streaming_placeholder` — calm progress instead of
+                //     a parade of in-flight agents.
+                //   • As soon as the workflow's *final* agent starts
+                //     streaming, its message is promoted to the main bubble
+                //     and tokens flow into the chat live. The final agent
+                //     is identified as the last leaf in workflowGraphRows
+                //     (DFS pre-order on the composition tree).
+                //   • Single-agent turns (no workflowType anywhere) stream
+                //     into the main thread unchanged.
+                const isStreaming = !!this.__currentState.isStreaming;
+                const isWorkflowArtefact = (m) => (
+                    m.type === 'parallel_group' ||
+                    m.type === 'workflow_marker' ||
+                    m.type === 'tool_call' ||
+                    (m.role === 'assistant' && !!m.workflowType)
+                );
+
+                // Resolve the workflow's final agent name from the static
+                // composition tree (last leaf in DFS pre-order). Used to
+                // promote that agent's in-flight message to the main bubble
+                // while still streaming. Null for ad-hoc / non-composed
+                // agents — those keep the placeholder until the run ends.
+                let finalAgentName = null;
+                {
+                    const rows = this.workflowGraphRows;
+                    if (rows && rows.length > 0) {
+                        for (let k = rows.length - 1; k >= 0; k--) {
+                            if (rows[k].isLeaf && rows[k].agentName) {
+                                finalAgentName = rows[k].agentName;
+                                break;
+                            }
+                        }
+                    }
+                }
+                const out = [];
+                let j = 0;
+                while (j < flat.length) {
+                    const head = flat[j];
+                    if (head.role !== 'user') {
+                        out.push(head);
+                        j++;
+                        continue;
+                    }
+                    // Push the user message; then scan its turn.
+                    out.push(head);
+                    j++;
+
+                    const turnStart = j;
+                    while (j < flat.length && flat[j].role !== 'user') j++;
+                    const turnEnd = j;
+
+                    // "Streaming" applies only to the LAST turn — older
+                    // turns are definitively closed even while a new run
+                    // is in flight, so their final bubble must stay put
+                    // and not be replaced by a placeholder.
+                    const isLastTurn = turnEnd === flat.length;
+                    const turnIsStreaming = isStreaming && isLastTurn;
+
+                    // Detect whether this is a multi-agent turn. We define it
+                    // as "the turn contains any workflow-tagged message" —
+                    // even a single workflow message means the run came from
+                    // a composed agent, so the activity surface is the right
+                    // place for everything that isn't the final answer.
+                    let hasAnyWorkflow = false;
+                    for (let k = turnStart; k < turnEnd; k++) {
+                        if (isWorkflowArtefact(flat[k])) { hasAnyWorkflow = true; break; }
+                    }
+
+                    // Single-agent fast path: pass through unchanged.
+                    if (!hasAnyWorkflow) {
+                        for (let k = turnStart; k < turnEnd; k++) out.push(flat[k]);
+                        continue;
+                    }
+
+                    // Multi-agent turn: pick out the last assistant message
+                    // in the turn — for a finished run this *is* the final
+                    // answer; for an in-flight run it's the currently-
+                    // streaming agent (which may or may not be the final
+                    // agent — we promote it to the main bubble only when
+                    // its agentName matches finalAgentName).
+                    let lastAssistantIdx = -1;
+                    for (let k = turnEnd - 1; k >= turnStart; k--) {
+                        if (flat[k].role === 'assistant') { lastAssistantIdx = k; break; }
+                    }
+
+                    // Decide what to render in the main slot for this turn:
+                    //   • finished turn → the last assistant (the final).
+                    //   • streaming turn whose last assistant message
+                    //     belongs to the workflow's final agent → that
+                    //     message streams into the main bubble live, and
+                    //     stays there even after its TEXT_MESSAGE_END but
+                    //     before RUN_FINISHED (so we don't flip back to a
+                    //     placeholder for the tail of the run).
+                    //   • streaming turn whose last assistant is an
+                    //     intermediate agent → placeholder.
+                    const lastMsg = lastAssistantIdx >= 0 ? flat[lastAssistantIdx] : null;
+                    const lastIsFinalAgent = !!(
+                        lastMsg
+                        && finalAgentName
+                        && lastMsg.agentName === finalAgentName
+                    );
+                    const promoteFinalToMain = !turnIsStreaming || lastIsFinalAgent;
+
+                    const activitySteps = [];
+                    const nonWorkflowTail = []; // errors/system → keep inline
+                    for (let k = turnStart; k < turnEnd; k++) {
+                        const m = flat[k];
+                        // The promoted-final message is rendered in the
+                        // main slot, not inside the activity card.
+                        if (promoteFinalToMain && k === lastAssistantIdx) continue;
+                        if (isWorkflowArtefact(m)) {
+                            activitySteps.push(m);
+                        } else {
+                            nonWorkflowTail.push(m);
+                        }
+                    }
+
+                    if (activitySteps.length > 0) {
+                        const first = activitySteps[0];
+                        const lastStep = activitySteps[activitySteps.length - 1];
+                        out.push({
+                            id: 'activity-' + head.id,
+                            type: 'activity_card',
+                            steps: activitySteps,
+                            stepCount: activitySteps.length,
+                            startedAt: first.timestamp,
+                            updatedAt: lastStep.timestamp,
+                            timestamp: first.timestamp,
+                        });
+                    }
+
+                    // Inline non-workflow rows (errors, etc.) come before
+                    // the final/placeholder so they aren't hidden under it.
+                    for (const m of nonWorkflowTail) out.push(m);
+
+                    if (promoteFinalToMain && lastMsg) {
+                        // Stream the final agent's message live into the
+                        // main thread (or render the settled answer
+                        // post-run). Tag for the attribution footer.
+                        out.push({ ...lastMsg, _isFinalOfTurn: true });
+                    } else if (turnIsStreaming) {
+                        // Waiting for the final agent to start. Show a calm
+                        // placeholder so the main thread doesn't churn with
+                        // intermediate agent text.
+                        out.push({
+                            id: 'placeholder-' + head.id,
+                            type: 'streaming_placeholder',
+                            timestamp: flat[lastAssistantIdx >= 0 ? lastAssistantIdx : turnStart]?.timestamp,
+                        });
+                    }
+                }
+                return out;
             },
 
             get isStreaming() {
                 return this.__currentState.isStreaming;
             },
+
+            /**
+             * All activity_card entries from displayMessages, oldest → newest.
+             * Drives the Activity side panel; intentionally separate from the
+             * chat thread so the main bubble stack stays focused on the final
+             * answer.
+             */
+            get activityCards() {
+                return this.displayMessages.filter(m => m.type === 'activity_card');
+            },
+
+            /** True iff there's at least one activity_card to show. */
+            get hasActivity() {
+                return this.activityCards.length > 0;
+            },
+
+            /**
+             * Flat-list view of the current agent's composition graph.
+             *
+             * The static workflow tree (sequential / parallel / loop /
+             * conditional composites with agent leaves) is flattened into
+             * one row per node, in pre-order traversal, with `depth` and
+             * `isLast` siblings so the template can draw the rail glyphs.
+             *
+             * Each leaf's `agentName` is resolved by looking up the leaf's
+             * `agent_id` in `AVAILABLE_AGENTS` — the same list the agent
+             * picker uses. Runtime status comes from `agentStatusFor()`.
+             *
+             * Returns [] for single-agent (non-composed) runs; the chat
+             * thread is already the right surface for those.
+             */
+            get workflowGraphRows() {
+                const graph = this.currentAgentData?.graph;
+                if (!graph || !graph.type) return [];
+                const rows = [];
+                const agentMap = {};
+                for (const a of (this.AVAILABLE_AGENTS || [])) {
+                    if (a && a.id) agentMap[a.id] = a;
+                }
+                const walk = (node, depth, isLast, ancestorIsLastChain) => {
+                    if (!node || !node.type) return;
+                    const isLeaf = node.type === 'agent' || node.type === 'remote';
+                    let agentName = null;
+                    let outputKey = null;
+                    let description = null;
+                    if (isLeaf && node.agent_id) {
+                        const sub = agentMap[node.agent_id];
+                        agentName = sub?.name || null;
+                        outputKey = sub?.outputKey || null;
+                        description = sub?.description || null;
+                    }
+                    rows.push({
+                        id: node.id || ('node_' + rows.length),
+                        depth,
+                        kind: node.type, // 'sequential' | 'parallel' | 'loop' | 'conditional' | 'agent' | 'remote'
+                        label: agentName || node.label || node.id || node.type,
+                        agentName,
+                        outputKey,
+                        description,
+                        condition: node.condition || null,
+                        maxIterations: node.max_iterations || null,
+                        isLeaf,
+                        isLast,
+                        ancestorIsLastChain,
+                    });
+                    if (Array.isArray(node.children) && node.children.length > 0) {
+                        for (let i = 0; i < node.children.length; i++) {
+                            const last = i === node.children.length - 1;
+                            walk(node.children[i], depth + 1, last, [...ancestorIsLastChain, isLast]);
+                        }
+                    }
+                };
+                walk(graph, 0, true, []);
+                return rows;
+            },
+
+            /** True iff the current agent has a composition graph worth rendering. */
+            get hasWorkflowGraph() {
+                return this.workflowGraphRows.length > 0;
+            },
+
+            /**
+             * High-level summary of the current workflow run — drives the
+             * hero card on top of the Activity panel.
+             *
+             * status: 'idle' (nothing started) | 'running' | 'success' | 'error'
+             * elapsedMs: live during run, frozen on finish/error
+             */
+            get workflowRunSummary() {
+                const rows = this.workflowGraphRows;
+                const leaves = rows.filter(r => r.isLeaf && r.agentName);
+                let done = 0, active = 0, error = 0;
+                let currentName = null;
+                for (const r of leaves) {
+                    const s = this.agentStatusFor(r.agentName);
+                    if (s === 'done') done++;
+                    else if (s === 'active') { active++; currentName = r.agentName; }
+                    else if (s === 'error') error++;
+                }
+                const pending = leaves.length - done - active - error;
+                const state = this.__currentState || {};
+                let status = 'idle';
+                if (error > 0) status = 'error';
+                else if (this.isStreaming || active > 0) status = 'running';
+                else if (leaves.length > 0 && done === leaves.length) status = 'success';
+                else if (done > 0) status = 'success'; // partial-done counts as success when no longer streaming
+                // Live-ticking elapsed: while running, use _activityNowTick which
+                // updates every second; after end, freeze at runEndedAt.
+                let elapsedMs = 0;
+                if (state.runStartedAt) {
+                    const end = (status === 'running')
+                        ? (this._activityNowTick || Date.now())
+                        : (state.runEndedAt || Date.now());
+                    elapsedMs = Math.max(0, end - state.runStartedAt);
+                }
+                return {
+                    status,
+                    total: leaves.length,
+                    done, active, error, pending,
+                    currentAgentName: currentName,
+                    elapsedMs,
+                    elapsedLabel: this.__formatElapsed(elapsedMs),
+                };
+            },
+
+            __formatElapsed(ms) {
+                if (!ms || ms <= 0) return '0s';
+                if (ms < 1000) return ms + 'ms';
+                if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
+                const m = Math.floor(ms / 60000);
+                const s = Math.floor((ms % 60000) / 1000);
+                return `${m}m ${s}s`;
+            },
+
+            // Live tick — bumped by an interval started in init() (see below).
+            // Drives the elapsed-time display in the Activity hero card.
+            _activityNowTick: Date.now(),
             
             get activeAgentName() {
                 return this.__currentState.activeAgentName || null;
@@ -566,6 +870,16 @@ document.addEventListener('alpine:init', () => {
 
                 // Register keyboard shortcuts
                 this.__registerKeyboardShortcuts();
+
+                // Live tick for the Activity panel's elapsed timer. Only
+                // bumps state while a run is in flight so we don't churn
+                // reactivity on idle threads.
+                const activityTick = setInterval(() => {
+                    if (this.isStreaming) {
+                        this._activityNowTick = Date.now();
+                    }
+                }, 500);
+                this.__cleanupTasks.add(() => clearInterval(activityTick));
             },
 
             /**

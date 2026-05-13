@@ -28,6 +28,7 @@ llm_agents:
     name: CoordinatorAgent
     description: Receives the user request, decides which domain is needed, and coordinates the overall resolution.
     icon: target
+    output_key: routing_decision
     system_prompt: |
       ## Role: Request Coordinator
 
@@ -49,6 +50,7 @@ llm_agents:
     name: TriageAgent
     description: Reviews the routing decision and selects the specific specialist agent to handle the request.
     icon: git-branch
+    output_key: specialist_selection
     system_prompt: |
       ## Role: Triage Analyst
 

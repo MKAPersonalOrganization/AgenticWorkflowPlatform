@@ -86,6 +86,12 @@ export function createEventHandlerMethods() {
          */
         __handleWorkflowNodeCompleted(value, state) {
             trackWorkflowEvent({ type: 'WORKFLOW_NODE_COMPLETED', ...value }, state);
+            // Book the visual-hysteresis flush so the lamp transitions
+            // from ACTIVE (bridge) to DONE on its own even if no further
+            // events follow. See chat-workflow-status.js for the rule.
+            if (value && value.agentName) {
+                this.scheduleHysteresisFlush(value.agentName);
+            }
         },
 
         __handleStateChangeReported(value, state) {
@@ -478,6 +484,7 @@ export function createEventHandlerMethods() {
             state.parallelAgentMessages = {};
             state.parallelCoalesceMap = {};
             state.parallelParent = null;
+            state.runEndedAt = Date.now();
             eventSource?.close();
         },
 
@@ -499,6 +506,7 @@ export function createEventHandlerMethods() {
             state.parallelAgentMessages = {};
             state.parallelCoalesceMap = {};
             state.parallelParent = null;
+            state.runEndedAt = Date.now();
 
             if (threadId === this.__currentThreadId) {
                 this.__showError(event.message || window.i18n.t('An error occurred'), threadId);

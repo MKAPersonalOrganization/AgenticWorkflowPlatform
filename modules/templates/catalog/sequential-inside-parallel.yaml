@@ -112,6 +112,7 @@ llm_agents:
     name: SlackDrafterAgent
     description: Community manager that crafts a concise, emoji-friendly Slack announcement from the enhanced message.
     icon: pencil-line
+    output_key: drafted_slack_message
     system_prompt: |
       ## Role: Community Manager
 
