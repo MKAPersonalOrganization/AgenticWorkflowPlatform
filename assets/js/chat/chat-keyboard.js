@@ -32,12 +32,16 @@ export function createKeyboardMethods() {
                     return;
                 }
 
-                // Escape — Close modals or cancel streaming
+                // Escape — close shortcuts overlay or cancel streaming.
+                // Only preventDefault when we actually consume the key, so
+                // other escape consumers (native <dialog> cancel, Alpine
+                // @keydown.escape.window) still see it.
                 if (e.key === 'Escape') {
-                    e.preventDefault();
                     if (this.showKeyboardShortcuts) {
+                        e.preventDefault();
                         this.showKeyboardShortcuts = false;
                     } else if (this.isStreaming) {
+                        e.preventDefault();
                         this.__stopStreaming();
                     }
                     return;
