@@ -439,9 +439,10 @@ github.com/stripe/stripe-go/v84/customer
 github.com/stripe/stripe-go/v84/form
 github.com/stripe/stripe-go/v84/paymentintent
 github.com/stripe/stripe-go/v84/webhook
-# github.com/templui/templui v1.9.6
+# github.com/templui/templui v1.11.0
 ## explicit; go 1.24
 github.com/templui/templui/cmd/templui
+github.com/templui/templui/components
 # github.com/tidwall/gjson v1.18.0
 ## explicit; go 1.12
 github.com/tidwall/gjson

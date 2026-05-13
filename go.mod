@@ -31,6 +31,7 @@ require (
 	github.com/redis/go-redis/v9 v9.19.0
 	github.com/stretchr/testify v1.11.1
 	github.com/stripe/stripe-go/v84 v84.4.1
+	github.com/templui/templui v1.11.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/text v0.36.0
 	google.golang.org/adk v1.2.0
@@ -93,7 +94,6 @@ require (
 	github.com/segmentio/asm v1.2.1 // indirect
 	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
-	github.com/templui/templui v1.9.6 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.2.0 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect

@@ -98,21 +98,16 @@ templ GraphSettingsPanel() {
 					</div>
 					@slider.Slider(slider.Props{
 						Class: "px-0.5",
+						Min:   50,
+						Max:   1000,
+						Step:  50,
+						Value: 100, // Tied via x-model/init
 						Attributes: templ.Attributes{
 							"@input":  "graphMaxNodes = $event.target.value",
 							"@change": "loadGraph()",
+							"x-model": "graphMaxNodes",
 						},
-					}) {
-						@slider.Input(slider.InputProps{
-							Min:   50,
-							Max:   1000,
-							Step:  50,
-							Value: 100, // Tied via x-model/init
-							Attributes: templ.Attributes{
-								"x-model": "graphMaxNodes",
-							},
-						})
-					}
+					})
 					<p class="text-[10px] text-muted-foreground px-0.5 italic">
 						{ i18n.T(ctx, "Limit the number of nodes fetched from the server.") }
 					</p>
@@ -128,21 +123,16 @@ templ GraphSettingsPanel() {
 					</div>
 					@slider.Slider(slider.Props{
 						Class: "px-0.5",
+						Min:   1,
+						Max:   5,
+						Step:  1,
+						Value: 2,
 						Attributes: templ.Attributes{
 							"@input":  "graphDepth = $event.target.value",
 							"@change": "loadGraph()",
+							"x-model": "graphDepth",
 						},
-					}) {
-						@slider.Input(slider.InputProps{
-							Min:   1,
-							Max:   5,
-							Step:  1,
-							Value: 2,
-							Attributes: templ.Attributes{
-								"x-model": "graphDepth",
-							},
-						})
-					}
+					})
 					<p class="text-[10px] text-muted-foreground px-0.5 italic">
 						{ i18n.T(ctx, "Depth of relationship traversal from the focus node.") }
 					</p>

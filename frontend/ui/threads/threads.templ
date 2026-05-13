@@ -44,11 +44,11 @@ templ ThreadsDialog() {
 				// The translucent glass surface comes from the system default
 				// (dialog.Content → .glass-heavy). No bg/border/blur overrides
 				// here — they would fight the themed --glass-* tokens.
-				Class:      "sm:max-w-2xl max-h-[65vh] h-auto top-[12vh] -translate-y-0",
-				PanelClass: "p-0 gap-0",
+				Class: "sm:max-w-2xl max-h-[65vh] h-auto top-[12vh] -translate-y-0",
 			}) {
+				// -m-6 cancels the panel's hardcoded p-6 (v1.11.0 removed PanelClass) so the list fills edge-to-edge.
 				<div
-					class="flex flex-col max-h-[65vh] min-h-0"
+					class="-m-6 flex flex-col max-h-[65vh] min-h-0"
 					x-data="{
 						rowMenu: { x: 0, y: 0, session: null },
 						positionAndShow(x, y, session) {

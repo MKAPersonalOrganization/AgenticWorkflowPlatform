@@ -1,4 +1,4 @@
-// templui component dialog - version: v1.9.6 installed by templui v1.9.6
+// templui component dialog - version: v1.11.0 installed by templui v1.11.0
 // 📚 Documentation: https://templui.io/docs/components/dialog
 package dialog
 
@@ -32,9 +32,9 @@ type TriggerProps struct {
 
 type ContentProps struct {
 	Class           string
-	PanelClass      string // Overrides the inner panel classes (default: "relative flex flex-col gap-4 p-6 min-h-0 grow")
 	Attributes      templ.Attributes
 	HideCloseButton bool
+	DisableModal    bool
 }
 
 type CloseProps struct {
@@ -126,27 +126,14 @@ templ Content(props ...ContentProps) {
 	<dialog
 		class={
 			utils.TwMerge(
-				// Positioning & sizing
-				"fixed left-[50%] top-[50%] z-50 m-0 w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-hidden outline-none sm:max-w-lg",
-				// Surface — glass-heavy is the system default for dialogs (see
-				// assets/css/input.css: glass tier documentation). bg/border/blur
-				// are driven by themed --glass-* tokens so this adapts to light
-				// and dark without per-theme overrides at each callsite.
-				"glass-heavy text-foreground p-0",
-				// Premium radius + layered shadow from the theme's modern shadow system
-				"rounded-xl shadow-modern-xl",
-				// Visibility (templui state-driven)
+				"fixed left-[50%] top-[50%] z-50 m-0 w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-hidden border bg-background text-foreground p-0 shadow-lg outline-none sm:max-w-lg",
 				"[&:not([open]):not([data-tui-dialog-closing=true])]:hidden",
-				// Backdrop — blurred cinematic scrim
-				"[&::backdrop]:transition-all [&::backdrop]:duration-300 [&::backdrop]:ease-out",
+				"rounded-lg",
+				"[&::backdrop]:transition-all [&::backdrop]:duration-200",
 				"data-[tui-dialog-open=false]:[&::backdrop]:bg-black/0",
-				"data-[tui-dialog-open=false]:[&::backdrop]:backdrop-blur-none",
-				"data-[tui-dialog-open=true]:[&::backdrop]:bg-black/30",
-				"data-[tui-dialog-open=true]:dark:[&::backdrop]:bg-black/60",
-				"data-[tui-dialog-open=true]:[&::backdrop]:backdrop-blur-sm",
-				// Enter/exit — smoother premium easing with subtle scale
-				"transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
-				"data-[tui-dialog-open=false]:scale-[0.98]",
+				"data-[tui-dialog-open=true]:[&::backdrop]:bg-black/50",
+				"transition-all duration-200",
+				"data-[tui-dialog-open=false]:scale-95",
 				"data-[tui-dialog-open=true]:scale-100",
 				"data-[tui-dialog-open=false]:opacity-0",
 				"data-[tui-dialog-open=true]:opacity-100",
@@ -156,25 +143,27 @@ templ Content(props ...ContentProps) {
 		data-tui-dialog-content
 		data-tui-dialog-open={ utils.IfElse(open, "true", "false") }
 		data-tui-dialog-initial-open={ utils.IfElse(open, "true", "false") }
+		data-tui-dialog-show-modal={ utils.IfElse(!p.DisableModal, "true", "false") }
 		{ p.Attributes... }
 	>
-		<div class={ utils.TwMerge("relative flex flex-col gap-4 p-6 min-h-0 grow", p.PanelClass) } data-tui-dialog-panel>
+		<div class="relative grid gap-4 p-6" data-tui-dialog-panel>
 			{ children... }
 			if !p.HideCloseButton {
 				<button
 					class={ utils.TwMerge(
-							// Positioning & proper click target
-							"absolute top-3 right-3",
-							"size-8 inline-flex items-center justify-center",
-							// Surface & radius matching the premium card
-							"rounded-md text-muted-foreground",
-							// Smooth hover treatment
-							"transition-all duration-200 ease-out",
-							"hover:bg-accent hover:text-foreground",
+							// Positioning
+							"absolute top-4 right-4",
+							// Style
+							"rounded-xs opacity-70",
+							// Interactions
+							"transition-opacity hover:opacity-100",
 							// Focus states
 							"focus:outline-none focus:ring-2",
 							"focus:ring-ring focus:ring-offset-2",
 							"ring-offset-background",
+							// Hover/Data states
+							"data-[tui-dialog-open=true]:bg-accent",
+							"data-[tui-dialog-open=true]:text-muted-foreground",
 							// Disabled state
 							"disabled:pointer-events-none",
 							// Icon styles
