@@ -10,9 +10,10 @@ import (
 
 	"github.com/google/jsonschema-go/jsonschema"
 
-	"google.golang.org/adk/session"
-	adktool "google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
+	adkagent "google.golang.org/adk/v2/agent"
+	"google.golang.org/adk/v2/session"
+	adktool "google.golang.org/adk/v2/tool"
+	"google.golang.org/adk/v2/tool/functiontool"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -55,8 +56,8 @@ func WrapExecutableTool(et agent.ExecutableTool, sessionID, userID string) adkto
 // wrapWithPanicRecovery returns the adktool execution closure with a
 // deferred recover() so panics in tool code surface as structured
 // {"error": "..."} results instead of crashing the agent loop.
-func wrapWithPanicRecovery(et agent.ExecutableTool, sessionID, userID string) func(adktool.Context, map[string]any) (map[string]any, error) {
-	return func(ctx adktool.Context, args map[string]any) (result map[string]any, err error) {
+func wrapWithPanicRecovery(et agent.ExecutableTool, sessionID, userID string) func(adkagent.Context, map[string]any) (map[string]any, error) {
+	return func(ctx adkagent.Context, args map[string]any) (result map[string]any, err error) {
 		defer func() {
 			if r := recover(); r != nil {
 				result = map[string]any{errorKey: fmt.Sprintf("tool panic: %v", r)}
@@ -87,12 +88,12 @@ func WrapExecutableTools(tools []agent.ExecutableTool, sessionID, userID string)
 // ExecutableTool.Execute contract. It converts the typed agent.Result into
 // the map[string]any that ADK-Go expects as FunctionResponse.Response.
 //
-// ctx is adktool.Context (not plain context.Context) so we can:
+// ctx is adkagent.Context (not plain context.Context) so we can:
 //   - populate Arguments.CallID from ctx.FunctionCallID()
 //   - forward Result.Actions (TransferToAgent, Escalate, StateDelta) to
 //     ctx.Actions(), matching ADK's tool.Context.Actions() semantics.
 func executeFoundationTool(
-	ctx adktool.Context,
+	ctx adkagent.Context,
 	et agent.ExecutableTool,
 	args map[string]any,
 	sessionID, userID string,
@@ -118,7 +119,7 @@ func executeFoundationTool(
 // ensureIOHandler injects the default PauseHandler when no io handler
 // is already attached to ctx. Callers (e.g. the confirmation-resume
 // path) may pre-attach a CachedReadHandler; we keep it when present.
-func ensureIOHandler(ctx adktool.Context) context.Context {
+func ensureIOHandler(ctx adkagent.Context) context.Context {
 	if agentio.FromContext(ctx) != nil {
 		return ctx
 	}
@@ -131,7 +132,7 @@ func ensureIOHandler(ctx adktool.Context) context.Context {
 // payload as custom_input so the frontend disambiguates it from a
 // yes/no confirmation prompt. All other errors surface as
 // {"error": "..."} so the LLM sees the failure and can recover.
-func handleToolExecError(ctx adktool.Context, et agent.ExecutableTool, err error) (map[string]any, error) {
+func handleToolExecError(ctx adkagent.Context, et agent.ExecutableTool, err error) (map[string]any, error) {
 	var inputReq *agentio.ErrInputRequired
 	if errors.As(err, &inputReq) {
 		return requestInputPause(ctx, et, inputReq)
@@ -143,7 +144,7 @@ func handleToolExecError(ctx adktool.Context, et agent.ExecutableTool, err error
 // protocol: build a custom_input payload (optionally carrying a schema)
 // and ask the orchestrator to pause. SkipSummarization stops the LLM
 // from freely talking after the pause.
-func requestInputPause(ctx adktool.Context, et agent.ExecutableTool, inputReq *agentio.ErrInputRequired) (map[string]any, error) {
+func requestInputPause(ctx adkagent.Context, et agent.ExecutableTool, inputReq *agentio.ErrInputRequired) (map[string]any, error) {
 	payload := map[string]any{"type": "custom_input"}
 	if inputReq.Schema != nil {
 		payload["schema"] = inputReq.Schema
@@ -162,7 +163,7 @@ func requestInputPause(ctx adktool.Context, et agent.ExecutableTool, inputReq *a
 // Note: EventActions.EndInvocation has no equivalent in ADK's tool.Context
 // (it maps to InvocationContext.EndInvocation(), which is not accessible here).
 // Tools that need to stop an invocation should do so via agent-level callbacks.
-func applyEventActions(ctx adktool.Context, actions *agent.EventActions) {
+func applyEventActions(ctx adkagent.Context, actions *agent.EventActions) {
 	if actions == nil {
 		return
 	}

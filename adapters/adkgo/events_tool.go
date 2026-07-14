@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"strings"
 
-	"google.golang.org/adk/session"
-	adktool "google.golang.org/adk/tool"
+	"google.golang.org/adk/v2/session"
+	adktool "google.golang.org/adk/v2/tool"
 )
 
 // translateFunctionResponses walks the event's FunctionResponse parts

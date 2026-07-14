@@ -6,8 +6,8 @@ import (
 	"strings"
 	"unicode"
 
-	adktool "google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/agenttool"
+	adktool "google.golang.org/adk/v2/tool"
+	"google.golang.org/adk/v2/tool/agenttool"
 
 	fagent "aicompass/foundation/agent"
 )

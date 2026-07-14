@@ -6,8 +6,8 @@ import (
 	"iter"
 	"strings"
 
-	"google.golang.org/adk/agent"
-	"google.golang.org/adk/session"
+	"google.golang.org/adk/v2/agent"
+	"google.golang.org/adk/v2/session"
 	"google.golang.org/genai"
 
 	fagent "aicompass/foundation/agent"
@@ -157,7 +157,7 @@ func newA2AFileEvent(ictx agent.InvocationContext, agentName string, chunk A2ASt
 		"fileName": chunk.FileName,
 		"mimeType": chunk.MimeType,
 	})
-	evt := session.NewEvent(ictx.InvocationID())
+	evt := session.NewEvent(ictx, ictx.InvocationID())
 	evt.Author = agentName
 	evt.Actions.StateDelta = map[string]any{
 		"__a2a_file__": string(fileData),
@@ -173,7 +173,7 @@ func newA2AArtifactEvent(ictx agent.InvocationContext, agentName string, chunk A
 		"title":      chunk.Title,
 		"content":    chunk.Content,
 	})
-	evt := session.NewEvent(ictx.InvocationID())
+	evt := session.NewEvent(ictx, ictx.InvocationID())
 	evt.Author = agentName
 	evt.Actions.StateDelta = map[string]any{
 		"__a2a_artifact__": string(artifactData),
@@ -185,7 +185,7 @@ func newA2AArtifactEvent(ictx agent.InvocationContext, agentName string, chunk A
 // The caller decides whether to keep it partial (flush mid-stream) or promote
 // it to the final NON-PARTIAL event with accumulated text at stream end.
 func newA2APartialTextEvent(ictx agent.InvocationContext, agentName, delta string) *session.Event {
-	evt := session.NewEvent(ictx.InvocationID())
+	evt := session.NewEvent(ictx, ictx.InvocationID())
 	evt.Author = agentName
 	evt.Content = &genai.Content{
 		Role:  "model",

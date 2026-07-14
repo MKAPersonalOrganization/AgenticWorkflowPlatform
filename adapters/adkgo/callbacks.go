@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"google.golang.org/adk/agent"
-	"google.golang.org/adk/agent/llmagent"
-	"google.golang.org/adk/model"
-	adktool "google.golang.org/adk/tool"
+	"google.golang.org/adk/v2/agent"
+	"google.golang.org/adk/v2/agent/llmagent"
+	"google.golang.org/adk/v2/model"
+	adktool "google.golang.org/adk/v2/tool"
 
 	fagent "aicompass/foundation/agent"
 )
@@ -45,7 +45,7 @@ func buildConfirmationCallback(
 	checker ConfirmationChecker,
 	agentName, userID, toolSetID string,
 ) llmagent.BeforeToolCallback {
-	return func(ctx adktool.Context, t adktool.Tool, args map[string]any) (map[string]any, error) {
+	return func(ctx agent.Context, t adktool.Tool, args map[string]any) (map[string]any, error) {
 		toolName := t.Name()
 
 		// If confirmation was already provided by the user, check the result.
@@ -102,7 +102,7 @@ func toolLoggingCallbacks(
 ) (llmagent.BeforeToolCallback, llmagent.AfterToolCallback) {
 	var startTimes sync.Map // FunctionCallID → time.Time
 
-	before := func(ctx adktool.Context, t adktool.Tool, args map[string]any) (map[string]any, error) {
+	before := func(ctx agent.Context, t adktool.Tool, args map[string]any) (map[string]any, error) {
 		startTimes.Store(ctx.FunctionCallID(), time.Now())
 		log.Info(ctx, "tool call started",
 			"agent", agentName,
@@ -114,7 +114,7 @@ func toolLoggingCallbacks(
 		return nil, nil
 	}
 
-	after := func(ctx adktool.Context, t adktool.Tool, _ map[string]any, result map[string]any, toolErr error) (map[string]any, error) {
+	after := func(ctx agent.Context, t adktool.Tool, _ map[string]any, result map[string]any, toolErr error) (map[string]any, error) {
 		start := time.Now()
 		if v, ok := startTimes.LoadAndDelete(ctx.FunctionCallID()); ok {
 			start = v.(time.Time)
@@ -170,7 +170,7 @@ func buildBeforeOnlyCallbacks(
 	}
 
 	return []llmagent.BeforeToolCallback{
-		func(ctx adktool.Context, t adktool.Tool, args map[string]any) (map[string]any, error) {
+		func(ctx agent.Context, t adktool.Tool, args map[string]any) (map[string]any, error) {
 			fCtx := newEnforcerContext(ctx, t, args, agentName, sessionID, userID)
 			chain := fagent.Chain(mws...)
 			if err := chain(fagent.HandlerFunc(func(*fagent.Context) error { return nil })).Handle(fCtx); err != nil {
@@ -228,7 +228,7 @@ func modelLoggingCallbacks(
 ) (llmagent.BeforeModelCallback, llmagent.AfterModelCallback) {
 	var startTimes sync.Map // invocationID → time.Time
 
-	before := func(ctx agent.CallbackContext, req *model.LLMRequest) (*model.LLMResponse, error) {
+	before := func(ctx agent.Context, req *model.LLMRequest) (*model.LLMResponse, error) {
 		startTimes.Store(ctx.InvocationID(), time.Now())
 		log.Info(ctx, "model call started",
 			"agent", agentName,
@@ -238,7 +238,7 @@ func modelLoggingCallbacks(
 		return nil, nil // nil = proceed with the actual model call
 	}
 
-	after := func(ctx agent.CallbackContext, resp *model.LLMResponse, respErr error) (*model.LLMResponse, error) {
+	after := func(ctx agent.Context, resp *model.LLMResponse, respErr error) (*model.LLMResponse, error) {
 		start := time.Now()
 		if v, ok := startTimes.LoadAndDelete(ctx.InvocationID()); ok {
 			start = v.(time.Time)
@@ -302,7 +302,7 @@ func toolErrorCallback(
 	log *logger.Logger,
 	agentName, sessionID string,
 ) llmagent.OnToolErrorCallback {
-	return func(ctx adktool.Context, t adktool.Tool, args map[string]any, err error) (map[string]any, error) {
+	return func(ctx agent.Context, t adktool.Tool, args map[string]any, err error) (map[string]any, error) {
 		// ── Confirmation-flow errors (ADK-Go v1.0.0 sentinels) ──────────────
 		// These are HITL flow-control signals, not actual failures.
 		// Return a structured result so the LLM gets clear guidance instead

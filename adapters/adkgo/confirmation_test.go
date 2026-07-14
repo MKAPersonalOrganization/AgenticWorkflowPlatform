@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/adk/model"
-	"google.golang.org/adk/session"
-	"google.golang.org/adk/tool/toolconfirmation"
+	"google.golang.org/adk/v2/model"
+	"google.golang.org/adk/v2/session"
+	"google.golang.org/adk/v2/tool/toolconfirmation"
 	"google.golang.org/genai"
 )
 
@@ -56,7 +56,7 @@ func buildConfirmationFunctionCallEvent() *session.Event {
 		"toolConfirmation":     confirmation,
 	}
 
-	evt := session.NewEvent("inv-1")
+	evt := session.NewEvent(context.Background(), "inv-1")
 	evt.ID = "evt-confirm"
 	evt.Author = testAgent
 	evt.Timestamp = time.Now()
@@ -80,7 +80,7 @@ func buildConfirmationFunctionCallEvent() *session.Event {
 // when the original tool runs and requests confirmation. This event carries
 // RequestedToolConfirmations keyed by the ORIGINAL tool call ID.
 func buildFunctionResponseEvent() *session.Event {
-	evt := session.NewEvent("inv-1")
+	evt := session.NewEvent(context.Background(), "inv-1")
 	evt.ID = "evt-func-resp"
 	evt.Author = testAgent
 	evt.Timestamp = time.Now()
@@ -175,7 +175,7 @@ func TestTranslateEvent_ConfirmationFunctionCall_EmitsToolNeedsConfirmation(t *t
 func TestTranslateEvent_RegularToolCall_StillEmitsToolStart(t *testing.T) {
 	t.Parallel()
 
-	evt := session.NewEvent("inv-1")
+	evt := session.NewEvent(context.Background(), "inv-1")
 	evt.ID = "evt-regular"
 	evt.Author = testAgent
 	evt.Timestamp = time.Now()

@@ -1,10 +1,10 @@
 package adkgo
 
 import (
-	"google.golang.org/adk/agent"
-	"google.golang.org/adk/agent/llmagent"
-	adkmodel "google.golang.org/adk/model"
-	adktool "google.golang.org/adk/tool"
+	"google.golang.org/adk/v2/agent"
+	"google.golang.org/adk/v2/agent/llmagent"
+	adkmodel "google.golang.org/adk/v2/model"
+	adktool "google.golang.org/adk/v2/tool"
 	"google.golang.org/genai"
 
 	fagent "aicompass/foundation/agent"

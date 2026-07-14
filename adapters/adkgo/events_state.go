@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"google.golang.org/adk/session"
+	"google.golang.org/adk/v2/session"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────

@@ -29,7 +29,7 @@ import (
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"google.golang.org/adk/artifact"
+	"google.golang.org/adk/v2/artifact"
 	"google.golang.org/genai"
 )
 
@@ -306,7 +306,7 @@ func (s *s3Service) GetArtifactVersion(ctx context.Context, req *artifact.GetArt
 			Version:        version,
 			CanonicalURI:   canonicalURI,
 			CustomMetadata: customMeta,
-			CreateTime:     float64(stat.LastModified.Unix()),
+			CreateTime:     stat.LastModified,
 			MimeType:       stat.ContentType,
 		},
 	}, nil

@@ -3,14 +3,14 @@ package adkgo
 import (
 	"fmt"
 
-	"google.golang.org/adk/agent"
-	"google.golang.org/adk/agent/llmagent"
-	adkmodel "google.golang.org/adk/model"
-	adktool "google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/exitlooptool"
-	"google.golang.org/adk/tool/loadartifactstool"
-	"google.golang.org/adk/tool/loadmemorytool"
-	"google.golang.org/adk/tool/preloadmemorytool"
+	"google.golang.org/adk/v2/agent"
+	"google.golang.org/adk/v2/agent/llmagent"
+	adkmodel "google.golang.org/adk/v2/model"
+	adktool "google.golang.org/adk/v2/tool"
+	"google.golang.org/adk/v2/tool/exitlooptool"
+	"google.golang.org/adk/v2/tool/loadartifactstool"
+	"google.golang.org/adk/v2/tool/loadmemorytool"
+	"google.golang.org/adk/v2/tool/preloadmemorytool"
 	"google.golang.org/genai"
 
 	fagent "aicompass/foundation/agent"

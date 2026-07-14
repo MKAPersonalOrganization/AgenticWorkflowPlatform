@@ -5,8 +5,8 @@ import (
 	"iter"
 	"strings"
 
-	"google.golang.org/adk/agent"
-	"google.golang.org/adk/session"
+	"google.golang.org/adk/v2/agent"
+	"google.golang.org/adk/v2/session"
 
 	fagent "aicompass/foundation/agent"
 )

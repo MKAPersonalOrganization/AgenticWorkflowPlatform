@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"google.golang.org/adk/session"
+	"google.golang.org/adk/v2/session"
 	"google.golang.org/genai"
 )
 

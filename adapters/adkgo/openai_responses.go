@@ -13,7 +13,7 @@ import (
 	"github.com/openai/openai-go/v3/shared"
 	"google.golang.org/genai"
 
-	adkmodel "google.golang.org/adk/model"
+	adkmodel "google.golang.org/adk/v2/model"
 )
 
 // openAIResponsesModel implements adkmodel.LLM via OpenAI's Responses API.

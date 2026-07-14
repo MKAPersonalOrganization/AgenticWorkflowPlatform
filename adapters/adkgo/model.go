@@ -13,8 +13,8 @@ import (
 	"github.com/openai/openai-go/v3/shared"
 	"google.golang.org/genai"
 
-	adkmodel "google.golang.org/adk/model"
-	"google.golang.org/adk/model/gemini"
+	adkmodel "google.golang.org/adk/v2/model"
+	"google.golang.org/adk/v2/model/gemini"
 
 	fagent "aicompass/foundation/agent"
 )

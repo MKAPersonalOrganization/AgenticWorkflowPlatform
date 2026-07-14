@@ -20,7 +20,7 @@ import (
 // The same placeholder regex ADK-Go uses at runtime is mirrored here so
 // what the analyzer flags is exactly what the runtime would try to inject:
 // `{+[^{}]*}+`, see
-// vendor/google.golang.org/adk/internal/llminternal/instruction_processor.go:70.
+// vendor/google.golang.org/adk/v2/internal/llminternal/instruction_processor.go:70.
 // References to scoped state (`app:`, `user:`, `temp:`) and artifacts
 // (`artifact.X`) bypass graph-flow lineage and are skipped — those are
 // resolved by separate ADK subsystems and have no producer in the graph.
@@ -42,14 +42,14 @@ import (
 // ─────────────────────────────────────────────────────────────────────────────
 
 // placeholderRegex mirrors ADK-Go's instruction-template placeholder regex
-// at vendor/google.golang.org/adk/internal/llminternal/instruction_processor.go:70.
+// at vendor/google.golang.org/adk/v2/internal/llminternal/instruction_processor.go:70.
 // What ADK-Go injects at runtime is exactly what this analyzer parses, so
 // the two cannot drift on `{{key}}` vs `{key}` quirks.
 var placeholderRegex = regexp.MustCompile(`{+[^{}]*}+`)
 
 // validKeyRegex matches a bare ADK state-key identifier — letters, digits,
 // underscore, leading non-digit. Matches the runtime accept set in
-// vendor/google.golang.org/adk/.../instruction_processor.go.
+// vendor/google.golang.org/adk/v2/.../instruction_processor.go.
 var validKeyRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
 // IssueKind enumerates the categories the analyzer reports. UI surfaces

@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"google.golang.org/adk/agent"
-	"google.golang.org/adk/agent/workflowagents/loopagent"
-	"google.golang.org/adk/agent/workflowagents/parallelagent"
-	"google.golang.org/adk/agent/workflowagents/sequentialagent"
-	adkmodel "google.golang.org/adk/model"
+	"google.golang.org/adk/v2/agent"
+	"google.golang.org/adk/v2/agent/workflowagents/loopagent"
+	"google.golang.org/adk/v2/agent/workflowagents/parallelagent"
+	"google.golang.org/adk/v2/agent/workflowagents/sequentialagent"
+	adkmodel "google.golang.org/adk/v2/model"
 
 	fagent "aicompass/foundation/agent"
 )
