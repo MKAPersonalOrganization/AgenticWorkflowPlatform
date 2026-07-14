@@ -68,7 +68,7 @@ github.com/a-h/templ/parser/v2/goexpression
 github.com/a-h/templ/parser/v2/visitor
 github.com/a-h/templ/runtime
 github.com/a-h/templ/safehtml
-# github.com/a2aproject/a2a-go/v2 v2.2.1
+# github.com/a2aproject/a2a-go/v2 v2.3.1
 ## explicit; go 1.25.0
 github.com/a2aproject/a2a-go/v2/a2a
 github.com/a2aproject/a2a-go/v2/a2aclient
@@ -160,6 +160,9 @@ github.com/fatih/color
 # github.com/felixge/httpsnoop v1.0.4
 ## explicit; go 1.13
 github.com/felixge/httpsnoop
+# github.com/fergusstrange/embedded-postgres v1.34.0
+## explicit; go 1.18
+github.com/fergusstrange/embedded-postgres
 # github.com/fsnotify/fsnotify v1.9.0
 ## explicit; go 1.17
 github.com/fsnotify/fsnotify
@@ -277,6 +280,12 @@ github.com/jackc/puddle/v2/internal/genstack
 ## explicit; go 1.10
 github.com/jmoiron/sqlx
 github.com/jmoiron/sqlx/reflectx
+# github.com/johannesboyne/gofakes3 v1.2.0
+## explicit; go 1.24
+github.com/johannesboyne/gofakes3
+github.com/johannesboyne/gofakes3/backend/s3mem
+github.com/johannesboyne/gofakes3/internal/goskipiter
+github.com/johannesboyne/gofakes3/internal/s3io
 # github.com/klauspost/compress v1.18.6
 ## explicit; go 1.24
 github.com/klauspost/compress/internal/le
@@ -408,6 +417,9 @@ github.com/rivo/uniseg
 # github.com/rs/xid v1.6.0
 ## explicit; go 1.16
 github.com/rs/xid
+# github.com/ryszard/goskiplist v0.0.0-20150312221310-2dfbae5fcf46
+## explicit
+github.com/ryszard/goskiplist/skiplist
 # github.com/segmentio/asm v1.2.1
 ## explicit; go 1.18
 github.com/segmentio/asm/ascii
@@ -459,6 +471,9 @@ github.com/tidwall/sjson
 ## explicit; go 1.24
 github.com/tinylib/msgp/msgp
 github.com/tinylib/msgp/msgp/setof
+# github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
+## explicit
+github.com/xi2/xz
 # github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e
 ## explicit; go 1.19
 github.com/xo/terminfo
@@ -516,13 +531,16 @@ go.opentelemetry.io/otel/trace
 go.opentelemetry.io/otel/trace/embedded
 go.opentelemetry.io/otel/trace/internal/telemetry
 go.opentelemetry.io/otel/trace/noop
+# go.shabbyrobe.org/gocovmerge v0.0.0-20230507111327-fa4f82cfbf4d
+## explicit; go 1.20
+go.shabbyrobe.org/gocovmerge
 # go.uber.org/atomic v1.11.0
 ## explicit; go 1.18
 go.uber.org/atomic
 # go.yaml.in/yaml/v3 v3.0.4
 ## explicit; go 1.16
 go.yaml.in/yaml/v3
-# golang.org/x/crypto v0.50.0
+# golang.org/x/crypto v0.51.0
 ## explicit; go 1.25.0
 golang.org/x/crypto/argon2
 golang.org/x/crypto/blake2b
@@ -545,7 +563,7 @@ golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/modfile
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.53.0
+# golang.org/x/net v0.55.0
 ## explicit; go 1.25.0
 golang.org/x/net/html
 golang.org/x/net/html/atom
@@ -574,13 +592,13 @@ golang.org/x/oauth2/jwt
 ## explicit; go 1.25.0
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.43.0
+# golang.org/x/sys v0.45.0
 ## explicit; go 1.25.0
 golang.org/x/sys/cpu
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/text v0.36.0
+# golang.org/x/text v0.37.0
 ## explicit; go 1.25.0
 golang.org/x/text/cases
 golang.org/x/text/feature/plural
@@ -605,6 +623,7 @@ golang.org/x/text/unicode/rangetable
 golang.org/x/text/width
 # golang.org/x/tools v0.44.0
 ## explicit; go 1.25.0
+golang.org/x/tools/cover
 golang.org/x/tools/go/ast/astutil
 golang.org/x/tools/go/ast/edge
 golang.org/x/tools/go/ast/inspector
@@ -628,56 +647,59 @@ golang.org/x/tools/internal/stdlib
 golang.org/x/tools/internal/typeparams
 golang.org/x/tools/internal/typesinternal
 golang.org/x/tools/internal/versions
-# google.golang.org/adk v1.2.0
+# google.golang.org/adk/v2 v2.0.0
 ## explicit; go 1.25.0
-google.golang.org/adk/agent
-google.golang.org/adk/agent/llmagent
-google.golang.org/adk/agent/workflowagents/loopagent
-google.golang.org/adk/agent/workflowagents/parallelagent
-google.golang.org/adk/agent/workflowagents/sequentialagent
-google.golang.org/adk/artifact
-google.golang.org/adk/internal/agent
-google.golang.org/adk/internal/agent/parentmap
-google.golang.org/adk/internal/agent/runconfig
-google.golang.org/adk/internal/artifact
-google.golang.org/adk/internal/context
-google.golang.org/adk/internal/converters
-google.golang.org/adk/internal/llminternal
-google.golang.org/adk/internal/llminternal/converters
-google.golang.org/adk/internal/llminternal/googlellm
-google.golang.org/adk/internal/memory
-google.golang.org/adk/internal/plugininternal
-google.golang.org/adk/internal/plugininternal/plugincontext
-google.golang.org/adk/internal/sessionutils
-google.golang.org/adk/internal/telemetry
-google.golang.org/adk/internal/toolinternal
-google.golang.org/adk/internal/toolinternal/toolutils
-google.golang.org/adk/internal/typeutil
-google.golang.org/adk/internal/utils
-google.golang.org/adk/internal/version
-google.golang.org/adk/memory
-google.golang.org/adk/model
-google.golang.org/adk/model/gemini
-google.golang.org/adk/plugin
-google.golang.org/adk/plugin/retryandreflect
-google.golang.org/adk/runner
-google.golang.org/adk/session
-google.golang.org/adk/tool
-google.golang.org/adk/tool/agenttool
-google.golang.org/adk/tool/exitlooptool
-google.golang.org/adk/tool/functiontool
-google.golang.org/adk/tool/loadartifactstool
-google.golang.org/adk/tool/loadmemorytool
-google.golang.org/adk/tool/preloadmemorytool
-google.golang.org/adk/tool/toolconfirmation
-# google.golang.org/api v0.277.0
+google.golang.org/adk/v2/agent
+google.golang.org/adk/v2/agent/llmagent
+google.golang.org/adk/v2/agent/workflowagents/loopagent
+google.golang.org/adk/v2/agent/workflowagents/parallelagent
+google.golang.org/adk/v2/agent/workflowagents/sequentialagent
+google.golang.org/adk/v2/artifact
+google.golang.org/adk/v2/internal/agent
+google.golang.org/adk/v2/internal/agent/parentmap
+google.golang.org/adk/v2/internal/agent/runconfig
+google.golang.org/adk/v2/internal/artifact
+google.golang.org/adk/v2/internal/context
+google.golang.org/adk/v2/internal/converters
+google.golang.org/adk/v2/internal/llminternal
+google.golang.org/adk/v2/internal/llminternal/converters
+google.golang.org/adk/v2/internal/llminternal/googlellm
+google.golang.org/adk/v2/internal/memory
+google.golang.org/adk/v2/internal/plugininternal
+google.golang.org/adk/v2/internal/plugininternal/plugincontext
+google.golang.org/adk/v2/internal/sessionutils
+google.golang.org/adk/v2/internal/telemetry
+google.golang.org/adk/v2/internal/toolinternal
+google.golang.org/adk/v2/internal/toolinternal/toolutils
+google.golang.org/adk/v2/internal/typeutil
+google.golang.org/adk/v2/internal/utils
+google.golang.org/adk/v2/internal/version
+google.golang.org/adk/v2/internal/workflowinternal
+google.golang.org/adk/v2/memory
+google.golang.org/adk/v2/model
+google.golang.org/adk/v2/model/gemini
+google.golang.org/adk/v2/platform
+google.golang.org/adk/v2/plugin
+google.golang.org/adk/v2/plugin/retryandreflect
+google.golang.org/adk/v2/runner
+google.golang.org/adk/v2/session
+google.golang.org/adk/v2/tool
+google.golang.org/adk/v2/tool/agenttool
+google.golang.org/adk/v2/tool/exitlooptool
+google.golang.org/adk/v2/tool/functiontool
+google.golang.org/adk/v2/tool/loadartifactstool
+google.golang.org/adk/v2/tool/loadmemorytool
+google.golang.org/adk/v2/tool/preloadmemorytool
+google.golang.org/adk/v2/tool/toolconfirmation
+google.golang.org/adk/v2/workflow
+# google.golang.org/api v0.279.0
 ## explicit; go 1.25.0
 google.golang.org/api/googleapi
 google.golang.org/api/internal/third_party/uritemplates
-# google.golang.org/genai v1.55.0
+# google.golang.org/genai v1.57.0
 ## explicit; go 1.24
 google.golang.org/genai
-# google.golang.org/genproto/googleapis/rpc v0.0.0-20260427160629-7cedc36a6bc4
+# google.golang.org/genproto/googleapis/rpc v0.0.0-20260511170946-3700d4141b60
 ## explicit; go 1.25.0
 google.golang.org/genproto/googleapis/rpc/code
 google.golang.org/genproto/googleapis/rpc/errdetails

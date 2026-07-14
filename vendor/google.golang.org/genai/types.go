@@ -170,12 +170,13 @@ const (
 	PhishBlockThresholdBlockOnlyExtremelyHigh PhishBlockThreshold = "BLOCK_ONLY_EXTREMELY_HIGH"
 )
 
-// Specifies the function Behavior. Currently only supported by the BidiGenerateContent
-// method. This enum is not supported in Vertex AI.
+// Specifies the function Behavior. Currently only non-blocking functions are supported.
+// If not specified, the system keeps the current function call behavior. This field
+// is currently only supported by the BidiGenerateContent method.
 type Behavior string
 
 const (
-	// This value is unused.
+	// This value is unspecified.
 	BehaviorUnspecified Behavior = "UNSPECIFIED"
 	// If set, the system will wait to receive the function response before continuing the
 	// conversation.
@@ -2190,8 +2191,9 @@ type FunctionDeclaration struct {
 	// specified by the schema is the response value of the function. This field is mutually
 	// exclusive with `response`.
 	ResponseJsonSchema any `json:"responseJsonSchema,omitempty"`
-	// Optional. Specifies the function Behavior. Currently only supported by the BidiGenerateContent
-	// method. This field is not supported in Vertex AI.
+	// Optional. Specifies the function Behavior. Currently only non-blocking functions
+	// are supported. If not specified, the system keeps the current function call behavior.
+	// This field is currently only supported by the BidiGenerateContent method.
 	Behavior Behavior `json:"behavior,omitempty"`
 }
 
@@ -2976,6 +2978,8 @@ type GroundingChunkRetrievedContext struct {
 	// Optional. Page number of the retrieved context. This field is not supported in Vertex
 	// AI.
 	PageNumber *int32 `json:"pageNumber,omitempty"`
+	// Optional. Media ID. This field is not supported in Vertex AI.
+	MediaID string `json:"mediaId,omitempty"`
 }
 
 // A `Web` chunk is a piece of evidence that comes from a web page. It contains the
@@ -5972,6 +5976,9 @@ type CreateFileSearchStoreConfig struct {
 	HTTPOptions *HTTPOptions `json:"httpOptions,omitempty"`
 	// Optional. The human-readable display name for the file search store.
 	DisplayName string `json:"displayName,omitempty"`
+	// Optional. The embedding model to use for the FileSearchStore.
+	// Format: `models/{model}`. If not specified, the default embedding model will be used.
+	EmbeddingModel string `json:"embeddingModel,omitempty"`
 }
 
 // A collection of Documents.
@@ -5993,6 +6000,8 @@ type FileSearchStore struct {
 	// The size of raw bytes ingested into the FileSearchStore. This is the
 	// total size of all the documents in the FileSearchStore.
 	SizeBytes int64 `json:"sizeBytes,omitempty,string"`
+	// Optional. The embedding model used by the FileSearchStore.
+	EmbeddingModel string `json:"embeddingModel,omitempty"`
 }
 
 func (f *FileSearchStore) UnmarshalJSON(data []byte) error {
@@ -7457,6 +7466,17 @@ type LiveClientMessage struct {
 	ToolResponse *LiveClientToolResponse `json:"toolResponse,omitempty"`
 }
 
+// Config for stream translation.
+type StreamTranslationConfig struct {
+	// Optional. If true, the model will generate audio when the target language is
+	// spoken, essentially it will parrot the input. If false, we will not produce
+	// audio for the target language.
+	EchoTargetLanguage *bool `json:"echoTargetLanguage,omitempty"`
+	// Optional. The target language for translation. Supported values are BCP-47
+	// language codes (e.g. "en", "es", "fr").
+	TargetLanguageCode string `json:"targetLanguageCode,omitempty"`
+}
+
 // Session config for the API connection.
 type LiveConnectConfig struct {
 	// Optional. Used to override HTTP request options.
@@ -7531,6 +7551,8 @@ type LiveConnectConfig struct {
 	// Optional. Safety settings in the request to block unsafe content in the
 	// response.
 	SafetySettings []*SafetySetting `json:"safetySettings,omitempty"`
+	// Optional. Config for stream translation.
+	StreamTranslationConfig *StreamTranslationConfig `json:"streamTranslationConfig,omitempty"`
 }
 
 // Parameters for sending client content to the live API.
@@ -7685,4 +7707,10 @@ type CountTokensResult struct {
 type ComputeTokensResult struct {
 	// Optional. Lists of tokens info from the input.
 	TokensInfo []*TokensInfo `json:"tokensInfo,omitempty"`
+}
+
+// Used to override the default configuration.
+type DownloadMediaConfig struct {
+	// Optional. Used to override HTTP request options.
+	HTTPOptions *HTTPOptions `json:"httpOptions,omitempty"`
 }
