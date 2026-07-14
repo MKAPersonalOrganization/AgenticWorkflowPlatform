@@ -1,0 +1,35 @@
+# fly.toml app configuration file generated for school-with-ai-demo on 2026-07-14T23:01:08+02:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'compass-ai'
+primary_region = 'fra'
+
+[build]
+  dockerfile = 'Dockerfile.demo'
+
+[env]
+  APP_AUTH_APP_URL = 'https://compass-ai.fly.dev'
+  APP_DEMO_MODE = 'true'
+  APP_EDGEQUAKE_ENABLED = 'false'
+  APP_WEB_API_HOST = '0.0.0.0:8090'
+  APP_WEB_TLS_DISABLED = 'true'
+
+[http_service]
+  internal_port = 8090
+  force_https = true
+  auto_stop_machines = 'off'
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '1m0s'
+    method = 'GET'
+    path = '/readiness'
+
+[[vm]]
+  size = 'shared-cpu-2x'
+  memory = '2gb'

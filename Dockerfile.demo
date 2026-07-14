@@ -1,0 +1,87 @@
+# =============================================================================
+# Demo Deployment Build (Fly.io and similar TLS-terminating platforms)
+# =============================================================================
+# Differences from the production Dockerfile:
+#   - Runtime is debian-slim (glibc): demo mode runs an embedded Postgres
+#     whose zonky binaries are glibc-linked and won't start on Alpine/musl.
+#   - Runs as a non-root user: Postgres refuses to run as root.
+#   - Pre-seeds the embedded-postgres binary cache at build time so container
+#     boots never download anything. The version MUST match the one pinned in
+#     infra/demoinfra/demoinfra.go (embeddedpostgres.V18 = 18.3.0).
+#   - No TLS certs: the platform edge terminates TLS (APP_WEB_TLS_DISABLED).
+#
+# Expected runtime env (see fly.toml): APP_DEMO_MODE=true,
+# APP_WEB_TLS_DISABLED=true, APP_WEB_API_HOST=0.0.0.0:8090.
+# =============================================================================
+
+# Stage 1: Build — generate templ files, build CSS, compile binary
+FROM golang:1.25-alpine AS builder
+
+RUN apk add --no-cache nodejs npm
+
+WORKDIR /app
+
+# Copy module files + pre-vendored dependencies (no network needed at build time)
+COPY go.mod go.sum ./
+COPY vendor ./vendor
+
+# Copy all source
+COPY . .
+
+# Generate templ files (templ is declared as a `go tool` in go.mod)
+RUN go tool templ generate
+
+# Install Tailwind v4 + typography plugin locally so @import "tailwindcss" resolves
+RUN npm install tailwindcss @tailwindcss/cli @tailwindcss/typography
+
+# Build and minify Tailwind CSS output
+RUN npx @tailwindcss/cli \
+    -i ./assets/css/input.css \
+    -o ./assets/css/output.css \
+    --minify
+
+# Compile binary — build tag "demo"
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -mod=vendor \
+    -ldflags="-s -w -X main.build=demo" \
+    -o /bin/ai-chat-platform .
+
+# =============================================================================
+# Stage 2: Runtime — glibc base, non-root, pre-seeded Postgres binaries
+# =============================================================================
+FROM debian:stable-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates tzdata curl unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd --create-home --uid 10001 app
+
+WORKDIR /app
+
+# Binary
+COPY --from=builder /bin/ai-chat-platform .
+
+# Static assets (CSS, JS, images, locale catalogs)
+COPY --from=builder /app/assets ./assets
+
+# Pre-seed the embedded-postgres binary cache. The library looks for
+# ~/.embedded-postgres-go/embedded-postgres-binaries-<os>-<arch>-<version>.txz
+# and skips the download when it exists. The Maven jar is a zip wrapping the
+# txz archive.
+ARG PG_VERSION=18.3.0
+RUN mkdir -p /home/app/.embedded-postgres-go \
+    && curl -fsSL -o /tmp/pg.jar "https://repo1.maven.org/maven2/io/zonky/test/postgres/embedded-postgres-binaries-linux-amd64/${PG_VERSION}/embedded-postgres-binaries-linux-amd64-${PG_VERSION}.jar" \
+    && unzip -o /tmp/pg.jar -d /tmp/pg \
+    && mv /tmp/pg/*.txz "/home/app/.embedded-postgres-go/embedded-postgres-binaries-linux-amd64-${PG_VERSION}.txz" \
+    && rm -rf /tmp/pg /tmp/pg.jar \
+    && chown -R app:app /home/app/.embedded-postgres-go
+
+RUN chown -R app:app /app
+
+USER app
+ENV HOME=/home/app
+
+EXPOSE 8090
+
+CMD ["./ai-chat-platform"]
