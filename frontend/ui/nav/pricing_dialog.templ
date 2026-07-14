@@ -1,6 +1,7 @@
 package nav
 
 import (
+	"aicompass/foundation/features"
 	"aicompass/frontend/components/button"
 	"aicompass/frontend/ui/i18n"
 	"aicompass/frontend/components/icon"
@@ -103,13 +104,24 @@ templ pricingDialog() {
 									</template>
 								</ul>
 								<!-- Activate button -->
-								<button
-									type="button"
-									@click="activate()"
-									class="w-full inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-								>
-									{ i18n.T(ctx, "Activate Now") }
-								</button>
+								if features.Demo(ctx) {
+									<button
+										type="button"
+										disabled
+										title={ i18n.T(ctx, "Payments are disabled in the demo") }
+										class="w-full inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 bg-primary text-primary-foreground opacity-50 cursor-not-allowed"
+									>
+										{ i18n.T(ctx, "Activate Now") }
+									</button>
+								} else {
+									<button
+										type="button"
+										@click="activate()"
+										class="w-full inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+									>
+										{ i18n.T(ctx, "Activate Now") }
+									</button>
+								}
 							</div>
 							<p class="text-xs text-muted-foreground text-center">
 								{ i18n.T(ctx, "Secure payment powered by Stripe. Your card details never touch our servers.") }

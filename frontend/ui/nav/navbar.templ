@@ -1,6 +1,7 @@
 package nav
 
 import (
+	"aicompass/foundation/features"
 	a2acomp "aicompass/frontend/ui/a2a"
 	"aicompass/frontend/components/button"
 	"aicompass/frontend/ui/filesystem"
@@ -229,9 +230,11 @@ templ Navbar(props ...NavbarProps) {
 				<div class="nav-item w-full flex justify-center">
 					@filesystem.FilesystemButtonTrigger()
 				</div>
-				<div class="nav-item w-full flex justify-center">
-					@resources.ResourcesButtonTrigger()
-				</div>
+				if features.KnowledgeBase(ctx) {
+					<div class="nav-item w-full flex justify-center">
+						@resources.ResourcesButtonTrigger()
+					</div>
+				}
 				<div class="nav-item w-full flex justify-center">
 					@a2acomp.A2AButtonTrigger()
 				</div>

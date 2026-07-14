@@ -1,6 +1,7 @@
 package nav
 
 import (
+	"aicompass/foundation/features"
 	"fmt"
 	"aicompass/frontend/components/alert"
 	"aicompass/frontend/components/button"
@@ -471,7 +472,8 @@ templ Settings() {
 										</div>
 									</div>
 									<!-- Knowledge Graph Embedding -->
-									<div class="border-t border-border pt-6 space-y-4">
+									if features.KnowledgeBase(ctx) {
+										<div class="border-t border-border pt-6 space-y-4">
 										<div class="space-y-2">
 											<h3 class="text-foreground font-medium flex items-center gap-2">
 												@icon.Network(icon.Props{Class: "size-4"})
@@ -559,6 +561,7 @@ templ Settings() {
 											</div>
 										</template>
 									</div>
+									}
 								</div>
 							}
 							<!-- Personalization Tab -->
@@ -1117,14 +1120,26 @@ templ Settings() {
 																<p class="text-xs text-muted-foreground ps-6">
 																	{ i18n.T(ctx, "Unlimited conversations, all AI models, priority support, and more for just $5/month.") }
 																</p>
-																<button
-																	type="button"
-																	@click="$dispatch('open-pricing-dialog')"
-																	class="w-full inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium h-9 px-4 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-																>
-																	@icon.Sparkles(icon.Props{Class: "size-4"})
-																	{ i18n.T(ctx, "Subscribe — $5/month") }
-																</button>
+																if features.Demo(ctx) {
+																	<button
+																		type="button"
+																		disabled
+																		title={ i18n.T(ctx, "Payments are disabled in the demo") }
+																		class="w-full inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium h-9 px-4 bg-primary text-primary-foreground opacity-50 cursor-not-allowed"
+																	>
+																		@icon.Sparkles(icon.Props{Class: "size-4"})
+																		{ i18n.T(ctx, "Subscribe — $5/month") }
+																	</button>
+																} else {
+																	<button
+																		type="button"
+																		@click="$dispatch('open-pricing-dialog')"
+																		class="w-full inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium h-9 px-4 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+																	>
+																		@icon.Sparkles(icon.Props{Class: "size-4"})
+																		{ i18n.T(ctx, "Subscribe — $5/month") }
+																	</button>
+																}
 															</div>
 															<p class="text-[10px] text-muted-foreground text-center mt-2 flex items-center justify-center gap-1">
 																@icon.ShieldCheck(icon.Props{Class: "size-3"})

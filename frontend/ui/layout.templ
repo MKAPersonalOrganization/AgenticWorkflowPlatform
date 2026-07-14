@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"aicompass/foundation/features"
 	a2acomp "aicompass/frontend/ui/a2a"
 	"aicompass/frontend/ui/agents"
 	"aicompass/frontend/ui/convsearch"
@@ -133,7 +134,9 @@ templ BaseLayout(props LayoutProps) {
 			<!-- Global Modals (authenticated only) -->
 			if props.User != nil {
 				<div x-cloak>
-					@resources.ResourcesDialog()
+					if features.KnowledgeBase(ctx) {
+						@resources.ResourcesDialog()
+					}
 					@agents.AgentsDialog()
 					<!-- Agent Designer is a full page at /agent-designer (not a dialog). -->
 					@tools.ToolsDialog()

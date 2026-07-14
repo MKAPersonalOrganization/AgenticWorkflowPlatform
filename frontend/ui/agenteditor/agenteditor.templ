@@ -1,6 +1,7 @@
 package agenteditor
 
 import (
+	"aicompass/foundation/features"
 	"aicompass/frontend/components/button"
 	"aicompass/frontend/components/icon"
 	"aicompass/frontend/components/input"
@@ -130,7 +131,9 @@ templ agentNodeForm() {
 	<template x-if="editingAgent">
 		<div class="space-y-4">
 			@toolsSection()
-			@knowledgeBasesSection()
+			if features.KnowledgeBase(ctx) {
+				@knowledgeBasesSection()
+			}
 			@filesystemsSection()
 		</div>
 	</template>

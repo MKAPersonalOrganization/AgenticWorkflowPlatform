@@ -21,8 +21,8 @@ type bannerHandler struct {
 // getBanner returns the current banner as JSON.
 func (h *bannerHandler) getBanner(w http.ResponseWriter, r *http.Request) {
 	b := Banner{
-		ID:          "welcome-v3",
-		Message:     "Welcome to the new version! (with HTML link)",
+		ID:          "welcome-demo",
+		Message:     "Welcome to the demo version!",
 		Persistable: false,
 	}
 

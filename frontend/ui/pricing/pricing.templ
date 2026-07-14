@@ -1,5 +1,6 @@
 package pricing
 
+import "aicompass/foundation/features"
 import "aicompass/frontend/components/card"
 import "aicompass/frontend/components/button"
 import "aicompass/frontend/components/icon"
@@ -62,20 +63,39 @@ templ ActivationCard() {
 				</ul>
 			}
 			@card.Footer(card.FooterProps{Class: "flex-col pt-6"}) {
-				@button.Button(button.Props{
-					Variant:   button.VariantDefault,
-					FullWidth: true,
-					Size:      button.SizeLg,
-					Attributes: templ.Attributes{
-						"@click": "$dispatch('open-checkout-dialog')",
-					},
-				}) {
-					@icon.Lock(icon.Props{Class: "size-4"})
-					<span>{ i18n.T(ctx, "Activate Now") }</span>
+				if features.Demo(ctx) {
+					@button.Button(button.Props{
+						Variant:   button.VariantDefault,
+						FullWidth: true,
+						Size:      button.SizeLg,
+						Disabled:  true,
+						Class:     "opacity-50 cursor-not-allowed",
+						Attributes: templ.Attributes{
+							"title": i18n.T(ctx, "Payments are disabled in the demo"),
+						},
+					}) {
+						@icon.Lock(icon.Props{Class: "size-4"})
+						<span>{ i18n.T(ctx, "Activate Now") }</span>
+					}
+					<p class="text-xs text-muted-foreground mt-4 text-center">
+						{ i18n.T(ctx, "Payments are disabled in this demo version.") }
+					</p>
+				} else {
+					@button.Button(button.Props{
+						Variant:   button.VariantDefault,
+						FullWidth: true,
+						Size:      button.SizeLg,
+						Attributes: templ.Attributes{
+							"@click": "$dispatch('open-checkout-dialog')",
+						},
+					}) {
+						@icon.Lock(icon.Props{Class: "size-4"})
+						<span>{ i18n.T(ctx, "Activate Now") }</span>
+					}
+					<p class="text-xs text-muted-foreground mt-4 text-center">
+						{ i18n.T(ctx, "Secure payment powered by Stripe. Your card details never touch our servers.") }
+					</p>
 				}
-				<p class="text-xs text-muted-foreground mt-4 text-center">
-					{ i18n.T(ctx, "Secure payment powered by Stripe. Your card details never touch our servers.") }
-				</p>
 			}
 		}
 	</div>
