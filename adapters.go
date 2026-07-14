@@ -94,6 +94,29 @@ func (a *WorkspaceProviderAdapter) ListWorkspaces(ctx context.Context, tCtx *ten
 	return &permissions.WorkspaceList{Items: workspaces}, nil
 }
 
+// nullDocumentProvider is the chatcontracts.DocumentProvider wired in when
+// the experimental knowledge-base feature is disabled: every call reports the
+// feature as forbidden without contacting Edgequake.
+type nullDocumentProvider struct{}
+
+func (nullDocumentProvider) ListDocuments(context.Context, *tenant.TenantContext, int, int, string) (any, error) {
+	return nil, chatcontracts.ErrKnowledgeForbidden
+}
+
+func (nullDocumentProvider) UploadDocument(context.Context, *tenant.TenantContext, string, string, io.Reader) (any, error) {
+	return nil, chatcontracts.ErrKnowledgeForbidden
+}
+
+// nullWorkspaceProvider is the permissions.WorkspaceProvider wired in when
+// the experimental knowledge-base feature is disabled. It returns an empty
+// (non-nil) list so /v1/agents/{id}/workspaces succeeds and the frontend
+// hides its knowledge-base sections, which render only when workspaces exist.
+type nullWorkspaceProvider struct{}
+
+func (nullWorkspaceProvider) ListWorkspaces(context.Context, *tenant.TenantContext, int, int) (*permissions.WorkspaceList, error) {
+	return &permissions.WorkspaceList{Items: []permissions.Workspace{}}, nil
+}
+
 // chatProfileAdapter bridges identity.UserProfileRepository to
 // chatcontracts.UserProfileRepository so the chat module does not import
 // modules/userprofile/identity directly.

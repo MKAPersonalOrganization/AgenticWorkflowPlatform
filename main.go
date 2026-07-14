@@ -9,6 +9,7 @@ import (
 	"aicompass/foundation/auth"
 	"aicompass/foundation/debug"
 	"aicompass/foundation/event"
+	"aicompass/foundation/features"
 	"aicompass/foundation/i18n"
 	"aicompass/foundation/logger"
 	"aicompass/foundation/middleware"
@@ -20,11 +21,13 @@ import (
 	"aicompass/frontend/ui/docs"
 	"aicompass/frontend/ui/landing"
 	"aicompass/frontend/ui/pricing"
+	"aicompass/infra/demoinfra"
 	"aicompass/infra/googleauth"
 	"aicompass/infra/memdb"
 	"aicompass/infra/projection/subscriber"
 	"aicompass/infra/sqldb"
 	"aicompass/infra/sqldb/migrate"
+	"aicompass/modules/chat/chatcontracts"
 	"aicompass/modules/chat/handlers/common"
 	"aicompass/modules/chat/thread"
 	"aicompass/modules/knowledge/edgequake"
@@ -124,7 +127,11 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 	cfg := struct {
 		conf.Version
-		Web struct {
+		// DemoMode boots the entire infrastructure in-process (embedded
+		// Postgres, in-memory Redis and S3). All data is ephemeral — lost on
+		// restart. For showcase deployments with no real users.
+		DemoMode bool `conf:"default:false"`
+		Web      struct {
 			ReadTimeout       time.Duration `conf:"default:60s"`
 			WriteTimeout      time.Duration `conf:"default:60s"`
 			IdleTimeout       time.Duration `conf:"default:60s"`
@@ -134,6 +141,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 			DebugHost         string        `conf:"default:0.0.0.0:4010"`
 			TLSCert           string        `conf:"default:./tls/cert.pem"`
 			TLSKey            string        `conf:"default:./tls/key.pem"`
+			// TLSDisabled serves plain HTTP instead of HTTPS. For deployments
+			// behind a TLS-terminating proxy (Fly.io, nginx, load balancers)
+			// where the edge owns the certificate.
+			TLSDisabled bool `conf:"default:false"`
 		}
 		Auth struct {
 			AppURL             string `conf:"default:https://localhost:8090"`
@@ -180,6 +191,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 			S3Region    string `conf:"default:us-east-1"`
 		}
 		Edgequake struct {
+			// Enabled is the experimental flag for all knowledge-base (RAG)
+			// features. When false (the default), Edgequake routes, tools,
+			// prompt injection, and UI surfaces are hidden.
+			Enabled  bool   `conf:"default:false"`
 			BaseURL  string `conf:"default:http://localhost:8081"`
 			TenantID string
 		}
@@ -208,12 +223,44 @@ func run(ctx context.Context, log *logger.Logger) error {
 	log.Info(ctx, "startup", "config_tenant_id", cfg.Edgequake.TenantID)
 
 	// -------------------------------------------------------------------------
+	// Demo Mode — in-process infrastructure
+	//
+	// Boots embedded Postgres, in-memory Redis, and in-memory S3, then points
+	// the config at them. Everything is ephemeral; data is lost on restart.
+
+	if cfg.DemoMode {
+		log.Info(ctx, "startup", "status", "DEMO MODE — in-process infrastructure, ALL DATA IS EPHEMERAL")
+		demoInfra, overrides, err := demoinfra.Start(ctx, log, []string{
+			cfg.Artifacts.S3Bucket,
+			cfg.Artifacts.S3Bucket + "-agent-artifacts",
+		})
+		if err != nil {
+			return fmt.Errorf("starting demo infrastructure: %w", err)
+		}
+		defer demoInfra.Stop()
+
+		cfg.DB.User = overrides.DBUser
+		cfg.DB.Password = overrides.DBPassword
+		cfg.DB.Host = overrides.DBHost
+		cfg.DB.Name = overrides.DBName
+		cfg.DB.DisableTLS = true
+		cfg.Redis.Addr = overrides.RedisAddr
+		cfg.Redis.Password = ""
+		cfg.Artifacts.S3Endpoint = overrides.S3Endpoint
+		cfg.Artifacts.S3UseSSL = false
+	}
+
+	// -------------------------------------------------------------------------
 	// Production Configuration Guard
 	//
 	// Reject known development defaults when the binary is built for
-	// production (build != "develop").
+	// production (build != "develop"). Demo mode is exempt: it has no real
+	// users or durable data, and its embedded services only accept loopback
+	// connections.
 
-	if err := validateProductionConfig(log, cfg.Build, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass, cfg.DB.Password, cfg.Artifacts.S3AccessKey, cfg.Artifacts.S3SecretKey, cfg.Stripe.SecretKey, cfg.Stripe.WebhookSecret); err != nil {
+	if cfg.DemoMode {
+		log.Info(ctx, "startup", "status", "production config guard skipped (demo mode)")
+	} else if err := validateProductionConfig(log, cfg.Build, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass, cfg.DB.Password, cfg.Artifacts.S3AccessKey, cfg.Artifacts.S3SecretKey, cfg.Stripe.SecretKey, cfg.Stripe.WebhookSecret); err != nil {
 		return err
 	}
 
@@ -429,7 +476,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	toolregistry.RegisterPlugin(&codebase.Provider{})
 	toolregistry.RegisterPlugin(&cognitive.Provider{})
 	toolregistry.RegisterPlugin(&document.Provider{})
-	toolregistry.RegisterPlugin(&knowledgebase.Provider{})
+	if cfg.Edgequake.Enabled {
+		toolregistry.RegisterPlugin(&knowledgebase.Provider{})
+	}
 	toolregistry.RegisterPlugin(&library.Provider{})
 	toolregistry.RegisterPlugin(&planmode.Provider{})
 	toolregistry.RegisterPlugin(&todos.Provider{})
@@ -490,8 +539,13 @@ func run(ctx context.Context, log *logger.Logger) error {
 		}, nil
 	})
 	knowledgeModule := knowledgemod.New(log, cfg.Edgequake.BaseURL, embeddingResolver, cfg.Edgequake.TenantID)
-	edgequakeService := knowledgeModule.Service()
-	log.Info(ctx, "startup", "status", "knowledge module initialized", "baseURL", cfg.Edgequake.BaseURL)
+	var edgequakeService *edgequake.Service
+	if cfg.Edgequake.Enabled {
+		edgequakeService = knowledgeModule.Service()
+		log.Info(ctx, "startup", "status", "knowledge module initialized", "baseURL", cfg.Edgequake.BaseURL)
+	} else {
+		log.Info(ctx, "startup", "status", "knowledge-base feature disabled (experimental — set APP_EDGEQUAKE_ENABLED=true to enable)")
+	}
 
 	// Initialize Agents
 
@@ -504,6 +558,15 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// -------------------------------------------------------------------------
 	// Initialize Chat Module (core chat bounded context — ADR 014)
 
+	// When the experimental knowledge-base feature is off, chat's document
+	// endpoints and the permissions workspace listing get null-object
+	// providers: no Edgequake calls, empty/forbidden results, and the
+	// frontend hides the corresponding sections.
+	var documentProvider chatcontracts.DocumentProvider = nullDocumentProvider{}
+	if cfg.Edgequake.Enabled {
+		documentProvider = &DocumentProviderAdapter{svc: edgequakeService}
+	}
+
 	chatModule := chatmod.New(chatmod.Dependencies{
 		Log:                      log,
 		DB:                       db,
@@ -514,7 +577,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		AgentProvider:            agentProvider,
 		ToolRegistry:             toolRegistry,
 		RequirementConfigService: toolReqsStore,
-		DocumentProvider:         &DocumentProviderAdapter{svc: edgequakeService},
+		DocumentProvider:         documentProvider,
 		TenantID:                 cfg.Edgequake.TenantID,
 		AllowedOrigin:            cfg.Auth.AppURL,
 		SSE:                      common.DefaultSSEConfig(),
@@ -570,8 +633,9 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// Resolve per-user, per-agent tool config at request time (TTS, service URLs, KB namespaces, etc.)
 	// so the adapter layer stays tool-agnostic.
 	extraConfigFn := adkgo.ExtraConfigFunc(func(ctx context.Context, userID, agentName string) map[string]string {
-		extra := map[string]string{
-			"edgequake_base_url": cfg.Edgequake.BaseURL,
+		extra := map[string]string{}
+		if cfg.Edgequake.Enabled {
+			extra["edgequake_base_url"] = cfg.Edgequake.BaseURL
 		}
 		if apiKey, model, voice, err := aiSettingsModule.GetTTSConfigForUserFlat(ctx, userID); err == nil && apiKey != "" {
 			extra["tts_api_key"] = apiKey
@@ -587,7 +651,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 		return extra
 	})
 
-	kbPromptInjector := adkgo.NewKnowledgeBasePromptInjector(workspacePermissionsService)
+	var promptInjectors []adkgo.PromptInjector
+	if cfg.Edgequake.Enabled {
+		promptInjectors = append(promptInjectors, adkgo.NewKnowledgeBasePromptInjector(workspacePermissionsService))
+	}
 
 	adkRunner, err := adkgo.NewRunnerAdapter(adkgo.RunnerAdapterConfig{
 		Log:                    log,
@@ -604,7 +671,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		A2AResolver:            a2aModule.Service(),
 		A2ASubAgentProvider:    &a2aSubAgentAdapter{svc: a2aModule.Service()},
 		NewToolSetFactory:      newToolSetFactory,
-		PromptInjectors:        []adkgo.PromptInjector{kbPromptInjector},
+		PromptInjectors:        promptInjectors,
 		MemoryService:          memdb.New(db),
 		ArtifactService:        adkArtifactService,
 		ExtraConfigFn:          extraConfigFn,
@@ -649,7 +716,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 	// -------------------------------------------------------------------------
 	// Initialize Router & Routes
 
-	root, appRouter := buildRootRouter(log, rateLimitRedis)
+	root, appRouter := buildRootRouter(log, rateLimitRedis, cfg.Edgequake.Enabled, cfg.DemoMode)
 
 	// Initialize Google OAuth client and auth handlers
 	googleClient := googleauth.NewClient(googleauth.Config{
@@ -665,21 +732,27 @@ func run(ctx context.Context, log *logger.Logger) error {
 	}
 	authMiddleware := auth.NewMiddleware(googleClient, sessionStore, cfg.Auth.AppURL, ctx)
 
+	var workspaceProvider permissionsmod.WorkspaceProvider = nullWorkspaceProvider{}
+	if cfg.Edgequake.Enabled {
+		workspaceProvider = &WorkspaceProviderAdapter{svc: edgequakeService}
+	}
+
 	registerRoutes(appRouter, log, authHandlers, authMiddleware, healthHandler, routeModules{
-		chat:           chatModule,
-		userProfile:    userProfileModule,
-		aiSettings:     aiSettingsModule,
-		pluginSettings: pluginSettingsModule,
-		agentDef:       agentDefModule,
-		templates:      templatesModule,
-		knowledge:      knowledgeModule,
-		mcp:            mcpModule,
-		a2a:            a2aModule,
-		resources:      resourcesModule,
-		filesystem:     filesystemModule,
-		billing:        billingModule,
-		permissions:    permissionsmod.New(log, workspacePermissionsService, &WorkspaceProviderAdapter{svc: edgequakeService}, agentProvider, cfg.Edgequake.TenantID),
-		analytics:      analyticsmod.New(log, statsProjection, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass),
+		chat:             chatModule,
+		userProfile:      userProfileModule,
+		aiSettings:       aiSettingsModule,
+		pluginSettings:   pluginSettingsModule,
+		agentDef:         agentDefModule,
+		templates:        templatesModule,
+		knowledge:        knowledgeModule,
+		knowledgeEnabled: cfg.Edgequake.Enabled,
+		mcp:              mcpModule,
+		a2a:              a2aModule,
+		resources:        resourcesModule,
+		filesystem:       filesystemModule,
+		billing:          billingModule,
+		permissions:      permissionsmod.New(log, workspacePermissionsService, workspaceProvider, agentProvider, cfg.Edgequake.TenantID),
+		analytics:        analyticsmod.New(log, statsProjection, cfg.DashboardAdmin.User, cfg.DashboardAdmin.Pass),
 	}, edgequakeService)
 
 	// Set Stripe API key — must be done before any Stripe SDK calls
@@ -707,8 +780,12 @@ func run(ctx context.Context, log *logger.Logger) error {
 	serverErrors := make(chan error, 1)
 
 	go func() {
+		if cfg.Web.TLSDisabled {
+			log.Info(ctx, "startup", "status", "api router started (HTTP — TLS terminated upstream)", "host", server.Addr)
+			serverErrors <- server.ListenAndServe()
+			return
+		}
 		log.Info(ctx, "startup", "status", "api router started (HTTPS)", "host", server.Addr)
-
 		serverErrors <- server.ListenAndServeTLS(cfg.Web.TLSCert, cfg.Web.TLSKey)
 	}()
 
@@ -751,7 +828,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 
 // buildRootRouter creates the root chi router with global middleware and
 // an app sub-router with per-IP rate limiting. Returns (root, appRouter).
-func buildRootRouter(log *logger.Logger, rateLimitRedis *goredis.Client) (chi.Router, chi.Router) {
+func buildRootRouter(log *logger.Logger, rateLimitRedis *goredis.Client, knowledgeEnabled, demoMode bool) (chi.Router, chi.Router) {
 	root := chi.NewRouter()
 	root.Use(middleware.Panics())
 	root.Use(middleware.SecurityHeaders())
@@ -759,6 +836,7 @@ func buildRootRouter(log *logger.Logger, rateLimitRedis *goredis.Client) (chi.Ro
 	root.Use(middleware.Logger(log))
 	root.Use(middleware.Metrics())
 	root.Use(middleware.I18n)
+	root.Use(features.Middleware(knowledgeEnabled, demoMode))
 
 	// Static assets get a higher rate limit to support parallel loading.
 	root.Group(func(r chi.Router) {
@@ -797,7 +875,10 @@ type routeModules struct {
 	knowledge interface {
 		RegisterRoutes(chi.Router, *auth.Middleware)
 	}
-	mcp interface {
+	// knowledgeEnabled gates mounting of the knowledge module's routes
+	// (experimental knowledge-base feature flag).
+	knowledgeEnabled bool
+	mcp              interface {
 		RegisterRoutes(chi.Router, *auth.Middleware)
 	}
 	a2a interface {
@@ -845,7 +926,9 @@ func registerRoutes(
 	mods.chat.RegisterRoutes(r, authMW)
 	mods.mcp.RegisterRoutes(r, authMW)
 	mods.a2a.RegisterRoutes(r, authMW)
-	mods.knowledge.RegisterRoutes(r, authMW)
+	if mods.knowledgeEnabled {
+		mods.knowledge.RegisterRoutes(r, authMW)
+	}
 	mods.analytics.RegisterRoutes(r)
 
 	// Health check endpoints (public)
@@ -915,7 +998,9 @@ func HandleViewChatInputScreen(log *logger.Logger, edgequakeService *edgequake.S
 		user := auth.GetUserFromContext(r.Context())
 
 		// Sync user to RAG at most once per process lifetime (idempotent create).
-		if user != nil {
+		// Skipped entirely when the experimental knowledge-base feature is off
+		// (edgequakeService is nil in that case).
+		if user != nil && edgequakeService != nil {
 			if _, alreadySynced := syncedUsers.LoadOrStore(user.ID, struct{}{}); !alreadySynced {
 				// Detach from the request context: the response will return
 				// before the sync completes, but request-scoped values (trace
