@@ -131,6 +131,11 @@ func run(ctx context.Context, log *logger.Logger) error {
 		// Postgres, in-memory Redis and S3). All data is ephemeral — lost on
 		// restart. For showcase deployments with no real users.
 		DemoMode bool `conf:"default:false"`
+		// DemoResetInterval schedules a clean process exit this long after
+		// boot when DemoMode is on. Paired with a platform restart policy of
+		// "always" (fly.toml [restart]), this gives the demo a fresh,
+		// empty environment on a fixed cadence. Zero disables the reset.
+		DemoResetInterval time.Duration `conf:"default:24h"`
 		Web      struct {
 			ReadTimeout       time.Duration `conf:"default:60s"`
 			WriteTimeout      time.Duration `conf:"default:60s"`
@@ -149,10 +154,10 @@ func run(ctx context.Context, log *logger.Logger) error {
 		Auth struct {
 			AppURL             string `conf:"default:https://localhost:8090"`
 			GoogleClientID     string
-			GoogleClientSecret string
+			GoogleClientSecret string `conf:"mask"`
 			GitHubClientID     string
-			GitHubClientSecret string
-			SessionSecret      string `conf:"default:change-me-in-production-32-chars!"`
+			GitHubClientSecret string `conf:"mask"`
+			SessionSecret      string `conf:"default:change-me-in-production-32-chars!,mask"`
 
 			// DevLoginToken, when non-empty, mounts POST /auth/dev-login on the
 			// main app router. Tests must present this value in the
@@ -185,7 +190,7 @@ func run(ctx context.Context, log *logger.Logger) error {
 		Artifacts struct {
 			S3Endpoint  string `conf:"default:localhost:9100"`
 			S3AccessKey string `conf:"default:minio"`
-			S3SecretKey string `conf:"default:miniosecret"`
+			S3SecretKey string `conf:"default:miniosecret,mask"`
 			S3Bucket    string `conf:"default:artifacts"`
 			S3UseSSL    bool   `conf:"default:false"`
 			S3Region    string `conf:"default:us-east-1"`
@@ -248,6 +253,17 @@ func run(ctx context.Context, log *logger.Logger) error {
 		cfg.Redis.Password = ""
 		cfg.Artifacts.S3Endpoint = overrides.S3Endpoint
 		cfg.Artifacts.S3UseSSL = false
+
+		// Periodic demo reset: exit cleanly after the interval and let the
+		// platform's "always" restart policy boot a fresh process — and with
+		// it a fresh, empty embedded database.
+		if cfg.DemoResetInterval > 0 {
+			time.AfterFunc(cfg.DemoResetInterval, func() {
+				log.Info(ctx, "demo-reset", "status", "reset interval elapsed, restarting for a fresh demo environment")
+				_ = syscall.Kill(os.Getpid(), syscall.SIGTERM)
+			})
+			log.Info(ctx, "startup", "status", "demo reset scheduled", "interval", cfg.DemoResetInterval)
+		}
 	}
 
 	// -------------------------------------------------------------------------

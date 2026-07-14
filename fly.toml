@@ -16,6 +16,11 @@ primary_region = 'fra'
   APP_WEB_API_HOST = '0.0.0.0:8090'
   APP_WEB_TLS_DISABLED = 'true'
 
+# Always restart on exit: demo mode exits cleanly every APP_DEMO_RESET_INTERVAL
+# (default 24h) so each restart brings a fresh, empty demo database.
+[[restart]]
+  policy = 'always'
+
 [http_service]
   internal_port = 8090
   force_https = true
