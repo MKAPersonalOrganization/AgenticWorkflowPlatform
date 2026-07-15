@@ -4,8 +4,9 @@ package docs
 templ docsAIModels() {
 	@docsSection("ai-models", "AI Models", iconCpu, "text-blue-500") {
 		<p>
-			Compass.AI supports <strong>models from OpenAI and Google Gemini</strong>. Configure your preferred
-			model globally in Settings → AI → Chat Model, and all agents automatically use it.
+			Compass.AI supports <strong>models from OpenAI, Anthropic, and Google Gemini</strong>. Configure your
+			default model globally in Settings → AI → Chat Model; every agent uses it unless you override the
+			model on that agent.
 		</p>
 		<h3>Supported Providers</h3>
 		@docsTable() {
@@ -17,24 +18,25 @@ templ docsAIModels() {
 			</thead>
 			<tbody>
 				@docsTableRow2("OpenAI", "GPT family of models — all-rounders with strong reasoning and multimodal capabilities")
+				@docsTableRow2("Anthropic", "Claude family of models — strong reasoning and long-context capabilities")
 				@docsTableRow2("Google Gemini", "Flash and Pro models — fast, efficient, with large context windows")
 			</tbody>
 		}
 		<h3>Streaming and Real-Time Delivery</h3>
 		<p>
-			All models stream responses in real-time over Server-Sent Events (SSE).
-			You see tokens appear character-by-character as the AI generates them, with live tool
-			execution feedback and smooth UI updates.
+			Responses stream in real-time by default — you see tokens appear as the AI
+			generates them, with live tool execution feedback and smooth UI updates.
+			Streaming can be turned off per agent in the agent editor if you prefer
+			complete responses delivered in one piece.
 		</p>
-		<h3>Global Execution Settings</h3>
+		<h3>Execution Settings</h3>
 		<p>
-			All AI execution parameters are configured globally in Settings → AI → Chat Model.
-			Every agent inherits the same model, temperature, max tokens, and iteration limits.
-			Agents only define behavioral configuration: name, system prompt, tools, and knowledge base access.
+			The model, temperature, max tokens, and iteration limits configured in
+			Settings → AI → Chat Model act as the default for every agent. Individual agents can
+			optionally override the provider, model, and generation parameters (temperature,
+			max output tokens, and more) in the agent editor's Model Configuration section.
+			Agents also define behavioral configuration such as the name, system prompt, and tools.
 		</p>
-		@docsInfoBox("Provider Health") {
-			<p>Compass.AI monitors provider availability and can gracefully handle provider outages. Each provider connection is health-checked independently.</p>
-		}
 	}
 }
 
@@ -45,7 +47,7 @@ templ docsAISettings() {
 			Compass.AI gives you <strong>full control over your AI infrastructure</strong> through a clean
 			two-layer architecture: <strong>provider credentials</strong> and <strong>capability configuration</strong>.
 			Add your API keys once, then independently choose which provider and model powers each AI
-			function — chat, voice, embeddings — without any overlap or duplication.
+			function — from chat to voice — without any overlap or duplication.
 		</p>
 		<h3>Two-Layer Architecture</h3>
 		<p>
@@ -53,13 +55,13 @@ templ docsAISettings() {
 			Compass.AI cleanly separates the two concerns:
 		</p>
 		<ul class="space-y-2 my-4">
-			<li>• <strong>Layer 1 — Providers</strong> — Store API keys for OpenAI and Google Gemini. Each provider is configured once and shared across all capabilities.</li>
-			<li>• <strong>Layer 2 — Capabilities</strong> — For each AI function (chat, voice, embedding), choose which of your configured providers and which specific model to use. No re-entering keys.</li>
+			<li>• <strong>Layer 1 — Providers</strong> — Store API keys for OpenAI, Anthropic, and Google Gemini. Each provider is configured once and shared across all capabilities.</li>
+			<li>• <strong>Layer 2 — Capabilities</strong> — Choose which of your configured providers and which specific model powers each AI function. No re-entering keys.</li>
 		</ul>
 		<p>
-			This means you can use GPT-4o for chat, Gemini Flash for a different agent, OpenAI TTS for voice, and
-			Gemini for embeddings — all at the same time, on the same account. Change your chat model without
-			touching your voice or embedding setup.
+			This means you can use GPT-4o for chat, Gemini Flash for a different agent, and OpenAI
+			voices for speech — all at the same time, on the same account. Change your chat model
+			without touching your voice setup.
 		</p>
 		<h3>Capabilities</h3>
 		@docsTable() {
@@ -72,21 +74,20 @@ templ docsAISettings() {
 			</thead>
 			<tbody>
 				@docsTableRow("Chat Model (LLM)", "The AI model used for chatting with agents", "Provider, model, temperature, max tokens, max iterations")
-				@docsTableRow("Text-to-Speech (TTS)", "Voice synthesis for spoken audio", "Provider, model, voice, voice instructions")
-				@docsTableRow("Embedding", "Vector embeddings for knowledge graph search", "Provider, model")
-				@docsTableRow("Speech-to-Text (STT)", "Transcription and audio understanding", "Provider, model")
+				@docsTableRow("Text-to-Speech (TTS)", "Voice synthesis for spoken audio", "Model and voice — configured in Plugin Settings (currently OpenAI voices)")
 				@docsTableRow("Image Generation", "AI image creation from text", "Coming soon")
 			</tbody>
 		}
 		<h3>Setup Workflow</h3>
 		<ol class="list-decimal list-inside space-y-2 my-4">
-			<li><strong>Add your providers</strong> — Go to Settings → AI and enter your API keys for OpenAI or Gemini. Add as many as you like.</li>
-			<li><strong>Configure each capability</strong> — Under each capability section (Chat Model, Voice, Embedding), pick a provider and model from your already-configured list. No re-entering keys.</li>
-			<li><strong>Fine-tune settings</strong> — Adjust capability-specific options like temperature, max tokens, or voice selection.</li>
+			<li><strong>Add your providers</strong> — Go to Settings → AI and enter your API keys for OpenAI, Anthropic, or Gemini. Add as many as you like.</li>
+			<li><strong>Configure the chat model</strong> — Under the Chat Model section, pick a provider and model from your already-configured list. No re-entering keys.</li>
+			<li><strong>Fine-tune settings</strong> — Adjust options like temperature, max tokens, and max iterations.</li>
+			<li><strong>Set up voice (optional)</strong> — Enable the voice engine in Settings → Speech, then choose the voice model and voice under Plugin Settings.</li>
 			<li><strong>Start using agents</strong> — Every agent automatically uses the right provider for each capability based on your configuration.</li>
 		</ol>
 		@docsInfoBox("Your Keys, Your Control") {
-			<p>Compass.AI never stores your API keys in plain text — they are encrypted at rest. You own your keys and can revoke them at any time. Compass.AI does not proxy or mark up API costs; all charges go directly to your provider. Use token analytics to monitor usage and optimize spend.</p>
+			<p>Once saved, your API keys are never displayed back in full — only a masked preview is shown — and they are used only server-side to call your provider. You own your keys and can revoke them at any time. Compass.AI does not proxy or mark up API costs; all charges go directly to your provider. Use token analytics to monitor usage and optimize spend.</p>
 		}
 	}
 }
@@ -101,8 +102,9 @@ templ docsAgentStore() {
 		</p>
 		<h3>Browsing the Catalog</h3>
 		<p>
-			Open the Agent Templates from the sidebar navigation. Templates can be searched
-			by name, description, or tags.
+			Open the <strong>Agent Designer</strong> from the top bar, then choose
+			<strong>Browse Templates</strong>. Templates can be searched by name, description,
+			or category, and you can filter them by category using the filter pills above the grid.
 		</p>
 		<h3>Pattern Families</h3>
 		@docsTable() {
@@ -122,18 +124,17 @@ templ docsAgentStore() {
 		}
 		<h3>Forking Agents</h3>
 		<p>
-			When you find an agent you like, click <strong>"Add to My Agents"</strong> to fork it into your personal
-			collection. Forked agents are fully editable — you can customize the system prompt,
-			add or remove tools, and configure knowledge base access.
+			When you find an agent you like, click <strong>"Fork &amp; Edit"</strong> — you'll be asked to
+			name your copy, which is then added to your personal collection and opened in the editor.
+			Forked agents are fully editable — you can customize the system prompt and add or remove tools.
 		</p>
 		@docsInfoBox("Agent Properties") {
 			<ul class="space-y-2 mt-2">
 				<li><strong>Name</strong> — Display name for the agent</li>
 				<li><strong>Description</strong> — Short description of the agent's purpose</li>
 				<li><strong>System Prompt</strong> — Instructions that define the agent's behavior and personality</li>
-				<li><strong>Icon</strong> — Emoji label for visual identification</li>
+				<li><strong>Icon</strong> — Visual symbol shown on the agent card (set by the template; not currently editable)</li>
 				<li><strong>Tool Sets</strong> — Which plugins and individual tools are enabled</li>
-				<li><strong>Workspace Access</strong> — Which knowledge base workspaces the agent can query</li>
 			</ul>
 		}
 	}
@@ -148,12 +149,12 @@ templ docsCustomAgents() {
 		</p>
 		<h3>Creating a Custom Agent</h3>
 		<ol class="list-decimal list-inside space-y-2 my-4">
-			<li>Open the Agent Templates from the sidebar</li>
-			<li>Click <strong>"Create Agent"</strong> at the top</li>
-			<li>Fill in the agent's name, description, and icon</li>
+			<li>Open the <strong>Agent Designer</strong> from the button in the top bar</li>
+			<li>Click <strong>"New Agent"</strong> at the top, then choose <strong>LLM Agent</strong></li>
+			<li>Fill in the agent's name and description</li>
 			<li>Write a detailed system prompt that defines the agent's role and instructions</li>
-			<li>Configure which tool sets and individual tools are available to the agent</li>
-			<li>Assign knowledge base workspaces the agent can access</li>
+			<li>Save with <strong>Create Agent</strong> at the bottom of the form</li>
+			<li>Edit the agent to configure which tool sets and individual tools are available to it</li>
 		</ol>
 		<h3>System Prompt Best Practices</h3>
 		<p>
@@ -173,16 +174,20 @@ templ docsCustomAgents() {
 			use relevant capabilities:
 		</p>
 		<ul class="space-y-2 my-4">
-			<li>• A <strong>Data Analyst</strong> might only need Calculator and Knowledge Base</li>
-			<li>• A <strong>Research Assistant</strong> might need Knowledge Base and Document tools</li>
+			<li>• A <strong>Data Analyst</strong> might only need Calculator</li>
+			<li>• A <strong>Research Assistant</strong> might need Document tools</li>
 			<li>• A <strong>Code Reviewer</strong> might need Codebase and Cognitive tools</li>
 		</ul>
-		<h3>Workspace Permissions</h3>
+		<h3>Beyond Prompt and Tools</h3>
 		<p>
-			Control which knowledge base workspaces each agent can access. This is useful when you have
-			multiple knowledge bases (e.g., "Physics Notes" and "History Research") and want specific
-			agents to only query relevant workspaces.
+			Custom agents offer several more capabilities in the agent editor:
 		</p>
+		<ul class="space-y-2 my-4">
+			<li>• <strong>Model Configuration</strong> — Override the global provider, model, and generation parameters (temperature, max output tokens, and more) for this agent, or leave everything on the global default.</li>
+			<li>• <strong>Filesystems</strong> — Choose which filesystems the agent can access (configured after the initial save, like tools).</li>
+			<li>• <strong>Sub-Agents</strong> — Attach other agents the agent can delegate to (see Workflow Orchestration).</li>
+			<li>• <strong>Import YAML</strong> — Instead of building an agent by hand, choose <strong>Import YAML</strong> on the create screen to define one from a YAML definition — paste it, upload a file, or fetch it from a URL.</li>
+		</ul>
 	}
 }
 
@@ -192,8 +197,9 @@ templ docsMultiAgentOrchestration() {
 		<p>
 			Compass.AI supports <strong>composing multiple agents into coordinated workflows</strong> that solve
 			complex, multi-step problems. Built on proven agent orchestration patterns, the engine supports five composition
-			patterns — sequential, parallel, loop, conditional routing, and coordinator delegation — all configurable from a
-			visual builder in the UI.
+			patterns — sequential, parallel, loop, conditional routing, and coordinator delegation. The first four are
+			composed in a visual builder in the UI; coordinator delegation is configured through the Sub-Agents section
+			of the agent editor.
 		</p>
 		<h3>Why Workflow Orchestration?</h3>
 		<p>
@@ -217,7 +223,7 @@ templ docsMultiAgentOrchestration() {
 			<tbody>
 				@docsTableRow("Sequential", "Agents execute one after another. Each receives the prior agent's output.", "Research → Analysis → Report pipelines")
 				@docsTableRow("Parallel", "All child agents execute simultaneously. Results are collected and merged.", "Running multiple analysts on the same dataset at once")
-				@docsTableRow("Loop", "Re-executes child agents until an exit condition is met or max iterations reached.", "Iterative refinement: draft → review → revise cycles")
+				@docsTableRow("Loop", "Re-executes child agents for a fixed number of iterations. Optionally enable early exit on the loop node to let the last agent end the loop when its exit condition is met.", "Iterative refinement: draft → review → revise cycles")
 				@docsTableRow("Conditional", "An evaluator agent analyzes input and routes to the appropriate specialist branch.", "Sentiment-based routing: positive → happy agent, negative → empathetic agent")
 				@docsTableRow("Coordinator", "An LM agent delegates to sub-agents dynamically based on conversation context.", "Open-ended triage: user query routed to the best specialist")
 			</tbody>
@@ -295,7 +301,7 @@ templ docsMultiAgentOrchestration() {
 		<ul class="space-y-2 my-4">
 			<li>• <strong>Utility sub-tasks</strong> — "summarise this passage", "extract entities", "translate to French" — the parent needs the result but owns the final answer.</li>
 			<li>• <strong>Structured extraction</strong> — a child with an Output Schema produces validated JSON that the parent merges into its broader response.</li>
-			<li>• <strong>Capability wrapping</strong> — expose a specialist agent (with its own tools/KB) as a clean callable without giving the parent those tools directly.</li>
+			<li>• <strong>Capability wrapping</strong> — expose a specialist agent (with its own tools) as a clean callable without giving the parent those tools directly.</li>
 		</ul>
 		@docsInfoBox("Not for handoffs") {
 			<p>If the child should <em>own</em> the reply end-to-end (e.g. "escalate to the billing specialist"), use a <strong>Sub-Agent</strong> and let the parent transfer instead. Agent-as-Tool always keeps the parent in charge.</p>
@@ -306,11 +312,14 @@ templ docsMultiAgentOrchestration() {
 			composition. These prevent undesirable delegation chains and enforce architectural boundaries.
 		</p>
 		<ul class="space-y-2 my-4">
-			<li>• <strong>Block transfer to parent</strong> — Prevents a sub-agent from handing control back to the parent. Useful when a specialist should fully resolve its task before returning.</li>
-			<li>• <strong>Block transfer to peers</strong> — Prevents a sub-agent from delegating to sibling agents. Enforces strict separation of concerns between specialists.</li>
+			<li>• <strong>Prevent escalation to parent</strong> — Prevents a sub-agent from handing control back to the parent. Useful when a specialist should fully resolve its task before returning.</li>
+			<li>• <strong>Prevent delegation to siblings</strong> — Prevents a sub-agent from delegating to sibling agents. Enforces strict separation of concerns between specialists.</li>
 		</ul>
+		<p>
+			Both toggles live in the <strong>Sub-Agents</strong> section of the agent editor.
+		</p>
 		@docsInfoBox("Default Behavior") {
-			<p>By default, all transfers are allowed. Transfer policies are optional constraints you apply per-agent to tighten delegation when your workflow requires it. You can set defaults on the agent definition and override them per-node in a workflow.</p>
+			<p>By default, all transfers are allowed. Transfer policies are optional constraints you apply per-agent to tighten delegation when your workflow requires it.</p>
 		}
 		<h3>Context Control (Include Contents)</h3>
 		<p>
@@ -393,11 +402,11 @@ templ docsMultiAgentOrchestration() {
 		}
 		<h3>Global Instructions <span class="text-[10px] font-semibold uppercase tracking-wider ms-2 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 align-middle">Root only</span></h3>
 		<p>
-			A <strong>global instruction</strong> is a shared directive applied to <strong>every agent in the workflow</strong>.
-			It lives on the <strong>root agent</strong> and automatically covers the root
-			itself plus every sub-agent it delegates to — coordinator children, workflow
-			leaves, and agents-as-tools alike. Use it for cross-cutting rules like tone,
-			compliance language, or a required output format.
+			A <strong>global instruction</strong> is a shared directive applied across a coordinator
+			and its team. It lives on the <strong>root agent</strong> and covers the root itself plus
+			the sub-agents it delegates to. It does not carry into workflow compositions or into
+			agents called as tools — those run from their own configuration. Use it for
+			cross-cutting rules like tone, compliance language, or a required output format.
 		</p>
 		<p>
 			The designer enforces this by only showing the Global Instruction field when
@@ -452,16 +461,22 @@ templ docsMultiAgentOrchestration() {
 			The workflow tree builder provides a <strong>visual, interactive editor</strong> to compose multi-agent workflows.
 		</p>
 		<ul class="space-y-2 my-4">
-			<li>• <strong>Add nodes</strong> — Insert sequential, parallel, loop, or agent nodes at any level of the tree</li>
+			<li>• <strong>Add nodes</strong> — Insert sequential, parallel, loop, conditional, agent, or remote (A2A) nodes at any level of the tree</li>
 			<li>• <strong>Nest compositions</strong> — Place a parallel group inside a sequential pipeline, or a loop inside a parallel group — any combination works</li>
-			<li>• <strong>Per-node overrides</strong> — Override transfer policies and context control on individual nodes without changing the agent definition</li>
-			<li>• <strong>Live preview</strong> — See an animated pipeline visualization with flow particles showing execution direction</li>
 			<li>• <strong>Drag to reorder</strong> — Rearrange agents within compositions by dragging</li>
 		</ul>
 		<p>
-			<strong>Precedence resolution:</strong> per-node overrides in a workflow take priority over
-			agent-level defaults, which take priority over system defaults. This means the same agent
-			can behave differently depending on where it appears in a workflow.
+			<strong>Remote (A2A) nodes</strong> delegate a workflow step to an external agent
+			registered as an A2A connector, so a pipeline can include agents that run outside
+			Compass.AI.
+		</p>
+		<p>
+			An agent's transfer policy and context-control settings live on the agent definition
+			and follow the agent wherever it is placed in a workflow.
+		</p>
+		<p>
+			While a workflow runs, an activity panel in chat visualizes the pipeline live,
+			showing which nodes are executing and the direction of flow.
 		</p>
 	}
 }
@@ -472,7 +487,9 @@ templ docsUserProfile() {
 		<p>
 			The Personalized Profile lets you define your work preferences so every AI agent
 			automatically adjusts its approach to match how you work best.
-			Access it from the account settings menu (click your avatar in the bottom-left corner).
+			Access it from the account settings menu (click your avatar in the bottom-left corner,
+			choose <strong>Settings</strong>, then open the <strong>Personalization</strong> tab),
+			or edit it on the dedicated page at <code>/profile</code>.
 		</p>
 		<h3>Profile Fields</h3>
 		@docsTable() {
@@ -484,7 +501,7 @@ templ docsUserProfile() {
 				</tr>
 			</thead>
 			<tbody>
-				@docsTableRow("Learning Style", "How you prefer to absorb and process information", "Visual thinker, hands-on, detail-oriented")
+				@docsTableRow("Work Style", "How you prefer to absorb and process information — pick from Visual, Auditory, Read/Write, Kinesthetic, or Multimodal", "Visual")
 				@docsTableRow("Struggles", "Areas where you need extra help", "Complex math, abstract concepts")
 				@docsTableRow("Strengths", "Subjects or skills you are good at", "Problem solving, creative thinking")
 				@docsTableRow("Goals", "What you are working toward", "Ship new features, improve system design")
@@ -498,8 +515,8 @@ templ docsUserProfile() {
 		</p>
 		<ol class="list-decimal list-inside space-y-2 my-4">
 			<li>Open the account settings menu (avatar icon, bottom-left of the sidebar)</li>
-			<li>Click <strong>Profile</strong> to open the profile dialog</li>
-			<li>Fill in your learning style, struggles, strengths, and goals</li>
+			<li>Click <strong>Settings</strong>, then open the <strong>Personalization</strong> tab</li>
+			<li>Fill in your work style, struggles, strengths, and goals</li>
 			<li>Save — changes apply to all future conversations immediately</li>
 		</ol>
 		<h3>Adaptive Communication</h3>

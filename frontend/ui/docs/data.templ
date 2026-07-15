@@ -1,61 +1,5 @@
 package docs
 
-// ─── Knowledge Base ──────────────────────────────────────────────────────────
-templ docsKnowledgeBase() {
-	@docsSection("knowledge-base", "Knowledge Base", iconDatabase, "text-pink-500") {
-		<p>
-			The Knowledge Base feature turns Compass.AI into a powerful RAG (Retrieval Augmented Generation)
-			platform. Upload your documents, and your AI agents can answer questions grounded in your own data.
-		</p>
-		<h3>Workspaces</h3>
-		<p>
-			Documents are organized into <strong>workspaces</strong>. Each workspace is an independent collection
-			with its own vector index and knowledge graph. You can create workspaces for different subjects,
-			projects, or topics.
-		</p>
-		<h3>Document Pipeline</h3>
-		<p>
-			When you upload a document, it goes through an automated processing pipeline:
-		</p>
-		<ol class="list-decimal list-inside space-y-2 my-4">
-			<li><strong>Upload</strong> — File is received and stored</li>
-			<li><strong>Extraction</strong> — Text is extracted from PDFs, documents, and files</li>
-			<li><strong>Chunking</strong> — Text is split into optimally-sized chunks</li>
-			<li><strong>Embedding</strong> — Chunks are converted to vector embeddings</li>
-			<li><strong>Indexing</strong> — Vectors are stored in the search index</li>
-			<li><strong>Graph Building</strong> — Entities and relationships are extracted into a knowledge graph</li>
-		</ol>
-		<h3>Knowledge Graph</h3>
-		<p>
-			Beyond simple vector search, Compass.AI builds a <strong>knowledge graph</strong> from your documents.
-			You can visually explore entities, relationships, and concepts through an interactive graph view.
-			Search by node labels, browse popular concepts, and see how your documents connect.
-		</p>
-		<h3>Per-Agent Access Control</h3>
-		<p>
-			Each agent can be granted access to specific workspaces. This means a "Research Analyst" agent will
-			only search your research workspace, while a "Strategy Consultant" agent queries your planning workspace.
-			This keeps responses focused and relevant.
-		</p>
-		@docsTable() {
-			<thead>
-				<tr>
-					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Feature</th>
-					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Details</th>
-				</tr>
-			</thead>
-			<tbody>
-				@docsTableRow2("Document Types", "PDF, text files, and more")
-				@docsTableRow2("Processing", "Automatic pipeline with progress tracking")
-				@docsTableRow2("Search", "Hybrid vector + knowledge graph retrieval")
-				@docsTableRow2("Graph", "Interactive visualization with node search")
-				@docsTableRow2("Access Control", "Per-agent workspace permissions")
-				@docsTableRow2("Operations", "Rebuild, reprocess, scan, and retry failed documents")
-			</tbody>
-		}
-	}
-}
-
 // ─── Memory & Artifacts ──────────────────────────────────────────────────────
 templ docsMemoryArtifacts() {
 	@docsSection("memory", "Memory & Artifacts", iconBrain, "text-cyan-500") {
@@ -63,7 +7,7 @@ templ docsMemoryArtifacts() {
 		<p>
 			<strong>Cross-session memory</strong> is a built-in agent capability that gives
 			each agent persistent recall across conversations. When enabled, sessions are
-			indexed after each run using PostgreSQL full-text search, and the agent gets two
+			indexed after each run for fast keyword search, and the agent gets two
 			complementary recall paths:
 		</p>
 		<ul class="space-y-2 my-4">
@@ -109,9 +53,10 @@ templ docsMemoryArtifacts() {
 				Everything you've said to any of your agents pools into one searchable history.
 			</li>
 			<li>
-				<strong>A conversation becomes searchable after it ends.</strong>
-				Anything said earlier in the current turn is already in view; things said in
-				prior conversations become recallable once those conversations complete.
+				<strong>A conversation becomes searchable as each reply completes.</strong>
+				Everything in the current conversation is already in the agent's context;
+				content from other conversations becomes recallable once a turn in them
+				has finished.
 			</li>
 		</ul>
 		<h3>Code Execution</h3>
@@ -152,15 +97,26 @@ templ docsMemoryArtifacts() {
 		<p>
 			<strong>Versioned artifacts</strong> are a built-in agent capability for creating,
 			saving, and loading persistent files across sessions — reports, CSVs, generated
-			images, refined code. Each save creates a new version, and an agent can load any
-			previous version by name.
+			images, refined code. Each save creates a new version, and the agent always works
+			with the latest version of each file; older versions are retained.
 		</p>
 		<p>
 			Like memory, artifacts are an <strong>agent feature</strong>, not a tool or plugin
-			— toggle them per agent in the designer. When on, the agent can list available
-			artifacts, load any version, and save new ones. Other capabilities (document
-			generation, text-to-speech, etc.) can write artifacts directly too.
+			— toggle them per agent in the designer with two switches:
 		</p>
+		<ul class="space-y-2 my-4">
+			<li>
+				<strong>Use artifacts</strong> — turns the capability on. The agent can list
+				available artifacts and load them into the conversation; new versions are
+				written by capabilities that produce files (document generation,
+				text-to-speech, auto-saved uploads).
+			</li>
+			<li>
+				<strong>Auto-save uploaded files</strong> — additionally saves files you attach
+				in chat as artifacts automatically, handing the agent a reference to the file
+				so it can refer back to it later.
+			</li>
+		</ul>
 		<p>Use cases include:</p>
 		<ul class="space-y-2 my-4">
 			<li>• Reports and analysis documents that evolve across sessions</li>
@@ -171,8 +127,9 @@ templ docsMemoryArtifacts() {
 		</ul>
 		<p>
 			The chat UI shows an <strong>Artifact Version Saved</strong> card whenever an agent
-			creates or updates a file, so you can see exactly what was produced and roll back
-			to an earlier version if needed.
+			creates or updates a file, showing the file name and its new version number. Open
+			the Artifacts panel in chat to see every file the conversation has produced and
+			download any of them.
 		</p>
 		<h3>Thread Management</h3>
 		<p>
@@ -206,64 +163,25 @@ templ docsFileAttachments() {
 			</thead>
 			<tbody>
 				@docsTableRow("Images", "PNG, JPEG, GIF, WebP", "Visual analysis, diagram review, photo questions")
-				@docsTableRow("Audio", "MP3, WAV, OGG", "Transcription, audio analysis")
-				@docsTableRow("Documents", "PDF, TXT, Markdown", "Document review, content extraction")
+				@docsTableRow("Audio", "MP3, WAV, OGG, WebM", "Transcription, audio analysis")
+				@docsTableRow("Documents", "PDF, TXT, Markdown, CSV", "Document review, content extraction")
 			</tbody>
 		}
 		<h3>How Attachments Work</h3>
 		<ol class="list-decimal list-inside space-y-2 my-4">
 			<li>Click the attachment icon in the chat input bar</li>
 			<li>Select one or more files from your device</li>
-			<li>Files are uploaded to secure S3 storage and attached to your message</li>
+			<li>Files are securely uploaded and attached to your message</li>
 			<li>The AI agent receives the file content alongside your text message</li>
 			<li>The agent can analyze, summarize, or discuss the attached content</li>
 		</ol>
 		<p>
+			You can also attach files by pasting them from the clipboard or dragging and
+			dropping them onto the chat input.
+		</p>
+		<p>
 			Attachments are stored per-thread and persist with the conversation history. The maximum
-			upload size is <strong>150 MB per file</strong>.
-		</p>
-	}
-}
-
-// ─── Resource Library ────────────────────────────────────────────────────────
-templ docsResourceLibrary() {
-	@docsSection("resource-library", "Resource Library", iconFolderOpen, "text-emerald-500") {
-		<p>
-			The Resource Library provides persistent file management separate from chat conversations.
-			Upload documents, reference materials, and project files that you can access anytime.
-		</p>
-		<h3>Public vs Private Resources</h3>
-		@docsTable() {
-			<thead>
-				<tr>
-					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Type</th>
-					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Visibility</th>
-					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Description</th>
-				</tr>
-			</thead>
-			<tbody>
-				@docsTableRow("Public", "All users", "System-wide library of curated reference materials and templates")
-				@docsTableRow("Private", "You only", "Your personal uploads: notes, documents, and reference materials")
-			</tbody>
-		}
-		<h3>Features</h3>
-		<ul class="space-y-2 my-4">
-			<li>
-				<strong>Upload</strong> -- Drag and drop files into your personal library
-			</li>
-			<li>
-				<strong>Download</strong> -- Access any resource with automatic content-type detection
-			</li>
-			<li>
-				<strong>Delete</strong> -- Remove private resources you no longer need
-			</li>
-			<li>
-				<strong>S3 Storage</strong> -- All files are stored in reliable S3-compatible object storage
-			</li>
-		</ul>
-		<p>
-			Resources are separate from the Knowledge Base. While the Knowledge Base indexes documents for
-			AI-powered RAG queries, the Resource Library is a simple file store for your reference materials.
+			upload size is <strong>20 MB per file</strong>, with up to <strong>5 files per message</strong>.
 		</p>
 	}
 }
@@ -272,16 +190,13 @@ templ docsResourceLibrary() {
 templ docsConversationSearch() {
 	@docsSection("conversation-search", "Conversation Search", iconSearch, "text-sky-500") {
 		<p>
-			Compass.AI provides <strong>full-text search across all your conversations</strong>, making it easy
-			to find past discussions, answers, and generated content.
+			Compass.AI lets you <strong>quickly search your conversations by title</strong>, making it easy
+			to find past discussions.
 		</p>
 		<h3>Search Capabilities</h3>
 		<ul class="space-y-2 my-4">
 			<li>
-				<strong>Thread Search</strong> -- Search across all thread titles and messages
-			</li>
-			<li>
-				<strong>Message Content</strong> -- Find specific answers, explanations, or tool outputs
+				<strong>Thread Search</strong> -- Search across all your thread titles
 			</li>
 			<li>
 				<strong>Quick Navigation</strong> -- Click any search result to jump directly to the thread
@@ -306,8 +221,7 @@ templ docsConversationSearch() {
 			</li>
 		</ul>
 		<p>
-			Threads are backed by an <strong>event-sourced architecture</strong> (CQRS), meaning the read model is
-			optimized for fast retrieval while the write model ensures data integrity.
+			Your full conversation history is stored reliably and loads quickly, even for long threads.
 		</p>
 	}
 }

@@ -6,7 +6,7 @@ import "aicompass/frontend/components/icon"
 templ docsWorkflowExamples() {
 	@docsSection("workflow-examples", "Workflow Examples", iconBlocks, "text-violet-500") {
 		<p>
-			Compass.AI ships with a library of <strong>pre-built workflow templates</strong> in the Agent Templates that
+			Compass.AI ships with a library of <strong>pre-built workflow templates</strong> that
 			demonstrate different multi-agent composition patterns. Each template can be <strong>forked and customized</strong>.
 			This section walks through every pattern with architecture diagrams to help you design your own workflows.
 		</p>
@@ -25,7 +25,7 @@ templ docsWorkflowExamples() {
 				@docsTableRow("Parallel Fan-Out/In", "Independent work streams that merge for a final step", "parallel-workflow")
 				@docsTableRow("Loop", "Iterative refinement with fixed or early-exit termination", "loop-workflow, loop-with-exit")
 				@docsTableRow("Conditional Routing", "Classify input then route to the best specialist branch", "conditional-routing")
-				@docsTableRow("Nested Workflows", "Compose sequential, parallel, and loop inside each other", "sequential-inside-parallel, parallel-inside-sequential")
+				@docsTableRow("Nested Workflows", "Compose sequential, parallel, and loop inside each other", "sequential-inside-parallel, parallel-inside-sequential, sequential-inside-loop, parallel-inside-loop-inside-sequential")
 				@docsTableRow("Context Control", "Isolate agents from conversation history", "context-control")
 				@docsTableRow("Output Schema", "Force structured JSON output from an agent", "output-schema")
 				@docsTableRow("Agent Isolation", "Constrain agents from delegating to others", "agent-isolation")
@@ -34,7 +34,8 @@ templ docsWorkflowExamples() {
 		}
 		@docsInfoBox("State Passing") {
 			<p>
-				All workflows use <strong>OutputKey → &#123;variable&#125; templates</strong> to pass data between agents.
+				Most workflows use <strong>OutputKey → &#123;variable&#125; templates</strong> to pass data between agents
+				(the Implicit State pattern is the exception — its agents read prior output directly from conversation history).
 				Each agent saves its output under a named key; downstream agents reference it with
 				<code>&#123;key_name&#125;</code> in their system prompts. Keys can be optional with
 				<code>&#123;key?&#125;</code> (substitutes empty string if absent).
@@ -47,8 +48,9 @@ templ docsWorkflowExamples() {
 templ docsSequentialExamples() {
 	@docsSection("sequential-examples", "Sequential Pipelines", iconPipelineDoc, "text-blue-500") {
 		<p>
-			In a <strong>sequential pipeline</strong>, agents execute one after another. Each agent receives the
-			previous agent's output via state keys. This is the simplest and most common composition pattern.
+			In a <strong>sequential pipeline</strong>, agents execute one after another. Each agent sees the
+			previous agent's output — either implicitly through conversation history or explicitly via state keys.
+			This is the simplest and most common composition pattern.
 		</p>
 		<!-- Sequential Workflow (City → Time) -->
 		<h3>Sequential Workflow: City Generator → Time Report</h3>
@@ -142,7 +144,7 @@ templ docsParallelExamples() {
 				{Node: wfAgent{Name: "EventExtractor"}, Children: []wfNestedNode{{Node: wfNode{Name: "CalendarPublisher"}}}},
 			},
 		})
-		@wfConceptBadges([]string{"sequential inside parallel", "state isolation per branch", "nested composition"})
+		@wfConceptBadges([]string{"sequential inside parallel", "distinct output keys per branch", "nested composition"})
 		<!-- Parallel Inside Sequential -->
 		<h3>Parallel Inside Sequential</h3>
 		<p>
@@ -155,8 +157,8 @@ templ docsParallelExamples() {
 			Nodes: []wfNestedNode{
 				{Node: wfNode{Name: "IntakeAnalyst", Subtitle: "output: topic_brief"}},
 				{Type: "parallel", Node: wfAgent{Name: "Analysis Group"}, Children: []wfNestedNode{
-					{Node: wfNode{Name: "TechnicalAnalyst", Subtitle: "output: tech_assessment"}},
-					{Node: wfNode{Name: "BusinessAnalyst", Subtitle: "output: biz_assessment"}},
+					{Node: wfNode{Name: "TechnicalAnalyst", Subtitle: "output: technical_assessment"}},
+					{Node: wfNode{Name: "BusinessAnalyst", Subtitle: "output: business_assessment"}},
 					{Node: wfNode{Name: "RiskAnalyst", Subtitle: "output: risk_assessment"}},
 				}},
 				{Node: wfNode{Name: "Synthesiser", Subtitle: "reads all 3 → final_report"}},
@@ -213,9 +215,9 @@ templ docsLoopExamples() {
 			Nodes: []wfNestedNode{
 				{Node: wfNode{Name: "PlannerAgent", Subtitle: "output: requirements"}},
 				{Type: "loop", Node: wfAgent{Name: "Generate → Score → Check"}, Children: []wfNestedNode{
-					{Node: wfNode{Name: "Generator", Subtitle: "output: draft"}},
-					{Node: wfNode{Name: "Scorer", Subtitle: "score ≥ 8 → exit_loop"}},
-					{Node: wfNode{Name: "Checker", Subtitle: "early exit decision"}},
+					{Node: wfNode{Name: "Generator", Subtitle: "output: generated_output"}},
+					{Node: wfNode{Name: "Scorer", Subtitle: "output: output_score (1-10)"}},
+					{Node: wfNode{Name: "Checker", Subtitle: "score ≥ 8 → exit_loop"}},
 				}},
 				{Node: wfNode{Name: "EditorAgent", Subtitle: "reads {generated_output} → final"}},
 			},
@@ -264,7 +266,9 @@ templ docsConditionalExamples() {
 			A conditional node has an <strong>evaluator</strong> (first child) that outputs a classification
 			value to session state via <code>output_key</code>. The remaining children are <strong>branches</strong>,
 			each with a <code>condition</code> field. Only the branch whose condition matches the evaluator's
-			output executes. A branch with <code>condition: "*"</code> acts as a fallback.
+			output executes. A branch can be a single agent or an entire nested workflow — a sequential,
+			parallel, or loop group. A branch with <code>condition: "*"</code> — or with no condition set at all —
+			acts as a fallback.
 		</p>
 		@wfConditional(wfConditionalGroup{
 			Evaluator: wfNode{Name: "Classifier", Subtitle: "output: category"},
@@ -284,20 +288,21 @@ templ docsConditionalExamples() {
 				If no branch matches and there's no fallback, the workflow errors.
 			</p>
 		}
-		<!-- Conditional Routing: Coordinator → Triage → Specialist -->
-		<h3>Conditional Routing: Coordinator → Triage → Specialist</h3>
+		<!-- Conditional Routing: Support Inquiry Triage -->
+		<h3>Conditional Routing: Support Inquiry Triage</h3>
 		<p>
-			A coordinator receives a user request, a triage agent decides which domain is needed,
-			then a conditional router sends it to the right specialist. If the specialist can't help,
-			they escalate back to the coordinator for re-routing.
+			The catalog's <strong>Conditional Routing</strong> template classifies a support inquiry,
+			then routes it to the matching specialist branch. The technical branch is itself a
+			<strong>sequential pipeline</strong> (diagnosis → solution), showing that a branch can be a
+			full nested workflow rather than a single agent.
 		</p>
 		@wfConditional(wfConditionalGroup{
-			Evaluator: wfNode{Name: "TriageAgent", Subtitle: "output: specialist_selection"},
-			OutputKey: "specialist_selection",
+			Evaluator: wfNode{Name: "InquiryClassifier", Subtitle: "output: inquiry_type"},
+			OutputKey: "inquiry_type",
 			Branches: []wfBranch{
-				{Label: "TechSpecialist", Condition: "technical", Color: "emerald"},
+				{Label: "TechnicalDiagnosis → TechnicalSolution", Condition: "technical", Color: "emerald"},
 				{Label: "BillingSpecialist", Condition: "billing", Color: "amber"},
-				{Label: "GeneralSpecialist", Condition: "*", Color: "slate"},
+				{Label: "GeneralAssistant", Condition: "*", Color: "slate"},
 			},
 		})
 		@docsTable() {
@@ -309,14 +314,13 @@ templ docsConditionalExamples() {
 				</tr>
 			</thead>
 			<tbody>
-				@docsTableRow("CoordinatorAgent", "Receives request, classifies domain", "N/A — pre-evaluator")
-				@docsTableRow("TriageAgent", "Reviews classification, selects specialist", "N/A — evaluator")
-				@docsTableRow("TechSpecialist", "Handles technical requests", "technical")
-				@docsTableRow("BillingSpecialist", "Handles billing requests", "billing")
-				@docsTableRow("GeneralSpecialist", "Handles everything else", "* (fallback)")
+				@docsTableRow("InquiryClassifier", "Classifies the inquiry into a category", "N/A — evaluator")
+				@docsTableRow("TechnicalDiagnosis → TechnicalSolution", "Sequential branch: diagnoses the issue, then proposes a fix", "technical")
+				@docsTableRow("BillingSpecialist", "Handles billing questions", "billing")
+				@docsTableRow("GeneralAssistant", "Handles everything else", "* (fallback)")
 			</tbody>
 		}
-		@wfConceptBadges([]string{"triage pattern", "3 branches + fallback", "escalation to parent"})
+		@wfConceptBadges([]string{"triage pattern", "nested branch (sequential)", "fallback (*)"})
 	}
 }
 
@@ -362,29 +366,28 @@ templ docsAdvancedExamples() {
 			{Name: "Executor", Subtitle: "reads {evaluation}+{findings}"},
 		})
 		@wfConceptBadges([]string{"disallow_transfer_to_parent", "disallow_transfer_to_peers", "role boundaries"})
-		<!-- Transfer to Parent -->
-		<h3>Transfer to Parent: Escalation Pattern</h3>
+		@docsInfoBox("Per-Agent Settings") {
+			<p>
+				<code>include_contents</code>, <code>output_schema</code>, and the
+				<code>disallow_transfer_*</code> flags are <strong>agent-level settings</strong>: you configure
+				them on each agent in the agent editor. If you fork one of these example templates, apply the
+				setting to the relevant forked agent yourself — it is not carried over automatically.
+			</p>
+		}
+		<!-- Coordinator Pattern -->
+		<h3>Coordinator Pattern: LLM-Driven Routing</h3>
 		<p>
-			A sequential workflow where a specialist agent can escalate back to the parent coordinator
-			when it cannot resolve the request. The parent re-routes to a different specialist.
+			Instead of a workflow graph, you can build a <strong>coordinator</strong> in the agent designer:
+			a single root agent with sub-agents attached. The root agent uses the
+			<code>transfer_to_agent</code> tool to decide at runtime which sub-agent handles the request —
+			there is no fixed execution order. A sub-agent that cannot resolve the request can transfer back
+			to the coordinator for re-routing, giving you an escalation path.
 		</p>
 		@wfSequential([]wfAgent{
-			{Name: "Coordinator", Subtitle: "output: routing_decision"},
-			{Name: "TriageAgent", Subtitle: "output: specialist_selection"},
-			{Name: "Specialist", Subtitle: "can transfer to parent → resolution or escalation"},
+			{Name: "RootAgent", Subtitle: "transfer_to_agent tool → routes to sub-agent"},
+			{Name: "SubAgent A ∥ SubAgent B ∥ SubAgent C", Subtitle: "specialists, can escalate back"},
 		})
-		@wfConceptBadges([]string{"transfer_to_parent", "escalation", "re-routing"})
-		<!-- Transfer to Peers -->
-		<h3>Transfer to Peers: Coordinator Pattern</h3>
-		<p>
-			A single LLM root agent with child agents, using the <code>transfer_to_agent</code> tool to
-			route between peers. No workflow graph — the LLM decides which agent handles the request.
-		</p>
-		@wfSequential([]wfAgent{
-			{Name: "RootAgent", Subtitle: "transfer_to_agent tool → routes to peer"},
-			{Name: "PeerAgent A ∥ PeerAgent B ∥ PeerAgent C", Subtitle: "specialists"},
-		})
-		@wfConceptBadges([]string{"coordinator pattern", "LLM-driven routing", "no workflow graph"})
+		@wfConceptBadges([]string{"coordinator pattern", "LLM-driven routing", "no workflow graph", "escalation"})
 	}
 }
 
@@ -392,7 +395,7 @@ templ docsAdvancedExamples() {
 templ docsDesignYourOwn() {
 	@docsSection("design-your-own", "Design Your Own Workflow", iconWandDoc, "text-pink-500") {
 		<p>
-			Every example above is a template you can <strong>fork from the Agent Templates</strong> and adapt.
+			Every example above is a template you can <strong>fork from the template catalog in the Agent Designer</strong> and adapt.
 			Here's a step-by-step guide to designing your own workflow orchestration from scratch.
 		</p>
 		<h3>Step 1 — Identify the Stages</h3>
@@ -438,16 +441,16 @@ templ docsDesignYourOwn() {
 		</ul>
 		<h3>Step 5 — Build and Test</h3>
 		<ol class="list-decimal list-inside space-y-2 my-4">
-			<li>Open the <strong>Agent Templates</strong> and browse the catalog templates for a starting point.</li>
-			<li>Click <strong>Add to My Agents</strong> on the one closest to your needs, or create a new agent.</li>
+			<li>Open the <strong>Agent Designer</strong> and click <strong>Browse Templates</strong> to browse the catalog for a starting point.</li>
+			<li>Click <strong>Fork &amp; Edit</strong> on the template closest to your needs (you'll be asked to name your copy), or create a new agent.</li>
 			<li>In the workflow editor, add your composition nodes (sequential, parallel, loop).</li>
-			<li>Add agent states inside each composition node and assign your agents.</li>
+			<li>Add agent nodes inside each composition node and assign your agents.</li>
 			<li>Set <code>output_key</code> on each agent node.</li>
 			<li>Test with a simple prompt first, then iterate on the system prompts.</li>
 		</ol>
 		@docsInfoBox("Nesting Compositions") {
 			<p>
-				Composition nodes can be nested up to <strong>5 levels deep</strong>. You can place a parallel group inside a
+				Workflow trees support up to <strong>5 levels of nesting, counting the agents at the leaves</strong>. You can place a parallel group inside a
 				sequential pipeline, or a loop inside a parallel group — any combination works. The visual tree
 				builder shows the full hierarchy in real time.
 			</p>

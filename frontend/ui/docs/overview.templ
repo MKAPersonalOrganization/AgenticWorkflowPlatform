@@ -5,27 +5,27 @@ templ docsOverview() {
 	@docsSection("overview", "Overview", iconCompass, "text-primary") {
 		<p>
 			<strong>Compass.AI</strong> is an AI-powered workspace and productivity platform that brings together
-			conversational AI, a rich plugin ecosystem, knowledge management, and external service integration
+			conversational AI, a rich plugin ecosystem, and external service integration
 			into a single, beautiful web application.
 		</p>
 		<p>
 			At its core, Compass.AI is built around the concept of <strong>AI agents</strong> — specialized assistants
-			that can be configured with unique personalities, tool sets, and knowledge base access. Whether you're
+			that can be configured with unique personalities and tool sets. Whether you're
 			a professional organizing projects, a researcher gathering data, or a developer exploring new technologies,
 			Compass.AI adapts to your workflow.
 		</p>
 		@docsInfoBox("Key Concepts") {
 			<ul class="space-y-2 mt-2">
-				<li><strong>AI Models</strong> — Models from OpenAI and Google Gemini with global per-capability configuration</li>
+				<li><strong>AI Models</strong> — Models from OpenAI, Anthropic, and Google Gemini with global per-capability configuration</li>
 				<li><strong>BYOK (Bring Your Own Key)</strong> — Use your own API keys with decoupled per-capability provider configuration</li>
 				<li><strong>Agents</strong> — AI personalities with custom prompts and per-agent tool configurations</li>
+				<li><strong>Multi-Agent Workflows</strong> — Compose agents into sequential, parallel, and looping workflows, starting from a catalog of ready-made templates</li>
 				<li><strong>Plugins</strong> — A rich set of built-in tool sets that extend what agents can do, useful for many agentic scenarios</li>
 				<li><strong>MCP Connectors</strong> — Bridge to external services via the Model Context Protocol with OAuth 2.1</li>
-				<li><strong>Knowledge Base</strong> — Document-backed RAG with vector embeddings and knowledge graph visualization</li>
 				<li><strong>Personalized Profile</strong> — Your work preferences auto-injected into agent interactions</li>
-				<li><strong>Threads</strong> — Persistent, event-sourced conversations with full history and file attachments</li>
-				<li><strong>Memory</strong> — Cross-session recall with automatic preloading and on-demand search, powered by PostgreSQL FTS, enabled per-agent as a plugin</li>
-				<li><strong>Artifacts</strong> — Versioned files created and managed by agents (reports, CSVs, images), backed by S3 with full version history</li>
+				<li><strong>Threads</strong> — Persistent conversations with full history and file attachments</li>
+				<li><strong>Memory</strong> — Cross-session recall with automatic preloading and on-demand search, enabled per-agent via the agent's memory settings</li>
+				<li><strong>Artifacts</strong> — Versioned files created and managed by agents (reports, CSVs, images) with full version history</li>
 			</ul>
 		}
 	}
@@ -38,20 +38,20 @@ templ docsGettingStarted() {
 		<p>
 			Compass.AI uses Google OAuth for authentication. Click <strong>"Get Started"</strong> on the home page and sign in with your Google account. Your account is created automatically on first login.
 		</p>
-		<h3>2. Start a Conversation</h3>
+		<h3>2. Create Your First Agent</h3>
 		<p>
-			Once signed in, you'll see the chat interface. Type any message to start a conversation with the default <strong>Assistant</strong> agent. The assistant is a general-purpose AI that can help with a wide range of tasks.
+			Once signed in, you'll see the chat interface. New accounts start without any agents, so create your first one: open the <strong>Agent Designer</strong> (button in the top bar) and build an agent from scratch or start from a ready-made template. Then return to the chat and type a message to start a conversation.
 		</p>
 		<h3>3. Choose an Agent</h3>
 		<p>
-			Click the agent selector at the top of the chat to switch between your agents. You can also visit the <strong>Agent Templates</strong> (via the sidebar) to browse workflow templates demonstrating multi-agent composition patterns.
+			Click the agent button in the message input bar (next to the attach button) to open the Agents dialog and switch between your agents. You can also open the <strong>Agent Designer</strong> and choose <strong>Browse Templates</strong> to explore workflow templates demonstrating multi-agent composition patterns.
 		</p>
 		<h3>4. Explore Features</h3>
 		<p>
-			Use the sidebar to access threads (conversation history), resources (file uploads), tools (plugin management), and the agent templates. Each agent can be configured with different tools and knowledge base access.
+			Use the sidebar to access your conversation history (threads), filesystems, remote agents (A2A), tools (plugin management), and account settings. To attach files to a conversation, use the paperclip button in the message input bar. Each agent can be configured with its own tools, model settings, and instructions.
 		</p>
 		@docsInfoBox("Quick Tip") {
-			<p>Press <kbd class="px-1.5 py-0.5 rounded border border-border bg-muted text-xs font-mono">?</kbd> anywhere in the app to view all keyboard shortcuts.</p>
+			<p>Press <kbd class="px-1.5 py-0.5 rounded border border-border bg-muted text-xs font-mono">Ctrl+/</kbd> (<kbd class="px-1.5 py-0.5 rounded border border-border bg-muted text-xs font-mono">Cmd+/</kbd> on Mac) anywhere in the app — or click the <strong>?</strong> button in the message bar — to view all keyboard shortcuts.</p>
 		}
 	}
 }

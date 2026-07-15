@@ -18,10 +18,8 @@ templ docsTokenUsage() {
 			<tbody>
 				@docsTableRow2("Prompt Tokens", "Tokens in the input (your message + context)")
 				@docsTableRow2("Completion Tokens", "Tokens generated in the AI response")
-				@docsTableRow2("Cached Tokens", "Tokens served from cache (lower cost)")
-				@docsTableRow2("Reasoning Tokens", "Tokens used for chain-of-thought reasoning (o1/o3 models)")
-				@docsTableRow2("Audio Tokens", "Tokens for audio processing (TTS)")
 				@docsTableRow2("Total Tokens", "Combined token count for the interaction")
+				@docsTableRow2("Model", "Which model handled the message")
 			</tbody>
 		}
 		<h3>Analytics Dashboard</h3>
@@ -52,20 +50,17 @@ templ docsTokenUsage() {
 templ docsArchitecture() {
 	@docsSection("architecture", "Architecture", iconLayers, "text-indigo-500") {
 		<p>
-			Compass.AI is built on a modern, event-sourced architecture designed for reliability, scalability,
-			and observability. Every component is designed for horizontal scaling and fault tolerance.
+			Compass.AI is built on a modern architecture designed for reliability, scalability,
+			and observability.
 		</p>
-		<h3>Event Sourcing & CQRS</h3>
+		<h3>Reliability & History</h3>
 		<p>
-			Every state change in Compass.AI is recorded as an immutable <strong>event</strong> in PostgreSQL.
-			This event-sourced approach provides:
+			Every action in Compass.AI is durably recorded, which provides:
 		</p>
 		<ul class="space-y-2 my-4">
-			<li>• <strong>Full audit trail</strong> — Every action is recorded and can be replayed</li>
-			<li>• <strong>Time-travel debugging</strong> — Reconstruct state at any point in time</li>
-			<li>• <strong>Reliable projections</strong> — Read models are derived from events, ensuring consistency</li>
-			<li>• <strong>CQRS separation</strong> — Write side (commands) and read side (queries) are fully decoupled</li>
-			<li>• <strong>Optimistic concurrency</strong> — Stream version checking prevents conflicting updates</li>
+			<li>• <strong>Full audit trail</strong> — A complete, trustworthy record of everything that happened</li>
+			<li>• <strong>Consistent history</strong> — Your conversations and agent activity stay accurate across the platform</li>
+			<li>• <strong>Conflict protection</strong> — Concurrent updates can't silently overwrite each other</li>
 		</ul>
 		<h3>Real-Time Streaming</h3>
 		<p>
@@ -77,30 +72,10 @@ templ docsArchitecture() {
 			<li>• <strong>Thought streaming</strong> — See AI reasoning in real-time via the Cognitive plugin</li>
 			<li>• <strong>Elicitation events</strong> — Interactive forms rendered mid-conversation</li>
 		</ul>
-		<h3>Background Processing</h3>
-		<p>
-			Long-running tasks (AI agent execution, document processing, embedding generation) are handled by
-			<strong>Asynq</strong> — a Redis-backed task queue that supports concurrent workers,
-			retry policies, circuit breakers, and graceful shutdown.
-		</p>
-		<h3>Multi-Pod Scalability</h3>
-		<p>
-			Compass.AI is designed for horizontal scaling. Events are broadcast across pods via
-			<strong>Redis Pub/Sub</strong>, ensuring all instances stay synchronized. The projection
-			updater runs independently, keeping read models up to date across the cluster.
-		</p>
-		@docsInfoBox("Tech Stack") {
+		@docsInfoBox("Integrations & Standards") {
 			<div class="grid grid-cols-2 gap-2 mt-2 text-sm">
-				<div><strong>Language:</strong> Go</div>
-				<div><strong>Templates:</strong> Templ</div>
-				<div><strong>Frontend:</strong> Alpine.js + HTMX patterns</div>
-				<div><strong>CSS:</strong> Tailwind CSS v4</div>
-				<div><strong>Database:</strong> PostgreSQL + pgvector</div>
-				<div><strong>Queue:</strong> Redis + Asynq</div>
-				<div><strong>Storage:</strong> S3 (MinIO compatible)</div>
-				<div><strong>Payments:</strong> Stripe (event-sourced)</div>
-				<div><strong>Embeddings:</strong> OpenAI / Gemini</div>
-				<div><strong>TTS:</strong> OpenAI Whisper-aligned</div>
+				<div><strong>Payments:</strong> Stripe</div>
+				<div><strong>AI Providers:</strong> OpenAI / Gemini</div>
 				<div><strong>Protocols:</strong> MCP, A2A, OAuth 2.1</div>
 			</div>
 		}
@@ -123,11 +98,11 @@ templ docsSecurity() {
 			<tbody>
 				@docsTableRow2("Transport", "TLS encryption with restricted elliptic curves (X25519, P256)")
 				@docsTableRow2("Authentication", "Google OAuth with session management")
-				@docsTableRow2("Rate Limiting", "Per-IP rate limiting (10 req/s API, 100 req/s assets)")
-				@docsTableRow2("Body Limits", "1 MB default, 150 MB for file uploads")
-				@docsTableRow2("Headers", "Security headers middleware on all responses")
-				@docsTableRow2("Panic Recovery", "Global panic recovery middleware")
-				@docsTableRow2("MCP Security", "SSRF protection, encrypted OAuth tokens at rest, per-server circuit breakers")
+				@docsTableRow2("Rate Limiting", "Per-IP rate limiting (20 req/s API, 100 req/s assets)")
+				@docsTableRow2("Body Limits", "1 MB default; up to 150 MB for chat messages with attachments, 20 MB per uploaded file")
+				@docsTableRow2("Headers", "Security headers set on every response")
+				@docsTableRow2("Error Recovery", "Automatic recovery from internal errors — a failed request never crashes the service")
+				@docsTableRow2("MCP Security", "SSRF protection, per-server circuit breakers")
 				@docsTableRow2("Payments", "PCI SAQ-A compliant via Stripe.js")
 				@docsTableRow2("Production Guard", "Rejects development defaults in production builds")
 			</tbody>
@@ -139,7 +114,8 @@ templ docsSecurity() {
 templ docsI18n() {
 	@docsSection("i18n", "Internationalization", iconLanguages, "text-teal-500") {
 		<p>
-			Compass.AI supports multiple languages with full RTL (right-to-left) layout support.
+			Compass.AI currently supports <strong>English</strong> and <strong>Arabic</strong>, with full RTL
+			(right-to-left) layout support for Arabic. English is the fallback when no preference is detected.
 		</p>
 		<h3>Language Detection</h3>
 		<p>
@@ -150,10 +126,15 @@ templ docsI18n() {
 			<li>Cookie preference</li>
 			<li>Browser <code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">Accept-Language</code> header</li>
 		</ol>
+		<p>
+			You can also change the language manually at any time from <strong>Settings → Language</strong>;
+			your choice is remembered for future visits.
+		</p>
 		<h3>RTL Support</h3>
 		<p>
 			When an RTL language (like Arabic) is detected, the entire UI flips direction automatically.
-			This includes layout, text alignment, scroll directions, and icon mirroring. Compass.AI uses
+			This includes layout, text alignment, scroll directions, and icon mirroring. In Arabic,
+			numbers throughout the interface are displayed using Eastern Arabic numerals (٠١٢٣٤٥٦٧٨٩). Compass.AI uses
 			logical CSS properties (<code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">margin-inline-start</code>) and the
 			<code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">dir</code> attribute for correct bidirectional rendering.
 		</p>
@@ -176,19 +157,22 @@ templ docsBilling() {
 		<h3>Payment Flow</h3>
 		<ol class="list-decimal list-inside space-y-2 my-4">
 			<li>Navigate to the <strong>Pricing</strong> page</li>
-			<li>Select a plan and click <strong>Subscribe</strong></li>
-			<li>Complete payment via Stripe Checkout</li>
+			<li>Click <strong>Activate Now</strong> on the Full Access plan</li>
+			<li>Complete payment in the secure in-app payment form (powered by Stripe) — card details go directly to Stripe</li>
 			<li>Subscription activates immediately</li>
-			<li>Webhooks keep Compass.AI in sync</li>
+			<li>Stripe keeps Compass.AI in sync automatically</li>
 		</ol>
+		<p>
+			Note: payments are disabled in the demo environment.
+		</p>
 		<h3>Subscription Management</h3>
 		<p>
-			Subscriptions are managed through the <strong>Stripe Customer Portal</strong>:
+			Subscriptions are managed from <strong>Account Settings</strong>:
 		</p>
 		<ul class="space-y-2 my-4">
-			<li>Upgrade or downgrade plans</li>
-			<li>Update payment method</li>
+			<li>View your plan, card brand and last 4 digits, and next billing date</li>
 			<li>Cancel subscription (access retained until period end)</li>
+			<li>Changed your mind? Reactivate a cancelled subscription any time before your billing period ends</li>
 		</ul>
 		@docsTable() {
 			<thead>
@@ -200,9 +184,8 @@ templ docsBilling() {
 			<tbody>
 				@docsTableRow2("Payment Processor", "Stripe")
 				@docsTableRow2("Compliance", "PCI SAQ-A")
-				@docsTableRow2("Webhook Events", "Checkout completed, subscription updated/deleted, invoice paid")
-				@docsTableRow2("Customer Portal", "Self-service billing management via Stripe")
-				@docsTableRow2("Trial Support", "Configurable trial periods per plan")
+				@docsTableRow2("Automatic Sync", "Stripe notifies Compass.AI of payments, refunds, disputes, and failed renewals")
+				@docsTableRow2("Subscription Management", "View status, cancel, or reactivate from Account Settings")
 			</tbody>
 		}
 	}

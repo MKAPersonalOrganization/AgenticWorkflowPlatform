@@ -18,14 +18,15 @@ templ docsPlugins() {
 				</tr>
 			</thead>
 			<tbody>
-				@docsTableRow("Calculator", "Mathematical computations and expressions", "Solving equations, unit conversions, statistics")
-				@docsTableRow("Codebase", "Source code analysis and generation", "Code review, refactoring, debugging")
+				@docsTableRow("Calculator", "Mathematical computations and expressions", "Arithmetic, powers and roots, solving algebraic equations")
 				@docsTableRow("Cognitive", "Advanced reasoning and analysis tools", "Logic puzzles, step-by-step problem solving")
-				@docsTableRow("Document", "File processing and text extraction", "PDF parsing, document summarization")
-				@docsTableRow("Elicitation", "Interactive clarification and follow-ups", "Gathering requirements, interviews")
-				@docsTableRow("Knowledge Base", "RAG queries against uploaded documents", "Research, fact-checking, document Q&A")
-				@docsTableRow("Library", "Access to reference materials and resources", "Looking up definitions, formulas, references")
+				@docsTableRow("Document Management", "Create, update, and delete markdown documents the agent produces", "Reports, notes, structured write-ups")
+				@docsTableRow("Filesystem", "Read and write files in your attached virtual filesystems", "Browsing folders, editing files, organizing project content")
+				@docsTableRow("Plan Mode", "Research-first planning with your approval before execution", "Safe autonomous research, reviewing a plan before changes")
+				@docsTableRow("Progress Tracker", "Structured task lists with real-time status updates", "Following an agent's progress on multi-step requests")
+				@docsTableRow("Task Tracker", "Hierarchical tasks with dependencies, statuses, and visual graphs", "Project management, breaking down large initiatives")
 				@docsTableRow("Text-to-Speech", "Convert AI responses to spoken audio", "Accessibility, narration, auditory processing")
+				@docsTableRow("Web Search", "Grounded web search with real-time results and citations", "Up-to-date research, fact-finding, troubleshooting")
 			</tbody>
 		}
 		@docsInfoBox("Memory and artifacts aren't plugins") {
@@ -38,7 +39,7 @@ templ docsPlugins() {
 		}
 		<h3>How Plugins Work</h3>
 		<p>
-			Each plugin implements a <code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">Provider</code> interface and registers its tool sets at application startup. The tool registry stores the state of each plugin (enabled/disabled) in PostgreSQL, ensuring consistency across restarts.
+			Each plugin registers its tool sets when the platform starts. Your enable/disable choices are saved persistently, so your agent configurations survive restarts.
 		</p>
 		<h3>Per-Agent Tool Management</h3>
 		<p>
@@ -50,8 +51,8 @@ templ docsPlugins() {
 			<li>• <strong>Toggle individual tools</strong> — Fine-tune by enabling/disabling specific tools within a set</li>
 		</ul>
 		<p>
-			This flexibility lets you create highly specialized agents. For example, a "Software Engineer" agent might
-			have the Codebase plugin fully enabled, but only the <code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">evaluate</code> tool from the Calculator plugin.
+			This flexibility lets you create highly specialized agents. For example, a "Research Assistant" agent might
+			have the Web Search plugin fully enabled, but only the <strong>Solve Equation</strong> tool from the Calculator plugin.
 		</p>
 		<h3>MCP & A2A Integration</h3>
 		<p>
@@ -71,12 +72,13 @@ templ docsVoiceTTS() {
 			using advanced voice synthesis. Perfect for accessibility, reviewing
 			reference materials, and hands-free interactions.
 		</p>
-		<h3>Decoupled Voice Configuration</h3>
+		<h3>Voice Configuration</h3>
 		<p>
-			Voice settings are a standalone <strong>capability</strong> in Compass.AI's two-layer AI architecture.
-			Your configured providers are listed automatically — just pick which one to use for TTS, select a
-			model and voice, and you're done. Configure once in Settings → AI → AI Voice Configuration, and
-			every agent that uses the TTS plugin automatically picks up your preferences.
+			Text-to-speech currently uses your OpenAI provider key, added in <strong>Settings → AI</strong>
+			(support for additional voice providers is planned). Enable <strong>Text-to-Speech</strong> in
+			<strong>Settings → Speech</strong>, then choose the TTS model and default voice in the
+			Text-to-Speech plugin's <strong>Plugin Settings</strong> panel, found in the Plugins &amp; Tools
+			dialog. Configure once, and every agent that uses the TTS plugin automatically picks up your preferences.
 		</p>
 		<h3>Available Voices</h3>
 		<p>
@@ -108,7 +110,7 @@ templ docsVoiceTTS() {
 		<h3>Features</h3>
 		<ul class="space-y-2 my-4">
 			<li>
-				<strong>Per-user voice selection</strong> -- Choose your preferred default voice in AI Settings; agents can still override per-request
+				<strong>Per-user voice selection</strong> -- Choose your preferred default voice in the plugin's settings; agents can still override per-request
 			</li>
 			<li>
 				<strong>Word-level timestamps</strong> -- Synchronized highlighting via Whisper forced-alignment so you can follow along as audio plays
@@ -126,13 +128,25 @@ templ docsVoiceTTS() {
 		<h3>Usage</h3>
 		<ol class="list-decimal list-inside space-y-2 my-4">
 			<li>Add your OpenAI API key in <strong>Settings → AI</strong></li>
-			<li>Configure your preferred TTS model and voice in the <strong>Voice Configuration</strong> section</li>
+			<li>Configure your preferred TTS model and voice in the Text-to-Speech plugin's <strong>Plugin Settings</strong> panel</li>
 			<li>Enable the <strong>Text-to-Speech</strong> plugin for your agent</li>
 			<li>Ask the agent to read text aloud, explain something verbally, or narrate content</li>
 			<li>The agent generates an audio file and presents it with an inline player</li>
 		</ol>
+		<h3>Focus Mode Listening Sessions</h3>
+		<p>
+			Every generated audio clip includes a <strong>Focus Mode</strong> button that opens a fullscreen
+			listening session designed for deep listening and language learning:
+		</p>
+		<ul class="space-y-2 my-4">
+			<li>• <strong>Synchronized word highlighting</strong> — Follow along word by word as the audio plays, and click any word to jump there</li>
+			<li>• <strong>Playback controls</strong> — Adjustable speed, sentence-by-sentence navigation, and repeat</li>
+			<li>• <strong>A-B looping</strong> — Set loop points to replay a passage until it sticks</li>
+			<li>• <strong>Transcript reading modes</strong> — Show, blur, or hide the transcript to test your listening comprehension</li>
+			<li>• <strong>Keyboard shortcuts</strong> — Drive the whole session from the keyboard: Space to play/pause, arrows to navigate, and more (press <strong>?</strong> in Focus Mode for the full list)</li>
+		</ul>
 		@docsInfoBox("Interactive Audio") {
-			<p>Combine TTS with the Elicitation plugin for interactive audio sessions: the agent reads a report aloud, then asks you for feedback.</p>
+			<p>Agents can pause mid-conversation and ask you for input, making interactive audio sessions possible: the agent reads a report aloud, then asks you for feedback.</p>
 		}
 	}
 }
@@ -165,8 +179,9 @@ templ docsMCP() {
 		}
 		<h3>Setting Up an MCP Connector</h3>
 		<ol class="list-decimal list-inside space-y-2 my-4">
-			<li>Navigate to the <strong>Tools</strong> section in the sidebar</li>
-			<li>Click <strong>"Add MCP Connector"</strong></li>
+			<li>Open <strong>Plugins &amp; Tools</strong> from the sidebar</li>
+			<li>Switch to the <strong>MCP Servers</strong> tab</li>
+			<li>Click <strong>"Add Server"</strong></li>
 			<li>Enter the MCP server URL (e.g., <code class="px-1.5 py-0.5 rounded bg-muted text-sm font-mono">https://mcp.github.com</code>)</li>
 			<li>If the server requires OAuth, you'll be redirected to authenticate</li>
 			<li>Once connected, available tools are automatically discovered</li>
@@ -181,14 +196,14 @@ templ docsMCP() {
 		<h3>MCP Proxy</h3>
 		<p>
 			Compass.AI includes an authenticated reverse proxy to MCP servers. This means your agents can
-			communicate with external services through Compass.AI's secure infrastructure, with SSRF protection
-			and encrypted OAuth tokens at rest.
+			communicate with external services through Compass.AI's secure infrastructure, with SSRF protection —
+			and your OAuth tokens are never exposed through the API.
 		</p>
 		<h3>Preset Connectors</h3>
 		<p>
-			Compass.AI ships with a catalog of preset MCP connectors for popular services. These presets
-			come pre-configured with the correct server URLs and OAuth settings, so you can connect
-			with a single click.
+			Compass.AI recognizes the server URLs of popular services — GitHub, Stripe, Box, Linear, and
+			Notion. When you enter one of these URLs, Compass.AI automatically applies a friendly display
+			name and any pre-configured OAuth settings.
 		</p>
 		@docsTable() {
 			<thead>
@@ -200,9 +215,9 @@ templ docsMCP() {
 			<tbody>
 				@docsTableRow2("Protocol", "Model Context Protocol (MCP)")
 				@docsTableRow2("Auth Flow", "OAuth 2.1 Authorization Code + PKCE")
-				@docsTableRow2("Max Connectors", "Generous per-user limit")
-				@docsTableRow2("Tool Discovery", "Automatic — refreshable on demand")
-				@docsTableRow2("Security", "SSRF protection, encrypted tokens at rest")
+				@docsTableRow2("Max Connectors", "20 per user")
+				@docsTableRow2("Tool Discovery", "Automatic on connect — reconnect to re-discover tools")
+				@docsTableRow2("Security", "SSRF protection; OAuth tokens are never exposed through the API")
 				@docsTableRow2("Proxy", "Authenticated reverse proxy to MCP servers")
 			</tbody>
 		}
@@ -253,10 +268,12 @@ templ docsA2A() {
 				<span class="text-muted-foreground">→</span>
 				@statusBadge("Connected", "bg-success")
 				<span class="text-muted-foreground">or</span>
-				@statusBadge("Auth Required", "bg-warning")
-				<span class="text-muted-foreground">or</span>
 				@statusBadge("Error", "bg-destructive")
 			</div>
+			<p class="mt-2 text-sm">
+				You can also disconnect a connector at any time — it moves to a
+				<strong>Disconnected</strong> state and can be reconnected later.
+			</p>
 		}
 		<h3>Setting Up an A2A Connector</h3>
 		<ol class="list-decimal list-inside space-y-2 my-4">
@@ -302,7 +319,7 @@ templ docsA2A() {
 				@docsTableRow2("Granularity", "One tool per agent (not per skill)")
 				@docsTableRow2("Auth Methods", "None, Bearer, API Key, Custom Header")
 				@docsTableRow2("Max Connectors", "20 per user")
-				@docsTableRow2("Security", "SSRF protection, private network support for Docker")
+				@docsTableRow2("Security", "SSRF protection — private and internal network addresses are blocked")
 				@docsTableRow2("Compatibility", "Any A2A-compliant agent (Python, Go, Node.js, etc.)")
 			</tbody>
 		}
