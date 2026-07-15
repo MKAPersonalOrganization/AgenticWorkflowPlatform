@@ -95,30 +95,29 @@ templ docsAISettings() {
 templ docsAgentStore() {
 	@docsSection("agent-store", "Agent Templates", iconStore, "text-purple-500") {
 		<p>
-			Agent Templates is a curated catalog of pre-built AI agents designed for specific tasks.
-			Each agent comes with a carefully crafted system prompt and tool configuration.
+			Agent Templates is a catalog of pre-built workflow templates, each demonstrating a
+			multi-agent <strong>composition pattern</strong>. They are learning-by-example starting
+			points: fork one, study how it is wired, and adapt it to your own use case.
 		</p>
 		<h3>Browsing the Catalog</h3>
 		<p>
-			Open the Agent Templates from the sidebar navigation. Agents are organized by category and can be searched
-			by name, description, or tags. Featured agents appear at the top of the catalog.
+			Open the Agent Templates from the sidebar navigation. Templates can be searched
+			by name, description, or tags.
 		</p>
-		<h3>Agent Categories</h3>
+		<h3>Pattern Families</h3>
 		@docsTable() {
 			<thead>
 				<tr>
-					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Category</th>
-					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Description</th>
-					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Examples</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Family</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">What it demonstrates</th>
+					<th class="text-start py-2 px-3 text-sm font-medium border-b border-border">Templates</th>
 				</tr>
 			</thead>
 			<tbody>
-				@docsTableRow("Workflow", "Multi-agent pipelines for structured processes", "Research → Draft → Review, Data Analysis Pipeline")
-				@docsTableRow("Writing", "Content creation and editing agents", "Technical Writer, Editor, Copy Reviewer")
-				@docsTableRow("Development", "Programming and technical agents", "Code Reviewer, API Designer, Debug Assistant")
-				@docsTableRow("Research", "Analysis and information synthesis", "Market Analyst, Fact Checker, Paper Reviewer")
-				@docsTableRow("Creative", "Design, ideation, and creative thinking", "Brainstorm Partner, Story Builder, Concept Explorer")
-				@docsTableRow("Productivity", "Task automation and workflow agents", "Meeting Summarizer, Project Planner, Data Organizer")
+				@docsTableRow("Basic workflows", "The three core orchestration primitives", "Sequential Workflow, Parallel Workflow, Loop Workflow, Loop with Exit")
+				@docsTableRow("Nested composition", "Workflows inside workflows, arbitrarily deep", "Sequential Inside Parallel, Parallel Inside Sequential, Sequential Inside Loop, Parallel Inside Loop Inside Sequential")
+				@docsTableRow("Routing & delegation", "Dynamic control flow between agents", "Conditional Routing, Transfer to Peers, Transfer to Parent")
+				@docsTableRow("State & context", "Passing data and controlling what agents see", "Implicit State, Output Schema, Context Control, Agent Isolation")
 			</tbody>
 		}
 		<h3>Forking Agents</h3>
